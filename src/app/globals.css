@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom utility classes */
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 ease-in-out inline-block text-center cursor-pointer;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-blue text-white hover:bg-brand-blue-dark active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply btn border-2 border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply btn text-primary hover:bg-dark-secondary;
+  }
+
+  /* Text utilities */
+  .heading-1 {
+    @apply text-5xl md:text-6xl font-bold text-primary leading-tight;
+  }
+
+  .heading-2 {
+    @apply text-4xl md:text-5xl font-bold text-primary leading-tight;
+  }
+
+  .heading-3 {
+    @apply text-3xl md:text-4xl font-bold text-primary leading-tight;
+  }
+
+  .heading-4 {
+    @apply text-2xl md:text-3xl font-bold text-primary;
+  }
+
+  .body-lg {
+    @apply text-lg text-secondary leading-relaxed;
+  }
+
+  .body-md {
+    @apply text-base text-secondary leading-relaxed;
+  }
+
+  .body-sm {
+    @apply text-sm text-muted leading-relaxed;
+  }
+
+  /* Layout utilities */
+  .container-wide {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-padding {
+    @apply py-16 md:py-24 lg:py-32;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-dark-secondary rounded-xl p-6 md:p-8 border border-dark-tertiary transition-all duration-300 hover:border-brand-blue hover:shadow-xl;
+  }
+
+  .card-elevated {
+    @apply card shadow-lg hover:shadow-2xl hover:-translate-y-1;
+  }
+
+  /* Effects */
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-blue to-brand-blue-light bg-clip-text text-transparent;
+  }
+
+  .glass-effect {
+    @apply backdrop-blur-md bg-dark-secondary bg-opacity-40 border border-dark-tertiary;
+  }
+}
+
+/* Global styles */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-dark-bg text-primary font-sans;
+}
+
+/* Smooth transitions for all interactive elements */
+a,
+button {
+  @apply transition-colors duration-200;
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  @apply outline-none ring-2 ring-brand-blue ring-offset-2 ring-offset-dark-bg rounded;
+}
+
+.section-spacing {
+  padding: 60px 0;
+}
