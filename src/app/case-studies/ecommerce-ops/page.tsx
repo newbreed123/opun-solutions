@@ -227,6 +227,12 @@ export default function EcommerceOpsStudy() {
         </div>
       </Section>
 
+      <h3 className="heading-3 text-center mt-16">
+        See how this works in real businesses
+      </h3>
+
+      <Button href="/case-studies">View Case Studies</Button>
+
       {/* CTA */}
       <CTASection
         headline="Ready to grow your online store?"

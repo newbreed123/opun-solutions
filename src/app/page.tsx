@@ -23,41 +23,46 @@ export default function Home() {
             {/* LEFT SIDE */}
             <div>
               <h1 className="heading-1 mb-6 leading-tight">
-                Websites, Ecommerce & AI Systems Built to{" "}
-                <span className="gradient-text">Drive Real Revenue</span>
+                Your Website Isn’t the Problem —{" "}
+                <span className="gradient-text">Your System Is</span>
               </h1>
 
               <p className="body-lg text-secondary mb-8">
-                We build high-converting websites, ecommerce platforms, AI
-                assistants, and backend systems that help you capture leads,
-                sell online, and automate operations.
+                We build ecommerce and service business systems that fix
+                conversion issues, automate operations, and help you scale
+                without chaos.
               </p>
 
               {/* Trust Points */}
               <div className="space-y-3 mb-10">
                 <div className="flex items-center gap-3">
-                  <Check size={20} className="text-brand-blue flex-shrink-0" />
-                  <span className="body-md">Conversion-focused design</span>
+                  <Check size={20} className="text-brand-blue" />
+                  <span className="body-md">Fix low conversion rates</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Check size={20} className="text-brand-blue flex-shrink-0" />
+                  <Check size={20} className="text-brand-blue" />
+                  <span className="body-md">Automate manual operations</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Check size={20} className="text-brand-blue" />
                   <span className="body-md">
-                    Full-stack ecommerce expertise
+                    Connect your systems end-to-end
                   </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check size={20} className="text-brand-blue flex-shrink-0" />
-                  <span className="body-md">Real business automation</span>
                 </div>
               </div>
 
               {/* CTAs */}
               <div className="flex gap-4 flex-wrap">
                 <Button href="/contact" variant="primary" size="lg">
-                  Get Free Website Audit
+                  Book Free Strategy Call
                 </Button>
-                <Button href="/services" variant="secondary" size="lg">
-                  View Services
+
+                <Button
+                  href="/solutions/ecommerce"
+                  variant="secondary"
+                  size="lg"
+                >
+                  Explore Ecommerce Systems
                 </Button>
               </div>
             </div>
@@ -102,13 +107,30 @@ export default function Home() {
       </section>
       {/* Problem Section */}
       <Section bgColor="secondary" padded={true}>
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="heading-2 mb-6">The Problem</h2>
-          <p className="body-lg text-secondary">
-            Many service businesses struggle with outdated websites, lost leads,
-            and manual processes. Without proper systems, you're stuck handling
-            everything manually—scheduling, follow-ups, payments—while
-            competitors capture your market share.
+        <h3 className="heading-4 mb-6 text-brand-blue">
+          Most businesses we work with struggle with:
+        </h3>
+
+        <div className="space-y-4">
+          {[
+            "Low conversion rates",
+            "Manual order & customer handling",
+            "Poor tracking and unclear performance",
+            "Disconnected tools and workflows",
+          ].map((item, i) => (
+            <div key={i} className="pb-3 border-b border-dark-tertiary">
+              <p className="body-md text-primary">{item}</p>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-4 mb-6 mt-12">
+          <h2 className="heading-2 mb-6">
+            Most Businesses Don’t Have a Website Problem
+          </h2>
+          <p className="body-lg mb-6 text-secondary">
+            Leads aren’t captured properly. Checkout flows leak revenue.
+            Operations are manual and disconnected. That’s why growth feels
+            inconsistent — even when traffic is there.
           </p>
         </div>
       </Section>
@@ -116,7 +138,14 @@ export default function Home() {
       {/* Solution Section */}
       <Section bgColor="primary" padded={true}>
         <div className="mb-12">
-          <h2 className="heading-2 text-center mb-4">Our Solution</h2>
+          <h2 className="heading-2 text-center mb-4">
+            {" "}
+            Complete Systems — Not Just Websites
+          </h2>
+          <p className="body-lg text-center text-secondary mt-2">
+            Most clients come to us thinking they need a new website. What they
+            actually need is a better system.
+          </p>
           <p className="body-lg text-center text-secondary max-w-2xl mx-auto">
             Complete digital systems that turn your website into a
             lead-generating, revenue-driving business engine.
@@ -163,45 +192,75 @@ export default function Home() {
         </div>
       </Section>
 
-      {/* LEFT CONTENT */}
-      <section className="section-spacing bg-navy">
-        <div className="container-wide">
-          <div className="bg-navy-light border border-white/10 rounded-2xl p-8 md:p-12 grid md:grid-cols-2 gap-10 items-center">
-            <div>
-              <h2 className="mb-6">
-                Ecommerce Systems Built From Real Operational Experience
-              </h2>
+      <Section bgColor="secondary" padded={true}>
+        <div className="mb-12 text-center">
+          <h2 className="heading-2 mb-4">What Are You Trying to Improve?</h2>
+          <p className="body-lg text-secondary">
+            We build different systems depending on your business model.
+          </p>
+        </div>
 
-              <p className="text-gray-300 mb-6">
-                We don’t just build ecommerce websites — we understand how they
-                operate. From checkout flows and fraud prevention to shipping
-                and backend systems, we build ecommerce solutions that actually
-                work in real businesses.
-              </p>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="card-elevated">
+            <h3 className="heading-4 mb-3">Ecommerce Growth Systems</h3>
+            <p className="body-md mb-6 text-secondary">
+              Improve conversion rates, fix checkout issues, and scale your
+              operations with better backend systems.
+            </p>
+            <Button href="/solutions/ecommerce" variant="secondary">
+              Explore Ecommerce →
+            </Button>
+          </div>
 
-              <ul className="space-y-2 text-gray-300">
-                <li>✔ Ecommerce website development</li>
-                <li>✔ Checkout optimization</li>
-                <li>✔ Fraud prevention systems</li>
-                <li>✔ Shipping & fulfillment workflows</li>
-                <li>✔ NetSuite & backend integrations</li>
-              </ul>
-            </div>
+          <div className="card-elevated">
+            <h3 className="heading-4 mb-3">Lead Generation Systems</h3>
+            <p className="body-md mb-6 text-secondary">
+              Capture more leads, automate follow-ups, and improve your sales
+              pipeline with smarter systems.
+            </p>
+            <Button href="/services" variant="secondary">
+              Explore Services →
+            </Button>
+          </div>
+        </div>
+      </Section>
+      {/* Ecommerce Focus Section */}
+      <Section bgColor="secondary" padded={true}>
+        <div className="bg-dark-tertiary border border-white/10 rounded-2xl p-8 md:p-12 grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <h2 className="mb-6">
+              Ecommerce Systems Built From Real Operational Experience
+            </h2>
 
-            {/* RIGHT SIDE VISUAL */}
-            <div className="bg-navy border border-white/10 rounded-xl p-6">
-              <h3 className="mb-4 font-bold">What This Means</h3>
+            <p className="text-secondary mb-6">
+              We don’t just build ecommerce websites — we understand how they
+              operate. From checkout flows and fraud prevention to shipping and
+              backend systems, we build ecommerce solutions that actually work
+              in real businesses.
+            </p>
 
-              <div className="space-y-3 text-gray-300">
-                <p>• Fewer failed or fraudulent orders</p>
-                <p>• Smoother checkout experience</p>
-                <p>• Better fulfillment workflows</p>
-                <p>• Systems that scale with your business</p>
-              </div>
+            <ul className="space-y-2 text-secondary">
+              <li>✔ Ecommerce website development</li>
+              <li>✔ Checkout optimization</li>
+              <li>✔ Fraud prevention systems</li>
+              <li>✔ Shipping & fulfillment workflows</li>
+              <li>✔ NetSuite & backend integrations</li>
+            </ul>
+          </div>
+
+          {/* RIGHT SIDE VISUAL */}
+          <div className="bg-dark-secondary border border-white/10 rounded-xl p-6">
+            <h3 className="mb-4 font-bold">What This Means</h3>
+
+            <div className="space-y-3 text-secondary">
+              <p>• Fewer failed or fraudulent orders</p>
+              <p>• Smoother checkout experience</p>
+              <p>• Better fulfillment workflows</p>
+              <p>• Systems that scale with your business</p>
             </div>
           </div>
         </div>
-      </section>
+      </Section>
 
       {/* Services Section */}
       <Section bgColor="primary" padded={true}>
@@ -258,6 +317,33 @@ export default function Home() {
         </div>
       </Section>
 
+      <Section bgColor="primary" padded={true}>
+        <div className="text-center mb-12">
+          <h2 className="heading-2 mb-4">Real Results from Real Systems</h2>
+          <p className="body-lg text-secondary">
+            These aren’t redesigns — they’re system-level improvements.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <div>
+            <p className="heading-3 text-brand-blue">3x</p>
+            <p className="body-sm text-muted">More qualified leads</p>
+          </div>
+          <div>
+            <p className="heading-3 text-brand-blue">60%</p>
+            <p className="body-sm text-muted">Less manual work</p>
+          </div>
+          <div>
+            <p className="heading-3 text-brand-blue">5x</p>
+            <p className="body-sm text-muted">Revenue growth</p>
+          </div>
+          <div>
+            <p className="heading-3 text-brand-blue">98%</p>
+            <p className="body-sm text-muted">Client satisfaction</p>
+          </div>
+        </div>
+      </Section>
       {/* Case Studies Preview */}
       <Section bgColor="secondary" padded={true}>
         <div className="mb-12">

@@ -4,7 +4,6 @@ import { useState } from "react";
 import HeroSection from "@/components/HeroSection";
 import Section from "@/components/Section";
 import CTASection from "@/components/CTASection";
-import Button from "@/components/Button";
 import { Mail, Phone, MapPin } from "lucide-react";
 
 export default function Contact() {

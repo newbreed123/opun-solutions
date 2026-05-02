@@ -6,8 +6,18 @@ import { Menu, X } from "lucide-react";
 
 const navLinks = [
   { label: "Home", href: "/" },
-  { label: "Services", href: "/services" },
+  {
+    label: "Services",
+    href: "/services",
+    children: [
+      {
+        label: "Ecommerce Solutions",
+        href: "/services/ecommerce-solutions",
+      },
+    ],
+  },
   { label: "Case Studies", href: "/case-studies" },
+  { label: "Industries", href: "/industries" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
@@ -31,18 +41,33 @@ export default function Header() {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((link) => (
-            <Link
+            <div
               key={link.href}
-              href={link.href}
-              className="text-secondary hover:text-brand-blue transition-colors font-medium"
+              className={link.children ? "relative group" : ""}
             >
-              {link.label}
-            </Link>
+              <Link
+                href={link.href}
+                className="text-secondary hover:text-brand-blue transition-colors font-medium"
+              >
+                {link.label}
+              </Link>
+
+              {link.children && (
+                <div className="absolute left-0 top-full mt-3 hidden min-w-[220px] rounded-[1.75rem] border border-white/10 bg-dark-secondary p-4 shadow-xl group-hover:block">
+                  {link.children.map((child) => (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      className="block rounded-2xl px-4 py-3 text-secondary hover:bg-dark-bg hover:text-brand-blue transition-colors"
+                    >
+                      {child.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
-          <Link
-            href="/contact"
-            className="btn-primary text-sm"
-          >
+          <Link href="/contact" className="btn-primary text-sm">
             Get Started
           </Link>
         </div>
@@ -62,14 +87,29 @@ export default function Header() {
         <div className="md:hidden bg-dark-secondary border-t border-dark-tertiary">
           <nav className="container-wide py-4 space-y-4">
             {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="block text-secondary hover:text-brand-blue transition-colors py-2"
-                onClick={() => setIsOpen(false)}
-              >
-                {link.label}
-              </Link>
+              <div key={link.href} className="space-y-1">
+                <Link
+                  href={link.href}
+                  className="block text-secondary hover:text-brand-blue transition-colors py-2"
+                  onClick={() => setIsOpen(false)}
+                >
+                  {link.label}
+                </Link>
+                {link.children && (
+                  <div className="space-y-1 pl-4">
+                    {link.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        className="block text-secondary/80 hover:text-brand-blue transition-colors py-2"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        {child.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
             <Link
               href="/contact"

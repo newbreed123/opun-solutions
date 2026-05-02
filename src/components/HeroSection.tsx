@@ -1,4 +1,3 @@
-import React from "react";
 import Button from "./Button";
 
 interface HeroSectionProps {
@@ -23,7 +22,9 @@ export default function HeroSection({
       className={`relative w-full min-h-screen flex items-center justify-center text-center py-20 md:py-32 ${
         backgroundImage ? "bg-cover bg-center" : "bg-dark-bg"
       }`}
-      style={backgroundImage ? { backgroundImage: `url(${backgroundImage})` } : {}}
+      style={
+        backgroundImage ? { backgroundImage: `url(${backgroundImage})` } : {}
+      }
     >
       {backgroundImage && (
         <div className="absolute inset-0 bg-black bg-opacity-50" />

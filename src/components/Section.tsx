@@ -3,6 +3,7 @@ import React from "react";
 interface SectionProps {
   children: React.ReactNode;
   className?: string;
+  id?: string;
   bgColor?: "primary" | "secondary";
   padded?: boolean;
 }
@@ -10,6 +11,7 @@ interface SectionProps {
 export default function Section({
   children,
   className = "",
+  id,
   bgColor = "primary",
   padded = true,
 }: SectionProps) {
@@ -20,6 +22,7 @@ export default function Section({
 
   return (
     <section
+      id={id}
       className={`${bgClasses[bgColor]} ${padded ? "section-padding" : ""} ${className}`}
     >
       <div className="container-wide">{children}</div>
