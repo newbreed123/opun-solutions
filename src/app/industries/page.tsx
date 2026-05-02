@@ -139,7 +139,7 @@ export default function Industries() {
   return (
     <>
       <Section bgColor="secondary" padded={true}>
-        <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] items-center">
+        <div className="grid gap-6 lg:gap-10 lg:grid-cols-[1.2fr_0.8fr] items-center">
           <div className="max-w-3xl">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-4">
               Industries
@@ -222,8 +222,8 @@ export default function Industries() {
             </p>
           </div>
 
-          <div className="grid gap-6">
-            {industries.map((industry, index) => (
+          <div className="grid gap-4">
+            {industries.map((industry) => (
               <div
                 key={industry.title}
                 className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-xl shadow-black/10"
@@ -306,7 +306,7 @@ export default function Industries() {
             <h2 className="heading-2">Why Businesses Choose Opun</h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:gap-6 md:grid-cols-2 xl:grid-cols-4">
             {differentiation.map((item) => (
               <div
                 key={item.title}

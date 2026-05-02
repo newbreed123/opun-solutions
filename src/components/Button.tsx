@@ -30,9 +30,9 @@ export default function Button({
   };
 
   const sizeClasses = {
-    sm: "px-4 py-2 text-sm",
-    md: "px-6 py-3 text-base",
-    lg: "px-8 py-4 text-lg",
+    sm: "px-4 py-2 text-sm w-full max-w-[360px] mx-auto sm:w-auto sm:max-w-none sm:mx-0",
+    md: "px-6 py-3 text-base w-full max-w-[360px] mx-auto sm:w-auto sm:max-w-none sm:mx-0",
+    lg: "sm:px-8 sm:py-4 px-6 py-3 text-base sm:text-lg w-full max-w-[360px] mx-auto sm:w-auto sm:max-w-none sm:mx-0",
   };
 
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;

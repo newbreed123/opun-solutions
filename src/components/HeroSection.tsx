@@ -19,7 +19,7 @@ export default function HeroSection({
 }: HeroSectionProps) {
   return (
     <section
-      className={`relative w-full min-h-screen flex items-center justify-center text-center py-20 md:py-32 ${
+      className={`relative w-full min-h-[70vh] md:min-h-[80vh] py-16 md:py-20 flex items-center justify-center text-center ${
         backgroundImage ? "bg-cover bg-center" : "bg-dark-bg"
       }`}
       style={
@@ -30,17 +30,17 @@ export default function HeroSection({
         <div className="absolute inset-0 bg-black bg-opacity-50" />
       )}
 
-      <div className="relative z-10 container-wide max-w-4xl mx-auto px-4">
-        <h1 className="heading-1 mb-6 animate-fadeIn">{headline}</h1>
+      <div className="relative z-10 container-wide max-w-4xl mx-auto px-6 flex flex-col items-center gap-4">
+        <h1 className="heading-1 mb-0 animate-fadeIn">{headline}</h1>
 
         {subheadline && (
-          <p className="body-lg mb-10 text-secondary max-w-2xl mx-auto animate-fadeIn">
+          <p className="body-lg mb-6 text-secondary max-w-2xl mx-auto animate-fadeIn">
             {subheadline}
           </p>
         )}
 
         {ctas && ctas.length > 0 && (
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-slideInUp">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center animate-slideInUp flex-wrap">
             {ctas.map((cta, index) => (
               <Button
                 key={index}

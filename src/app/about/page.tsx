@@ -95,7 +95,7 @@ export default function About() {
       {/* Expertise */}
       <Section bgColor="primary">
         <h2 className="heading-2 text-center mb-12">Our Expertise</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {[
             "Website Design & Development",
             "Ecommerce Platforms",

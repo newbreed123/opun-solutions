@@ -7,17 +7,42 @@ import { Menu, X } from "lucide-react";
 const navLinks = [
   { label: "Home", href: "/" },
   {
-    label: "Services",
+    label: "Solutions",
     href: "/services",
     children: [
       {
-        label: "Ecommerce Solutions",
+        label: "Free Ecommerce Audit",
+        href: "/services/ecommerce-audit",
+      },
+      {
+        label: "Ecommerce Systems",
         href: "/services/ecommerce-solutions",
+      },
+      {
+        label: "Lead Generation Systems",
+        href: "/services",
+      },
+      {
+        label: "AI Chatbots & Automation",
+        href: "/services",
+      },
+      {
+        label: "Client Portals & Dashboards",
+        href: "/services",
       },
     ],
   },
+  {
+    label: "Industries",
+    href: "/industries",
+    children: [
+      { label: "Ecommerce Brands", href: "/services/ecommerce-solutions" },
+      { label: "Care Agencies", href: "/industries" },
+      { label: "Coaches & Consultants", href: "/industries" },
+      { label: "Local Services", href: "/industries" },
+    ],
+  },
   { label: "Case Studies", href: "/case-studies" },
-  { label: "Industries", href: "/industries" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
@@ -56,7 +81,7 @@ export default function Header() {
                 <div className="absolute left-0 top-full mt-3 hidden min-w-[220px] rounded-[1.75rem] border border-white/10 bg-dark-secondary p-4 shadow-xl group-hover:block">
                   {link.children.map((child) => (
                     <Link
-                      key={child.href}
+                      key={`${child.label}-${child.href}`}
                       href={child.href}
                       className="block rounded-2xl px-4 py-3 text-secondary hover:bg-dark-bg hover:text-brand-blue transition-colors"
                     >
@@ -68,7 +93,7 @@ export default function Header() {
             </div>
           ))}
           <Link href="/contact" className="btn-primary text-sm">
-            Get Started
+            Book Strategy Call
           </Link>
         </div>
 
@@ -85,12 +110,12 @@ export default function Header() {
       {/* Mobile Navigation */}
       {isOpen && (
         <div className="md:hidden bg-dark-secondary border-t border-dark-tertiary">
-          <nav className="container-wide py-4 space-y-4">
+          <nav className="container-wide py-6 space-y-2">
             {navLinks.map((link) => (
               <div key={link.href} className="space-y-1">
                 <Link
                   href={link.href}
-                  className="block text-secondary hover:text-brand-blue transition-colors py-2"
+                  className="block text-secondary hover:text-brand-blue transition-colors py-3 font-medium"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.label}
@@ -99,9 +124,9 @@ export default function Header() {
                   <div className="space-y-1 pl-4">
                     {link.children.map((child) => (
                       <Link
-                        key={child.href}
+                        key={`${child.label}-${child.href}`}
                         href={child.href}
-                        className="block text-secondary/80 hover:text-brand-blue transition-colors py-2"
+                        className="block text-secondary/80 hover:text-brand-blue transition-colors py-2 text-sm"
                         onClick={() => setIsOpen(false)}
                       >
                         {child.label}
@@ -111,13 +136,15 @@ export default function Header() {
                 )}
               </div>
             ))}
-            <Link
-              href="/contact"
-              className="block btn-primary text-center"
-              onClick={() => setIsOpen(false)}
-            >
-              Get Started
-            </Link>
+            <div className="pt-4 border-t border-dark-tertiary">
+              <Link
+                href="/contact"
+                className="block btn-primary text-center w-full"
+                onClick={() => setIsOpen(false)}
+              >
+                Book Strategy Call
+              </Link>
+            </div>
           </nav>
         </div>
       )}

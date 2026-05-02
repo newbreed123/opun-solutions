@@ -136,7 +136,7 @@ export default function CaseStudies() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
             <CaseStudyCard
               image="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
               industry="Professional Services"
@@ -180,7 +180,7 @@ export default function CaseStudies() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
               {
                 number: "1",

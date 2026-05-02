@@ -73,7 +73,7 @@ export default function Contact() {
 
       {/* Contact Form & Info */}
       <Section bgColor="primary">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
           {/* Contact Info */}
           <div>
             <h3 className="heading-3 mb-8">Contact Information</h3>

@@ -91,7 +91,7 @@ export default function Services() {
     <>
       {/* Hero */}
       <Section bgColor="secondary" padded={true}>
-        <div className="grid gap-10 lg:grid-cols-[1.25fr_0.95fr] items-center">
+        <div className="grid gap-6 lg:gap-10 lg:grid-cols-[1.25fr_0.95fr] items-center">
           <div className="max-w-3xl">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-4">
               Services
@@ -105,7 +105,7 @@ export default function Services() {
               digital systems that help businesses capture leads, sell online,
               and operate with confidence.
             </p>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button href="/contact" variant="primary" size="lg">
                 Book Free Strategy Call
               </Button>
@@ -158,7 +158,7 @@ export default function Services() {
             </h2>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:gap-6 md:grid-cols-2 xl:grid-cols-3">
             {coreServices.map((service) => (
               <div
                 key={service.title}
@@ -190,7 +190,7 @@ export default function Services() {
 
       {/* Featured Ecommerce Section */}
       <Section bgColor="secondary" padded={true}>
-        <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] items-center">
+        <div className="grid gap-6 lg:gap-10 lg:grid-cols-[0.95fr_1.05fr] items-center">
           <div className="max-w-2xl">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
               Ecommerce Experience
@@ -275,7 +275,7 @@ export default function Services() {
               A clear process for building systems that perform
             </h2>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {[
               {
                 title: "Audit & Strategy",
@@ -324,7 +324,7 @@ export default function Services() {
               Select the system that fits your growth stage
             </h2>
           </div>
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-3">
             {[
               {
                 name: "Launch",

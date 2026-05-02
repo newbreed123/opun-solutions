@@ -51,19 +51,19 @@ const coreSolutionCards = [
     icon: LayoutGrid,
     title: "Storefront Development",
     description:
-      "Modern ecommerce storefronts built to reflect your brand, highlight products clearly, and support strong conversion paths.",
+      "Product pages and navigation designed to turn browsers into buyers.",
   },
   {
     icon: CreditCard,
     title: "Checkout Optimization",
     description:
-      "Simplified checkout flows, flexible payment options, and clearer trust signals for shoppers at the final step.",
+      "A checkout experience that reduces abandonment and keeps customers moving to purchase.",
   },
   {
     icon: ServerCog,
     title: "Backend Integrations",
     description:
-      "Connect payment, ERP, CRM, inventory, and fulfillment systems so data flows where it needs to without extra manual work.",
+      "Payments, inventory, and order systems connected so your store runs automatically.",
   },
 ];
 
@@ -72,31 +72,31 @@ const supportingSolutionCards = [
     icon: ShoppingCart,
     title: "Product & Collection Structure",
     description:
-      "Organized product catalogs, filters, and collections that help customers navigate the catalog and find what they need.",
+      "Catalog and filters organized so customers find the right products quickly.",
   },
   {
     icon: ShieldCheck,
     title: "Fraud Prevention Workflows",
     description:
-      "Order validation checks and review processes designed to reduce risk while keeping legitimate orders moving smoothly.",
+      "Order protection that catches fraud without blocking legitimate shoppers.",
   },
   {
     icon: Truck,
     title: "Shipping & Fulfillment Systems",
     description:
-      "Shipping rules, carrier configuration, and fulfillment workflows that align order flow with your operations.",
+      "Shipping and fulfillment rules aligned to avoid delays and surprise costs.",
   },
   {
     icon: BarChart3,
     title: "Google Ads & Tracking",
     description:
-      "Tracking, analytics, and conversion measurement set up so marketing performance can be understood and improved.",
+      "Tracking set up so you know which campaigns actually drive sales.",
   },
   {
     icon: Zap,
     title: "Customer Support & AI Assistants",
     description:
-      "Automated assistance that helps your team manage inquiries, support tasks, and customer journey touchpoints.",
+      "Automated support that answers shoppers fast and keeps orders moving.",
   },
 ];
 
@@ -157,22 +157,26 @@ const packages = [
 export default function EcommerceSolutions() {
   return (
     <>
-      <Section bgColor="secondary" padded={true} className="py-24">
-        <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center">
+      <Section bgColor="secondary" padded={true}>
+        <div className="grid gap-6 lg:gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div className="max-w-3xl">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-4">
               Ecommerce Solutions
             </p>
             <h1 className="heading-1 mb-6 leading-tight">
-              Ecommerce Systems Built for Real Operations — Not Just Pretty
-              Stores
+              <span className="block md:inline">
+                Ecommerce Systems Built for Real Operations
+              </span>
+              <span className="block md:hidden">—</span>
+              <span className="hidden md:inline"> — </span>
+              <span className="block md:inline">Not Just Pretty Stores</span>
             </h1>
             <p className="body-lg text-secondary max-w-3xl mb-8">
               We design and build ecommerce systems that improve how your store
               sells, how orders are handled, and how your operations run
               day-to-day.
             </p>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button href="/contact" variant="primary" size="lg">
                 Book Free Ecommerce Audit
               </Button>
@@ -212,7 +216,7 @@ export default function EcommerceSolutions() {
         </div>
       </Section>
 
-      <Section bgColor="primary" padded={true} className="py-24">
+      <Section bgColor="primary" padded={true}>
         <div className="max-w-6xl mx-auto">
           <div className="mb-10 text-center">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
@@ -246,43 +250,57 @@ export default function EcommerceSolutions() {
       <Section
         bgColor="secondary"
         padded={true}
-        className="pt-24 py-24"
+        className="pt-20"
         id="solutions"
       >
         <div className="max-w-6xl mx-auto">
           <div className="mb-10 text-center">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
-              Solution
+              THE SYSTEM
             </p>
-            <h2 className="heading-2">A Complete Ecommerce Growth System</h2>
+            <h2 className="heading-2">
+              A System That Fixes What’s Slowing Your Growth
+            </h2>
             <p className="body-lg text-secondary max-w-3xl mx-auto mt-4">
-              We bring together storefront, checkout, fraud prevention,
-              shipping, integrations, and tracking into one operational system.
+              We bring every storefront, checkout, fraud, shipping, integration,
+              and tracking layer into one connected ecommerce system — not a set
+              of isolated services.
             </p>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-3">
-            {coreSolutionCards.map((card) => (
-              <div
-                key={card.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10"
-              >
-                <card.icon className="w-10 h-10 text-brand-blue mb-5" />
-                <h3 className="heading-4 mb-3 text-white">{card.title}</h3>
-                <p className="body-md text-secondary">{card.description}</p>
-              </div>
-            ))}
+          <div className="mb-8">
+            <div className="mb-6 text-left">
+              <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
+                Revenue Layer
+              </p>
+              <p className="body-md text-secondary max-w-3xl">
+                The pieces that directly drive orders, conversions, and customer
+                confidence.
+              </p>
+            </div>
+
+            <div className="grid gap-4 xl:gap-6 xl:grid-cols-3">
+              {coreSolutionCards.map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10"
+                >
+                  <card.icon className="w-10 h-10 text-brand-blue mb-5" />
+                  <h3 className="heading-4 mb-3 text-white">{card.title}</h3>
+                  <p className="body-md text-secondary">{card.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-12">
             <div className="mb-6 text-left">
               <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
-                Supporting Systems
+                Operations Layer
               </p>
               <p className="body-md text-secondary max-w-3xl">
-                These operational systems support the storefront, checkout, and
-                backend connections that keep your commerce engine running
-                reliably.
+                The systems that keep orders flowing, risks managed, and
+                performance visible.
               </p>
             </div>
 
@@ -299,16 +317,35 @@ export default function EcommerceSolutions() {
               ))}
             </div>
           </div>
+
+          <div className="mt-12 rounded-[2rem] border border-white/10 bg-dark-secondary p-10 text-center">
+            <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
+              One Connected System
+            </p>
+            <h3 className="heading-3 mb-4 text-white">
+              This Isn’t a Collection of Services — It’s One Connected System
+            </h3>
+            <p className="body-md text-secondary max-w-3xl mx-auto">
+              Every storefront, checkout, shipping, fraud, and tracking layer is
+              built to work together so your ecommerce operation scales
+              predictably.
+            </p>
+            <div className="mt-8 inline-flex w-full justify-center sm:w-auto">
+              <Button href="/contact" variant="primary" size="lg">
+                Book a Free Ecommerce Audit
+              </Button>
+            </div>
+          </div>
         </div>
       </Section>
 
       <Section
         bgColor="primary"
         padded={true}
-        className="py-24 bg-gradient-to-br from-dark-bg via-dark-secondary to-dark-bg"
+        className="bg-gradient-to-br from-dark-bg via-dark-secondary to-dark-bg"
       >
         <div className="max-w-6xl mx-auto">
-          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] items-center">
+          <div className="grid gap-6 lg:gap-10 lg:grid-cols-[0.95fr_1.05fr] items-center">
             <div>
               <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
                 Why Our Ecommerce Work Is Different
@@ -346,13 +383,13 @@ export default function EcommerceSolutions() {
         </div>
       </Section>
 
-      <Section bgColor="primary" padded={true} className="py-24">
+      <Section bgColor="primary" padded={true}>
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
             Technology Stack
           </p>
           <h2 className="heading-2 mb-6">Tools & Platforms We Work With</h2>
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
             {technologyStack.map((group) => (
               <div
                 key={group.category}
@@ -377,7 +414,7 @@ export default function EcommerceSolutions() {
         </div>
       </Section>
 
-      <Section bgColor="primary" padded={true} className="py-24">
+      <Section bgColor="primary" padded={true}>
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
             Process
@@ -389,7 +426,7 @@ export default function EcommerceSolutions() {
                 key={step}
                 className="rounded-[2rem] border border-white/10 bg-dark-secondary p-5 shadow-xl shadow-black/5 text-left"
               >
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue text-white text-lg font-semibold">
+                <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-blue text-white text-base font-semibold">
                   {index + 1}
                 </div>
                 <p className="font-semibold text-white mb-2">{step}</p>
@@ -399,13 +436,13 @@ export default function EcommerceSolutions() {
         </div>
       </Section>
 
-      <Section bgColor="primary" padded={true} className="py-24">
+      <Section bgColor="primary" padded={true}>
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
             Packages
           </p>
           <h2 className="heading-2 mb-6">Ecommerce Packages</h2>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-4 md:gap-6 md:grid-cols-3">
             {packages.map((pkg) => (
               <div
                 key={pkg.title}
@@ -426,13 +463,13 @@ export default function EcommerceSolutions() {
         </div>
       </Section>
 
-      <Section bgColor="secondary" padded={true} className="py-24">
+      <Section bgColor="secondary" padded={true}>
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
             Impact
           </p>
           <h2 className="heading-2 mb-6">What This Actually Helps You Do</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:gap-4 lg:gap-5 sm:grid-cols-2 lg:grid-cols-5">
             {[
               "Increase checkout completion",
               "Reduce manual order handling",

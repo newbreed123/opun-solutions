@@ -6,7 +6,7 @@
 @layer components {
   /* Buttons */
   .btn {
-    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 ease-in-out inline-block text-center cursor-pointer;
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 ease-in-out inline-flex items-center justify-center text-center cursor-pointer whitespace-nowrap;
   }
 
   .btn-primary {
@@ -23,40 +23,62 @@
 
   /* Text utilities */
   .heading-1 {
-    @apply text-5xl md:text-6xl font-bold text-primary leading-tight;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    @apply font-bold text-primary;
+    line-height: 1.1;
   }
 
   .heading-2 {
-    @apply text-4xl md:text-5xl font-bold text-primary leading-tight;
+    font-size: clamp(1.6rem, 4vw, 2.5rem);
+    @apply font-bold text-primary;
+    line-height: 1.2;
   }
 
   .heading-3 {
-    @apply text-3xl md:text-4xl font-bold text-primary leading-tight;
+    font-size: clamp(1.3rem, 3vw, 1.75rem);
+    @apply font-bold text-primary;
+    line-height: 1.3;
   }
 
   .heading-4 {
-    @apply text-2xl md:text-3xl font-bold text-primary;
+    font-size: clamp(1.25rem, 4vw, 2rem);
+    @apply font-bold text-primary;
+    line-height: 1.25;
   }
 
   .body-lg {
-    @apply text-lg text-secondary leading-relaxed;
+    font-size: clamp(1rem, 2vw, 1.125rem);
+    @apply text-secondary;
+    line-height: 1.7;
+    max-width: 65ch;
   }
 
   .body-md {
-    @apply text-base text-secondary leading-relaxed;
+    @apply text-base text-secondary;
+    line-height: 1.7;
+    max-width: 65ch;
   }
 
   .body-sm {
-    @apply text-sm text-muted leading-relaxed;
+    @apply text-sm text-muted;
+    line-height: 1.6;
   }
 
   /* Layout utilities */
   .container-wide {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    @apply max-w-7xl mx-auto px-6 sm:px-8 lg:px-12;
   }
 
   .section-padding {
-    @apply py-16 md:py-24 lg:py-32;
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+
+  @media (min-width: 768px) {
+    .section-padding {
+      padding-top: 5rem;
+      padding-bottom: 5rem;
+    }
   }
 
   /* Cards */
