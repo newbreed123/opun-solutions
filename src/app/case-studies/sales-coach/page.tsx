@@ -1,6 +1,5 @@
 import Section from "@/components/Section";
 import CTASection from "@/components/CTASection";
-import Button from "@/components/Button";
 import Image from "next/image";
 
 export default function SalesCoachCaseStudy() {
