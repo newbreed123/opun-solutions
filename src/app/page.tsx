@@ -532,9 +532,10 @@ export default function Home() {
           <CaseStudyCard
             image="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=500&h=300&fit=crop"
             industry="Ecommerce"
-            headline="Online Store Supported with Better Operations"
-            result="Optimized ecommerce system + Google Ads integration improved revenue and reduced operational friction."
-            href="/case-studies/ecommerce-ops"
+            headline="Ecommerce System Success"
+            resultBadge="3X Revenue"
+            result="A stronger storefront, checkout, and operations system that turned traffic into more revenue and fewer manual headaches."
+            href="/case-studies/ecommerce-system-success"
           />
         </div>
 

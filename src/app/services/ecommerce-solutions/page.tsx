@@ -420,9 +420,14 @@ export default function EcommerceSolutions() {
             See how this works in real businesses
           </h3>
 
-          <Button href="/case-studies" className=" mt-8">
-            View Case Studies
-          </Button>
+          <div className="flex flex-col items-center gap-4">
+            <Button href="/case-studies" className="mt-8">
+              View Case Studies
+            </Button>
+            <Button href="/case-studies/ecommerce-system-success" variant="secondary" className="mt-2">
+              View Ecommerce Case Study
+            </Button>
+          </div>
         </div>
       </Section>
 
