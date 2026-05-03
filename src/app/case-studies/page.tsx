@@ -1,6 +1,7 @@
 import Section from "@/components/Section";
 import CaseStudyCard from "@/components/CaseStudyCard";
 import CTASection from "@/components/CTASection";
+import ProjectProofGrid from "@/components/ProjectProofGrid";
 
 export default function CaseStudies() {
   return (
@@ -225,6 +226,8 @@ export default function CaseStudies() {
           </div>
         </div>
       </Section>
+
+      <ProjectProofGrid />
 
       {/* CTA */}
       <CTASection

@@ -1,6 +1,7 @@
 import Section from "@/components/Section";
 import CTASection from "@/components/CTASection";
 import Button from "@/components/Button";
+import ProcessProof from "@/components/ProcessProof";
 import {
   Globe,
   ShoppingCart,
@@ -387,6 +388,8 @@ export default function Services() {
           </div>
         </div>
       </Section>
+
+      <ProcessProof />
 
       {/* Final CTA */}
       <CTASection

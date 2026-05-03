@@ -1,6 +1,7 @@
 import Section from "@/components/Section";
 import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
+import ProofBar from "@/components/ProofBar";
 import {
   Search,
   ShoppingCart,
@@ -387,6 +388,12 @@ export default function EcommerceAudit() {
           </div>
         </div>
       </Section>
+
+      <section className="bg-dark-bg py-12 md:py-16 border-t border-dark-tertiary">
+        <div className="container-wide">
+          <ProofBar />
+        </div>
+      </section>
 
       {/* Final CTA */}
       <CTASection

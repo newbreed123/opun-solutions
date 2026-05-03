@@ -3,6 +3,7 @@ import ServiceCard from "@/components/ServiceCard";
 import CaseStudyCard from "@/components/CaseStudyCard";
 import CTASection from "@/components/CTASection";
 import Button from "@/components/Button";
+import ProofBar from "@/components/ProofBar";
 import {
   Globe,
   MessageSquare,
@@ -111,6 +112,14 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Proof Bar */}
+      <section className="bg-dark-bg py-12 md:py-16 border-t border-dark-tertiary">
+        <div className="container-wide">
+          <ProofBar />
+        </div>
+      </section>
+
       {/* Problem Section */}
       <Section bgColor="secondary" padded={true}>
         <h3 className="heading-4 mb-6 text-brand-blue">THE REAL PROBLEM</h3>

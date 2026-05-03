@@ -10,6 +10,7 @@ interface ButtonProps {
   className?: string;
   disabled?: boolean;
   target?: "_blank" | "_self";
+  rel?: string;
 }
 
 export default function Button({
@@ -21,6 +22,7 @@ export default function Button({
   className = "",
   disabled = false,
   target = "_self",
+  rel = "",
 }: ButtonProps) {
   const baseClasses = "btn";
   const variantClasses = {
@@ -39,7 +41,7 @@ export default function Button({
 
   if (href) {
     return (
-      <Link href={href} target={target} className={classes}>
+      <Link href={href} target={target} rel={rel} className={classes}>
         {children}
       </Link>
     );

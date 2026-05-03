@@ -1,6 +1,7 @@
 import Section from "@/components/Section";
 import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
+import ExperienceProof from "@/components/ExperienceProof";
 import {
   ShoppingCart,
   ShieldCheck,
@@ -339,49 +340,11 @@ export default function EcommerceSolutions() {
         </div>
       </Section>
 
-      <Section
+      <ExperienceProof
         bgColor="primary"
-        padded={true}
-        className="bg-gradient-to-br from-dark-bg via-dark-secondary to-dark-bg"
-      >
-        <div className="max-w-6xl mx-auto">
-          <div className="grid gap-6 lg:gap-10 lg:grid-cols-[0.95fr_1.05fr] items-center">
-            <div>
-              <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
-                Why Our Ecommerce Work Is Different
-              </p>
-              <p className="body-lg text-white font-semibold max-w-3xl mb-5">
-                Most agencies design stores. We build systems around real
-                ecommerce operations.
-              </p>
-              <h2 className="heading-2 mb-6">
-                Built From Real Ecommerce Operations Experience
-              </h2>
-              <p className="body-lg text-secondary max-w-3xl">
-                Opun understands ecommerce beyond design: we build for online
-                orders, fraud review, shipping workflows, backend systems,
-                conversion tracking, and customer journeys.
-              </p>
-            </div>
-            <div className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-[0_40px_80px_rgba(0,102,255,0.08)]">
-              <ul className="space-y-5">
-                {[
-                  "Ecommerce operations and order workflows",
-                  "Fraud review and prevention handling",
-                  "Shipping and fulfillment coordination",
-                  "Backend system understanding (NetSuite-related environments)",
-                  "Google Ads and conversion tracking",
-                ].map((item) => (
-                  <li key={item} className="flex gap-3">
-                    <Check size={18} className="text-brand-blue mt-1" />
-                    <span className="text-secondary">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </Section>
+        title="Built From Real Ecommerce Operations Experience"
+        description="Most agencies design stores. We build systems around how ecommerce actually operates — orders, fraud, shipping, integrations, and customer journeys."
+      />
 
       <Section bgColor="primary" padded={true}>
         <div className="max-w-6xl mx-auto text-center">
