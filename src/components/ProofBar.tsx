@@ -21,7 +21,7 @@ export default function ProofBar({
 
   return (
     <div className={`${centered ? "text-center" : ""}`}>
-      <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-6">
+      <p className="text-brand-blue uppercase tracking-[0.18em] sm:tracking-[0.32em] text-xs sm:text-sm font-semibold mb-6">
         Built On Real Experience
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

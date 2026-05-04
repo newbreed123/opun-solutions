@@ -1,4 +1,5 @@
 import Section from "@/components/Section";
+import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import Image from "next/image";
 
@@ -9,32 +10,23 @@ export default function CareAgencyCaseStudy() {
       <section className="relative w-full bg-dark-secondary py-16 md:py-24">
         <div className="container-wide">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
-              <p className="text-brand-blue text-sm font-semibold uppercase tracking-wide mb-4">
-                Case Study
-              </p>
+            <div className="max-w-2xl">
               <h1 className="heading-1 mb-6">
-                Care Agency Streamlined Booking & Doubled Response Time
+                Build a Client Acquisition System That Works for Care Agencies
               </h1>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-secondary uppercase tracking-wide mb-1">
-                    Industry
-                  </p>
-                  <p className="text-lg font-semibold">Healthcare Services</p>
-                </div>
-                <div>
-                  <p className="text-sm text-secondary uppercase tracking-wide mb-1">
-                    Timeline
-                  </p>
-                  <p className="text-lg font-semibold">2 months</p>
-                </div>
-              </div>
+              <p className="body-lg text-secondary mb-8">
+                Stop losing potential clients to poor online experiences and
+                manual processes. Create a systematic approach that turns
+                inquiries into bookings consistently.
+              </p>
+              <Button href="/contact" size="lg">
+                Start Your Project
+              </Button>
             </div>
             <div className="relative w-full h-96 rounded-xl overflow-hidden">
               <Image
                 src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=400&fit=crop"
-                alt="Care Agency"
+                alt="Care Agency Client Acquisition"
                 fill
                 className="object-cover"
               />
@@ -43,167 +35,260 @@ export default function CareAgencyCaseStudy() {
         </div>
       </section>
 
-      {/* The Challenge */}
+      {/* Problem Section */}
       <Section bgColor="primary">
         <div className="max-w-3xl">
-          <h2 className="heading-2 mb-6">The Challenge</h2>
-          <div className="space-y-4 body-lg text-secondary">
-            <p>
-              This care agency was growing fast, but their operations couldn't
-              keep up. They had clients calling during business hours, emails
-              going unanswered, and no system for scheduling shifts.
-              Administrative staff spent more time on phone calls and email than
-              actually managing care.
-            </p>
-            <p>
-              Families were frustrated by slow response times. Potential clients
-              couldn't easily book services. The agency was losing business and
-              burning out their team.
-            </p>
-            <p>
-              <strong>Key problems:</strong>
-            </p>
-            <ul className="space-y-2 ml-4">
-              <li>
-                • Manual scheduling process (spreadsheets and phone calls)
+          <h2 className="heading-2 mb-6">
+            The Common Challenges Care Agencies Face
+          </h2>
+          <div className="space-y-4">
+            <ul className="space-y-3 body-lg text-secondary">
+              <li className="flex items-start">
+                <span className="text-brand-blue mr-3">•</span>
+                Families calling during business hours only, missing
+                opportunities outside normal hours
               </li>
-              <li>• Slow response to inquiries (24-48 hour delays)</li>
-              <li>• No way for clients to check service status or updates</li>
-              <li>• Administrative bottleneck slowing growth</li>
-              <li>• Lost potential clients due to poor online experience</li>
+              <li className="flex items-start">
+                <span className="text-brand-blue mr-3">•</span>
+                Manual processes for handling inquiries, leading to delays and
+                lost information
+              </li>
+              <li className="flex items-start">
+                <span className="text-brand-blue mr-3">•</span>
+                No clear way for potential clients to understand services or get
+                started
+              </li>
+              <li className="flex items-start">
+                <span className="text-brand-blue mr-3">•</span>
+                Website that doesn't convert visitors into leads
+              </li>
+              <li className="flex items-start">
+                <span className="text-brand-blue mr-3">•</span>
+                Difficulty building trust with families who are making important
+                decisions
+              </li>
+              <li className="flex items-start">
+                <span className="text-brand-blue mr-3">•</span>
+                Administrative burden that prevents focusing on actual care
+                delivery
+              </li>
             </ul>
           </div>
         </div>
       </Section>
 
-      {/* The Solution */}
+      {/* Reframe Section */}
       <Section bgColor="secondary">
         <div className="max-w-3xl">
-          <h2 className="heading-2 mb-6">Our Solution</h2>
+          <h2 className="heading-2 mb-6">
+            The Real Issue: Lack of a Client Acquisition System
+          </h2>
+          <div className="space-y-4 body-lg text-secondary">
+            <p>
+              These challenges aren't just operational problems—they're symptoms
+              of a fundamental gap: most care agencies don't have a systematic
+              approach to client acquisition. Without a structured system, every
+              new client comes from luck or personal connections rather than
+              predictable processes.
+            </p>
+            <p>
+              The result is inconsistent growth, wasted marketing spend, and
+              constant firefighting instead of strategic development. Families
+              deserve better ways to find care, and agencies deserve systems
+              that work even when they're busy with clients.
+            </p>
+          </div>
+        </div>
+      </Section>
+
+      {/* Solution Sections */}
+      <Section bgColor="primary">
+        <div className="max-w-3xl">
+          <h2 className="heading-2 mb-8">
+            Building a Complete Client Acquisition System
+          </h2>
+
+          <div className="space-y-12">
+            <div>
+              <h3 className="heading-3 mb-4 text-brand-blue">
+                Website & Messaging
+              </h3>
+              <p className="body-lg text-secondary mb-4">
+                Create a website that clearly communicates your value and makes
+                it easy for families to understand your services.
+              </p>
+              <ul className="space-y-2 ml-4 body-md text-secondary">
+                <li>
+                  • Service pages that address specific family needs and
+                  concerns
+                </li>
+                <li>
+                  • Clear pricing and what's included in each service level
+                </li>
+                <li>• Professional presentation that builds credibility</li>
+                <li>
+                  • Mobile-optimized design for families searching on phones
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="heading-3 mb-4 text-brand-blue">Inquiry Flow</h3>
+              <p className="body-lg text-secondary mb-4">
+                Design a smooth process from initial interest to consultation
+                booking.
+              </p>
+              <ul className="space-y-2 ml-4 body-md text-secondary">
+                <li>
+                  • Multiple contact options (phone, email, web form, chat)
+                </li>
+                <li>
+                  • Automated responses that acknowledge inquiries immediately
+                </li>
+                <li>• Simple qualification questions to understand needs</li>
+                <li>• Clear next steps and timelines for families</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="heading-3 mb-4 text-brand-blue">Lead Capture</h3>
+              <p className="body-lg text-secondary mb-4">
+                Ensure no potential client falls through the cracks.
+              </p>
+              <ul className="space-y-2 ml-4 body-md text-secondary">
+                <li>• Web forms that capture essential information</li>
+                <li>• Integration with your existing systems</li>
+                <li>• Follow-up sequences for incomplete inquiries</li>
+                <li>
+                  • Organization that makes it easy to prioritize hot leads
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="heading-3 mb-4 text-brand-blue">
+                UX Improvements
+              </h3>
+              <p className="body-lg text-secondary mb-4">
+                Make every interaction smooth and professional.
+              </p>
+              <ul className="space-y-2 ml-4 body-md text-secondary">
+                <li>• Fast-loading pages that work on all devices</li>
+                <li>• Clear navigation and calls-to-action</li>
+                <li>• Consistent branding and professional design</li>
+                <li>• Accessibility considerations for all family members</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="heading-3 mb-4 text-brand-blue">Trust Building</h3>
+              <p className="body-lg text-secondary mb-4">
+                Help families feel confident in their choice.
+              </p>
+              <ul className="space-y-2 ml-4 body-md text-secondary">
+                <li>
+                  • Clear information about your experience and qualifications
+                </li>
+                <li>• Transparent processes and what to expect</li>
+                <li>• Professional presentation of your team and values</li>
+                <li>• Easy ways to learn more before committing</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* Results Section */}
+      <Section bgColor="secondary">
+        <div className="max-w-3xl">
+          <h2 className="heading-2 mb-6">
+            Real Improvements Care Agencies Experience
+          </h2>
           <div className="space-y-6 body-lg text-secondary">
             <p>
-              We built an integrated system combining a modern website, AI
-              chatbot, and client portal to automate inquiries and give families
-              visibility into their care.
+              When care agencies implement systematic client acquisition, they
+              see meaningful improvements in how they operate and grow. The
+              changes are practical and sustainable.
             </p>
 
-            <div>
-              <h3 className="heading-4 mb-4 text-primary">
-                1. Client Portal Dashboard
-              </h3>
-              <ul className="space-y-2 ml-4">
-                <li>✓ Families can view assigned caregivers and schedules</li>
-                <li>✓ Real-time updates on caregiver arrival/departure</li>
-                <li>✓ Secure messaging system with care team</li>
-                <li>✓ Access to billing and service history</li>
-              </ul>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-6 bg-dark-bg rounded-lg">
+                <h4 className="heading-4 mb-3 text-primary">
+                  Operational Efficiency
+                </h4>
+                <p>
+                  Administrative staff can focus on client care rather than
+                  constantly managing inquiries. Processes become repeatable and
+                  scalable.
+                </p>
+              </div>
 
-            <div>
-              <h3 className="heading-4 mb-4 text-primary">
-                2. AI Chatbot for Instant Response
-              </h3>
-              <ul className="space-y-2 ml-4">
-                <li>✓ Answers common questions about services instantly</li>
-                <li>✓ Qualifies and books initial consultations</li>
-                <li>✓ Available 24/7 (even after hours and weekends)</li>
-                <li>✓ Hands off complex cases to human team</li>
-              </ul>
-            </div>
+              <div className="p-6 bg-dark-bg rounded-lg">
+                <h4 className="heading-4 mb-3 text-primary">
+                  Consistent Lead Quality
+                </h4>
+                <p>
+                  Better qualified leads mean more productive conversations and
+                  higher conversion rates from inquiry to client.
+                </p>
+              </div>
 
-            <div>
-              <h3 className="heading-4 mb-4 text-primary">
-                3. Workflow Automation
-              </h3>
-              <ul className="space-y-2 ml-4">
-                <li>✓ Automated scheduling between requests and team</li>
-                <li>✓ Confirmation texts and reminders to caregivers</li>
-                <li>✓ Invoice generation and payment tracking</li>
-                <li>✓ Lead capture and follow-up sequences</li>
-              </ul>
+              <div className="p-6 bg-dark-bg rounded-lg">
+                <h4 className="heading-4 mb-3 text-primary">
+                  Professional Image
+                </h4>
+                <p>
+                  A polished online presence and smooth processes demonstrate
+                  competence and build family confidence.
+                </p>
+              </div>
+
+              <div className="p-6 bg-dark-bg rounded-lg">
+                <h4 className="heading-4 mb-3 text-primary">Scalable Growth</h4>
+                <p>
+                  Systems that handle more inquiries without proportional
+                  increases in administrative burden.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </Section>
 
-      {/* The Results */}
+      {/* Insight Section */}
       <Section bgColor="primary">
-        <div>
-          <h2 className="heading-2 mb-12 text-center">The Results</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="card text-center">
-              <p className="text-4xl font-bold text-brand-blue mb-2">60%</p>
-              <p className="body-md">Faster booking time</p>
-            </div>
-            <div className="card text-center">
-              <p className="text-4xl font-bold text-brand-blue mb-2">2x</p>
-              <p className="body-md">Inquiry response rate increase</p>
-            </div>
-            <div className="card text-center">
-              <p className="text-4xl font-bold text-brand-blue mb-2">40%</p>
-              <p className="body-md">Admin time reduced</p>
-            </div>
-            <div className="card text-center">
-              <p className="text-4xl font-bold text-brand-blue mb-2">95%</p>
-              <p className="body-md">Client satisfaction score</p>
-            </div>
-          </div>
-
-          <div className="mt-12 p-8 bg-dark-secondary rounded-xl border-l-4 border-brand-blue">
-            <p className="text-lg italic text-secondary">
-              "The portal and chatbot system freed up our team to focus on
-              actual care instead of administrative chaos. Families love being
-              able to see what's happening. We've doubled our clients in 6
-              months without hiring more admin staff."
-            </p>
-            <p className="mt-4 font-semibold text-primary">
-              — Care Agency Director
-            </p>
-          </div>
-        </div>
-      </Section>
-
-      {/* Key Takeaways */}
-      <Section bgColor="secondary">
         <div className="max-w-3xl">
-          <h2 className="heading-2 mb-8">Key Takeaways</h2>
-          <div className="space-y-6">
-            <div>
-              <h3 className="heading-4 mb-2 text-primary">
-                1. Automation Scales Without Hiring
-              </h3>
-              <p className="body-lg text-secondary">
-                With the right systems, you can handle 2x the clients without
-                proportionally increasing your team.
-              </p>
-            </div>
-            <div>
-              <h3 className="heading-4 mb-2 text-primary">
-                2. Transparency Builds Trust & Loyalty
-              </h3>
-              <p className="body-lg text-secondary">
-                Clients who can see real-time updates and communicate easily are
-                happier and more loyal.
-              </p>
-            </div>
-            <div>
-              <h3 className="heading-4 mb-2 text-primary">
-                3. Admin Efficiency is a Revenue Driver
-              </h3>
-              <p className="body-lg text-secondary">
-                Every hour saved in admin work is an hour your team can spend on
-                quality care or business development.
-              </p>
-            </div>
+          <h2 className="heading-2 mb-6">
+            Strategic Thinking for Care Agency Growth
+          </h2>
+          <div className="space-y-4 body-lg text-secondary">
+            <p>
+              The most successful care agencies treat client acquisition as a
+              system to be designed and optimized, not a collection of random
+              tactics. They understand that families are making important
+              decisions and need clear, trustworthy information and processes.
+            </p>
+            <p>
+              Rather than chasing the latest marketing trends, these agencies
+              focus on building comprehensive systems that work consistently.
+              They invest in understanding their clients' journey and removing
+              friction at every step. This approach leads to sustainable growth
+              that supports their mission of providing quality care.
+            </p>
+            <p>
+              The key insight is that client acquisition systems should serve
+              both the agency's growth goals and the families' need for
+              reliable, professional care services.
+            </p>
           </div>
         </div>
       </Section>
 
-      {/* CTA */}
+      {/* Final CTA */}
       <CTASection
-        headline="Ready to automate your business?"
-        subheadline="Let's build systems that scale your business without burning out your team."
-        buttonLabel="Book a Strategy Call"
+        headline="Ready to Build Your Client Acquisition System?"
+        subheadline="Let's create processes that turn inquiries into clients consistently."
+        buttonLabel="Start Your Project"
         buttonHref="/contact"
       />
     </>

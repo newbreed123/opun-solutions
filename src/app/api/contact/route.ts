@@ -1,40 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  buildFriendlyValidationError,
+  FieldDefinition,
+  getMissingRequiredFields,
+  isValidEmail,
+  logDevelopmentSubmission,
+  methodNotAllowedResponse,
+  readJsonBody,
+  toCleanStringRecord,
+  ValidationIssue,
+} from "@/lib/form-submissions";
 
-interface ContactFormData {
-  name: string;
-  email: string;
-  businessType: string;
-  service: string;
-  projectDescription: string;
-}
+const contactFields: FieldDefinition[] = [
+  { key: "name", label: "name", required: true },
+  { key: "email", label: "email", required: true },
+  { key: "businessType", label: "business type", required: true },
+  {
+    key: "serviceNeeded",
+    label: "service needed",
+    required: true,
+    aliases: ["service"],
+  },
+  { key: "projectDescription", label: "project details", required: true },
+];
 
 export async function POST(request: NextRequest) {
   try {
-    const body: ContactFormData = await request.json();
+    const body = await readJsonBody(request);
+    const values = toCleanStringRecord(body, contactFields);
 
-    if (!body.name || !body.email || !body.service || !body.projectDescription) {
+    if (!values) {
       return NextResponse.json(
-        { error: "Missing required fields for contact form." },
+        {
+          success: false,
+          error: "We could not read your inquiry. Please try submitting again.",
+        },
         { status: 400 }
       );
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(body.email)) {
+    const issues: ValidationIssue[] = getMissingRequiredFields(
+      values,
+      contactFields
+    );
+
+    if (values.email && !isValidEmail(values.email)) {
+      issues.push({
+        field: "email",
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    if (issues.length > 0) {
       return NextResponse.json(
-        { error: "Invalid email address." },
+        {
+          success: false,
+          error: buildFriendlyValidationError(issues),
+          fields: issues,
+        },
         { status: 400 }
       );
     }
 
-    console.log("Contact form submission:", {
-      name: body.name,
-      email: body.email,
-      businessType: body.businessType,
-      service: body.service,
-      projectDescription: body.projectDescription,
-      timestamp: new Date().toISOString(),
-    });
+    logDevelopmentSubmission("Contact form", values);
 
     return NextResponse.json(
       {
@@ -46,8 +74,25 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Contact form error:", error);
     return NextResponse.json(
-      { error: "Failed to process your request. Please try again." },
+      {
+        success: false,
+        error:
+          "Sorry, we could not process your inquiry right now. Please try again in a moment.",
+      },
       { status: 500 }
     );
   }
 }
+
+function unsupportedMethod() {
+  return NextResponse.json(methodNotAllowedResponse(), {
+    status: 405,
+    headers: { Allow: "POST" },
+  });
+}
+
+export const GET = unsupportedMethod;
+export const PUT = unsupportedMethod;
+export const PATCH = unsupportedMethod;
+export const DELETE = unsupportedMethod;
+export const OPTIONS = unsupportedMethod;

@@ -114,9 +114,9 @@ export default function EcommerceAudit() {
     <>
       {/* Hero Section */}
       <Section bgColor="secondary" padded>
-        <div className="grid gap-8 lg:gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center">
+        <div className="grid gap-6 sm:gap-8 lg:gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div className="max-w-3xl">
-            <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-4">
+            <p className="text-brand-blue uppercase tracking-[0.18em] sm:tracking-[0.32em] text-xs sm:text-sm font-semibold mb-4">
               Free Ecommerce Systems Audit
             </p>
 
@@ -124,13 +124,13 @@ export default function EcommerceAudit() {
               Find What&apos;s Leaking Revenue in Your Ecommerce Business
             </h1>
 
-            <p className="body-lg text-secondary max-w-3xl mb-8">
+            <p className="body-lg text-secondary max-w-3xl mb-6 sm:mb-8">
               We&apos;ll review your storefront, checkout flow, tracking, order
               process, fraud review, shipping workflow, and backend systems —
               then show you the highest-impact fixes.
             </p>
 
-            <div className="space-y-3 mb-8">
+            <div className="space-y-3 mb-6 sm:mb-8">
               {[
                 "Built for real ecommerce operations",
                 "Focused on conversion and workflow improvements",
@@ -138,12 +138,12 @@ export default function EcommerceAudit() {
               ].map((item) => (
                 <div key={item} className="flex items-center gap-3">
                   <Check size={20} className="text-brand-blue flex-shrink-0" />
-                  <span className="body-md">{item}</span>
+                  <span className="body-md text-sm sm:text-base">{item}</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex flex-col items-start gap-3">
+            <div className="flex flex-col items-stretch gap-3 sm:items-start">
               <Button href="/contact" variant="primary" size="lg">
                 Book Your Free Ecommerce Audit
               </Button>
@@ -159,11 +159,13 @@ export default function EcommerceAudit() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(0,102,255,0.12)]">
-            <div className="rounded-3xl bg-dark-secondary border border-white/10 p-8">
-              <h2 className="heading-3 mb-6 text-white">What We Review</h2>
+          <div className="rounded-2xl sm:rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-4 sm:p-8 shadow-[0_40px_80px_rgba(0,102,255,0.12)]">
+            <div className="rounded-xl sm:rounded-3xl bg-dark-secondary border border-white/10 p-5 sm:p-8">
+              <h2 className="heading-3 mb-4 sm:mb-6 text-white">
+                What We Review
+              </h2>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {[
                   "Storefront and product flow",
                   "Checkout experience",
@@ -190,7 +192,7 @@ export default function EcommerceAudit() {
       <Section bgColor="primary" padded>
         <div className="max-w-6xl mx-auto">
           <div className="mb-10 text-center">
-            <h2 className="heading-2">
+            <h2 className="heading-2 mx-auto max-w-4xl">
               Your Store May Be Losing Revenue in Places You Can&apos;t See
             </h2>
           </div>
@@ -199,7 +201,7 @@ export default function EcommerceAudit() {
             {painPoints.map((pain) => (
               <div
                 key={pain}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-xl shadow-black/5"
+                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-xl shadow-black/5"
               >
                 <p className="body-md text-secondary">{pain}</p>
               </div>
@@ -219,16 +221,16 @@ export default function EcommerceAudit() {
             {auditCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10"
+                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8 shadow-lg shadow-black/10"
               >
-                <card.icon className="w-10 h-10 text-brand-blue mb-5" />
+                <card.icon className="w-9 h-9 sm:w-10 sm:h-10 text-brand-blue mb-4 sm:mb-5" />
                 <h3 className="heading-4 mb-3 text-white">{card.title}</h3>
                 <p className="body-md text-secondary">{card.description}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-12 rounded-[2rem] border border-white/10 bg-dark-bg p-8 text-center">
+          <div className="mt-10 sm:mt-12 rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8 text-center">
             <h3 className="heading-3 mb-4">
               Want to see how this applies to your store?
             </h3>
@@ -252,7 +254,7 @@ export default function EcommerceAudit() {
         <div className="max-w-6xl mx-auto">
           <div className="grid gap-8 lg:gap-10 lg:grid-cols-[0.95fr_1.05fr] items-center">
             <div>
-              <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
+              <p className="text-brand-blue uppercase tracking-[0.18em] sm:tracking-[0.32em] text-xs sm:text-sm font-semibold mb-3">
                 Why This Audit Is Different
               </p>
               <h2 className="heading-2 mb-6">
@@ -266,8 +268,8 @@ export default function EcommerceAudit() {
               </p>
             </div>
 
-            <div className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-[0_40px_80px_rgba(0,102,255,0.08)]">
-              <ul className="space-y-5">
+            <div className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-[0_40px_80px_rgba(0,102,255,0.08)]">
+              <ul className="space-y-4 sm:space-y-5">
                 {[
                   "We understand ecommerce operations",
                   "We look beyond visuals",
@@ -291,7 +293,7 @@ export default function EcommerceAudit() {
           <h2 className="heading-2 mb-4">
             Real Outcomes These Fixes Can Support
           </h2>
-          <p className="body-lg text-secondary max-w-3xl mx-auto mb-10">
+          <p className="body-lg text-secondary max-w-3xl mx-auto mb-8 sm:mb-10">
             The audit is designed to uncover opportunities that can improve how
             your store converts, operates, and scales.
           </p>
@@ -305,7 +307,7 @@ export default function EcommerceAudit() {
             ].map((item) => (
               <div
                 key={item}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8"
+                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8"
               >
                 <p className="body-md text-white font-semibold">{item}</p>
               </div>
@@ -317,13 +319,15 @@ export default function EcommerceAudit() {
       {/* What You Get */}
       <Section bgColor="primary" padded>
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="heading-2 mb-10">What You&apos;ll Walk Away With</h2>
+          <h2 className="heading-2 mb-8 sm:mb-10">
+            What You&apos;ll Walk Away With
+          </h2>
 
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {walkAway.map((item) => (
               <div
                 key={item}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-lg shadow-black/10"
+                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-lg shadow-black/10"
               >
                 <p className="body-md text-white font-semibold">{item}</p>
               </div>
@@ -343,14 +347,14 @@ export default function EcommerceAudit() {
             {whoThisIsFor.map((item) => (
               <div
                 key={item}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-xl shadow-black/5"
+                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8 shadow-xl shadow-black/5"
               >
                 <p className="body-md text-secondary">{item}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-12 rounded-[2rem] border border-white/10 bg-dark-secondary p-8">
+          <div className="mt-10 sm:mt-12 rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8">
             <h3 className="heading-3 mb-6 text-center">
               This Is Not For You If
             </h3>
@@ -370,13 +374,13 @@ export default function EcommerceAudit() {
       {/* Process */}
       <Section bgColor="primary" padded>
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="heading-2 mb-10">How It Works</h2>
+          <h2 className="heading-2 mb-8 sm:mb-10">How It Works</h2>
 
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {processSteps.map((step) => (
               <div
                 key={step.step}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-lg shadow-black/10"
+                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-lg shadow-black/10"
               >
                 <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue text-white text-lg font-semibold">
                   {step.step}

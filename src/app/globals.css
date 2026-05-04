@@ -6,7 +6,7 @@
 @layer components {
   /* Buttons */
   .btn {
-    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 ease-in-out inline-flex items-center justify-center text-center cursor-pointer whitespace-nowrap;
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 ease-in-out inline-flex items-center justify-center text-center cursor-pointer whitespace-normal sm:whitespace-nowrap min-w-0;
   }
 
   .btn-primary {
@@ -66,7 +66,7 @@
 
   /* Layout utilities */
   .container-wide {
-    @apply max-w-7xl mx-auto px-6 sm:px-8 lg:px-12;
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-12;
   }
 
   .section-padding {
@@ -83,7 +83,7 @@
 
   /* Cards */
   .card {
-    @apply bg-dark-secondary rounded-xl p-6 md:p-8 border border-dark-tertiary transition-all duration-300 hover:border-brand-blue hover:shadow-xl;
+    @apply bg-dark-secondary rounded-xl p-5 sm:p-6 md:p-8 border border-dark-tertiary transition-all duration-300 hover:border-brand-blue hover:shadow-xl;
   }
 
   .card-elevated {

@@ -1,52 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  buildFriendlyValidationError,
+  FieldDefinition,
+  getMissingRequiredFields,
+  isValidEmail,
+  isValidHttpUrl,
+  logDevelopmentSubmission,
+  methodNotAllowedResponse,
+  readJsonBody,
+  toCleanStringRecord,
+  ValidationIssue,
+} from "@/lib/form-submissions";
 
-interface EcommerceAuditFormData {
-  name: string;
-  email: string;
-  website: string;
-  businessType: string;
-  revenue: string;
-  biggestIssue: string;
-  runningAds: string;
-}
+const auditFields: FieldDefinition[] = [
+  { key: "name", label: "name", required: true },
+  { key: "email", label: "email", required: true },
+  { key: "website", label: "website URL", required: true },
+  { key: "businessType", label: "business type", required: true },
+  { key: "revenue", label: "monthly revenue range", required: true },
+  { key: "biggestIssue", label: "biggest issue", required: true },
+  { key: "runningAds", label: "ad status", required: true },
+];
 
 export async function POST(request: NextRequest) {
   try {
-    const body: EcommerceAuditFormData = await request.json();
+    const body = await readJsonBody(request);
+    const values = toCleanStringRecord(body, auditFields);
 
-    if (
-      !body.name ||
-      !body.email ||
-      !body.website ||
-      !body.businessType ||
-      !body.revenue ||
-      !body.biggestIssue ||
-      !body.runningAds
-    ) {
+    if (!values) {
       return NextResponse.json(
-        { error: "Missing required fields for ecommerce audit." },
+        {
+          success: false,
+          error:
+            "We could not read your audit request. Please try submitting again.",
+        },
         { status: 400 }
       );
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(body.email)) {
+    const issues: ValidationIssue[] = getMissingRequiredFields(
+      values,
+      auditFields
+    );
+
+    if (values.email && !isValidEmail(values.email)) {
+      issues.push({
+        field: "email",
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    if (values.website && !isValidHttpUrl(values.website)) {
+      issues.push({
+        field: "website",
+        message:
+          "Please enter a valid website URL beginning with http:// or https://.",
+      });
+    }
+
+    if (issues.length > 0) {
       return NextResponse.json(
-        { error: "Invalid email address." },
+        {
+          success: false,
+          error: buildFriendlyValidationError(issues),
+          fields: issues,
+        },
         { status: 400 }
       );
     }
 
-    console.log("Ecommerce audit submission:", {
-      name: body.name,
-      email: body.email,
-      website: body.website,
-      businessType: body.businessType,
-      revenue: body.revenue,
-      biggestIssue: body.biggestIssue,
-      runningAds: body.runningAds,
-      timestamp: new Date().toISOString(),
-    });
+    logDevelopmentSubmission("Ecommerce audit", values);
 
     return NextResponse.json(
       {
@@ -58,8 +81,25 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Ecommerce audit form error:", error);
     return NextResponse.json(
-      { error: "Failed to process your request. Please try again." },
+      {
+        success: false,
+        error:
+          "Sorry, we could not process your audit request right now. Please try again in a moment.",
+      },
       { status: 500 }
     );
   }
 }
+
+function unsupportedMethod() {
+  return NextResponse.json(methodNotAllowedResponse(), {
+    status: 405,
+    headers: { Allow: "POST" },
+  });
+}
+
+export const GET = unsupportedMethod;
+export const PUT = unsupportedMethod;
+export const PATCH = unsupportedMethod;
+export const DELETE = unsupportedMethod;
+export const OPTIONS = unsupportedMethod;

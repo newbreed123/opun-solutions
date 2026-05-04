@@ -18,11 +18,11 @@ export default function Home() {
   return (
     <>
       {/* Premium Hero Section */}
-      <section className="bg-dark-bg py-12 md:py-16">
+      <section className="bg-dark-bg py-10 sm:py-12 md:py-16">
         <div className="container-wide">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
             {/* LEFT SIDE */}
-            <div>
+            <div className="min-w-0">
               <h1 className="heading-1 mb-6 leading-tight">
                 Stop Losing Revenue to Broken Systems —{" "}
                 <span className="gradient-text">Fix Your Ecommerce Now</span>
@@ -75,7 +75,7 @@ export default function Home() {
             </div>
 
             {/* RIGHT SIDE - VISUAL CARD */}
-            <div className="card-elevated">
+            <div className="card-elevated min-w-0">
               <h3 className="heading-4 mb-6 text-brand-blue">What We Build</h3>
 
               <div className="space-y-4">
@@ -147,7 +147,7 @@ export default function Home() {
             operations are manual, and nothing is properly connected. That’s why
             growth feels inconsistent — even when demand is there.
           </p>
-          <div className="bg-dark-tertiary border border-white/10 rounded-xl p-6 mb-8">
+          <div className="bg-dark-tertiary border border-white/10 rounded-xl p-5 sm:p-6 mb-8">
             <p className="body-lg text-primary font-semibold text-center">
               If you’re tired of watching potential customers slip away because
               your systems don’t support your growth — you’re not alone. And it
@@ -341,20 +341,20 @@ export default function Home() {
       </Section>
       {/* Ecommerce Focus Section */}
       <Section bgColor="secondary" padded={true}>
-        <div className="bg-dark-tertiary border border-white/10 rounded-2xl p-8 md:p-12 grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <h2 className="mb-6">
+        <div className="bg-dark-tertiary border border-white/10 rounded-2xl p-5 sm:p-6 md:p-12 grid md:grid-cols-2 gap-8 md:gap-10 items-center">
+          <div className="min-w-0">
+            <h2 className="heading-2 mb-6">
               Ecommerce Systems Built From Real Operational Experience
             </h2>
 
-            <p className="text-secondary mb-6">
+            <p className="body-md text-secondary mb-6">
               We don’t just build ecommerce websites — we understand how they
               operate. From checkout flows and fraud prevention to shipping and
               backend systems, we build ecommerce solutions that actually work
               in real businesses.
             </p>
 
-            <ul className="space-y-2 text-secondary">
+            <ul className="space-y-2 text-secondary body-md">
               <li>✔ Ecommerce website development</li>
               <li>✔ Checkout optimization</li>
               <li>✔ Fraud prevention systems</li>
@@ -364,7 +364,7 @@ export default function Home() {
           </div>
 
           {/* RIGHT SIDE VISUAL */}
-          <div className="bg-dark-secondary border border-white/10 rounded-xl p-6">
+          <div className="bg-dark-secondary border border-white/10 rounded-xl p-5 sm:p-6 min-w-0">
             <h3 className="mb-4 font-bold">What This Means</h3>
 
             <div className="space-y-3 text-secondary">
@@ -386,7 +386,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center">
           <div className="card-elevated">
             <p className="heading-3 text-brand-blue mb-2">3x</p>
             <p className="body-sm text-secondary">
@@ -483,7 +483,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center">
           <div>
             <p className="heading-3 text-brand-blue">3x</p>
             <p className="body-sm text-muted">More qualified leads</p>

@@ -64,7 +64,7 @@ export default function Header() {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden lg:flex items-center gap-8">
           {navLinks.map((link) => (
             <div
               key={link.href}
@@ -100,7 +100,7 @@ export default function Header() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="md:hidden text-primary hover:text-brand-blue transition-colors"
+          className="lg:hidden text-primary hover:text-brand-blue transition-colors"
           aria-label="Toggle menu"
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -109,7 +109,7 @@ export default function Header() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="md:hidden bg-dark-secondary border-t border-dark-tertiary">
+        <div className="lg:hidden bg-dark-secondary border-t border-dark-tertiary">
           <nav className="container-wide py-6 space-y-2">
             {navLinks.map((link) => (
               <div key={link.href} className="space-y-1">
