@@ -32,7 +32,7 @@ export default function ExperienceProof({
             <h2 className="heading-2 mb-6">{title}</h2>
             <p className="body-lg text-secondary max-w-3xl">{description}</p>
           </div>
-          <div className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-[0_40px_80px_rgba(0,102,255,0.08)]">
+          <div className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-[0_40px_80px_rgba(37,99,235,0.08)]">
             <ul className="space-y-5">
               {proofPoints.map((point) => (
                 <li key={point} className="flex gap-3">

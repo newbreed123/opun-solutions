@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import OpunAIAssistant from "@/components/OpunAIAssistant";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,7 +9,6 @@ export const metadata: Metadata = {
     "Opun Solutions - Websites, AI & Business Systems for Service Businesses",
   description:
     "We build high-converting websites, smart AI assistants, and automation systems that help service businesses grow. Website design, ecommerce, chatbots, Google Ads, client portals & integrations.",
-  viewport: "width=device-width, initial-scale=1",
   icons: {
     icon: [
       {
@@ -16,6 +16,11 @@ export const metadata: Metadata = {
       },
     ],
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1
 };
 
 export default function RootLayout({
@@ -29,6 +34,7 @@ export default function RootLayout({
         <Header />
         <main>{children}</main>
         <Footer />
+        <OpunAIAssistant />
       </body>
     </html>
   );

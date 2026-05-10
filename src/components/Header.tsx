@@ -24,7 +24,7 @@ const navLinks = [
       },
       {
         label: "AI Chatbots & Automation",
-        href: "/services",
+        href: "/services/ai-chatbots-automation",
       },
       {
         label: "Client Portals & Dashboards",
@@ -37,9 +37,9 @@ const navLinks = [
     href: "/industries",
     children: [
       { label: "Ecommerce Brands", href: "/services/ecommerce-solutions" },
-      { label: "Care Agencies", href: "/industries" },
-      { label: "Coaches & Consultants", href: "/industries" },
-      { label: "Local Services", href: "/industries" },
+      // { label: "Care Agencies", href: "/industries" },
+      // { label: "Coaches & Consultants", href: "/industries" },
+      // { label: "Local Services", href: "/industries" },
     ],
   },
   { label: "Case Studies", href: "/case-studies" },
@@ -51,11 +51,11 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-dark-bg bg-opacity-95 backdrop-blur-sm border-b border-dark-tertiary">
+    <header className="sticky top-0 z-50 bg-dark-bg/90 backdrop-blur-xl border-b border-dark-border shadow-sm shadow-black/20">
       <nav className="container-wide flex items-center justify-between h-16 md:h-20">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 bg-brand-blue rounded-lg flex items-center justify-center group-hover:bg-brand-blue-light transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-blue to-brand-cyan shadow-glow flex items-center justify-center transition-transform group-hover:-translate-y-0.5">
             <span className="text-white font-bold text-lg">O</span>
           </div>
           <span className="text-xl font-bold text-primary hidden sm:block">
@@ -72,18 +72,18 @@ export default function Header() {
             >
               <Link
                 href={link.href}
-                className="text-secondary hover:text-brand-blue transition-colors font-medium"
+                className="text-secondary hover:text-brand-cyan transition-colors font-medium"
               >
                 {link.label}
               </Link>
 
               {link.children && (
-                <div className="absolute left-0 top-full mt-3 hidden min-w-[220px] rounded-[1.75rem] border border-white/10 bg-dark-secondary p-4 shadow-xl group-hover:block">
+                <div className="absolute left-0 top-full mt-3 hidden min-w-[220px] rounded-[1.75rem] border border-dark-border bg-dark-card p-4 shadow-xl group-hover:block">
                   {link.children.map((child) => (
                     <Link
                       key={`${child.label}-${child.href}`}
                       href={child.href}
-                      className="block rounded-2xl px-4 py-3 text-secondary hover:bg-dark-bg hover:text-brand-blue transition-colors"
+                      className="block rounded-2xl px-4 py-3 text-secondary hover:bg-white/5 hover:text-brand-cyan transition-colors"
                     >
                       {child.label}
                     </Link>
@@ -100,7 +100,7 @@ export default function Header() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="lg:hidden text-primary hover:text-brand-blue transition-colors"
+          className="lg:hidden rounded-lg p-2 text-primary hover:bg-white/5 hover:text-brand-cyan transition-colors"
           aria-label="Toggle menu"
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -109,13 +109,13 @@ export default function Header() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="lg:hidden bg-dark-secondary border-t border-dark-tertiary">
+        <div className="lg:hidden bg-dark-secondary border-t border-dark-border">
           <nav className="container-wide py-6 space-y-2">
             {navLinks.map((link) => (
               <div key={link.href} className="space-y-1">
                 <Link
                   href={link.href}
-                  className="block text-secondary hover:text-brand-blue transition-colors py-3 font-medium"
+                  className="block text-secondary hover:text-brand-cyan transition-colors py-3 font-medium"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.label}
@@ -126,7 +126,7 @@ export default function Header() {
                       <Link
                         key={`${child.label}-${child.href}`}
                         href={child.href}
-                        className="block text-secondary/80 hover:text-brand-blue transition-colors py-2 text-sm"
+                        className="block text-secondary/80 hover:text-brand-cyan transition-colors py-2 text-sm"
                         onClick={() => setIsOpen(false)}
                       >
                         {child.label}
@@ -136,7 +136,7 @@ export default function Header() {
                 )}
               </div>
             ))}
-            <div className="pt-4 border-t border-dark-tertiary">
+            <div className="pt-4 border-t border-dark-border">
               <Link
                 href="/contact"
                 className="block btn-primary text-center w-full"

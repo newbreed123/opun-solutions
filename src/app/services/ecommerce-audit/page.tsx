@@ -3,6 +3,10 @@ import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import ProofBar from "@/components/ProofBar";
 import {
+  AuditPreviewMockup,
+  WorkflowMapMockup,
+} from "@/components/VisualMockups";
+import {
   Search,
   ShoppingCart,
   ShieldCheck,
@@ -124,10 +128,11 @@ export default function EcommerceAudit() {
               Find What&apos;s Leaking Revenue in Your Ecommerce Business
             </h1>
 
-            <p className="body-lg text-secondary max-w-3xl mb-6 sm:mb-8">
-              We&apos;ll review your storefront, checkout flow, tracking, order
-              process, fraud review, shipping workflow, and backend systems —
-              then show you the highest-impact fixes.
+            <p className="body-lg mb-6 max-w-[32ch] text-secondary sm:mb-8 md:max-w-3xl">
+              <span className="block">We&apos;ll review your storefront, checkout,</span>
+              <span className="block">tracking, order process, fraud review,</span>
+              <span className="block">shipping workflow, and backend systems,</span>
+              <span className="block">then show you the highest-impact fixes.</span>
             </p>
 
             <div className="space-y-3 mb-6 sm:mb-8">
@@ -144,7 +149,12 @@ export default function EcommerceAudit() {
             </div>
 
             <div className="flex flex-col items-stretch gap-3 sm:items-start">
-              <Button href="/contact" variant="primary" size="lg">
+              <Button
+                href="/contact"
+                variant="primary"
+                size="lg"
+                className="mx-0 w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:w-auto"
+              >
                 Book Your Free Ecommerce Audit
               </Button>
 
@@ -153,38 +163,13 @@ export default function EcommerceAudit() {
               </p>
 
               <p className="body-sm text-brand-blue font-semibold">
-                Limited audit spots each week — we only take a few businesses at
-                a time.
+                A focused review of the systems most likely to affect sales,
+                workflow clarity, and operational control.
               </p>
             </div>
           </div>
 
-          <div className="rounded-2xl sm:rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-4 sm:p-8 shadow-[0_40px_80px_rgba(0,102,255,0.12)]">
-            <div className="rounded-xl sm:rounded-3xl bg-dark-secondary border border-white/10 p-5 sm:p-8">
-              <h2 className="heading-3 mb-4 sm:mb-6 text-white">
-                What We Review
-              </h2>
-
-              <div className="space-y-3 sm:space-y-4">
-                {[
-                  "Storefront and product flow",
-                  "Checkout experience",
-                  "Fraud and order review process",
-                  "Shipping and fulfillment workflow",
-                  "Tracking and analytics",
-                  "Backend tools and integrations",
-                ].map((item) => (
-                  <div key={item} className="flex items-start gap-3">
-                    <Check
-                      size={18}
-                      className="text-brand-blue mt-1 flex-shrink-0"
-                    />
-                    <p className="body-sm text-secondary">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <AuditPreviewMockup />
         </div>
       </Section>
 
@@ -201,7 +186,7 @@ export default function EcommerceAudit() {
             {painPoints.map((pain) => (
               <div
                 key={pain}
-                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-xl shadow-black/5"
+                className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 shadow-xl shadow-black/5"
               >
                 <p className="body-md text-secondary">{pain}</p>
               </div>
@@ -221,7 +206,7 @@ export default function EcommerceAudit() {
             {auditCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8 shadow-lg shadow-black/10"
+                className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 shadow-lg shadow-black/10"
               >
                 <card.icon className="w-9 h-9 sm:w-10 sm:h-10 text-brand-blue mb-4 sm:mb-5" />
                 <h3 className="heading-4 mb-3 text-white">{card.title}</h3>
@@ -230,7 +215,7 @@ export default function EcommerceAudit() {
             ))}
           </div>
 
-          <div className="mt-10 sm:mt-12 rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8 text-center">
+          <div className="mt-10 sm:mt-12 rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 text-center">
             <h3 className="heading-3 mb-4">
               Want to see how this applies to your store?
             </h3>
@@ -242,6 +227,8 @@ export default function EcommerceAudit() {
               Book Your Free Ecommerce Audit
             </Button>
           </div>
+
+          <WorkflowMapMockup className="mt-8" />
         </div>
       </Section>
 
@@ -268,7 +255,7 @@ export default function EcommerceAudit() {
               </p>
             </div>
 
-            <div className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-[0_40px_80px_rgba(0,102,255,0.08)]">
+            <div className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 shadow-[0_40px_80px_rgba(37,99,235,0.08)]">
               <ul className="space-y-4 sm:space-y-5">
                 {[
                   "We understand ecommerce operations",
@@ -307,7 +294,7 @@ export default function EcommerceAudit() {
             ].map((item) => (
               <div
                 key={item}
-                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8"
+                className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8"
               >
                 <p className="body-md text-white font-semibold">{item}</p>
               </div>
@@ -327,7 +314,7 @@ export default function EcommerceAudit() {
             {walkAway.map((item) => (
               <div
                 key={item}
-                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-lg shadow-black/10"
+                className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 shadow-lg shadow-black/10"
               >
                 <p className="body-md text-white font-semibold">{item}</p>
               </div>
@@ -347,14 +334,14 @@ export default function EcommerceAudit() {
             {whoThisIsFor.map((item) => (
               <div
                 key={item}
-                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-bg p-5 sm:p-8 shadow-xl shadow-black/5"
+                className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 shadow-xl shadow-black/5"
               >
                 <p className="body-md text-secondary">{item}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-10 sm:mt-12 rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8">
+          <div className="mt-10 sm:mt-12 rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8">
             <h3 className="heading-3 mb-6 text-center">
               This Is Not For You If
             </h3>
@@ -380,7 +367,7 @@ export default function EcommerceAudit() {
             {processSteps.map((step) => (
               <div
                 key={step.step}
-                className="rounded-xl sm:rounded-[2rem] border border-white/10 bg-dark-secondary p-5 sm:p-8 shadow-lg shadow-black/10"
+                className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 shadow-lg shadow-black/10"
               >
                 <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue text-white text-lg font-semibold">
                   {step.step}
@@ -393,7 +380,7 @@ export default function EcommerceAudit() {
         </div>
       </Section>
 
-      <section className="bg-dark-bg py-12 md:py-16 border-t border-dark-tertiary">
+      <section className="bg-dark-bg py-12 md:py-16 border-t border-dark-border">
         <div className="container-wide">
           <ProofBar />
         </div>

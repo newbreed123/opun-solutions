@@ -5,14 +5,14 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-dark-secondary border-t border-dark-tertiary">
+    <footer className="bg-dark-deep border-t border-dark-border">
       <div className="container-wide py-16 md:py-20">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-brand-blue rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-blue to-brand-cyan shadow-glow flex items-center justify-center">
                 <span className="text-white font-bold">O</span>
               </div>
               <span className="text-xl font-bold text-primary">Opun</span>
@@ -30,7 +30,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/services"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Web Design
                 </Link>
@@ -38,7 +38,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/services"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   AI Chatbots
                 </Link>
@@ -46,7 +46,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/services"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Ecommerce
                 </Link>
@@ -54,7 +54,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/services"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Integrations
                 </Link>
@@ -69,7 +69,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/about"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   About
                 </Link>
@@ -77,7 +77,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/case-studies"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Case Studies
                 </Link>
@@ -85,7 +85,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/contact"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Contact
                 </Link>
@@ -98,19 +98,19 @@ export default function Footer() {
             <h3 className="font-semibold text-primary mb-4">Get in Touch</h3>
             <ul className="space-y-3">
               <li className="flex items-center gap-2">
-                <Mail size={16} className="text-brand-blue flex-shrink-0" />
+                <Mail size={16} className="text-brand-cyan flex-shrink-0" />
                 <a
                   href="mailto:hello@opun.com"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   hello@opun.com
                 </a>
               </li>
               <li className="flex items-center gap-2">
-                <Phone size={16} className="text-brand-blue flex-shrink-0" />
+                <Phone size={16} className="text-brand-cyan flex-shrink-0" />
                 <a
                   href="tel:+1234567890"
-                  className="body-sm text-secondary hover:text-brand-blue transition-colors"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   +1 (234) 567-890
                 </a>
@@ -120,7 +120,7 @@ export default function Footer() {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-dark-tertiary my-8" />
+        <div className="border-t border-dark-border my-8" />
 
         {/* Bottom Footer */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -134,7 +134,7 @@ export default function Footer() {
               href="https://linkedin.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-secondary hover:text-brand-blue transition-colors"
+              className="text-secondary hover:text-brand-cyan transition-colors"
               aria-label="LinkedIn"
             >
               <Linkedin size={20} />
@@ -143,7 +143,7 @@ export default function Footer() {
               href="https://twitter.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-secondary hover:text-brand-blue transition-colors"
+              className="text-secondary hover:text-brand-cyan transition-colors"
               aria-label="Twitter"
             >
               <Twitter size={20} />
@@ -152,7 +152,7 @@ export default function Footer() {
               href="https://instagram.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-secondary hover:text-brand-blue transition-colors"
+              className="text-secondary hover:text-brand-cyan transition-colors"
               aria-label="Instagram"
             >
               <Instagram size={20} />

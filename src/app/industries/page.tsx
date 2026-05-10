@@ -154,7 +154,7 @@ export default function Industries() {
             </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <Button href="/contact" variant="primary" size="lg">
-                Book Free Strategy Call
+                Book Strategy Call
               </Button>
               <Button href="#overview" variant="secondary" size="lg">
                 Explore Industry Focus
@@ -162,8 +162,8 @@ export default function Industries() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(0,102,255,0.12)]">
-            <div className="rounded-3xl bg-dark-secondary border border-white/10 p-8">
+          <div className="rounded-[2rem] border border-dark-border bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(37,99,235,0.12)]">
+            <div className="rounded-3xl bg-dark-card border border-dark-border p-8">
               <p className="text-brand-blue uppercase tracking-[0.3em] text-xs font-semibold mb-4">
                 Industry Expertise
               </p>
@@ -227,7 +227,7 @@ export default function Industries() {
             {industries.map((industry) => (
               <div
                 key={industry.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-xl shadow-black/10"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-xl shadow-black/10"
               >
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-2xl">
@@ -311,7 +311,7 @@ export default function Industries() {
             {differentiation.map((item) => (
               <div
                 key={item.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-lg shadow-black/10"
               >
                 <item.icon className="w-10 h-10 text-brand-blue mb-5" />
                 <h3 className="heading-4 mb-3 text-white">{item.title}</h3>
@@ -322,7 +322,7 @@ export default function Industries() {
         </div>
       </Section>
 
-      <section className="bg-dark-bg py-12 md:py-16 border-t border-dark-tertiary">
+      <section className="bg-dark-bg py-12 md:py-16 border-t border-dark-border">
         <div className="container-wide">
           <ProofBar />
         </div>
@@ -331,7 +331,7 @@ export default function Industries() {
       <CTASection
         headline="Not sure which system your business needs?"
         subheadline="We’ll review your setup and recommend the highest-impact improvements."
-        buttonLabel="Book Free Strategy Call"
+        buttonLabel="Book Strategy Call"
         buttonHref="/contact"
       />
     </>

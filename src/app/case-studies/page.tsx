@@ -1,219 +1,148 @@
-import Section from "@/components/Section";
+import Button from "@/components/Button";
 import CaseStudyCard from "@/components/CaseStudyCard";
 import CTASection from "@/components/CTASection";
 import ProjectProofGrid from "@/components/ProjectProofGrid";
+import Section from "@/components/Section";
+import { Check } from "lucide-react";
 
 export default function CaseStudies() {
   return (
     <>
-      {/* Hero */}
       <Section bgColor="secondary" padded>
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="text-brand-blue text-sm font-semibold uppercase tracking-[0.25em] mb-4">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-brand-cyan">
             Case Studies
           </p>
-
-          <h1 className="heading-1 mb-6">Case Studies Built to Drive Growth</h1>
-
-          <p className="body-lg text-secondary max-w-3xl mx-auto leading-relaxed">
-            Real business problems, broken systems fixed, and measurable results
-            delivered through website, ecommerce, and operational improvements.
+          <h1 className="heading-1 mb-6">
+            Case Studies Built Around Real Business Systems
+          </h1>
+          <p className="body-lg mx-auto max-w-3xl text-secondary">
+            Practical examples of improved websites, ecommerce journeys,
+            inquiry flows, and operational systems without inflated claims or
+            generic redesign language.
           </p>
         </div>
       </Section>
 
-      {/* Featured Case Study */}
       <Section bgColor="primary">
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="text-center max-w-2xl mx-auto">
-            <p className="text-brand-blue text-sm font-semibold uppercase tracking-[0.25em] mb-4">
+        <div className="mx-auto max-w-6xl space-y-12">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-brand-cyan">
               Featured Case Study
             </p>
             <h2 className="heading-2 mb-4">
-              3X more qualified leads by fixing the site, checkout, and
-              follow-up system
+              A Care Agency Growth System Built Around Inquiry, Intake, and Client Journey Clarity
             </h2>
-            <p className="body-lg text-secondary leading-relaxed">
-              This project was not a redesign for the sake of style. It was a
-              system upgrade built to capture more leads, reduce friction, and
-              make operations easier to run.
+            <p className="body-lg mx-auto text-secondary">
+              This project focused on helping families understand services,
+              submit better inquiries, and giving the team a clearer operational
+              path for follow-up.
             </p>
           </div>
 
-          <div className="grid gap-10 xl:grid-cols-[1.2fr_0.8fr] items-start">
-            <div className="space-y-10">
-              <div className="space-y-4 max-w-2xl">
-                <h3 className="heading-3">Problem</h3>
-                <ul className="space-y-3 text-secondary leading-7 list-disc list-inside">
-                  <li>
-                    Leads were leaking from unclear messaging and a weak inquiry
-                    flow.
-                  </li>
-                  <li>
-                    Checkout interruptions and payment friction caused abandoned
-                    carts.
-                  </li>
-                  <li>
-                    Operations relied on manual order checks and inconsistent
-                    shipping workflows.
-                  </li>
-                </ul>
-              </div>
-
-              <div className="space-y-4 max-w-2xl">
-                <h3 className="heading-3">System Breakdown</h3>
-                <ul className="space-y-3 text-secondary leading-7 list-disc list-inside">
-                  <li>
-                    Product and service pages were disconnected from the lead
-                    capture journey.
-                  </li>
-                  <li>
-                    Checkout lacked clear trust signals and fallback handling
-                    for failed payments.
-                  </li>
-                  <li>
-                    Order validation, fraud review, and shipping were not
-                    aligned with the customer experience.
-                  </li>
-                </ul>
-              </div>
-
-              <div className="space-y-4 max-w-2xl">
-                <h3 className="heading-3">Solution</h3>
-                <ul className="space-y-3 text-secondary leading-7 list-disc list-inside">
-                  <li>
-                    Reworked the homepage and product flow for clearer visitor
-                    intent and better lead capture.
-                  </li>
-                  <li>
-                    Optimized checkout experience with stronger validation,
-                    trust copy, and clearer shipping options.
-                  </li>
-                  <li>
-                    Built a workflow dashboard for order review, fraud checks,
-                    and fulfillment handoff.
-                  </li>
-                </ul>
-              </div>
-
-              <div className="space-y-4 max-w-2xl">
-                <h3 className="heading-3">Results</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="rounded-3xl border border-white/10 bg-dark-secondary p-5">
-                    <p className="text-brand-blue text-lg font-semibold">3X</p>
-                    <p className="text-secondary text-sm">
-                      More qualified leads
-                    </p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-dark-secondary p-5">
-                    <p className="text-brand-blue text-lg font-semibold">
-                      +340%
-                    </p>
-                    <p className="text-secondary text-sm">
-                      Revenue growth from better checkout flow
-                    </p>
-                  </div>
-                  <div className="rounded-3xl border border-white/10 bg-dark-secondary p-5">
-                    <p className="text-brand-blue text-lg font-semibold">30%</p>
-                    <p className="text-secondary text-sm">
-                      Less manual order handling work
-                    </p>
-                  </div>
+          <div className="grid items-start gap-8 xl:grid-cols-[1.05fr_0.95fr]">
+            <div className="space-y-8">
+              {[
+                {
+                  title: "Problem",
+                  points: [
+                    "Families needed clearer service information before making contact.",
+                    "The path from website visitor to inquiry was too easy to abandon.",
+                    "Intake details and follow-up depended on manual coordination.",
+                  ],
+                },
+                {
+                  title: "System Breakdown",
+                  points: [
+                    "Service pages were not fully aligned with how families make care decisions.",
+                    "Inquiry forms did not collect enough useful context for a strong first response.",
+                    "Website flow and internal follow-up were not connected as a single client acquisition system.",
+                  ],
+                },
+                {
+                  title: "Solution",
+                  points: [
+                    "Reworked service presentation so families could understand fit and next steps.",
+                    "Improved inquiry and intake flow so the team received more useful context.",
+                    "Mapped a cleaner route from submitted inquiry to human follow-up.",
+                  ],
+                },
+              ].map((section) => (
+                <div key={section.title} className="card p-6">
+                  <h3 className="heading-3 mb-4">{section.title}</h3>
+                  <ul className="space-y-3">
+                    {section.points.map((point) => (
+                      <li key={point} className="flex gap-3 text-secondary">
+                        <Check className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
+              ))}
 
-              <div className="space-y-4 max-w-2xl rounded-3xl border border-white/10 bg-dark-secondary p-8">
-                <p className="text-brand-blue text-sm font-semibold uppercase tracking-[0.25em] mb-3">
-                  Client micro testimonial
-                </p>
-                <p className="body-md text-secondary leading-7">
-                  “The website and systems changes were exactly what we needed.
-                  Our team now spends less time firefighting, and the lead flow
-                  is finally consistent.”
-                </p>
-                <p className="text-sm text-muted">
-                  — Ecommerce founder, Ireland
-                </p>
-              </div>
+              <Button href="/case-studies/care-agency-growth" size="lg">
+                Read Care Agency Case Study
+              </Button>
             </div>
 
-            <div className="space-y-6 rounded-[2rem] border border-white/10 bg-dark-primary p-8">
-              <img
-                src="https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=900&h=650&fit=crop"
-                alt="Ecommerce operations and marketing dashboard"
-                className="rounded-3xl w-full h-[360px] object-cover"
-              />
-
-              <div className="space-y-4">
-                <p className="text-brand-blue text-xs font-semibold uppercase tracking-[0.25em]">
-                  Results Snapshot
-                </p>
-                <div className="space-y-3">
-                  <div className="rounded-3xl bg-dark-secondary p-4 border border-white/10">
-                    <p className="font-semibold text-white">
-                      Conversion clarity
-                    </p>
-                    <p className="text-secondary text-sm leading-6">
-                      Improved product and checkout messaging so more visitors
-                      turned into leads.
-                    </p>
+            <div className="card-elevated p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-cyan">
+                Business Impact
+              </p>
+              <div className="mt-6 grid gap-4">
+                {[
+                  ["Clearer", "Service decision path"],
+                  ["Stronger", "Client inquiry experience"],
+                  ["Better", "Intake and follow-up context"],
+                  ["More useful", "Operational handoff foundation"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-dark-border bg-white/[0.035] p-4">
+                    <p className="text-lg font-bold text-brand-cyan">{label}</p>
+                    <p className="mt-1 text-sm text-secondary">{value}</p>
                   </div>
-                  <div className="rounded-3xl bg-dark-secondary p-4 border border-white/10">
-                    <p className="font-semibold text-white">Operational flow</p>
-                    <p className="text-secondary text-sm leading-6">
-                      A single review process for orders, fraud checks, and
-                      shipping handoff.
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </Section>
 
-      {/* Project Examples */}
-      <Section bgColor="primary">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12 max-w-2xl mx-auto">
-            <p className="text-brand-blue text-sm font-semibold uppercase tracking-[0.25em] mb-4">
+      <Section bgColor="secondary">
+        <div className="mx-auto max-w-6xl">
+          <div className="mx-auto mb-12 max-w-2xl text-center">
+            <p className="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-brand-cyan">
               Project Examples
             </p>
             <h2 className="heading-2 mb-4">
-              Conversion-focused case studies across industries
+              Conversion-Focused Case Studies Across Industries
             </h2>
-            <p className="body-lg text-secondary leading-relaxed">
-              These examples show the kind of practical work we deliver—where
-              the goal is improving business systems, lead flow, and customer
-              experience.
+            <p className="body-lg text-secondary">
+              These examples show practical work where the goal is improving
+              business systems, lead flow, and customer experience.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <CaseStudyCard
               image="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
               industry="Professional Services"
               headline="Sales Coach Website & Lead Flow"
-              resultBadge="3X Leads"
               result="Refined messaging, improved service pages, and a cleaner inquiry funnel for more qualified client conversations."
               href="/case-studies/sales-coach"
             />
-
             <CaseStudyCard
               image="https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=400&fit=crop"
               industry="Care Services"
               headline="Care Agency Website & Client Journey"
-              resultBadge="+340% Revenue"
               result="Streamlined service discovery, contact flow, and booking logic so care clients could reach out faster."
-              href="/case-studies/care-agency"
+              href="/case-studies/care-agency-growth"
             />
-
             <CaseStudyCard
               image="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&h=400&fit=crop"
               industry="Ecommerce"
               headline="Ecommerce System Success"
-              resultBadge="3X Revenue"
-              result="A complete ecommerce system overhaul that delivered higher conversions, more reliable order flow, and better analytics."
+              result="A complete ecommerce system overhaul focused on clearer conversion paths, more reliable order flow, and better analytics."
               href="/case-studies/ecommerce-system-success"
             />
           </div>
@@ -222,12 +151,11 @@ export default function CaseStudies() {
 
       <ProjectProofGrid />
 
-      {/* Bottom CTA */}
       <CTASection
-        headline="Want results like this?"
-        subheadline="Book a free ecommerce audit and let us show you the highest-impact changes for your business."
-        buttonLabel="Book Free Ecommerce Audit"
-        buttonHref="/services/ecommerce-audit"
+        headline="Want to Improve Your Customer Journey?"
+        subheadline="Book a strategy call and let us map the highest-impact improvements for your website, customer journey, and operations."
+        buttonLabel="Book Strategy Call"
+        buttonHref="/contact"
       />
     </>
   );

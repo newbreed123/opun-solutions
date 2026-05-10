@@ -4,7 +4,7 @@ interface SectionProps {
   children: React.ReactNode;
   className?: string;
   id?: string;
-  bgColor?: "primary" | "secondary";
+  bgColor?: "primary" | "secondary" | "deep";
   padded?: boolean;
 }
 
@@ -16,8 +16,10 @@ export default function Section({
   padded = true,
 }: SectionProps) {
   const bgClasses = {
-    primary: "bg-dark-bg",
-    secondary: "bg-dark-secondary",
+    primary: "relative overflow-hidden bg-dark-bg border-t border-dark-border",
+    secondary:
+      "relative overflow-hidden bg-dark-secondary border-t border-dark-border",
+    deep: "relative overflow-hidden bg-dark-deep border-t border-dark-border",
   };
 
   return (

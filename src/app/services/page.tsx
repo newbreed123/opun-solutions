@@ -108,7 +108,7 @@ export default function Services() {
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button href="/contact" variant="primary" size="lg">
-                Book Free Strategy Call
+                Book Strategy Call
               </Button>
               <Button href="#packages" variant="secondary" size="lg">
                 View Packages
@@ -116,8 +116,8 @@ export default function Services() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(0,102,255,0.12)]">
-            <div className="rounded-3xl bg-dark-secondary border border-white/10 p-8">
+          <div className="rounded-[2rem] border border-dark-border bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(37,99,235,0.12)]">
+            <div className="rounded-3xl bg-dark-card border border-dark-border p-8">
               <p className="text-brand-blue uppercase tracking-[0.3em] text-xs font-semibold mb-4">
                 Business Systems
               </p>
@@ -163,7 +163,7 @@ export default function Services() {
             {coreServices.map((service) => (
               <div
                 key={service.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-xl shadow-black/10"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-xl shadow-black/10"
               >
                 <div className="flex items-center gap-4 mb-6">
                   <service.icon className="w-10 h-10 text-brand-blue" />
@@ -223,8 +223,8 @@ export default function Services() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(0,102,255,0.12)]">
-            <div className="rounded-3xl bg-dark-secondary border border-white/10 p-8">
+          <div className="rounded-[2rem] border border-dark-border bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(37,99,235,0.12)]">
+            <div className="rounded-3xl bg-dark-card border border-dark-border p-8">
               <p className="text-brand-blue uppercase tracking-[0.3em] text-xs font-semibold mb-4">
                 Ecommerce Operations Stack
               </p>
@@ -232,7 +232,7 @@ export default function Services() {
                 A modern operational layer for commerce teams
               </h3>
               <div className="space-y-4">
-                <div className="rounded-3xl bg-dark-bg p-4 border border-white/10">
+                <div className="rounded-3xl bg-dark-card p-4 border border-dark-border">
                   <p className="font-semibold text-primary mb-2">
                     Catalog & Product Strategy
                   </p>
@@ -241,7 +241,7 @@ export default function Services() {
                     higher conversion.
                   </p>
                 </div>
-                <div className="rounded-3xl bg-dark-bg p-4 border border-white/10">
+                <div className="rounded-3xl bg-dark-card p-4 border border-dark-border">
                   <p className="font-semibold text-primary mb-2">
                     Checkout & Fraud Controls
                   </p>
@@ -250,7 +250,7 @@ export default function Services() {
                     built-in fraud workflows.
                   </p>
                 </div>
-                <div className="rounded-3xl bg-dark-bg p-4 border border-white/10">
+                <div className="rounded-3xl bg-dark-card p-4 border border-dark-border">
                   <p className="font-semibold text-primary mb-2">
                     Operations & Integrations
                   </p>
@@ -301,7 +301,7 @@ export default function Services() {
             ].map((step, index) => (
               <div
                 key={step.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8"
               >
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-blue/10 text-brand-blue font-semibold mb-4">
                   {index + 1}
@@ -366,7 +366,7 @@ export default function Services() {
             ].map((packageItem) => (
               <div
                 key={packageItem.name}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8"
               >
                 <h3 className="heading-3 mb-4">{packageItem.name}</h3>
                 <p className="body-md text-secondary mb-6">
@@ -395,7 +395,7 @@ export default function Services() {
       <CTASection
         headline="Ready to build a system that grows with your business?"
         subheadline="Let’s review your current website, customer journey, and operations — then map the fastest path to more leads, better systems, and stronger growth."
-        buttonLabel="Book Free Strategy Call"
+        buttonLabel="Book Strategy Call"
         buttonHref="/contact"
       />
     </>

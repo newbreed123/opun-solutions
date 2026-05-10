@@ -20,7 +20,7 @@ export default function HeroSection({
   return (
     <section
       className={`relative w-full min-h-[70vh] md:min-h-[80vh] py-16 md:py-20 flex items-center justify-center text-center ${
-        backgroundImage ? "bg-cover bg-center" : "bg-dark-bg"
+        backgroundImage ? "bg-cover bg-center" : "hero-atmosphere"
       }`}
       style={
         backgroundImage ? { backgroundImage: `url(${backgroundImage})` } : {}

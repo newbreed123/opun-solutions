@@ -40,14 +40,14 @@ const defaultProjects: ProjectType[] = [
     improvement:
       "Built client portal and automated booking with inquiry tracking.",
     value:
-      "Customers booked appointments themselves. Customer satisfaction improved.",
+      "Families had a clearer path to inquire. The team had better context for follow-up.",
   },
 ];
 
 export default function ProjectProofGrid({
   bgColor = "secondary",
   title = "How We Help Real Businesses",
-  description = "These aren't redesigns — they're system fixes that improve how businesses operate and grow.",
+  description = "These are system improvements that help businesses operate with more clarity and stronger customer journeys.",
   projects = defaultProjects,
 }: ProjectProofGridProps) {
   return (
@@ -64,7 +64,7 @@ export default function ProjectProofGrid({
           {projects.map((project) => (
             <div
               key={project.title}
-              className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10"
+              className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-lg shadow-black/10"
             >
               <h3 className="heading-4 mb-4 text-white">{project.title}</h3>
 
@@ -82,7 +82,7 @@ export default function ProjectProofGrid({
                 <p className="body-md text-secondary">{project.improvement}</p>
               </div>
 
-              <div className="pt-4 border-t border-white/10">
+              <div className="pt-4 border-t border-dark-border">
                 <p className="text-brand-blue uppercase tracking-[0.24em] text-xs font-semibold mb-2">
                   Business Value
                 </p>

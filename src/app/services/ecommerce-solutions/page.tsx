@@ -3,6 +3,10 @@ import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import ExperienceProof from "@/components/ExperienceProof";
 import {
+  OperationsDashboardMockup,
+  WorkflowMapMockup,
+} from "@/components/VisualMockups";
+import {
   ShoppingCart,
   ShieldCheck,
   Truck,
@@ -165,14 +169,12 @@ export default function EcommerceSolutions() {
               Ecommerce Solutions
             </p>
             <h1 className="heading-1 mb-6 leading-tight">
-              <span className="block md:inline">
-                Ecommerce Systems Built for Real Operations
-              </span>
-              <span className="block md:hidden">—</span>
-              <span className="hidden md:inline"> — </span>
-              <span className="block md:inline">Not Just Pretty Stores</span>
+              <span className="block">Ecommerce Systems</span>
+              <span className="block">Built for Real</span>
+              <span className="block">Operations</span>
+              <span className="block">Not Pretty Stores</span>
             </h1>
-            <p className="body-lg text-secondary max-w-3xl mb-8">
+            <p className="body-lg mb-8 max-w-[32ch] text-secondary md:max-w-3xl">
               We design and build ecommerce systems that improve how your store
               sells, how orders are handled, and how your operations run
               day-to-day.
@@ -187,33 +189,7 @@ export default function EcommerceSolutions() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 via-white/10 to-white/5 p-8 shadow-[0_40px_80px_rgba(0,102,255,0.12)]">
-            <div className="rounded-3xl bg-dark-secondary border border-white/10 p-8">
-              <p className="text-brand-blue uppercase tracking-[0.3em] text-xs font-semibold mb-4">
-                Ecommerce Focus
-              </p>
-              <h2 className="heading-3 mb-4">
-                Practical ecommerce work built around real operations.
-              </h2>
-              <p className="body-md text-secondary">
-                From storefront design to shipping and backend systems, our work
-                is intended to support the full commerce workflow.
-              </p>
-              <div className="mt-8 space-y-3">
-                {[
-                  "Checkout and payment clarity",
-                  "Operational workflow support",
-                  "Fraud and order review",
-                  "Tracking and measurement",
-                ].map((item) => (
-                  <div key={item} className="flex items-start gap-3">
-                    <Check size={18} className="text-brand-blue mt-1" />
-                    <p className="body-sm text-secondary">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <OperationsDashboardMockup />
         </div>
       </Section>
 
@@ -238,7 +214,7 @@ export default function EcommerceSolutions() {
             {problemCards.map((card) => (
               <div
                 key={card.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 shadow-xl shadow-black/5"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-xl shadow-black/5"
               >
                 <h3 className="heading-4 mb-3 text-white">{card.title}</h3>
                 <p className="body-md text-secondary">{card.description}</p>
@@ -269,6 +245,8 @@ export default function EcommerceSolutions() {
             </p>
           </div>
 
+          <WorkflowMapMockup className="mb-12" />
+
           <div className="mb-8">
             <div className="mb-6 text-left">
               <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
@@ -284,7 +262,7 @@ export default function EcommerceSolutions() {
               {coreSolutionCards.map((card) => (
                 <div
                   key={card.title}
-                  className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10"
+                  className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-lg shadow-black/10"
                 >
                   <card.icon className="w-10 h-10 text-brand-blue mb-5" />
                   <h3 className="heading-4 mb-3 text-white">{card.title}</h3>
@@ -309,7 +287,7 @@ export default function EcommerceSolutions() {
               {supportingSolutionCards.map((card) => (
                 <div
                   key={card.title}
-                  className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10"
+                  className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-lg shadow-black/10"
                 >
                   <card.icon className="w-10 h-10 text-brand-blue mb-5" />
                   <h3 className="heading-4 mb-3 text-white">{card.title}</h3>
@@ -319,7 +297,7 @@ export default function EcommerceSolutions() {
             </div>
           </div>
 
-          <div className="mt-12 rounded-[2rem] border border-white/10 bg-dark-secondary p-10 text-center">
+          <div className="mt-12 rounded-[2rem] border border-dark-border bg-dark-card p-10 text-center">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
               One Connected System
             </p>
@@ -356,7 +334,7 @@ export default function EcommerceSolutions() {
             {technologyStack.map((group) => (
               <div
                 key={group.category}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-sm shadow-black/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(0,102,255,0.16)]"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-sm shadow-black/5 transition-transform duration-200 hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(37,99,235,0.16)]"
               >
                 <p className="text-brand-blue uppercase tracking-[0.24em] text-xs font-semibold mb-4">
                   {group.category}
@@ -365,7 +343,7 @@ export default function EcommerceSolutions() {
                   {group.tools.map((tool) => (
                     <div
                       key={tool}
-                      className="rounded-2xl border border-white/5 bg-white/5 px-4 py-3 transition-colors duration-200 hover:border-brand-blue hover:bg-white/10"
+                      className="rounded-2xl border border-dark-border bg-white/5 px-4 py-3 transition-colors duration-200 hover:border-brand-blue hover:bg-white/10"
                     >
                       <p className="font-medium text-white">{tool}</p>
                     </div>
@@ -387,7 +365,7 @@ export default function EcommerceSolutions() {
             {processSteps.map((step, index) => (
               <div
                 key={step}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-5 shadow-xl shadow-black/5 text-left"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-5 shadow-xl shadow-black/5 text-left"
               >
                 <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-blue text-white text-base font-semibold">
                   {index + 1}
@@ -409,7 +387,7 @@ export default function EcommerceSolutions() {
             {packages.map((pkg) => (
               <div
                 key={pkg.title}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-xl shadow-black/5"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-xl shadow-black/5"
               >
                 <h3 className="heading-4 mb-4">{pkg.title}</h3>
                 <p className="body-md text-secondary">{pkg.description}</p>
@@ -447,7 +425,7 @@ export default function EcommerceSolutions() {
             ].map((item) => (
               <div
                 key={item}
-                className="rounded-[2rem] border border-white/10 bg-dark-secondary p-5 shadow-sm shadow-black/5"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-5 shadow-sm shadow-black/5"
               >
                 <p className="font-semibold text-white">{item}</p>
               </div>

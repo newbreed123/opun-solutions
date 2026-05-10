@@ -68,7 +68,7 @@ export default function EcommerceSystemSuccess() {
           <div>
             <h2 className="heading-2 mb-4">What was actually broken</h2>
             <div className="space-y-6">
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Storefront</h3>
                 <p className="text-secondary leading-7">
                   Product pages lacked clarity on value, trust elements were
@@ -76,7 +76,7 @@ export default function EcommerceSystemSuccess() {
                   fragmented.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Checkout</h3>
                 <p className="text-secondary leading-7">
                   The checkout process was too complex, with poor layout,
@@ -84,7 +84,7 @@ export default function EcommerceSystemSuccess() {
                   payment issues.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Fraud & validation</h3>
                 <p className="text-secondary leading-7">
                   There was no consistent review process, so orders were either
@@ -92,14 +92,14 @@ export default function EcommerceSystemSuccess() {
                   completed.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Shipping & fulfillment</h3>
                 <p className="text-secondary leading-7">
                   Fulfillment was driven by spreadsheets and manual handoffs,
                   which created delays and shipping errors.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Tracking & analytics</h3>
                 <p className="text-secondary leading-7">
                   The marketing team could not measure which ads or pages were
@@ -112,7 +112,7 @@ export default function EcommerceSystemSuccess() {
           <div>
             <h2 className="heading-2 mb-4">The system we built</h2>
             <div className="grid gap-6 md:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">A clearer storefront</h3>
                 <p className="text-secondary leading-7">
                   Stronger product messaging, trust signals, and a simplified
@@ -120,14 +120,14 @@ export default function EcommerceSystemSuccess() {
                   decision.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">A smoother checkout</h3>
                 <p className="text-secondary leading-7">
                   Reduced friction, clearer shipping options, and better error
                   handling so more shoppers completed their purchase.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Reliable fraud review</h3>
                 <p className="text-secondary leading-7">
                   A repeatable order validation workflow that balanced risk with
@@ -135,14 +135,14 @@ export default function EcommerceSystemSuccess() {
                   review.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Faster fulfillment</h3>
                 <p className="text-secondary leading-7">
                   A standardized shipping and packing process with clear
                   handoffs between ecommerce and operations.
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6">
                 <h3 className="heading-4 mb-3">Measurable analytics</h3>
                 <p className="text-secondary leading-7">
                   Marketing and operations could finally see which pages, ads,
@@ -155,19 +155,19 @@ export default function EcommerceSystemSuccess() {
           <div>
             <h2 className="heading-2 mb-4">Results</h2>
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6 text-center">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6 text-center">
                 <p className="text-brand-blue text-4xl font-semibold">3X</p>
                 <p className="text-secondary mt-3 leading-7">
                   Revenue from the same traffic mix
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6 text-center">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6 text-center">
                 <p className="text-brand-blue text-4xl font-semibold">28%</p>
                 <p className="text-secondary mt-3 leading-7">
                   Higher checkout completion
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-dark-secondary p-6 text-center">
+              <div className="rounded-3xl border border-dark-border bg-dark-card p-6 text-center">
                 <p className="text-brand-blue text-4xl font-semibold">40%</p>
                 <p className="text-secondary mt-3 leading-7">
                   Less manual order handling work
@@ -176,7 +176,7 @@ export default function EcommerceSystemSuccess() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-dark-secondary p-8">
+          <div className="rounded-3xl border border-dark-border bg-dark-card p-8">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-4">
               Client Testimonial
             </p>

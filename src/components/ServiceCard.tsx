@@ -17,13 +17,13 @@ export default function ServiceCard({
   return (
     <div className="card group">
       <div className="mb-4">
-        <Icon className="w-12 h-12 text-brand-blue group-hover:text-brand-blue-light transition-colors" />
+        <Icon className="w-12 h-12 text-brand-cyan drop-shadow-[0_0_18px_rgba(6,182,212,0.22)] transition-colors group-hover:text-brand-blue-light" />
       </div>
       <h3 className="heading-4 mb-3">{title}</h3>
       <p className="body-md mb-4">{description}</p>
       <Link
         href={href}
-        className="text-brand-blue hover:text-brand-blue-light font-semibold inline-flex items-center gap-2 group/link"
+        className="text-brand-cyan hover:text-brand-blue-light font-semibold inline-flex items-center gap-2 group/link"
       >
         Learn More
         <span className="transition-transform group-hover/link:translate-x-1">

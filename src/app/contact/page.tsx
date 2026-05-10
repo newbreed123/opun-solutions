@@ -190,7 +190,7 @@ export default function Contact() {
                   setServicesSubmitted(false);
                   setServiceType("audit");
                 }}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 hover:border-brand-blue hover:bg-dark-secondary transition-all text-left group"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 hover:border-brand-blue hover:bg-dark-secondary transition-all text-left group"
               >
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 bg-brand-blue/10 rounded-lg flex items-center justify-center group-hover:bg-brand-blue/20 transition-colors">
@@ -221,7 +221,7 @@ export default function Contact() {
                   setServicesSubmitted(false);
                   setServiceType("services");
                 }}
-                className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 hover:border-brand-blue hover:bg-dark-secondary transition-all text-left group"
+                className="rounded-[2rem] border border-dark-border bg-dark-card p-8 hover:border-brand-blue hover:bg-dark-secondary transition-all text-left group"
               >
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 bg-brand-blue/10 rounded-lg flex items-center justify-center group-hover:bg-brand-blue/20 transition-colors">
@@ -286,7 +286,7 @@ export default function Contact() {
                 ].map((step) => (
                   <div
                     key={step.number}
-                    className="rounded-[2rem] border border-white/10 bg-dark-bg p-8 shadow-lg shadow-black/10 text-center"
+                    className="rounded-[2rem] border border-dark-border bg-dark-card p-8 shadow-lg shadow-black/10 text-center"
                   >
                     <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue text-white text-lg font-semibold">
                       {step.number}
@@ -358,7 +358,7 @@ export default function Contact() {
                           value={auditFormState.name}
                           onChange={handleAuditChange}
                           required
-                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                           placeholder="Your name"
                         />
                       </div>
@@ -377,7 +377,7 @@ export default function Contact() {
                           value={auditFormState.email}
                           onChange={handleAuditChange}
                           required
-                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                           placeholder="your@email.com"
                         />
                       </div>
@@ -396,7 +396,7 @@ export default function Contact() {
                           value={auditFormState.website}
                           onChange={handleAuditChange}
                           required
-                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                           placeholder="https://yourstore.com"
                         />
                       </div>
@@ -413,7 +413,7 @@ export default function Contact() {
                           name="businessType"
                           value={auditFormState.businessType}
                           onChange={handleAuditChange}
-                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                         >
                           <option value="ecommerce">
                             Ecommerce / Online Store
@@ -437,7 +437,7 @@ export default function Contact() {
                           value={auditFormState.revenue}
                           onChange={handleAuditChange}
                           required
-                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                         >
                           <option value="">Select a range</option>
                           <option value="0-10k">$0 - $10k</option>
@@ -461,7 +461,7 @@ export default function Contact() {
                           onChange={handleAuditChange}
                           rows={4}
                           required
-                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue resize-none"
+                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue resize-none"
                           placeholder="Low conversions? Manual fulfillment? Unclear tracking? Tell us what's slowing you down."
                         />
                       </div>
@@ -478,7 +478,7 @@ export default function Contact() {
                           name="runningAds"
                           value={auditFormState.runningAds}
                           onChange={handleAuditChange}
-                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                          className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                         >
                           <option value="">Select...</option>
                           <option value="yes">
@@ -507,7 +507,7 @@ export default function Contact() {
 
                 {/* Right: Booking Option */}
                 <div>
-                  <div className="rounded-[2rem] border border-white/10 bg-dark-secondary p-8 sticky top-8 h-fit">
+                  <div className="rounded-[2rem] border border-dark-border bg-dark-card p-8 sticky top-8 h-fit">
                     <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-4">
                       Prefer to Skip the Form?
                     </p>
@@ -529,7 +529,7 @@ export default function Contact() {
                       Book on Calendly →
                     </Button>
 
-                    <div className="mt-8 pt-8 border-t border-white/10">
+                    <div className="mt-8 pt-8 border-t border-dark-border">
                       <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-4">
                         What We Review
                       </p>
@@ -679,7 +679,7 @@ export default function Contact() {
                     value={servicesFormState.name}
                     onChange={handleServicesChange}
                     required
-                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                     placeholder="Your name"
                   />
                 </div>
@@ -698,7 +698,7 @@ export default function Contact() {
                     value={servicesFormState.email}
                     onChange={handleServicesChange}
                     required
-                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                     placeholder="your@email.com"
                   />
                 </div>
@@ -717,7 +717,7 @@ export default function Contact() {
                     value={servicesFormState.businessType}
                     onChange={handleServicesChange}
                     required
-                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                     placeholder="E.g., Ecommerce, SaaS, Service Business"
                   />
                 </div>
@@ -735,7 +735,7 @@ export default function Contact() {
                     value={servicesFormState.serviceNeeded}
                     onChange={handleServicesChange}
                     required
-                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
+                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue"
                   >
                     <option value="">Select a service</option>
                     <option value="website-design">
@@ -770,7 +770,7 @@ export default function Contact() {
                     onChange={handleServicesChange}
                     rows={6}
                     required
-                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-tertiary rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue resize-none"
+                    className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue resize-none"
                     placeholder="What are your goals? What challenges are you facing? What timeline do you have in mind?"
                   />
                 </div>

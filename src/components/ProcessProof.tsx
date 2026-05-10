@@ -32,7 +32,7 @@ export default function ProcessProof({
           {steps.map((step, index) => (
             <div
               key={step}
-              className="rounded-[2rem] border border-white/10 bg-dark-secondary p-5 shadow-xl shadow-black/5 text-left"
+              className="rounded-[2rem] border border-dark-border bg-dark-card p-5 shadow-xl shadow-black/5 text-left"
             >
               <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-blue text-white text-base font-semibold">
                 {index + 1}
