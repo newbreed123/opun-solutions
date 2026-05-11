@@ -290,7 +290,7 @@ export default function Industries() {
             ))}
           </div>
           <Button
-            href="/solutions/ecommerce"
+            href="/services/ecommerce-solutions"
             className="mt-8 items-center mx-auto"
           >
             View Ecommerce Solutions →

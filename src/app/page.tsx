@@ -6,7 +6,10 @@ import ServiceCard from "@/components/ServiceCard";
 import {
   AuditPreviewMockup,
   ChatbotPreviewMockup,
+  FunnelArchitectureDiagram,
+  LeadSystemDashboardMockup,
   OperationsDashboardMockup,
+  WorkflowMapMockup,
 } from "@/components/VisualMockups";
 import {
   BarChart3,
@@ -102,7 +105,7 @@ export default function Home() {
                 team sell better and operate with more control.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button href="/contact" variant="primary" size="lg">
+                <Button href="/contact?source=homepage" variant="primary" size="lg">
                   Book Strategy Call
                 </Button>
                 <Button href="/services/ecommerce-solutions" variant="secondary" size="lg">
@@ -110,7 +113,7 @@ export default function Home() {
                 </Button>
               </div>
             </div>
-            <OperationsDashboardMockup />
+            <LeadSystemDashboardMockup />
           </div>
 
           <div className="mt-12 grid gap-3 border-t border-dark-border pt-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -140,7 +143,7 @@ export default function Home() {
         </div>
         <SystemsMap />
         <div className="mt-10 text-center">
-          <Button href="/contact" size="lg">
+          <Button href="/contact?source=homepage" size="lg">
             Book Strategy Call
           </Button>
         </div>
@@ -186,7 +189,7 @@ export default function Home() {
           </div>
         </div>
         <div className="mt-10 text-center">
-          <Button href="/contact" size="lg">
+          <Button href="/contact?source=homepage" size="lg">
             Book Strategy Call
           </Button>
         </div>
@@ -195,20 +198,27 @@ export default function Home() {
       <Section bgColor="primary">
         <div className="mb-12 max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Coded UI Mockups
+            Visual System Proof
           </p>
           <h2 className="heading-2 mt-4">
-            Premium Interfaces That Make Operations Easier to Understand
+            Visual Workflows That Make Business Systems Easier to Understand
           </h2>
           <p className="body-lg mt-5 text-secondary">
-            We use real interface patterns to make complex workflows easier for
-            customers and teams to follow.
+            We use dashboard-style UI, lead flow diagrams, ecommerce audit
+            previews, and AI assistant mockups to make complex operations
+            visible before they become expensive problems.
           </p>
         </div>
-        <div className="grid gap-5 lg:grid-cols-3">
-          <ChatbotPreviewMockup />
-          <AuditPreviewMockup />
+        <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+          <FunnelArchitectureDiagram />
+          <div className="grid gap-5">
+            <AuditPreviewMockup />
+            <ChatbotPreviewMockup />
+          </div>
+        </div>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <OperationsDashboardMockup />
+          <WorkflowMapMockup />
         </div>
       </Section>
 
@@ -234,7 +244,7 @@ export default function Home() {
           />
           <ServiceCard
             icon={MessageSquare}
-            title="AI Chatbots & Automation"
+            title="AI & Automation"
             description="AI assistants that answer questions, qualify leads, route inquiries, and support human follow-up."
             href="/services/ai-chatbots-automation"
           />
@@ -299,7 +309,7 @@ export default function Home() {
         headline="Ready to Build a Business System That Converts?"
         subheadline="Book a strategy call and we will map where your website, ecommerce flow, AI assistant, automation, and operations can work better together."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact"
+        buttonHref="/contact?source=homepage"
       />
     </>
   );

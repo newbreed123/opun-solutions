@@ -85,7 +85,10 @@ export default function OpunAIAssistant() {
             ))}
           </div>
 
-          <Link href="/contact" className="btn btn-primary mt-5 w-full">
+          <Link
+            href="/contact?source=ai-chatbot"
+            className="btn btn-primary mt-5 w-full"
+          >
             <Check className="mr-2 h-4 w-4" />
             Book Strategy Call
           </Link>

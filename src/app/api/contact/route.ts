@@ -10,6 +10,7 @@ import {
   toCleanStringRecord,
   ValidationIssue,
 } from "@/lib/form-submissions";
+import { normalizeLead } from "@/lib/leads";
 
 const contactFields: FieldDefinition[] = [
   { key: "name", label: "name", required: true },
@@ -22,6 +23,7 @@ const contactFields: FieldDefinition[] = [
     aliases: ["service"],
   },
   { key: "projectDescription", label: "project details", required: true },
+  { key: "sourcePage", label: "source page", aliases: ["source"] },
 ];
 
 export async function POST(request: NextRequest) {
@@ -62,7 +64,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logDevelopmentSubmission("Contact form", values);
+    const lead = normalizeLead(values, {
+      leadType: "contact",
+      defaultSourcePage: "contact-general",
+    });
+
+    logDevelopmentSubmission("Contact form", lead);
 
     return NextResponse.json(
       {

@@ -11,6 +11,7 @@ import {
   toCleanStringRecord,
   ValidationIssue,
 } from "@/lib/form-submissions";
+import { normalizeLead } from "@/lib/leads";
 
 const auditFields: FieldDefinition[] = [
   { key: "name", label: "name", required: true },
@@ -20,6 +21,7 @@ const auditFields: FieldDefinition[] = [
   { key: "revenue", label: "monthly revenue range", required: true },
   { key: "biggestIssue", label: "biggest issue", required: true },
   { key: "runningAds", label: "ad status", required: true },
+  { key: "sourcePage", label: "source page", aliases: ["source"] },
 ];
 
 export async function POST(request: NextRequest) {
@@ -69,7 +71,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logDevelopmentSubmission("Ecommerce audit", values);
+    const lead = normalizeLead(values, {
+      leadType: "ecommerce-audit",
+      defaultSourcePage: "ecommerce-audit",
+    });
+
+    logDevelopmentSubmission("Ecommerce audit", lead);
 
     return NextResponse.json(
       {

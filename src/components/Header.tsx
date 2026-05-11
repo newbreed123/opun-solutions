@@ -11,24 +11,20 @@ const navLinks = [
     href: "/services",
     children: [
       {
-        label: "Free Ecommerce Audit",
-        href: "/services/ecommerce-audit",
-      },
-      {
         label: "Ecommerce Systems",
         href: "/services/ecommerce-solutions",
       },
       {
-        label: "Lead Generation Systems",
-        href: "/services",
-      },
-      {
-        label: "AI Chatbots & Automation",
+        label: "AI & Automation",
         href: "/services/ai-chatbots-automation",
       },
       {
-        label: "Client Portals & Dashboards",
-        href: "/services",
+        label: "Lead Generation Systems",
+        href: "/solutions/lead-generation-systems",
+      },
+      {
+        label: "Audit Scanner",
+        href: "/tools/ecommerce-audit-scanner",
       },
     ],
   },
@@ -37,12 +33,13 @@ const navLinks = [
     href: "/industries",
     children: [
       { label: "Ecommerce Brands", href: "/services/ecommerce-solutions" },
-      // { label: "Care Agencies", href: "/industries" },
-      // { label: "Coaches & Consultants", href: "/industries" },
-      // { label: "Local Services", href: "/industries" },
+      { label: "Care Agencies", href: "/industries" },
+      { label: "Coaches & Consultants", href: "/industries" },
+      { label: "Local Service Businesses", href: "/industries" },
     ],
   },
   { label: "Case Studies", href: "/case-studies" },
+  { label: "Insights", href: "/insights" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
@@ -92,7 +89,7 @@ export default function Header() {
               )}
             </div>
           ))}
-          <Link href="/contact" className="btn-primary text-sm">
+          <Link href="/contact?source=homepage" className="btn-primary text-sm">
             Book Strategy Call
           </Link>
         </div>
@@ -138,7 +135,7 @@ export default function Header() {
             ))}
             <div className="pt-4 border-t border-dark-border">
               <Link
-                href="/contact"
+                href="/contact?source=homepage"
                 className="block btn-primary text-center w-full"
                 onClick={() => setIsOpen(false)}
               >

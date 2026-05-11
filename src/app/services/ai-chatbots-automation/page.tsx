@@ -182,7 +182,7 @@ export default function AIChatbotsAutomationPage() {
         <div className="grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
           <div>
             <p className="mb-5 text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              AI CHATBOTS & AUTOMATION
+              AI & AUTOMATION
             </p>
             <h1 className="heading-1 w-[calc(100vw-2rem)] max-w-4xl md:w-auto">
               <span className="block">AI Assistants That</span>
@@ -192,12 +192,13 @@ export default function AIChatbotsAutomationPage() {
               <span className="block">Manual Work</span>
             </h1>
             <p className="mt-6 max-w-[32ch] text-lg leading-relaxed text-dark-muted md:max-w-2xl md:text-xl">
-              We build AI-powered assistants and automation workflows that help
-              your business respond instantly, qualify prospects, support
-              customers, and move people toward the right next step.
+              We build AI-powered assistants, automation workflows, dashboard
+              handoffs, and CRM/email integrations that help your business
+              respond quickly, qualify prospects, support customers, and move
+              people toward the right next step.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Button href="/contact" variant="primary" size="lg">
+              <Button href="/contact?source=ai-chatbot" variant="primary" size="lg">
                 Book Strategy Call
               </Button>
               <Button href="#automations" variant="secondary" size="lg">
@@ -467,7 +468,7 @@ export default function AIChatbotsAutomationPage() {
         headline="Ready to Turn Website Visitors Into Qualified Leads?"
         subheadline="Let's map where AI and automation can save time, capture more leads, and improve your customer journey."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact"
+        buttonHref="/contact?source=ai-chatbot"
       />
     </main>
   );

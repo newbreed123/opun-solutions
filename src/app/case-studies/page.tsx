@@ -3,7 +3,28 @@ import CaseStudyCard from "@/components/CaseStudyCard";
 import CTASection from "@/components/CTASection";
 import ProjectProofGrid from "@/components/ProjectProofGrid";
 import Section from "@/components/Section";
-import { Check } from "lucide-react";
+import { BarChart3, Check, LayoutGrid, ServerCog } from "lucide-react";
+
+const capabilityProof = [
+  {
+    title: "Integrations",
+    description:
+      "Planning how forms, CRM, email, ecommerce, and backend systems should pass information cleanly.",
+    icon: ServerCog,
+  },
+  {
+    title: "Dashboards",
+    description:
+      "Creating operational visibility around inquiries, intake, orders, requests, and follow-up status.",
+    icon: LayoutGrid,
+  },
+  {
+    title: "Tracking",
+    description:
+      "Improving source and conversion visibility so teams can understand what is actually working.",
+    icon: BarChart3,
+  },
+];
 
 export default function CaseStudies() {
   return (
@@ -110,6 +131,25 @@ export default function CaseStudies() {
 
       <Section bgColor="secondary">
         <div className="mx-auto max-w-6xl">
+          <div className="mb-12 grid gap-5 md:grid-cols-3">
+            {capabilityProof.map((capability) => {
+              const Icon = capability.icon;
+              return (
+                <div key={capability.title} className="card-elevated p-6">
+                  <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-dark-border bg-brand-blue/10 text-brand-cyan">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xl font-bold text-primary">
+                    {capability.title}
+                  </h3>
+                  <p className="mt-3 leading-relaxed text-secondary">
+                    {capability.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-brand-cyan">
               Project Examples
@@ -155,7 +195,7 @@ export default function CaseStudies() {
         headline="Want to Improve Your Customer Journey?"
         subheadline="Book a strategy call and let us map the highest-impact improvements for your website, customer journey, and operations."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact"
+        buttonHref="/contact?source=services"
       />
     </>
   );

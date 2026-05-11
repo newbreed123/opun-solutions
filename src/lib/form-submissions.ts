@@ -104,7 +104,7 @@ export function methodNotAllowedResponse() {
 
 export function logDevelopmentSubmission(
   formName: string,
-  values: Record<string, string>,
+  values: Record<string, unknown>,
 ) {
   if (process.env.NODE_ENV === "production") {
     return;

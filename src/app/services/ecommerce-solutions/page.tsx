@@ -136,7 +136,7 @@ const technologyStack = [
 const processSteps = [
   "Audit the current store and operations",
   "Map customer journey and backend workflow",
-  "Build storefront, automation, and integrations",
+  "Build storefront, automation, integrations, and dashboards",
   "Launch tracking and conversion measurement",
   "Improve based on performance",
 ];
@@ -180,7 +180,7 @@ export default function EcommerceSolutions() {
               day-to-day.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button href="/contact" variant="primary" size="lg">
+              <Button href="/contact?source=services" variant="primary" size="lg">
                 Book Free Ecommerce Audit
               </Button>
               <Button href="#solutions" variant="secondary" size="lg">
@@ -310,7 +310,7 @@ export default function EcommerceSolutions() {
               predictably.
             </p>
             <div className="mt-8 inline-flex w-full justify-center sm:w-auto">
-              <Button href="/contact" variant="primary" size="lg">
+              <Button href="/contact?source=services" variant="primary" size="lg">
                 Book a Free Ecommerce Audit
               </Button>
             </div>
@@ -415,12 +415,13 @@ export default function EcommerceSolutions() {
             Impact
           </p>
           <h2 className="heading-2 mb-6">What This Actually Helps You Do</h2>
-          <div className="grid gap-3 sm:gap-4 lg:gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:gap-4 lg:gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {[
               "Increase checkout completion",
               "Reduce manual order handling",
               "Improve shipping and fulfillment flow",
               "Get clear visibility into performance",
+              "Connect dashboards and backend integrations",
               "Build systems that support growth",
             ].map((item) => (
               <div
@@ -438,7 +439,7 @@ export default function EcommerceSolutions() {
         headline="See how this works in real businesses?"
         subheadline="Let’s review your storefront, checkout flow, operations, and tracking — then map the highest-impact improvements."
         buttonLabel="Book Free Ecommerce Audit"
-        buttonHref="/contact"
+        buttonHref="/contact?source=services"
       />
     </>
   );

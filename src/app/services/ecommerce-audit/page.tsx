@@ -66,11 +66,30 @@ const auditCards = [
 ];
 
 const walkAway = [
-  "Exactly where your store is losing revenue",
-  "What’s slowing down your operations",
-  "Tracking and visibility gaps",
-  "What to fix first, in order of impact",
-  "A clear path to improving conversions and efficiency",
+  {
+    title: "Revenue leak breakdown",
+    description:
+      "A practical look at where product discovery, checkout, trust, or follow-up may be costing you sales.",
+    icon: Target,
+  },
+  {
+    title: "Operational bottlenecks",
+    description:
+      "A review of the manual steps, order handling issues, fulfillment friction, and handoffs slowing the business down.",
+    icon: Truck,
+  },
+  {
+    title: "Tracking gaps",
+    description:
+      "A clear view of where analytics, ad tracking, backend events, or conversion visibility may be missing.",
+    icon: BarChart3,
+  },
+  {
+    title: "Fix-first roadmap",
+    description:
+      "A prioritized improvement path so you know what to address first instead of guessing.",
+    icon: Check,
+  },
 ];
 
 const whoThisIsFor = [
@@ -150,7 +169,7 @@ export default function EcommerceAudit() {
 
             <div className="flex flex-col items-stretch gap-3 sm:items-start">
               <Button
-                href="/contact"
+                href="/contact?source=ecommerce-audit"
                 variant="primary"
                 size="lg"
                 className="mx-0 w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:w-auto"
@@ -166,6 +185,11 @@ export default function EcommerceAudit() {
                 A focused review of the systems most likely to affect sales,
                 workflow clarity, and operational control.
               </p>
+
+              <div className="max-w-[calc(100vw-2rem)] rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 px-4 py-3 text-sm font-semibold leading-relaxed text-primary">
+                Limited audit spots each week so each review gets real
+                attention.
+              </div>
             </div>
           </div>
 
@@ -215,15 +239,15 @@ export default function EcommerceAudit() {
             ))}
           </div>
 
-          <div className="mt-10 sm:mt-12 rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 text-center">
+          <div className="mt-10 rounded-xl border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/15 via-dark-card to-brand-cyan/10 p-5 text-center shadow-[0_30px_80px_rgba(6,182,212,0.12)] sm:mt-12 sm:rounded-[2rem] sm:p-8">
             <h3 className="heading-3 mb-4">
-              Want to see how this applies to your store?
+              Want a clear fix-first roadmap for your store?
             </h3>
             <p className="body-md text-secondary mb-6">
-              We&apos;ll review your current setup and show you what to fix
-              first.
+              We&apos;ll review the customer journey, operations, and tracking
+              layers that matter most.
             </p>
-            <Button href="/contact" variant="primary" size="lg">
+            <Button href="/contact?source=ecommerce-audit" variant="primary" size="lg">
               Book Your Free Ecommerce Audit
             </Button>
           </div>
@@ -250,7 +274,7 @@ export default function EcommerceAudit() {
               </h2>
               <p className="body-lg text-secondary">
                 From the first click to checkout, order handling, shipping,
-                tracking, and backend coordination — we look at the full system,
+                tracking, and backend coordination, we look at the full system,
                 not just the surface.
               </p>
             </div>
@@ -310,15 +334,27 @@ export default function EcommerceAudit() {
             What You&apos;ll Walk Away With
           </h2>
 
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {walkAway.map((item) => (
               <div
-                key={item}
-                className="rounded-xl sm:rounded-[2rem] border border-dark-border bg-dark-card p-5 sm:p-8 shadow-lg shadow-black/10"
+                key={item.title}
+                className="rounded-xl border border-dark-border bg-dark-card p-5 text-left shadow-lg shadow-black/10 sm:rounded-[2rem] sm:p-8"
               >
-                <p className="body-md text-white font-semibold">{item}</p>
+                <item.icon className="mb-5 h-9 w-9 text-brand-cyan" />
+                <h3 className="heading-4 mb-3 text-white">{item.title}</h3>
+                <p className="body-md text-secondary">{item.description}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10 text-center">
+            <Button href="/contact?source=ecommerce-audit" variant="primary" size="lg">
+              Book Your Free Ecommerce Audit
+            </Button>
+            <p className="body-sm mx-auto mt-4 text-muted">
+              Limited audit spots each week. The goal is useful analysis, not a
+              rushed template report.
+            </p>
           </div>
         </div>
       </Section>
@@ -388,10 +424,10 @@ export default function EcommerceAudit() {
 
       {/* Final CTA */}
       <CTASection
-        headline="Ready to See Exactly What’s Holding Your Store Back?"
-        subheadline="We’ll show you what’s broken — and what to fix first."
+        headline="Ready to See Exactly What's Holding Your Store Back?"
+        subheadline="We'll show you what's broken and what to fix first."
         buttonLabel="Book Your Free Ecommerce Audit"
-        buttonHref="/contact"
+        buttonHref="/contact?source=ecommerce-audit"
       />
     </>
   );
