@@ -6,6 +6,7 @@ import Section from "@/components/Section";
 import {
   AlertTriangle,
   BarChart3,
+  ChevronDown,
   Check,
   ClipboardCheck,
   Download,
@@ -13,6 +14,7 @@ import {
   FileText,
   Loader2,
   Monitor,
+  MousePointerClick,
   Search,
   ServerCog,
   ShoppingCart,
@@ -21,6 +23,7 @@ import {
   Target,
   Wand2,
   WifiOff,
+  X,
 } from "lucide-react";
 
 type AuditCategory = {
@@ -41,9 +44,30 @@ type AuditResult = {
   overallStatus: string;
   overallExplanation: string;
   summary: string;
+  executiveSummary: ExecutiveSummary;
+  topPriorityRisks: TopPriorityRisk[];
   diagnostics: LiveDiagnostics;
   categories: AuditCategory[];
-  recommendedNextSteps: string[];
+  recommendedNextSteps: RecommendedNextStep[];
+};
+
+type ExecutiveSummary = {
+  summary: string;
+  highestImpactOpportunities: string[];
+  businessInterpretation: string;
+};
+
+type TopPriorityRisk = {
+  title: string;
+  riskLabel: string;
+  severity: string;
+  explanation: string;
+  recommendedFirstAction: string;
+};
+
+type RecommendedNextStep = {
+  action: string;
+  why: string;
 };
 
 type LiveDiagnostics = {
@@ -100,19 +124,19 @@ const recentScans = [
     website: "https://example-store.com",
     score: 67,
     date: "Mock data",
-    status: "Review needed",
+    status: "Needs Review",
   },
   {
     website: "https://demo-fashion.co",
     score: 74,
     date: "Mock data",
-    status: "Watchlist",
+    status: "Needs Review",
   },
   {
     website: "https://sample-homegoods.com",
     score: 59,
     date: "Mock data",
-    status: "High priority",
+    status: "High Priority",
   },
 ];
 
@@ -151,13 +175,25 @@ function priorityClasses(priority: AuditCategory["priority"]) {
   return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
 }
 
+function statusBadgeClasses(status: string) {
+  if (status === "High Priority") {
+    return "border-red-300/30 bg-red-400/10 text-red-100";
+  }
+
+  if (status === "Needs Review") {
+    return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+  }
+
+  return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
+}
+
 function scoreTone(score: number) {
   if (score < 65) {
     return "text-red-100";
   }
 
   if (score < 80) {
-    return "text-brand-cyan";
+    return "text-amber-100";
   }
 
   return "text-emerald-100";
@@ -168,6 +204,11 @@ export default function EcommerceAuditScannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [audit, setAudit] = useState<AuditResult | null>(null);
+  const [showRawLogs, setShowRawLogs] = useState(false);
+  const [expandedScreenshot, setExpandedScreenshot] = useState<{
+    src: string;
+    label: string;
+  } | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -206,6 +247,7 @@ export default function EcommerceAuditScannerPage() {
 
       setAudit(data.audit);
       setWebsite(normalizedWebsite);
+      setShowRawLogs(false);
     } catch {
       setError("Something went wrong while generating the preview report.");
       setAudit(null);
@@ -217,8 +259,8 @@ export default function EcommerceAuditScannerPage() {
   return (
     <>
       <Section bgColor="secondary" className="hero-atmosphere" padded>
-        <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-          <div>
+        <div className="grid min-w-0 items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="min-w-0">
             <p className="mb-5 text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
               Ecommerce Systems Audit Tool
             </p>
@@ -235,7 +277,7 @@ export default function EcommerceAuditScannerPage() {
 
             <form
               onSubmit={handleSubmit}
-              className="mt-8 rounded-[2rem] border border-dark-border bg-dark-card p-4 shadow-card-glow sm:p-5"
+              className="mt-8 max-w-full overflow-hidden rounded-[2rem] border border-dark-border bg-dark-card p-4 shadow-card-glow sm:p-5"
             >
               <label
                 htmlFor="website"
@@ -300,7 +342,7 @@ export default function EcommerceAuditScannerPage() {
             </form>
           </div>
 
-          <div className="card-elevated relative overflow-hidden p-5 md:p-6">
+          <div className="card-elevated relative min-w-0 max-w-full overflow-hidden p-5 md:p-6">
             <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-brand-blue/25 blur-3xl" />
             <div className="absolute -bottom-24 -left-16 h-52 w-52 rounded-full bg-brand-cyan/15 blur-3xl" />
             <div className="relative rounded-2xl border border-dark-border bg-dark-deep/80 p-5">
@@ -341,7 +383,7 @@ export default function EcommerceAuditScannerPage() {
       </Section>
 
       <Section bgColor="primary">
-        <div className="mx-auto max-w-6xl">
+        <div className="scanner-report-scope mx-auto w-full max-w-6xl overflow-x-hidden">
           {!audit ? (
             <div className="grid gap-5 lg:grid-cols-3">
               {[
@@ -377,6 +419,13 @@ export default function EcommerceAuditScannerPage() {
                     <p className="mt-2 text-sm font-semibold text-secondary">
                       {audit.overallStatus}
                     </p>
+                    <span
+                      className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
+                        audit.overallStatus
+                      )}`}
+                    >
+                      {audit.overallStatus}
+                    </span>
                     <p className="mt-3 text-sm leading-relaxed text-muted">
                       {audit.overallExplanation}
                     </p>
@@ -386,13 +435,13 @@ export default function EcommerceAuditScannerPage() {
                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-cyan">
                       Report Generated
                     </p>
-                    <h2 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
+                    <h2 className="mt-3 break-words text-3xl font-bold text-primary md:text-4xl">
                       Ecommerce Audit Preview for {audit.website}
                     </h2>
                     <p className="mt-4 leading-relaxed text-secondary">
                       {audit.summary}
                     </p>
-                    <div className="mt-5 inline-flex rounded-full border border-dark-border bg-white/[0.035] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                    <div className="mt-5 inline-flex max-w-full rounded-full border border-dark-border bg-white/[0.035] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
                       Generated {new Date(audit.generatedAt).toLocaleString()}
                     </div>
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -405,11 +454,113 @@ export default function EcommerceAuditScannerPage() {
                         <Download className="mr-2 h-4 w-4" />
                         Export Report
                       </button>
-                      <span className="inline-flex items-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-muted">
+                      <span className="inline-flex items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-muted">
                         Export coming soon
                       </span>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="card-elevated p-6 md:p-8">
+                <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                      Executive View
+                    </p>
+                    <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
+                      Executive Summary
+                    </h3>
+                    <p className="mt-5 text-lg leading-relaxed text-secondary">
+                      {audit.executiveSummary.summary}
+                    </p>
+                    <p className="mt-4 leading-relaxed text-muted">
+                      {audit.executiveSummary.businessInterpretation}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[2rem] border border-dark-border bg-dark-deep/70 p-5">
+                    <p className="text-sm font-bold text-primary">
+                      Highest-impact opportunities
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      {audit.executiveSummary.highestImpactOpportunities.map(
+                        (opportunity) => (
+                          <div
+                            key={opportunity}
+                            className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm leading-relaxed text-secondary"
+                          >
+                            <Target className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
+                            <span>{opportunity}</span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-3">
+                {audit.topPriorityRisks.map((risk) => (
+                  <div key={risk.title} className="card-elevated p-6">
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                          {risk.title}
+                        </p>
+                        <h3 className="mt-3 text-xl font-bold text-primary">
+                          {risk.riskLabel}
+                        </h3>
+                      </div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
+                          risk.severity
+                        )}`}
+                      >
+                        {risk.severity}
+                      </span>
+                    </div>
+                    <p className="leading-relaxed text-secondary">
+                      {risk.explanation}
+                    </p>
+                    <div className="mt-5 rounded-2xl border border-brand-cyan/25 bg-brand-cyan/10 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                        Recommended next step
+                      </p>
+                      <p className="mt-2 text-sm leading-relaxed text-primary">
+                        {risk.recommendedFirstAction}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-[2rem] border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/15 via-dark-card to-brand-cyan/10 p-6 shadow-[0_30px_80px_rgba(6,182,212,0.12)] md:p-8">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                  Action Plan
+                </p>
+                <h3 className="mt-3 text-3xl font-bold text-primary">
+                  What to Review First
+                </h3>
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  {audit.recommendedNextSteps.map((step, index) => (
+                    <div
+                      key={step.action}
+                      className="flex gap-4 rounded-2xl border border-dark-border bg-dark-deep/70 p-4"
+                    >
+                      <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-bold text-white">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-semibold leading-relaxed text-primary">
+                          {step.action}
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          {step.why}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -421,11 +572,11 @@ export default function EcommerceAuditScannerPage() {
                         {category.label}
                       </p>
                       <span
-                        className={`rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${priorityClasses(
-                          category.priority
+                        className={`rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
+                          category.status
                         )}`}
                       >
-                        {category.priority}
+                        {category.status}
                       </span>
                     </div>
                     <p className={`mt-5 text-4xl font-black ${scoreTone(category.score)}`}>
@@ -447,9 +598,9 @@ export default function EcommerceAuditScannerPage() {
                 ))}
               </div>
 
-              <div className="card-elevated p-6 md:p-8">
-                <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
+              <div className="card-elevated p-5 sm:p-6 md:p-8">
+                <div className="mb-8 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
                       Browser Capture
                     </p>
@@ -466,27 +617,55 @@ export default function EcommerceAuditScannerPage() {
                     href={audit.diagnostics.finalUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary"
+                    className="inline-flex w-full max-w-full items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary sm:w-auto"
                   >
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Open scanned URL
                   </a>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-2">
-                  <div className="rounded-[2rem] border border-dark-border bg-dark-deep/70 p-4">
-                    <div className="mb-4 flex items-center gap-3">
-                      <Monitor className="h-5 w-5 text-brand-cyan" />
-                      <h4 className="text-xl font-bold text-primary">
-                        Desktop Screenshot Preview
-                      </h4>
+                <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                  <div className="min-w-0 overflow-hidden rounded-[2rem] border border-dark-border bg-dark-deep/70 p-4">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Monitor className="h-5 w-5 flex-none text-brand-cyan" />
+                        <h4 className="min-w-0 text-xl font-bold text-primary">
+                          Desktop Screenshot Preview
+                        </h4>
+                      </div>
+                      {audit.diagnostics.desktopScreenshotUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedScreenshot({
+                              src: audit.diagnostics.desktopScreenshotUrl!,
+                              label: "Desktop screenshot",
+                            })
+                          }
+                          className="inline-flex w-full items-center justify-center rounded-xl border border-dark-border bg-white/[0.035] px-3 py-2 text-sm font-semibold text-secondary hover:border-brand-cyan hover:text-primary sm:w-auto"
+                        >
+                          <MousePointerClick className="mr-2 h-4 w-4 flex-none" />
+                          Open full screenshot
+                        </button>
+                      )}
                     </div>
                     {audit.diagnostics.desktopScreenshotUrl ? (
-                      <img
-                        src={audit.diagnostics.desktopScreenshotUrl}
-                        alt={`Desktop screenshot of ${audit.website}`}
-                        className="aspect-[16/10] w-full rounded-2xl border border-dark-border object-cover object-top"
-                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedScreenshot({
+                            src: audit.diagnostics.desktopScreenshotUrl!,
+                            label: "Desktop screenshot",
+                          })
+                        }
+                        className="group block w-full max-w-full overflow-hidden rounded-2xl border border-dark-border text-left"
+                      >
+                        <img
+                          src={audit.diagnostics.desktopScreenshotUrl}
+                          alt={`Desktop screenshot of ${audit.website}`}
+                          className="h-auto max-w-full aspect-[16/9] w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                        />
+                      </button>
                     ) : (
                       <div className="flex aspect-[16/10] items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] p-6 text-center text-secondary">
                         Desktop screenshot could not be captured.
@@ -494,21 +673,49 @@ export default function EcommerceAuditScannerPage() {
                     )}
                   </div>
 
-                  <div className="rounded-[2rem] border border-dark-border bg-dark-deep/70 p-4">
-                    <div className="mb-4 flex items-center gap-3">
-                      <Smartphone className="h-5 w-5 text-brand-cyan" />
-                      <h4 className="text-xl font-bold text-primary">
-                        Mobile Screenshot Preview
-                      </h4>
+                  <div className="min-w-0 overflow-hidden rounded-[2rem] border border-dark-border bg-dark-deep/70 p-4">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Smartphone className="h-5 w-5 flex-none text-brand-cyan" />
+                        <h4 className="min-w-0 text-xl font-bold text-primary">
+                          Mobile Screenshot Preview
+                        </h4>
+                      </div>
+                      {audit.diagnostics.mobileScreenshotUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedScreenshot({
+                              src: audit.diagnostics.mobileScreenshotUrl!,
+                              label: "Mobile screenshot",
+                            })
+                          }
+                          className="inline-flex w-full items-center justify-center rounded-xl border border-dark-border bg-white/[0.035] px-3 py-2 text-sm font-semibold text-secondary hover:border-brand-cyan hover:text-primary sm:w-auto"
+                        >
+                          <MousePointerClick className="mr-2 h-4 w-4 flex-none" />
+                          Open full screenshot
+                        </button>
+                      )}
                     </div>
                     {audit.diagnostics.mobileScreenshotUrl ? (
-                      <img
-                        src={audit.diagnostics.mobileScreenshotUrl}
-                        alt={`Mobile screenshot of ${audit.website}`}
-                        className="mx-auto aspect-[9/14] max-h-[34rem] w-full max-w-[18rem] rounded-2xl border border-dark-border object-cover object-top"
-                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedScreenshot({
+                            src: audit.diagnostics.mobileScreenshotUrl!,
+                            label: "Mobile screenshot",
+                          })
+                        }
+                        className="group mx-auto block w-full max-w-[23rem] overflow-hidden rounded-2xl border border-dark-border text-left"
+                      >
+                        <img
+                          src={audit.diagnostics.mobileScreenshotUrl}
+                          alt={`Mobile screenshot of ${audit.website}`}
+                          className="h-auto max-w-full aspect-[9/14] w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                        />
+                      </button>
                     ) : (
-                      <div className="mx-auto flex aspect-[9/14] max-h-[34rem] w-full max-w-[18rem] items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] p-6 text-center text-secondary">
+                      <div className="mx-auto flex aspect-[9/14] w-full max-w-[23rem] items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] p-6 text-center text-secondary">
                         Mobile screenshot could not be captured.
                       </div>
                     )}
@@ -516,21 +723,21 @@ export default function EcommerceAuditScannerPage() {
                 </div>
 
                 <div className="mt-6 grid gap-6 lg:grid-cols-2">
-                  <div className="rounded-[2rem] border border-dark-border bg-white/[0.035] p-5">
-                    <div className="mb-5 flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-brand-cyan" />
-                      <h4 className="text-xl font-bold text-primary">
+                  <div className="min-w-0 overflow-hidden rounded-[2rem] border border-dark-border bg-white/[0.035] p-4 sm:p-5">
+                    <div className="mb-5 flex min-w-0 items-center gap-3">
+                      <FileText className="h-5 w-5 flex-none text-brand-cyan" />
+                      <h4 className="min-w-0 text-xl font-bold text-primary">
                         Metadata Summary
                       </h4>
                     </div>
                     <div className="space-y-4">
-                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                        <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="min-w-0 rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                           <p className="text-sm font-bold text-primary">
                             Page title
                           </p>
                           {!audit.diagnostics.title && (
-                            <span className="rounded-full border border-red-300/30 bg-red-400/10 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-red-100">
+                            <span className="flex-none rounded-full border border-red-300/30 bg-red-400/10 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-red-100">
                               Missing
                             </span>
                           )}
@@ -541,13 +748,13 @@ export default function EcommerceAuditScannerPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                        <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="min-w-0 rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                           <p className="text-sm font-bold text-primary">
                             Meta description
                           </p>
                           {!audit.diagnostics.metaDescription && (
-                            <span className="rounded-full border border-red-300/30 bg-red-400/10 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-red-100">
+                            <span className="flex-none rounded-full border border-red-300/30 bg-red-400/10 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-red-100">
                               Missing
                             </span>
                           )}
@@ -560,16 +767,16 @@ export default function EcommerceAuditScannerPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-[2rem] border border-dark-border bg-white/[0.035] p-5">
-                    <div className="mb-5 flex items-center gap-3">
-                      <WifiOff className="h-5 w-5 text-brand-cyan" />
-                      <h4 className="text-xl font-bold text-primary">
+                  <div className="min-w-0 overflow-hidden rounded-[2rem] border border-dark-border bg-white/[0.035] p-4 sm:p-5">
+                    <div className="mb-5 flex min-w-0 items-center gap-3">
+                      <WifiOff className="h-5 w-5 flex-none text-brand-cyan" />
+                      <h4 className="min-w-0 text-xl font-bold text-primary">
                         Console Diagnostics
                       </h4>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="min-w-0 rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
                         <p className="text-sm font-bold text-primary">
                           Console errors
                         </p>
@@ -577,12 +784,29 @@ export default function EcommerceAuditScannerPage() {
                           {audit.diagnostics.consoleErrors.length}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                      <div className="min-w-0 rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
                         <p className="text-sm font-bold text-primary">
                           Failed requests
                         </p>
                         <p className="mt-2 text-3xl font-black text-brand-cyan">
                           {audit.diagnostics.failedRequests.length}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                        <p className="text-sm font-bold text-primary">
+                          Third-party warnings
+                        </p>
+                        <p className="mt-2 text-3xl font-black text-brand-cyan">
+                          {
+                            [
+                              ...audit.diagnostics.consoleErrors,
+                              ...audit.diagnostics.failedRequests,
+                            ].filter((message) =>
+                              /cdn|analytics|tag|pixel|gtm|google|facebook|meta|shopify|stripe|paypal/i.test(
+                                message
+                              )
+                            ).length
+                          }
                         </p>
                       </div>
                     </div>
@@ -593,20 +817,42 @@ export default function EcommerceAuditScannerPage() {
                         No critical console issues detected.
                       </div>
                     ) : (
-                      <div className="mt-4 space-y-3">
-                        {[
-                          ...audit.diagnostics.consoleErrors,
-                          ...audit.diagnostics.failedRequests,
-                        ]
-                          .slice(0, 5)
-                          .map((message) => (
-                            <div
-                              key={message}
-                              className="break-words rounded-2xl border border-dark-border bg-dark-deep/70 p-4 text-sm leading-relaxed text-secondary"
-                            >
-                              {message}
-                            </div>
-                          ))}
+                      <div className="mt-4">
+                        <p className="rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 text-sm leading-relaxed text-amber-100">
+                          Technical issues were detected. Review the raw logs
+                          only when diagnosing scripts, blocked assets, or
+                          tracking behavior.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowRawLogs((current) => !current)}
+                          className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary sm:w-auto"
+                        >
+                          <ChevronDown
+                            className={`mr-2 h-4 w-4 transition-transform ${
+                              showRawLogs ? "rotate-180" : ""
+                            }`}
+                          />
+                          {showRawLogs ? "Hide raw logs" : "View details"}
+                        </button>
+
+                        {showRawLogs && (
+                          <div className="mt-4 space-y-3">
+                            {[
+                              ...audit.diagnostics.consoleErrors,
+                              ...audit.diagnostics.failedRequests,
+                            ]
+                              .slice(0, 8)
+                              .map((message) => (
+                                <div
+                                  key={message}
+                                  className="break-words rounded-2xl border border-dark-border bg-dark-deep/70 p-4 text-sm leading-relaxed text-secondary"
+                                >
+                                  {message}
+                                </div>
+                              ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -637,19 +883,19 @@ export default function EcommerceAuditScannerPage() {
                   <div className="mt-6 space-y-3">
                     {[
                       {
-                        label: "High priority",
+                        label: "High Priority",
                         description:
                           "High priority issues should be fixed first because they are most likely to affect revenue, lead quality, tracking confidence, or operational flow.",
                       },
                       {
-                        label: "Medium priority",
+                        label: "Needs Review",
                         description:
-                          "Medium priority issues may affect conversion or operations and should be planned into the next improvement cycle.",
+                          "Needs Review items may affect conversion or operations and should be planned into the next improvement cycle.",
                       },
                       {
-                        label: "Low priority",
+                        label: "Healthy",
                         description:
-                          "Low priority issues are polish or optimization items that can improve the experience after the core system is working cleanly.",
+                          "Healthy areas appear stable in this lightweight scan, though they can still benefit from focused optimization.",
                       },
                     ].map((item) => (
                       <div
@@ -721,7 +967,7 @@ export default function EcommerceAuditScannerPage() {
                         <p className="break-words text-sm font-bold text-primary">
                           {scan.website}
                         </p>
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <div className="mt-3 grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
                           <div>
                             <p className="text-muted">Score</p>
                             <p className="mt-1 font-bold text-brand-cyan">
@@ -777,29 +1023,7 @@ export default function EcommerceAuditScannerPage() {
                 ))}
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-                <div className="card-elevated p-6 md:p-8">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-                    Recommended Next Steps
-                  </p>
-                  <h3 className="mt-3 text-3xl font-bold text-primary">
-                    What to Review First
-                  </h3>
-                  <div className="mt-6 space-y-3">
-                    {audit.recommendedNextSteps.map((step, index) => (
-                      <div
-                        key={step}
-                        className="flex gap-4 rounded-2xl border border-dark-border bg-white/[0.035] p-4"
-                      >
-                        <div className="flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-bold text-white">
-                          {index + 1}
-                        </div>
-                        <p className="leading-relaxed text-secondary">{step}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+              <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
                 <div className="card-elevated p-6 md:p-8">
                   <ClipboardCheck className="mb-5 h-10 w-10 text-brand-cyan" />
                   <h3 className="text-2xl font-bold text-primary">
@@ -820,6 +1044,21 @@ export default function EcommerceAuditScannerPage() {
                       Book Free Ecommerce Audit
                     </Button>
                   </div>
+                </div>
+
+                <div className="card-elevated p-6 md:p-8">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                    Report Positioning
+                  </p>
+                  <h3 className="mt-3 text-2xl font-bold text-primary">
+                    Built for ecommerce operations reviews
+                  </h3>
+                  <p className="mt-4 leading-relaxed text-secondary">
+                    This scanner keeps technical signals visible without making
+                    them the whole story. The goal is to help a team discuss
+                    conversion flow, tracking confidence, storefront clarity,
+                    and operational handoff in one place.
+                  </p>
                 </div>
               </div>
 
@@ -848,6 +1087,43 @@ export default function EcommerceAuditScannerPage() {
           )}
         </div>
       </Section>
+
+      {expandedScreenshot && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={expandedScreenshot.label}
+        >
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-[2rem] border border-dark-border bg-dark-deep shadow-2xl">
+            <div className="flex min-w-0 items-center justify-between gap-4 border-b border-dark-border p-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                  Screenshot Preview
+                </p>
+                <h3 className="mt-1 text-lg font-bold text-primary">
+                  {expandedScreenshot.label}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedScreenshot(null)}
+                className="flex-none rounded-full border border-dark-border bg-white/5 p-2 text-secondary hover:border-brand-cyan hover:text-primary"
+                aria-label="Close screenshot preview"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-[calc(92vh-5rem)] overflow-auto p-4">
+              <img
+                src={expandedScreenshot.src}
+                alt={expandedScreenshot.label}
+                className="mx-auto h-auto max-w-full rounded-2xl border border-dark-border"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

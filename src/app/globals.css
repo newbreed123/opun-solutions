@@ -222,6 +222,33 @@ button {
   min-width: 0;
 }
 
+.scanner-report-scope {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.scanner-report-scope .grid > *,
+.scanner-report-scope .flex > *,
+.scanner-report-scope .card,
+.scanner-report-scope .card-elevated {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.scanner-report-scope img,
+.scanner-report-scope button,
+.scanner-report-scope a {
+  max-width: 100%;
+}
+
+.scanner-report-scope :where(h2, h3, h4, p, span, a, button, td, th, li) {
+  overflow-wrap: anywhere;
+}
+
+.scanner-report-scope table {
+  min-width: 0;
+}
+
 .opun-ai-shell {
   position: fixed;
   right: 1rem;

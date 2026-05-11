@@ -96,11 +96,30 @@ const mockAuditCategories = [
 ];
 
 const recommendedNextSteps = [
-  "Review the homepage, collection/product pages, and checkout path against the highest-priority conversion issues.",
-  "Map the customer journey from traffic source to purchase, inquiry, support, and follow-up.",
-  "Audit analytics and ad conversion events before increasing traffic spend.",
-  "Identify where AI assistance, CRM/email routing, or dashboard visibility could reduce manual work.",
-  "Book a focused ecommerce systems audit for a human review of the actual storefront and operations.",
+  {
+    action:
+      "Review the homepage, collection/product pages, and checkout path against the highest-priority conversion issues.",
+    why: "These pages usually decide whether traffic becomes product interest, checkout intent, or a lost visitor.",
+  },
+  {
+    action:
+      "Map the customer journey from traffic source to purchase, inquiry, support, and follow-up.",
+    why: "A connected journey makes it easier to see where customers hesitate and where the team needs better handoff.",
+  },
+  {
+    action: "Audit analytics and ad conversion events before increasing traffic spend.",
+    why: "Clean tracking keeps paid traffic decisions grounded in reliable conversion and revenue signals.",
+  },
+  {
+    action:
+      "Identify where AI assistance, CRM/email routing, or dashboard visibility could reduce manual work.",
+    why: "Operational clarity helps the team respond faster and reduces repeated manual coordination.",
+  },
+  {
+    action:
+      "Book a focused ecommerce systems audit for a human review of the actual storefront and operations.",
+    why: "The tool shows signals; a human review can connect those signals to business context and priorities.",
+  },
 ];
 
 function adjustedStatus(score: number) {
@@ -109,10 +128,10 @@ function adjustedStatus(score: number) {
   }
 
   if (score < 80) {
-    return "Watchlist";
+    return "Needs Review";
   }
 
-  return "Stable Foundation";
+  return "Healthy";
 }
 
 function adjustedPriority(score: number) {
@@ -189,6 +208,94 @@ function applyLiveDiagnosticScoring(diagnostics: LiveDiagnosticsResult) {
   });
 }
 
+function buildExecutiveSummary({
+  categories,
+  diagnostics,
+  overallScore,
+}: {
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>;
+  diagnostics: LiveDiagnosticsResult;
+  overallScore: number;
+}) {
+  const lowestCategories = [...categories].sort((a, b) => a.score - b.score).slice(0, 2);
+  const opportunityLabels = lowestCategories.map((category) =>
+    category.label.replace(" Issues", "").toLowerCase(),
+  );
+  const diagnosticFlags = [
+    !diagnostics.title ? "missing page title" : "",
+    !diagnostics.metaDescription ? "missing meta description" : "",
+    diagnostics.consoleErrors.length > 0 ? "console errors" : "",
+    diagnostics.failedRequests.length > 0 ? "failed network requests" : "",
+  ].filter(Boolean);
+
+  const condition =
+    overallScore < 65
+      ? "This store should be treated as a high-priority systems review before more traffic is pushed into the funnel."
+      : overallScore < 80
+        ? "This store has a workable foundation, but several conversion, tracking, or operations signals need review before scaling."
+        : "This store appears to have a healthy foundation, with the biggest value likely coming from focused optimization rather than urgent repair.";
+
+  const diagnosticsSentence =
+    diagnosticFlags.length > 0
+      ? `The live diagnostics flagged ${diagnosticFlags.join(", ")}, which may create uncertainty for conversion measurement or page reliability.`
+      : "The lightweight live diagnostics did not detect critical console or metadata issues during this scan.";
+
+  return {
+    summary: `${condition} ${diagnosticsSentence}`,
+    highestImpactOpportunities: opportunityLabels.map((label) =>
+      `Prioritize ${label} because it is currently one of the lowest-scoring areas in the report.`,
+    ),
+    businessInterpretation:
+      "The practical business question is not only whether the storefront looks good, but whether visitors can understand the offer, move through the buying path, and leave clean data for the team to act on.",
+  };
+}
+
+function findCategory(
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>,
+  key: string,
+) {
+  return categories.find((category) => category.key === key) ?? categories[0];
+}
+
+function buildTopPriorityRisks(categories: ReturnType<typeof applyLiveDiagnosticScoring>) {
+  const conversion = findCategory(categories, "conversionIssues");
+  const ux = findCategory(categories, "uxUiIssues");
+  const operations = findCategory(categories, "operationsIssues");
+
+  return [
+    {
+      title: "Highest Revenue Risk",
+      riskLabel: conversion.label,
+      severity: conversion.status,
+      explanation:
+        conversion.issues[0] ??
+        "Conversion friction may keep qualified visitors from becoming buyers or inquiries.",
+      recommendedFirstAction:
+        "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first.",
+    },
+    {
+      title: "Highest UX Friction",
+      riskLabel: ux.label,
+      severity: ux.status,
+      explanation:
+        ux.issues[0] ??
+        "UX friction can make it harder for visitors to find the right product, answer, or next step.",
+      recommendedFirstAction:
+        "Check the mobile path, navigation clarity, and above-the-fold decision support.",
+    },
+    {
+      title: "Highest Operational Friction",
+      riskLabel: operations.label,
+      severity: operations.status,
+      explanation:
+        operations.issues[0] ??
+        "Operational gaps can create manual work after the customer takes action.",
+      recommendedFirstAction:
+        "Map order handling, support routing, backend handoffs, and team notifications.",
+    },
+  ];
+}
+
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
@@ -248,6 +355,12 @@ export async function POST(request: Request) {
       categories.reduce((total, category) => total + category.score, 0) /
         categories.length,
     );
+    const executiveSummary = buildExecutiveSummary({
+      categories,
+      diagnostics,
+      overallScore,
+    });
+    const topPriorityRisks = buildTopPriorityRisks(categories);
 
     logDevelopmentSubmission("Ecommerce audit scanner", {
       website: values.website,
@@ -268,6 +381,8 @@ export async function POST(request: Request) {
             "The report combines mock audit categories with lightweight live diagnostics for metadata, screenshots, console errors, and failed requests.",
           summary:
             "This internal MVP still uses mock strategic analysis, but now includes real lightweight diagnostics from the submitted URL. A future version can add Lighthouse, AI analysis, tracking detection, and deeper ecommerce workflow checks.",
+          executiveSummary,
+          topPriorityRisks,
           diagnostics,
           categories,
           recommendedNextSteps,
