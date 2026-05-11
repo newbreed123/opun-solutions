@@ -76,6 +76,33 @@ type LiveDiagnostics = {
   metaDescription: string | null;
   desktopScreenshotUrl: string | null;
   mobileScreenshotUrl: string | null;
+  technologyDetections: {
+    key: string;
+    label: string;
+    detected: boolean;
+    description: string;
+    signals: string[];
+  }[];
+  platformDetection: {
+    name: string;
+    confidence: number;
+    details: string[];
+  };
+  commerceFlowSignals: {
+    cartVisible: boolean;
+    checkoutVisible: boolean;
+    productCatalogVisible: boolean;
+    formVisible: boolean;
+    ctaVisible: boolean;
+    ctaCount: number;
+    ctaLabels: string[];
+  };
+  conversionSignals: {
+    formCount: number;
+    inputCount: number;
+    ctaCount: number;
+    ctaLabels: string[];
+  };
   consoleErrors: string[];
   failedRequests: string[];
   warnings: string[];
@@ -187,6 +214,30 @@ function statusBadgeClasses(status: string) {
   return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
 }
 
+function marketingStatusLabel(count: number) {
+  if (count >= 3) {
+    return "Active";
+  }
+
+  if (count > 0) {
+    return "Limited";
+  }
+
+  return "Not Detected";
+}
+
+function marketingStatusClasses(status: string) {
+  if (status === "Active") {
+    return "border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan";
+  }
+
+  if (status === "Limited") {
+    return "border-brand-blue/30 bg-brand-blue/10 text-brand-blue";
+  }
+
+  return "border-red-300/30 bg-red-400/10 text-red-100";
+}
+
 function scoreTone(score: number) {
   if (score < 65) {
     return "text-red-100";
@@ -205,6 +256,7 @@ export default function EcommerceAuditScannerPage() {
   const [error, setError] = useState("");
   const [audit, setAudit] = useState<AuditResult | null>(null);
   const [showRawLogs, setShowRawLogs] = useState(false);
+  const [showVisibilityDetails, setShowVisibilityDetails] = useState(false);
   const [expandedScreenshot, setExpandedScreenshot] = useState<{
     src: string;
     label: string;
@@ -239,7 +291,7 @@ export default function EcommerceAuditScannerPage() {
         setError(
           data.success
             ? "We could not generate the audit preview. Please try again."
-            : data.error
+            : data.error,
         );
         setAudit(null);
         return;
@@ -411,7 +463,7 @@ export default function EcommerceAuditScannerPage() {
                     </p>
                     <p
                       className={`mt-4 text-6xl font-black ${scoreTone(
-                        audit.overallScore
+                        audit.overallScore,
                       )}`}
                     >
                       {audit.overallScore}
@@ -421,7 +473,7 @@ export default function EcommerceAuditScannerPage() {
                     </p>
                     <span
                       className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
-                        audit.overallStatus
+                        audit.overallStatus,
                       )}`}
                     >
                       {audit.overallStatus}
@@ -493,7 +545,7 @@ export default function EcommerceAuditScannerPage() {
                             <Target className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
                             <span>{opportunity}</span>
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </div>
@@ -514,7 +566,7 @@ export default function EcommerceAuditScannerPage() {
                       </div>
                       <span
                         className={`rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
-                          risk.severity
+                          risk.severity,
                         )}`}
                       >
                         {risk.severity}
@@ -573,13 +625,15 @@ export default function EcommerceAuditScannerPage() {
                       </p>
                       <span
                         className={`rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
-                          category.status
+                          category.status,
                         )}`}
                       >
                         {category.status}
                       </span>
                     </div>
-                    <p className={`mt-5 text-4xl font-black ${scoreTone(category.score)}`}>
+                    <p
+                      className={`mt-5 text-4xl font-black ${scoreTone(category.score)}`}
+                    >
                       {category.score}
                     </p>
                     <p className="mt-2 text-sm font-bold text-primary">
@@ -803,8 +857,8 @@ export default function EcommerceAuditScannerPage() {
                               ...audit.diagnostics.failedRequests,
                             ].filter((message) =>
                               /cdn|analytics|tag|pixel|gtm|google|facebook|meta|shopify|stripe|paypal/i.test(
-                                message
-                              )
+                                message,
+                              ),
                             ).length
                           }
                         </p>
@@ -872,6 +926,257 @@ export default function EcommerceAuditScannerPage() {
                 </div>
               </div>
 
+              <div className="card-elevated p-6 md:p-8">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                  Platform & Tracking Visibility
+                </p>
+                <h3 className="mt-3 text-3xl font-bold text-primary">
+                  Storefront platform and marketing signal clarity
+                </h3>
+                <p className="mt-4 leading-relaxed text-secondary">
+                  This section shows what the scan could identify from the page
+                  assets and content, helping the team understand whether
+                  platform, tracking, and commerce flow signals are visible
+                  enough for measurement and optimization.
+                </p>
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                    <p className="text-sm font-bold text-primary">
+                      Platform detected
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold text-secondary">
+                      {audit.diagnostics.platformDetection.name}
+                    </p>
+                    <p className="mt-2 text-sm text-muted">
+                      {audit.diagnostics.platformDetection.confidence}%
+                      confidence
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
+                          <BarChart3 className="h-4 w-4" />
+                          Marketing & Visibility Stack
+                        </div>
+                        <p className="mt-4 text-sm font-semibold text-primary">
+                          Marketing tools visible
+                        </p>
+                        <p className="mt-2 text-3xl font-semibold text-secondary">
+                          {
+                            audit.diagnostics.technologyDetections.filter(
+                              (tool) =>
+                                tool.detected &&
+                                [
+                                  "googleAnalytics",
+                                  "googleTagManager",
+                                  "metaPixel",
+                                  "klaviyo",
+                                  "mailchimp",
+                                ].includes(tool.key),
+                            ).length
+                          }
+                        </p>
+                      </div>
+
+                      <span
+                        className={`mt-1 inline-flex items-center rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${marketingStatusClasses(
+                          marketingStatusLabel(
+                            audit.diagnostics.technologyDetections.filter(
+                              (tool) =>
+                                tool.detected &&
+                                [
+                                  "googleAnalytics",
+                                  "googleTagManager",
+                                  "metaPixel",
+                                  "klaviyo",
+                                  "mailchimp",
+                                ].includes(tool.key),
+                            ).length,
+                          ),
+                        )}`}
+                      >
+                        {marketingStatusLabel(
+                          audit.diagnostics.technologyDetections.filter(
+                            (tool) =>
+                              tool.detected &&
+                              [
+                                "googleAnalytics",
+                                "googleTagManager",
+                                "metaPixel",
+                                "klaviyo",
+                                "mailchimp",
+                              ].includes(tool.key),
+                          ).length,
+                        )}
+                      </span>
+                    </div>
+
+                    <p className="mt-4 text-sm leading-relaxed text-secondary">
+                      {audit.diagnostics.technologyDetections
+                        .filter(
+                          (tool) =>
+                            tool.detected &&
+                            [
+                              "googleAnalytics",
+                              "googleTagManager",
+                              "metaPixel",
+                              "klaviyo",
+                              "mailchimp",
+                            ].includes(tool.key),
+                        )
+                        .map((tool) => tool.label)
+                        .join(", ") ||
+                        "No visible marketing/tracking tools were detected from public page assets."}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                    <p className="text-sm font-bold text-primary">
+                      CTA / commerce signals
+                    </p>
+                    <p className="mt-3 text-2xl font-semibold text-secondary">
+                      {audit.diagnostics.commerceFlowSignals.ctaVisible
+                        ? "Visible"
+                        : "Hidden"}
+                    </p>
+                    <p className="mt-2 text-sm text-muted">
+                      Includes CTA labels, forms, and checkout indicators
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                    <p className="text-sm font-bold text-primary">
+                      Cart visibility
+                    </p>
+                    <p className="mt-3 text-xl font-semibold text-secondary">
+                      {audit.diagnostics.commerceFlowSignals.cartVisible
+                        ? "Yes"
+                        : "No"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                    <p className="text-sm font-bold text-primary">
+                      Checkout visibility
+                    </p>
+                    <p className="mt-3 text-xl font-semibold text-secondary">
+                      {audit.diagnostics.commerceFlowSignals.checkoutVisible
+                        ? "Yes"
+                        : "No"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                    <p className="text-sm font-bold text-primary">
+                      Product catalog visibility
+                    </p>
+                    <p className="mt-3 text-xl font-semibold text-secondary">
+                      {audit.diagnostics.commerceFlowSignals
+                        .productCatalogVisible
+                        ? "Yes"
+                        : "No"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 p-5">
+                  <p className="text-sm font-semibold text-brand-cyan uppercase tracking-[0.18em]">
+                    Business Impact
+                  </p>
+                  <p className="mt-3 leading-relaxed text-secondary">
+                    <strong>Platform visibility</strong> matters because it
+                    indicates whether the storefront foundation is detectable
+                    for support and optimization. Clear platform signals help
+                    teams route issues, apply platform-specific best practices,
+                    and predict maintenance needs.
+                  </p>
+                  <p className="mt-3 leading-relaxed text-secondary">
+                    <strong>Tracking visibility</strong> matters because it
+                    determines whether marketing spend can be measured and
+                    optimized. When tools like Google Analytics or Meta Pixel
+                    are visible, teams can trust conversion data and make
+                    confident decisions about ad budgets and campaign targeting.
+                  </p>
+                  <p className="mt-3 leading-relaxed text-secondary">
+                    <strong>Operational visibility</strong> impacts conversion
+                    analysis by showing whether customers can find carts,
+                    checkouts, and product catalogs. Hidden commerce signals can
+                    create friction that leaks visitors before they convert,
+                    making it harder to optimize the funnel.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowVisibilityDetails((current) => !current)
+                  }
+                  className="mt-6 inline-flex w-full items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary sm:w-auto"
+                >
+                  <ChevronDown
+                    className={`mr-2 h-4 w-4 transition-transform ${
+                      showVisibilityDetails ? "rotate-180" : ""
+                    }`}
+                  />
+                  {showVisibilityDetails ? "Hide details" : "View details"}
+                </button>
+
+                {showVisibilityDetails && (
+                  <div className="mt-5 space-y-4 rounded-2xl border border-dark-border bg-dark-deep/70 p-5 text-sm leading-relaxed text-secondary">
+                    <div>
+                      <p className="font-semibold text-primary">
+                        Platform detection details
+                      </p>
+                      <ul className="mt-3 space-y-2 pl-4 list-disc">
+                        {audit.diagnostics.platformDetection.details.map(
+                          (detail) => (
+                            <li key={detail}>{detail}</li>
+                          ),
+                        )}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-primary">
+                        Detected tracking tools
+                      </p>
+                      <p className="mt-2 text-sm text-secondary">
+                        {audit.diagnostics.technologyDetections
+                          .filter(
+                            (tool) =>
+                              tool.detected &&
+                              [
+                                "googleAnalytics",
+                                "googleTagManager",
+                                "metaPixel",
+                                "klaviyo",
+                                "mailchimp",
+                              ].includes(tool.key),
+                          )
+                          .map((tool) => tool.label)
+                          .join(", ") ||
+                          "No common marketing/tracking tools were detected from visible page assets."}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-primary">
+                        CTA labels sampled
+                      </p>
+                      <p className="mt-2 text-sm text-secondary">
+                        {audit.diagnostics.commerceFlowSignals.ctaLabels
+                          .length > 0
+                          ? audit.diagnostics.commerceFlowSignals.ctaLabels.join(
+                              ", ",
+                            )
+                          : "No strong CTA labels were found in the visible page sample."}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
                 <div className="card-elevated p-6 md:p-8">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
@@ -933,7 +1238,9 @@ export default function EcommerceAuditScannerPage() {
                     <table className="w-full text-left text-sm">
                       <thead className="bg-white/[0.04] text-muted">
                         <tr>
-                          <th className="px-4 py-3 font-semibold">Website URL</th>
+                          <th className="px-4 py-3 font-semibold">
+                            Website URL
+                          </th>
                           <th className="px-4 py-3 font-semibold">Score</th>
                           <th className="px-4 py-3 font-semibold">Date</th>
                           <th className="px-4 py-3 font-semibold">Status</th>
@@ -948,7 +1255,9 @@ export default function EcommerceAuditScannerPage() {
                             <td className="px-4 py-3 font-bold text-brand-cyan">
                               {scan.score}
                             </td>
-                            <td className="px-4 py-3 text-muted">{scan.date}</td>
+                            <td className="px-4 py-3 text-muted">
+                              {scan.date}
+                            </td>
                             <td className="px-4 py-3 text-secondary">
                               {scan.status}
                             </td>

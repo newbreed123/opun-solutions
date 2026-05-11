@@ -13,16 +13,76 @@ type ViewportScanResult = {
   screenshotError?: string;
 };
 
+type ViewportMetadata = {
+  title: string | null;
+  metaDescription: string | null;
+  technologyDetections: TechnologyDetection[];
+  platformDetection: PlatformDetection;
+  commerceFlowSignals: CommerceFlowSignals;
+  conversionSignals: ConversionSignals;
+};
+
+export type PlatformName =
+  | "Shopify"
+  | "BigCommerce"
+  | "WooCommerce"
+  | "Magento / Adobe Commerce"
+  | "Unknown";
+
+export type PlatformDetection = {
+  name: PlatformName;
+  confidence: number;
+  details: string[];
+};
+
+export type CommerceFlowSignals = {
+  cartVisible: boolean;
+  checkoutVisible: boolean;
+  productCatalogVisible: boolean;
+  formVisible: boolean;
+  ctaVisible: boolean;
+  ctaCount: number;
+  ctaLabels: string[];
+};
+
 export type LiveDiagnosticsResult = {
   finalUrl: string;
   title: string | null;
   metaDescription: string | null;
   desktopScreenshotUrl: string | null;
   mobileScreenshotUrl: string | null;
+  technologyDetections: TechnologyDetection[];
+  platformDetection: PlatformDetection;
+  commerceFlowSignals: CommerceFlowSignals;
+  conversionSignals: ConversionSignals;
   consoleErrors: string[];
   failedRequests: string[];
   warnings: string[];
   scanError?: string;
+};
+
+export type TechnologyDetection = {
+  key:
+    | "googleAnalytics"
+    | "googleTagManager"
+    | "metaPixel"
+    | "klaviyo"
+    | "mailchimp"
+    | "shopify"
+    | "bigCommerce"
+    | "wooCommerce"
+    | "magento";
+  label: string;
+  detected: boolean;
+  description: string;
+  signals: string[];
+};
+
+export type ConversionSignals = {
+  formCount: number;
+  inputCount: number;
+  ctaCount: number;
+  ctaLabels: string[];
 };
 
 type ViewportDefinition = {
@@ -105,6 +165,10 @@ export async function runLightweightEcommerceDiagnostics(
       metaDescription: desktop.metaDescription,
       desktopScreenshotUrl: desktop.screenshotUrl,
       mobileScreenshotUrl: mobile.screenshotUrl,
+      technologyDetections: desktop.technologyDetections,
+      platformDetection: desktop.platformDetection,
+      commerceFlowSignals: desktop.commerceFlowSignals,
+      conversionSignals: desktop.conversionSignals,
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
@@ -116,6 +180,10 @@ export async function runLightweightEcommerceDiagnostics(
       metaDescription: null,
       desktopScreenshotUrl: null,
       mobileScreenshotUrl: null,
+      technologyDetections: defaultTechnologyDetections(),
+      platformDetection: defaultPlatformDetection(),
+      commerceFlowSignals: defaultCommerceFlowSignals(),
+      conversionSignals: defaultConversionSignals(),
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
@@ -172,17 +240,23 @@ async function scanViewport({
 
     await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
 
-    const metadata =
+    const metadata: ViewportMetadata =
       viewport.name === "desktop"
         ? await extractMetadata(page)
-        : { title: null, metaDescription: null };
+        : {
+            title: null,
+            metaDescription: null,
+            technologyDetections: defaultTechnologyDetections(),
+            platformDetection: defaultPlatformDetection(),
+            commerceFlowSignals: defaultCommerceFlowSignals(),
+            conversionSignals: defaultConversionSignals(),
+          };
 
     const screenshot = await captureScreenshot(page, scanId, viewport);
 
     return {
       finalUrl: page.url(),
-      title: metadata.title,
-      metaDescription: metadata.metaDescription,
+      ...metadata,
       ...screenshot,
     };
   } finally {
@@ -224,10 +298,415 @@ async function extractMetadata(page: Page) {
       .getAttribute("content")
       .catch(() => ""),
   );
+  const signalDetection = await detectPageSignals(page);
 
   return {
     title,
     metaDescription,
+    ...signalDetection,
+  };
+}
+
+const trackingToolRules = [
+  {
+    key: "googleAnalytics",
+    label: "Google Analytics / GA4",
+    description:
+      "Looks for GA4, gtag, analytics.js, or Google Analytics collection scripts.",
+    patterns: [
+      /gtag\s*\(/i,
+      /G-[A-Z0-9]{4,}/i,
+      /google-analytics\.com/i,
+      /analytics\.js/i,
+      /\bga\s*\(/i,
+    ],
+  },
+  {
+    key: "googleTagManager",
+    label: "Google Tag Manager",
+    description:
+      "Looks for GTM container scripts, GTM IDs, or dataLayer setup.",
+    patterns: [/googletagmanager\.com\/gtm\.js/i, /GTM-[A-Z0-9]+/i, /dataLayer/i],
+  },
+  {
+    key: "metaPixel",
+    label: "Meta Pixel",
+    description:
+      "Looks for Meta/Facebook pixel scripts, fbq, or browser pixel requests.",
+    patterns: [/fbq\s*\(/i, /connect\.facebook\.net\/.*fbevents\.js/i, /facebook\.com\/tr/i, /_fbp/i],
+  },
+  {
+    key: "klaviyo",
+    label: "Klaviyo",
+    description:
+      "Looks for Klaviyo onsite scripts, forms, or _learnq tracking setup.",
+    patterns: [/klaviyo/i, /static\.klaviyo\.com/i, /_learnq/i],
+  },
+  {
+    key: "mailchimp",
+    label: "Mailchimp",
+    description:
+      "Looks for Mailchimp embedded forms, list-manage links, or tracking snippets.",
+    patterns: [/mailchimp/i, /list-manage\.com/i, /chimpstatic\.com/i, /mc\.list-manage\.com/i],
+  },
+] as const;
+
+const platformIndicatorRules = [
+  {
+    key: "shopify",
+    label: "Shopify Indicators",
+    description:
+      "Looks for Shopify CDN assets, theme objects, Shopify analytics, or cart endpoints.",
+    patterns: [
+      /cdn\.shopify\.com/i,
+      /ShopifyAnalytics/i,
+      /Shopify\.theme/i,
+      /myshopify\.com/i,
+      /\/cart\.js/i,
+      /\/products\//i,
+      /\/collections\//i,
+    ],
+  },
+  {
+    key: "bigCommerce",
+    label: "BigCommerce Indicators",
+    description:
+      "Looks for BigCommerce stencil assets, store APIs, or checkout/cart patterns.",
+    patterns: [
+      /cdn\d*\.bigcommerce\.com/i,
+      /bigcommerce\.com/i,
+      /stencil\.io/i,
+      /checkout\.php/i,
+      /cart\.php/i,
+      /cartAction\.php/i,
+      /bcapp/i,
+    ],
+  },
+  {
+    key: "wooCommerce",
+    label: "WooCommerce Indicators",
+    description:
+      "Looks for WordPress WooCommerce assets, plugin paths, or add-to-cart parameters.",
+    patterns: [
+      /woocommerce/i,
+      /wp-content\/plugins\/woocommerce/i,
+      /add-to-cart=/i,
+      /wc-add-to-cart/i,
+      /wp-json\/wc\/store/i,
+      /checkout\/order-received/i,
+    ],
+  },
+  {
+    key: "magento",
+    label: "Magento Indicators",
+    description:
+      "Looks for Magento or Adobe Commerce storefront scripts, checkout paths, and UI components.",
+    patterns: [
+      /mage\.js/i,
+      /Magento/i,
+      /checkout\/cart/i,
+      /minicart/i,
+      /Magento_Ui/i,
+      /requirejs\.config/i,
+    ],
+  },
+] as const;
+
+export function detectTechnologyDetections(signalText: string): TechnologyDetection[] {
+  const checks = [...trackingToolRules, ...platformIndicatorRules] as const;
+
+  return checks.map((check) => {
+    const signals = check.patterns
+      .filter((pattern) => pattern.test(signalText))
+      .map((pattern) => pattern.source)
+      .slice(0, 3);
+
+    return {
+      key: check.key,
+      label: check.label,
+      detected: signals.length > 0,
+      description: check.description,
+      signals,
+    };
+  });
+}
+
+export function detectEcommercePlatform(signalText: string): PlatformDetection {
+  const platformScores: Array<{
+    name: PlatformName;
+    count: number;
+    details: string[];
+  }> = platformIndicatorRules.map((rule) => {
+    const matches = rule.patterns.filter((pattern) => pattern.test(signalText));
+    return {
+      name:
+        rule.key === "shopify"
+          ? "Shopify"
+          : rule.key === "bigCommerce"
+          ? "BigCommerce"
+          : rule.key === "wooCommerce"
+          ? "WooCommerce"
+          : "Magento / Adobe Commerce",
+      count: matches.length,
+      details: matches.map((pattern) => `Matched ${pattern.source}`),
+    };
+  });
+
+  const best = platformScores.sort((a, b) => b.count - a.count)[0];
+
+  if (!best || best.count === 0) {
+    return {
+      name: "Unknown",
+      confidence: 0,
+      details: [
+        "No clear storefront platform indicators were detected from page assets or scripts.",
+      ],
+    };
+  }
+
+  return {
+    name: best.name,
+    confidence: Math.min(100, 40 + best.count * 25),
+    details:
+      best.details.length > 0
+        ? best.details
+        : [
+            `Detected a strong ${best.name} storefront signal based on visible platform indicators.`,
+          ],
+  };
+}
+
+export function detectCommerceFlowSignals(
+  signalText: string,
+  ctaLabels: string[],
+  formCount: number,
+  inputCount: number,
+): CommerceFlowSignals {
+  const cartVisible = /\/cart|\bcart\b|add-to-cart|add to bag|basket\b|bag\b/i.test(
+    signalText,
+  );
+  const checkoutVisible = /checkout|place order|complete order|order now|buy now/i.test(
+    signalText,
+  );
+  const productCatalogVisible = /\/products|\/collections|product-category|shop\//i.test(
+    signalText,
+  );
+
+  return {
+    cartVisible,
+    checkoutVisible,
+    productCatalogVisible,
+    formVisible: formCount > 0,
+    ctaVisible: ctaLabels.length > 0,
+    ctaCount: ctaLabels.length,
+    ctaLabels,
+  };
+}
+
+async function detectPageSignals(page: Page) {
+  try {
+    const pageData = await page.evaluate(() => {
+      const scriptText = Array.from(document.scripts)
+        .map((script) => `${script.src || ""} ${script.textContent || ""}`)
+        .join(" ");
+      const iframeSources = Array.from(document.querySelectorAll("iframe"))
+        .map((iframe) => iframe.getAttribute("src") || "")
+        .join(" ");
+      const linkSources = Array.from(
+        document.querySelectorAll("link[href], a[href], img[src], source[src]"),
+      )
+        .map((element) => {
+          const href = element.getAttribute("href") || "";
+          const src = element.getAttribute("src") || "";
+          return `${href} ${src}`;
+        })
+        .join(" ");
+      const pageMarkup = document.documentElement.innerHTML.slice(0, 500000);
+
+      const visibleText = Array.from(document.querySelectorAll("body *"))
+        .map((element) => {
+          const htmlElement = element as HTMLElement;
+          const style = window.getComputedStyle(htmlElement);
+
+          if (
+            style.display === "none" ||
+            style.visibility === "hidden" ||
+            htmlElement.offsetParent === null
+          ) {
+            return "";
+          }
+
+          if (htmlElement instanceof HTMLInputElement) {
+            return htmlElement.value || htmlElement.getAttribute("aria-label") || "";
+          }
+
+          return (
+            htmlElement.textContent ||
+            htmlElement.getAttribute("aria-label") ||
+            htmlElement.getAttribute("title") ||
+            ""
+          ).trim();
+        })
+        .filter(Boolean)
+        .join(" ");
+
+      const ctaPattern =
+        /add to cart|buy now|checkout|book|schedule|contact|get started|subscribe|sign up|request|quote|audit|demo|call|learn more|shop now/i;
+
+      const ctaLabels = Array.from(
+        document.querySelectorAll("a, button, input[type='submit']"),
+      )
+        .map((element) => {
+          const htmlElement = element as HTMLElement;
+          const label = htmlElement.textContent || htmlElement.getAttribute("aria-label") || "";
+          return label.replace(/\s+/g, " ").trim();
+        })
+        .filter((label) => label && ctaPattern.test(label))
+        .slice(0, 10);
+
+      return {
+        scriptText,
+        iframeSources,
+        linkSources,
+        pageMarkup,
+        visibleText,
+        ctaLabels,
+        formCount: document.querySelectorAll("form").length,
+        inputCount: document.querySelectorAll(
+          "input:not([type='hidden']), textarea, select",
+        ).length,
+      };
+    });
+
+    const signalText = (
+      `${pageData.scriptText} ${pageData.iframeSources} ${pageData.linkSources} ${pageData.pageMarkup} ${pageData.visibleText}`.slice(
+        0,
+        500000,
+      )
+    );
+
+    return {
+      technologyDetections: detectTechnologyDetections(signalText),
+      platformDetection: detectEcommercePlatform(signalText),
+      commerceFlowSignals: detectCommerceFlowSignals(
+        signalText,
+        pageData.ctaLabels,
+        pageData.formCount,
+        pageData.inputCount,
+      ),
+      conversionSignals: {
+        formCount: pageData.formCount,
+        inputCount: pageData.inputCount,
+        ctaCount: pageData.ctaLabels.length,
+        ctaLabels: pageData.ctaLabels,
+      },
+    };
+  } catch {
+    return {
+      technologyDetections: defaultTechnologyDetections(),
+      platformDetection: defaultPlatformDetection(),
+      commerceFlowSignals: defaultCommerceFlowSignals(),
+      conversionSignals: defaultConversionSignals(),
+    };
+  }
+}
+
+function defaultTechnologyDetections(): TechnologyDetection[] {
+  return [
+    {
+      key: "googleAnalytics",
+      label: "Google Analytics / GA4",
+      detected: false,
+      description: "Looks for GA4, gtag, analytics.js, or Google Analytics collection scripts.",
+      signals: [],
+    },
+    {
+      key: "googleTagManager",
+      label: "Google Tag Manager",
+      detected: false,
+      description: "Looks for GTM container scripts, GTM IDs, or dataLayer setup.",
+      signals: [],
+    },
+    {
+      key: "metaPixel",
+      label: "Meta Pixel",
+      detected: false,
+      description: "Looks for Meta/Facebook pixel scripts, fbq, or browser pixel requests.",
+      signals: [],
+    },
+    {
+      key: "klaviyo",
+      label: "Klaviyo",
+      detected: false,
+      description: "Looks for Klaviyo onsite scripts, forms, or _learnq tracking setup.",
+      signals: [],
+    },
+    {
+      key: "mailchimp",
+      label: "Mailchimp",
+      detected: false,
+      description: "Looks for Mailchimp embedded forms, list-manage links, or tracking snippets.",
+      signals: [],
+    },
+    {
+      key: "shopify",
+      label: "Shopify Indicators",
+      detected: false,
+      description: "Looks for Shopify CDN assets, theme objects, Shopify analytics, or cart endpoints.",
+      signals: [],
+    },
+    {
+      key: "bigCommerce",
+      label: "BigCommerce Indicators",
+      detected: false,
+      description: "Looks for BigCommerce stencil assets, store APIs, or checkout/cart patterns.",
+      signals: [],
+    },
+    {
+      key: "wooCommerce",
+      label: "WooCommerce Indicators",
+      detected: false,
+      description: "Looks for WordPress WooCommerce assets, plugin paths, or add-to-cart parameters.",
+      signals: [],
+    },
+    {
+      key: "magento",
+      label: "Magento Indicators",
+      detected: false,
+      description: "Looks for Magento or Adobe Commerce storefront scripts, checkout paths, and UI components.",
+      signals: [],
+    },
+  ];
+}
+
+function defaultPlatformDetection(): PlatformDetection {
+  return {
+    name: "Unknown",
+    confidence: 0,
+    details: [
+      "No clear storefront platform indicators were detected from the lightweight scan.",
+    ],
+  };
+}
+
+function defaultCommerceFlowSignals(): CommerceFlowSignals {
+  return {
+    cartVisible: false,
+    checkoutVisible: false,
+    productCatalogVisible: false,
+    formVisible: false,
+    ctaVisible: false,
+    ctaCount: 0,
+    ctaLabels: [],
+  };
+}
+
+function defaultConversionSignals(): ConversionSignals {
+  return {
+    formCount: 0,
+    inputCount: 0,
+    ctaCount: 0,
+    ctaLabels: [],
   };
 }
 

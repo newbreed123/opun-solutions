@@ -240,13 +240,23 @@ function buildExecutiveSummary({
       ? `The live diagnostics flagged ${diagnosticFlags.join(", ")}, which may create uncertainty for conversion measurement or page reliability.`
       : "The lightweight live diagnostics did not detect critical console or metadata issues during this scan.";
 
+  const platformSentence =
+    diagnostics.platformDetection.name !== "Unknown"
+      ? `The scan detected ${diagnostics.platformDetection.name} as the likely storefront platform with ${diagnostics.platformDetection.confidence}% confidence.`
+      : "The storefront platform could not be identified reliably from the visible page assets.";
+
+  const flowSentence =
+    diagnostics.commerceFlowSignals.checkoutVisible || diagnostics.commerceFlowSignals.cartVisible
+      ? "The cart and checkout path are visible enough to suggest a working commerce flow in this review."
+      : "Commerce flow signals are not clearly visible, which can make it harder to assess checkout readiness and conversion friction.";
+
   return {
     summary: `${condition} ${diagnosticsSentence}`,
     highestImpactOpportunities: opportunityLabels.map((label) =>
       `Prioritize ${label} because it is currently one of the lowest-scoring areas in the report.`,
     ),
     businessInterpretation:
-      "The practical business question is not only whether the storefront looks good, but whether visitors can understand the offer, move through the buying path, and leave clean data for the team to act on.",
+      `The practical business question is not only whether the storefront looks good, but whether visitors can understand the offer, move through the buying path, and leave clean data for the team to act on. ${platformSentence} ${flowSentence} Tracking and marketing tool visibility matters because it determines whether decision-makers can trust the conversion data and optimize media spend effectively.`,
   };
 }
 
