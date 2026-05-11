@@ -10,6 +10,13 @@ import {
   toCleanStringRecord,
   ValidationIssue,
 } from "@/lib/form-submissions";
+import {
+  runLightweightEcommerceDiagnostics,
+  type LiveDiagnosticsResult,
+} from "@/lib/ecommerce-audit-scanner";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const scannerFields: FieldDefinition[] = [
   { key: "website", label: "website URL", required: true, aliases: ["url"] },
@@ -96,6 +103,92 @@ const recommendedNextSteps = [
   "Book a focused ecommerce systems audit for a human review of the actual storefront and operations.",
 ];
 
+function adjustedStatus(score: number) {
+  if (score < 65) {
+    return "High Priority";
+  }
+
+  if (score < 80) {
+    return "Watchlist";
+  }
+
+  return "Stable Foundation";
+}
+
+function adjustedPriority(score: number) {
+  if (score < 65) {
+    return "High";
+  }
+
+  if (score < 80) {
+    return "Medium";
+  }
+
+  return "Low";
+}
+
+function applyLiveDiagnosticScoring(diagnostics: LiveDiagnosticsResult) {
+  const missingTitlePenalty = diagnostics.title ? 0 : 4;
+  const missingDescriptionPenalty = diagnostics.metaDescription ? 0 : 4;
+  const consolePenalty = Math.min(10, diagnostics.consoleErrors.length * 3);
+  const failedRequestPenalty = Math.min(6, diagnostics.failedRequests.length * 2);
+
+  return mockAuditCategories.map((category) => {
+    let penalty = 0;
+    const issues = [...category.issues];
+
+    if (category.key === "uxUiIssues") {
+      penalty += missingTitlePenalty;
+
+      if (!diagnostics.title) {
+        issues.push(
+          "The page title is missing, which can make the page feel less clear in browser tabs and search results.",
+        );
+      }
+    }
+
+    if (category.key === "conversionIssues") {
+      penalty += missingDescriptionPenalty;
+
+      if (!diagnostics.metaDescription) {
+        issues.push(
+          "The meta description is missing, which can weaken the page's search snippet and first-impression clarity.",
+        );
+      }
+    }
+
+    if (category.key === "technicalIssues") {
+      penalty += consolePenalty + failedRequestPenalty;
+
+      if (diagnostics.consoleErrors.length > 0) {
+        issues.push(
+          "Console errors were detected and should be reviewed because they may affect page behavior or tracking.",
+        );
+      }
+
+      if (diagnostics.failedRequests.length > 0) {
+        issues.push(
+          "Some network requests failed during the scan and should be checked for missing scripts, blocked assets, or third-party issues.",
+        );
+      }
+    }
+
+    if (category.key === "trackingIssues") {
+      penalty += Math.min(6, diagnostics.consoleErrors.length * 2);
+    }
+
+    const score = Math.max(35, category.score - penalty);
+
+    return {
+      ...category,
+      score,
+      status: adjustedStatus(score),
+      priority: adjustedPriority(score),
+      issues,
+    };
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
@@ -137,6 +230,24 @@ export async function POST(request: Request) {
     }
 
     const submittedAt = new Date().toISOString();
+    const diagnostics = await runLightweightEcommerceDiagnostics(values.website);
+
+    if (diagnostics.scanError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: diagnostics.scanError,
+          diagnostics,
+        },
+        { status: 502 },
+      );
+    }
+
+    const categories = applyLiveDiagnosticScoring(diagnostics);
+    const overallScore = Math.round(
+      categories.reduce((total, category) => total + category.score, 0) /
+        categories.length,
+    );
 
     logDevelopmentSubmission("Ecommerce audit scanner", {
       website: values.website,
@@ -151,13 +262,14 @@ export async function POST(request: Request) {
           website: values.website,
           mode: "mock",
           generatedAt: submittedAt,
-          overallScore: 67,
-          overallStatus: "Needs Strategic Review",
+          overallScore,
+          overallStatus: adjustedStatus(overallScore),
           overallExplanation:
-            "The mock scan suggests the store should be reviewed as a connected ecommerce system, not just a set of individual pages.",
+            "The report combines mock audit categories with lightweight live diagnostics for metadata, screenshots, console errors, and failed requests.",
           summary:
-            "This MVP scanner returns a structured sample audit. A future version can connect real crawling, performance checks, analytics validation, and ecommerce workflow diagnostics.",
-          categories: mockAuditCategories,
+            "This internal MVP still uses mock strategic analysis, but now includes real lightweight diagnostics from the submitted URL. A future version can add Lighthouse, AI analysis, tracking detection, and deeper ecommerce workflow checks.",
+          diagnostics,
+          categories,
           recommendedNextSteps,
         },
       },

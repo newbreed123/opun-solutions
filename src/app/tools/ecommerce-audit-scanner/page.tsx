@@ -9,13 +9,18 @@ import {
   Check,
   ClipboardCheck,
   Download,
+  ExternalLink,
+  FileText,
   Loader2,
+  Monitor,
   Search,
   ServerCog,
   ShoppingCart,
   Sparkles,
+  Smartphone,
   Target,
   Wand2,
+  WifiOff,
 } from "lucide-react";
 
 type AuditCategory = {
@@ -36,8 +41,20 @@ type AuditResult = {
   overallStatus: string;
   overallExplanation: string;
   summary: string;
+  diagnostics: LiveDiagnostics;
   categories: AuditCategory[];
   recommendedNextSteps: string[];
+};
+
+type LiveDiagnostics = {
+  finalUrl: string;
+  title: string | null;
+  metaDescription: string | null;
+  desktopScreenshotUrl: string | null;
+  mobileScreenshotUrl: string | null;
+  consoleErrors: string[];
+  failedRequests: string[];
+  warnings: string[];
 };
 
 type ScannerResponse =
@@ -275,9 +292,10 @@ export default function EcommerceAuditScannerPage() {
               </div>
 
               <p className="mt-4 text-sm leading-relaxed text-muted">
-                This MVP currently uses mock analysis. Live scanning with
-                screenshots, metadata checks, performance signals, and console
-                diagnostics will be added in the next phase.
+                This MVP currently uses mock strategic analysis plus lightweight
+                live diagnostics. Lighthouse performance signals, deeper
+                metadata checks, and richer browser diagnostics will be added in
+                the next phase.
               </p>
             </form>
           </div>
@@ -427,6 +445,185 @@ export default function EcommerceAuditScannerPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="card-elevated p-6 md:p-8">
+                <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                      Browser Capture
+                    </p>
+                    <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
+                      Live Diagnostics
+                    </h3>
+                    <p className="mt-3 max-w-3xl leading-relaxed text-secondary">
+                      Lightweight Playwright diagnostics from the submitted URL:
+                      screenshots, metadata, console errors, and failed network
+                      requests. Strategic recommendations remain mock analysis.
+                    </p>
+                  </div>
+                  <a
+                    href={audit.diagnostics.finalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open scanned URL
+                  </a>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="rounded-[2rem] border border-dark-border bg-dark-deep/70 p-4">
+                    <div className="mb-4 flex items-center gap-3">
+                      <Monitor className="h-5 w-5 text-brand-cyan" />
+                      <h4 className="text-xl font-bold text-primary">
+                        Desktop Screenshot Preview
+                      </h4>
+                    </div>
+                    {audit.diagnostics.desktopScreenshotUrl ? (
+                      <img
+                        src={audit.diagnostics.desktopScreenshotUrl}
+                        alt={`Desktop screenshot of ${audit.website}`}
+                        className="aspect-[16/10] w-full rounded-2xl border border-dark-border object-cover object-top"
+                      />
+                    ) : (
+                      <div className="flex aspect-[16/10] items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] p-6 text-center text-secondary">
+                        Desktop screenshot could not be captured.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-[2rem] border border-dark-border bg-dark-deep/70 p-4">
+                    <div className="mb-4 flex items-center gap-3">
+                      <Smartphone className="h-5 w-5 text-brand-cyan" />
+                      <h4 className="text-xl font-bold text-primary">
+                        Mobile Screenshot Preview
+                      </h4>
+                    </div>
+                    {audit.diagnostics.mobileScreenshotUrl ? (
+                      <img
+                        src={audit.diagnostics.mobileScreenshotUrl}
+                        alt={`Mobile screenshot of ${audit.website}`}
+                        className="mx-auto aspect-[9/14] max-h-[34rem] w-full max-w-[18rem] rounded-2xl border border-dark-border object-cover object-top"
+                      />
+                    ) : (
+                      <div className="mx-auto flex aspect-[9/14] max-h-[34rem] w-full max-w-[18rem] items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] p-6 text-center text-secondary">
+                        Mobile screenshot could not be captured.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-[2rem] border border-dark-border bg-white/[0.035] p-5">
+                    <div className="mb-5 flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-brand-cyan" />
+                      <h4 className="text-xl font-bold text-primary">
+                        Metadata Summary
+                      </h4>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <p className="text-sm font-bold text-primary">
+                            Page title
+                          </p>
+                          {!audit.diagnostics.title && (
+                            <span className="rounded-full border border-red-300/30 bg-red-400/10 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-red-100">
+                              Missing
+                            </span>
+                          )}
+                        </div>
+                        <p className="break-words text-secondary">
+                          {audit.diagnostics.title ??
+                            "Missing title. Titles help users and search engines understand page context."}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <p className="text-sm font-bold text-primary">
+                            Meta description
+                          </p>
+                          {!audit.diagnostics.metaDescription && (
+                            <span className="rounded-full border border-red-300/30 bg-red-400/10 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-red-100">
+                              Missing
+                            </span>
+                          )}
+                        </div>
+                        <p className="break-words text-secondary">
+                          {audit.diagnostics.metaDescription ??
+                            "Missing description. Descriptions can improve search snippets and explain page relevance."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[2rem] border border-dark-border bg-white/[0.035] p-5">
+                    <div className="mb-5 flex items-center gap-3">
+                      <WifiOff className="h-5 w-5 text-brand-cyan" />
+                      <h4 className="text-xl font-bold text-primary">
+                        Console Diagnostics
+                      </h4>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                        <p className="text-sm font-bold text-primary">
+                          Console errors
+                        </p>
+                        <p className="mt-2 text-3xl font-black text-brand-cyan">
+                          {audit.diagnostics.consoleErrors.length}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
+                        <p className="text-sm font-bold text-primary">
+                          Failed requests
+                        </p>
+                        <p className="mt-2 text-3xl font-black text-brand-cyan">
+                          {audit.diagnostics.failedRequests.length}
+                        </p>
+                      </div>
+                    </div>
+
+                    {audit.diagnostics.consoleErrors.length === 0 &&
+                    audit.diagnostics.failedRequests.length === 0 ? (
+                      <div className="mt-4 rounded-2xl border border-emerald-300/30 bg-emerald-400/10 p-4 text-sm font-semibold text-emerald-100">
+                        No critical console issues detected.
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        {[
+                          ...audit.diagnostics.consoleErrors,
+                          ...audit.diagnostics.failedRequests,
+                        ]
+                          .slice(0, 5)
+                          .map((message) => (
+                            <div
+                              key={message}
+                              className="break-words rounded-2xl border border-dark-border bg-dark-deep/70 p-4 text-sm leading-relaxed text-secondary"
+                            >
+                              {message}
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    {audit.diagnostics.warnings.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {audit.diagnostics.warnings.map((warning) => (
+                          <div
+                            key={warning}
+                            className="rounded-2xl border border-brand-cyan/30 bg-brand-cyan/10 p-3 text-sm leading-relaxed text-secondary"
+                          >
+                            {warning}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
