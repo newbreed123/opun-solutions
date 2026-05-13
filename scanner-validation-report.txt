@@ -1,0 +1,78 @@
+SCANNER VALIDATION SUMMARY
+===========================
+Total sites tested: 29
+Successful scans: 17
+Failed scans: 12
+Platform matches: 11
+Platform mismatches: 6
+
+1. Failure reasons grouped by type
+-----------------------------------
+- 8 x The URL could not be reached. Check that the domain is public and accessible.
+- 3 x The page responded with an error status. Try a public storefront page instead.
+- 1 x The page took too long to respond. Try again later or use a faster-loading URL.
+
+2. Sites that failed and why
+--------------------------------
+- Stone Equinox: The URL could not be reached. Check that the domain is public and accessible.
+- Perlin Packaging: The page responded with an error status. Try a public storefront page instead.
+- Omni Sponsors: The URL could not be reached. Check that the domain is public and accessible.
+- Shop Barbershop: The URL could not be reached. Check that the domain is public and accessible.
+- Cafe Appliances: The page responded with an error status. Try a public storefront page instead.
+- US Pilot Store: The URL could not be reached. Check that the domain is public and accessible.
+- Penn Retail: The URL could not be reached. Check that the domain is public and accessible.
+- TruLite Tools: The URL could not be reached. Check that the domain is public and accessible.
+- ColdB Custom: The page took too long to respond. Try again later or use a faster-loading URL.
+- Garnet Popcorn: The URL could not be reached. Check that the domain is public and accessible.
+- Shop NFL: The URL could not be reached. Check that the domain is public and accessible.
+- Coin Circuit: The page responded with an error status. Try a public storefront page instead.
+
+3. Platform mismatches with expected vs detected
+-----------------------------------------------
+- Career Step: expected=BigCommerce, detected=Unknown (0%)
+- LifeEasy Store: expected=BigCommerce, detected=Unknown (0%)
+- Precious Moments: expected=BigCommerce, detected=Shopify (100%)
+- Destaco: expected=Magento / Adobe Commerce, detected=BigCommerce (90%)
+- Donald Russell: expected=BigCommerce, detected=Shopify (100%)
+- Americas Bossa: expected=Magento / Adobe Commerce, detected=BigCommerce (100%)
+
+4. Detection patterns that looked reliable
+------------------------------------------
+- Shopify detections appear reliable when Shopify asset/script patterns are present and a detection confidence is high.
+- GA4 and GTM detection is reliable for sites with visible gtag, GTM IDs, or dataLayer setup.
+- Meta Pixel is reliably detected when fbq or facebook tracking script patterns exist.
+
+5. Detection patterns that need improvement
+---------------------------------------------
+- BigCommerce and Magento / Adobe Commerce false negatives: several sites returned Unknown despite expected platform definitions.
+- WooCommerce and custom storefronts may require stronger HTML/UI heuristics beyond scripts and paths.
+- Platform detection confidence is too low for sites with minimal visible script metadata.
+
+6. Recommended next fixes ranked by product impact
+--------------------------------------------------
+- Improve BigCommerce/Magento storefront detection heuristics first, because many failed or mismatched enterprise sites depend on these signals.
+- Add better Unknown handling and fallback rules for sites with hidden or deferred scripts.
+- Strengthen cart/checkout visibility patterns to reduce false negatives on commerce flow detection.
+- Tune marketing tool detection for non-standard tag injection flows (e.g. GTM containerless setups).
+
+Mismatched sites details:
+- Career Step (https://careerstep.com): expected BigCommerce, detected Unknown @ 0%
+- LifeEasy Store (https://store.lifeeasy.com): expected BigCommerce, detected Unknown @ 0%
+- Precious Moments (https://preciousmoments.com): expected BigCommerce, detected Shopify @ 100%
+- Destaco (https://destaco.com): expected Magento / Adobe Commerce, detected BigCommerce @ 90%
+- Donald Russell (https://donaldrussell.com): expected BigCommerce, detected Shopify @ 100%
+- Americas Bossa (https://americas.bossard.com): expected Magento / Adobe Commerce, detected BigCommerce @ 100%
+
+Failed sites details:
+- Stone Equinox (https://www.stoneequinox.com): The URL could not be reached. Check that the domain is public and accessible.
+- Perlin Packaging (https://perlpackaging.com): The page responded with an error status. Try a public storefront page instead.
+- Omni Sponsors (https://omnisponsors.com): The URL could not be reached. Check that the domain is public and accessible.
+- Shop Barbershop (https://shopbarbershop.org): The URL could not be reached. Check that the domain is public and accessible.
+- Cafe Appliances (https://cafeappliances.com): The page responded with an error status. Try a public storefront page instead.
+- US Pilot Store (https://store.pfu-us.icoh.com): The URL could not be reached. Check that the domain is public and accessible.
+- Penn Retail (https://store.pennretail.com.au): The URL could not be reached. Check that the domain is public and accessible.
+- TruLite Tools (https://trulitetools.com): The URL could not be reached. Check that the domain is public and accessible.
+- ColdB Custom (https://coldb.com): The page took too long to respond. Try again later or use a faster-loading URL.
+- Garnet Popcorn (https://garnetpopcorn.com): The URL could not be reached. Check that the domain is public and accessible.
+- Shop NFL (https://shop.nfl.com): The URL could not be reached. Check that the domain is public and accessible.
+- Coin Circuit (https://coincircuit.com): The page responded with an error status. Try a public storefront page instead.

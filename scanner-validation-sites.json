@@ -1,0 +1,177 @@
+[
+  {
+    "name": "Steve Madden",
+    "url": "https://www.stevemadden.com",
+    "expectedPlatform": "Shopify",
+    "notes": "Fashion ecommerce"
+  },
+  {
+    "name": "Stone Equinox",
+    "url": "https://www.stoneequinox.com",
+    "expectedPlatform": "Shopify",
+    "notes": ""
+  },
+  {
+    "name": "Shop Delta",
+    "url": "https://shop.delta.com",
+    "expectedPlatform": "Shopify",
+    "notes": "Large branded store"
+  },
+
+  {
+    "name": "Perlin Packaging",
+    "url": "https://perlpackaging.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": "Packaging supplier"
+  },
+  {
+    "name": "Omni Sponsors",
+    "url": "https://omnisponsors.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Shop Barbershop",
+    "url": "https://shopbarbershop.org",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Real Tree",
+    "url": "https://realtree.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": "Outdoor retail"
+  },
+  {
+    "name": "Cafe Appliances",
+    "url": "https://cafeappliances.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": "Appliance ecommerce"
+  },
+  {
+    "name": "Career Step",
+    "url": "https://careerstep.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Mizuno USA",
+    "url": "https://usa.mizuno.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": "Athletic retail"
+  },
+  {
+    "name": "LifeEasy Store",
+    "url": "https://store.lifeeasy.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Lions Shop",
+    "url": "https://shop.lions.com.au",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "US Pilot Store",
+    "url": "https://store.pfu-us.icoh.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Penn Retail",
+    "url": "https://store.pennretail.com.au",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "As Colour",
+    "url": "https://ascolour.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": "Strong apparel UX"
+  },
+  {
+    "name": "Precious Moments",
+    "url": "https://preciousmoments.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Blue Force Gear",
+    "url": "https://blueforcegear.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Team Store Fremantle",
+    "url": "https://teamstore.fremantlefc.com.au",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Destaco",
+    "url": "https://destaco.com",
+    "expectedPlatform": "Magento",
+    "notes": "Industrial B2B"
+  },
+  {
+    "name": "Revolution Dance",
+    "url": "https://revolutiondance.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "TruLite Tools",
+    "url": "https://trulitetools.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Greatland",
+    "url": "https://greatland.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Donald Russell",
+    "url": "https://donaldrussell.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": "Food ecommerce"
+  },
+  {
+    "name": "ColdB Custom",
+    "url": "https://coldb.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Shop Melbourne FC",
+    "url": "https://shop.melbournefc.com.au",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Americas Bossa",
+    "url": "https://americas.bossard.com",
+    "expectedPlatform": "Magento",
+    "notes": "Industrial ecommerce"
+  },
+  {
+    "name": "Garnet Popcorn",
+    "url": "https://garnetpopcorn.com",
+    "expectedPlatform": "BigCommerce",
+    "notes": ""
+  },
+  {
+    "name": "Shop NFL",
+    "url": "https://shop.nfl.com",
+    "expectedPlatform": "Salesforce Commerce Cloud",
+    "notes": "Enterprise sports ecommerce"
+  },
+  {
+    "name": "Coin Circuit",
+    "url": "https://coincircuit.com",
+    "expectedPlatform": "WooCommerce",
+    "notes": ""
+  }
+]

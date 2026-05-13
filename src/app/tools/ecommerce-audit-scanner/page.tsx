@@ -34,6 +34,7 @@ type AuditCategory = {
   explanation: string;
   priority: "Low" | "Medium" | "High";
   issues: string[];
+  findings?: HeuristicFinding[];
 };
 
 type AuditResult = {
@@ -46,9 +47,20 @@ type AuditResult = {
   summary: string;
   executiveSummary: ExecutiveSummary;
   topPriorityRisks: TopPriorityRisk[];
+  heuristicFindings?: HeuristicFinding[];
   diagnostics: LiveDiagnostics;
   categories: AuditCategory[];
   recommendedNextSteps: RecommendedNextStep[];
+};
+
+type HeuristicFinding = {
+  title: string;
+  category: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  confidence: "Low" | "Moderate" | "High" | "Needs Review";
+  businessImpact: string;
+  recommendedAction: string;
+  evidenceSummary: string;
 };
 
 type ExecutiveSummary = {
@@ -61,7 +73,9 @@ type TopPriorityRisk = {
   title: string;
   riskLabel: string;
   severity: string;
+  confidence?: string;
   explanation: string;
+  evidenceSummary?: string;
   recommendedFirstAction: string;
 };
 
@@ -86,7 +100,9 @@ type LiveDiagnostics = {
   platformDetection: {
     name: string;
     confidence: number;
+    confidenceLabel: string;
     details: string[];
+    explanation?: string;
   };
   commerceFlowSignals: {
     cartVisible: boolean;
@@ -120,13 +136,13 @@ type ScannerResponse =
 
 const scoreCards = [
   {
-    label: "UX/UI",
-    description: "Navigation, mobile clarity, page hierarchy",
+    label: "Mobile Journey",
+    description: "CTA visibility, readability, action clarity",
     icon: Wand2,
   },
   {
-    label: "Conversion",
-    description: "CTA clarity, trust, lead and checkout friction",
+    label: "Purchase Confidence",
+    description: "Trust, support, reassurance, checkout cues",
     icon: Target,
   },
   {
@@ -135,13 +151,13 @@ const scoreCards = [
     icon: ServerCog,
   },
   {
-    label: "Tracking",
-    description: "Events, attribution, campaign visibility",
+    label: "Marketing Visibility",
+    description: "Analytics, attribution, follow-up visibility",
     icon: BarChart3,
   },
   {
-    label: "Operations",
-    description: "Order flow, support routing, backend handoffs",
+    label: "Checkout Path",
+    description: "Cart, checkout, support, returns visibility",
     icon: ShoppingCart,
   },
 ];
@@ -203,15 +219,41 @@ function priorityClasses(priority: AuditCategory["priority"]) {
 }
 
 function statusBadgeClasses(status: string) {
-  if (status === "High Priority") {
+  if (status === "Critical") {
+    return "border-red-300/40 bg-red-500/15 text-red-100";
+  }
+
+  if (status === "High Priority" || status === "High") {
     return "border-red-300/30 bg-red-400/10 text-red-100";
   }
 
-  if (status === "Needs Review") {
+  if (status === "Needs Review" || status === "Medium") {
     return "border-amber-300/30 bg-amber-400/10 text-amber-100";
   }
 
   return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
+}
+
+const marketingToolKeys = [
+  "googleAnalytics",
+  "googleTagManager",
+  "metaPixel",
+  "klaviyo",
+  "mailchimp",
+] as const;
+
+function isMarketingTool(
+  tool: LiveDiagnostics["technologyDetections"][number],
+) {
+  return marketingToolKeys.includes(
+    tool.key as (typeof marketingToolKeys)[number],
+  );
+}
+
+function getVisibleMarketingTools(diagnostics: LiveDiagnostics) {
+  return diagnostics.technologyDetections.filter(
+    (tool) => tool.detected && isMarketingTool(tool),
+  );
 }
 
 function marketingStatusLabel(count: number) {
@@ -236,6 +278,72 @@ function marketingStatusClasses(status: string) {
   }
 
   return "border-red-300/30 bg-red-400/10 text-red-100";
+}
+
+function confidenceLevel(confidence: number) {
+  if (confidence >= 80) {
+    return "High confidence";
+  }
+
+  if (confidence >= 50) {
+    return "Moderate confidence";
+  }
+
+  if (confidence > 0) {
+    return "Low confidence";
+  }
+
+  return "Not visible";
+}
+
+function platformDisplayName(audit: AuditResult) {
+  const platform = audit.diagnostics.platformDetection;
+
+  if (platform.name === "Unknown") {
+    return "Platform not confidently identified";
+  }
+
+  return platform.name;
+}
+
+function showManualReviewChecklist(audit: AuditResult) {
+  const platform = audit.diagnostics.platformDetection;
+  return (
+    platform.name === "Unknown" ||
+    platform.confidenceLabel === "Low confidence" ||
+    platform.confidenceLabel === "Needs Review"
+  );
+}
+
+function signalLabel(isVisible: boolean) {
+  return isVisible ? "Visible" : "Not visible";
+}
+
+function platformMarketingInterpretation(audit: AuditResult) {
+  const platform = audit.diagnostics.platformDetection;
+  const marketingTools = getVisibleMarketingTools(audit.diagnostics);
+  const commerce = audit.diagnostics.commerceFlowSignals;
+
+  if (platform.name === "Unknown" && marketingTools.length === 0) {
+    return "The public storefront page did not expose clear platform or common marketing tags in this scan. This may indicate a custom, headless, or heavily customized storefront. Platform visibility is limited and should be manually confirmed before making platform-specific recommendations.";
+  }
+
+  const platformText =
+    platform.name === "Unknown"
+      ? "Platform not confidently identified"
+      : `The storefront appears to expose ${platform.name} signals`;
+  const marketingText =
+    marketingTools.length > 0
+      ? `${marketingTools.length} common marketing tool${marketingTools.length === 1 ? "" : "s"} were visible`
+      : "no common marketing tools were visible";
+  const journeyText =
+    commerce.cartVisible ||
+    commerce.checkoutVisible ||
+    commerce.productCatalogVisible
+      ? "customer journey signals are present enough to support a commerce-flow review"
+      : "cart, checkout, and catalog signals were not prominent on the loaded page";
+
+  return `${platformText}, and ${marketingText}. At a business level, ${journeyText}.`;
 }
 
 function scoreTone(score: number) {
@@ -575,6 +683,16 @@ export default function EcommerceAuditScannerPage() {
                     <p className="leading-relaxed text-secondary">
                       {risk.explanation}
                     </p>
+                    {risk.evidenceSummary && (
+                      <div className="mt-4 rounded-2xl border border-dark-border bg-white/[0.035] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                          Evidence
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-secondary">
+                          {risk.evidenceSummary}
+                        </p>
+                      </div>
+                    )}
                     <div className="mt-5 rounded-2xl border border-brand-cyan/25 bg-brand-cyan/10 p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
                         Recommended next step
@@ -664,7 +782,8 @@ export default function EcommerceAuditScannerPage() {
                     <p className="mt-3 max-w-3xl leading-relaxed text-secondary">
                       Lightweight Playwright diagnostics from the submitted URL:
                       screenshots, metadata, console errors, and failed network
-                      requests. Strategic recommendations remain mock analysis.
+                      requests. Ecommerce guidance is generated from public-page
+                      heuristic signals only.
                     </p>
                   </div>
                   <a
@@ -926,256 +1045,292 @@ export default function EcommerceAuditScannerPage() {
                 </div>
               </div>
 
-              <div className="card-elevated p-6 md:p-8">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-                  Platform & Tracking Visibility
-                </p>
-                <h3 className="mt-3 text-3xl font-bold text-primary">
-                  Storefront platform and marketing signal clarity
-                </h3>
-                <p className="mt-4 leading-relaxed text-secondary">
-                  This section shows what the scan could identify from the page
-                  assets and content, helping the team understand whether
-                  platform, tracking, and commerce flow signals are visible
-                  enough for measurement and optimization.
-                </p>
+              {(() => {
+                const visibleMarketingTools = getVisibleMarketingTools(
+                  audit.diagnostics,
+                );
+                const marketingStatus = marketingStatusLabel(
+                  visibleMarketingTools.length,
+                );
+                const commerce = audit.diagnostics.commerceFlowSignals;
 
-                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                    <p className="text-sm font-bold text-primary">
-                      Platform detected
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold text-secondary">
-                      {audit.diagnostics.platformDetection.name}
-                    </p>
-                    <p className="mt-2 text-sm text-muted">
-                      {audit.diagnostics.platformDetection.confidence}%
-                      confidence
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
-                          <BarChart3 className="h-4 w-4" />
-                          Marketing & Visibility Stack
-                        </div>
-                        <p className="mt-4 text-sm font-semibold text-primary">
-                          Marketing tools visible
+                return (
+                  <div className="card-elevated p-6 md:p-8">
+                    <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                          Platform & Marketing Visibility
                         </p>
-                        <p className="mt-2 text-3xl font-semibold text-secondary">
-                          {
-                            audit.diagnostics.technologyDetections.filter(
-                              (tool) =>
-                                tool.detected &&
-                                [
-                                  "googleAnalytics",
-                                  "googleTagManager",
-                                  "metaPixel",
-                                  "klaviyo",
-                                  "mailchimp",
-                                ].includes(tool.key),
-                            ).length
-                          }
+                        <h3 className="mt-3 text-3xl font-bold text-primary">
+                          What the storefront makes visible
+                        </h3>
+                        <p className="mt-4 text-lg leading-relaxed text-secondary">
+                          {platformMarketingInterpretation(audit)}
                         </p>
                       </div>
 
-                      <span
-                        className={`mt-1 inline-flex items-center rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${marketingStatusClasses(
-                          marketingStatusLabel(
-                            audit.diagnostics.technologyDetections.filter(
-                              (tool) =>
-                                tool.detected &&
-                                [
-                                  "googleAnalytics",
-                                  "googleTagManager",
-                                  "metaPixel",
-                                  "klaviyo",
-                                  "mailchimp",
-                                ].includes(tool.key),
-                            ).length,
-                          ),
-                        )}`}
-                      >
-                        {marketingStatusLabel(
-                          audit.diagnostics.technologyDetections.filter(
-                            (tool) =>
-                              tool.detected &&
-                              [
-                                "googleAnalytics",
-                                "googleTagManager",
-                                "metaPixel",
-                                "klaviyo",
-                                "mailchimp",
-                              ].includes(tool.key),
-                          ).length,
+                      <div className="rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 p-5">
+                        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                          Business interpretation
+                        </p>
+                        <p className="mt-3 leading-relaxed text-secondary">
+                          Use this as a quick read on whether the
+                          customer-facing storefront gives operators enough
+                          clues to discuss the platform, marketing measurement,
+                          and conversion path without touching private systems.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
+                          <ServerCog className="h-4 w-4" />
+                          Storefront platform
+                        </div>
+                        <p className="text-2xl font-semibold text-secondary">
+                          {platformDisplayName(audit)}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-muted">
+                          {confidenceLevel(
+                            audit.diagnostics.platformDetection.confidence,
+                          )}
+                          {" - "}
+                          {audit.diagnostics.platformDetection.confidence}%
+                        </p>
+                        {showManualReviewChecklist(audit) && (
+                          <p className="mt-3 text-xs leading-relaxed text-muted">
+                            Some ecommerce platforms hide or heavily customize
+                            storefront signals. This result means the scanner
+                            did not find enough reliable public-page evidence.
+                          </p>
                         )}
-                      </span>
+                      </div>
+
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
+                            <BarChart3 className="h-4 w-4" />
+                            Marketing visibility
+                          </div>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${marketingStatusClasses(
+                              marketingStatus,
+                            )}`}
+                          >
+                            {marketingStatus}
+                          </span>
+                        </div>
+                        <p className="text-2xl font-semibold text-secondary">
+                          {visibleMarketingTools.length} visible
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          {visibleMarketingTools.length > 0
+                            ? visibleMarketingTools
+                                .map((tool) => tool.label)
+                                .join(", ")
+                            : "No supported marketing tools were visible in the loaded page context."}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
+                          <Target className="h-4 w-4" />
+                          CTA and forms
+                        </div>
+                        <p className="text-2xl font-semibold text-secondary">
+                          {commerce.ctaVisible || commerce.formVisible
+                            ? "Present"
+                            : "Not prominent"}
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          {commerce.ctaCount} CTA label
+                          {commerce.ctaCount === 1 ? "" : "s"} sampled; form
+                          presence is{" "}
+                          {commerce.formVisible ? "visible" : "not visible"}.
+                        </p>
+                      </div>
                     </div>
 
-                    <p className="mt-4 text-sm leading-relaxed text-secondary">
-                      {audit.diagnostics.technologyDetections
-                        .filter(
-                          (tool) =>
-                            tool.detected &&
-                            [
-                              "googleAnalytics",
-                              "googleTagManager",
-                              "metaPixel",
-                              "klaviyo",
-                              "mailchimp",
-                            ].includes(tool.key),
-                        )
-                        .map((tool) => tool.label)
-                        .join(", ") ||
-                        "No visible marketing/tracking tools were detected from public page assets."}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                    <p className="text-sm font-bold text-primary">
-                      CTA / commerce signals
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold text-secondary">
-                      {audit.diagnostics.commerceFlowSignals.ctaVisible
-                        ? "Visible"
-                        : "Hidden"}
-                    </p>
-                    <p className="mt-2 text-sm text-muted">
-                      Includes CTA labels, forms, and checkout indicators
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                    <p className="text-sm font-bold text-primary">
-                      Cart visibility
-                    </p>
-                    <p className="mt-3 text-xl font-semibold text-secondary">
-                      {audit.diagnostics.commerceFlowSignals.cartVisible
-                        ? "Yes"
-                        : "No"}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                    <p className="text-sm font-bold text-primary">
-                      Checkout visibility
-                    </p>
-                    <p className="mt-3 text-xl font-semibold text-secondary">
-                      {audit.diagnostics.commerceFlowSignals.checkoutVisible
-                        ? "Yes"
-                        : "No"}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4">
-                    <p className="text-sm font-bold text-primary">
-                      Product catalog visibility
-                    </p>
-                    <p className="mt-3 text-xl font-semibold text-secondary">
-                      {audit.diagnostics.commerceFlowSignals
-                        .productCatalogVisible
-                        ? "Yes"
-                        : "No"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 p-5">
-                  <p className="text-sm font-semibold text-brand-cyan uppercase tracking-[0.18em]">
-                    Business Impact
-                  </p>
-                  <p className="mt-3 leading-relaxed text-secondary">
-                    <strong>Platform visibility</strong> matters because it
-                    indicates whether the storefront foundation is detectable
-                    for support and optimization. Clear platform signals help
-                    teams route issues, apply platform-specific best practices,
-                    and predict maintenance needs.
-                  </p>
-                  <p className="mt-3 leading-relaxed text-secondary">
-                    <strong>Tracking visibility</strong> matters because it
-                    determines whether marketing spend can be measured and
-                    optimized. When tools like Google Analytics or Meta Pixel
-                    are visible, teams can trust conversion data and make
-                    confident decisions about ad budgets and campaign targeting.
-                  </p>
-                  <p className="mt-3 leading-relaxed text-secondary">
-                    <strong>Operational visibility</strong> impacts conversion
-                    analysis by showing whether customers can find carts,
-                    checkouts, and product catalogs. Hidden commerce signals can
-                    create friction that leaks visitors before they convert,
-                    making it harder to optimize the funnel.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowVisibilityDetails((current) => !current)
-                  }
-                  className="mt-6 inline-flex w-full items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary sm:w-auto"
-                >
-                  <ChevronDown
-                    className={`mr-2 h-4 w-4 transition-transform ${
-                      showVisibilityDetails ? "rotate-180" : ""
-                    }`}
-                  />
-                  {showVisibilityDetails ? "Hide details" : "View details"}
-                </button>
-
-                {showVisibilityDetails && (
-                  <div className="mt-5 space-y-4 rounded-2xl border border-dark-border bg-dark-deep/70 p-5 text-sm leading-relaxed text-secondary">
-                    <div>
-                      <p className="font-semibold text-primary">
-                        Platform detection details
-                      </p>
-                      <ul className="mt-3 space-y-2 pl-4 list-disc">
-                        {audit.diagnostics.platformDetection.details.map(
-                          (detail) => (
-                            <li key={detail}>{detail}</li>
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        {
+                          label: "Cart presence",
+                          value: signalLabel(commerce.cartVisible),
+                          icon: ShoppingCart,
+                        },
+                        {
+                          label: "Checkout presence",
+                          value: signalLabel(commerce.checkoutVisible),
+                          icon: ClipboardCheck,
+                        },
+                        {
+                          label: "Product/catalog presence",
+                          value: signalLabel(commerce.productCatalogVisible),
+                          icon: FileText,
+                        },
+                        {
+                          label: "CTA/form presence",
+                          value: signalLabel(
+                            commerce.ctaVisible || commerce.formVisible,
                           ),
-                        )}
-                      </ul>
+                          icon: MousePointerClick,
+                        },
+                      ].map((item) => {
+                        const Icon = item.icon;
+
+                        return (
+                          <div
+                            key={item.label}
+                            className="rounded-2xl border border-dark-border bg-white/[0.035] p-4"
+                          >
+                            <Icon className="mb-4 h-5 w-5 text-brand-cyan" />
+                            <p className="text-sm font-bold text-primary">
+                              {item.label}
+                            </p>
+                            <p className="mt-2 text-lg font-semibold text-secondary">
+                              {item.value}
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div>
-                      <p className="font-semibold text-primary">
-                        Detected tracking tools
-                      </p>
-                      <p className="mt-2 text-sm text-secondary">
-                        {audit.diagnostics.technologyDetections
-                          .filter(
-                            (tool) =>
-                              tool.detected &&
-                              [
-                                "googleAnalytics",
-                                "googleTagManager",
-                                "metaPixel",
-                                "klaviyo",
-                                "mailchimp",
-                              ].includes(tool.key),
-                          )
-                          .map((tool) => tool.label)
-                          .join(", ") ||
-                          "No common marketing/tracking tools were detected from visible page assets."}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-primary">
-                        CTA labels sampled
-                      </p>
-                      <p className="mt-2 text-sm text-secondary">
-                        {audit.diagnostics.commerceFlowSignals.ctaLabels
-                          .length > 0
-                          ? audit.diagnostics.commerceFlowSignals.ctaLabels.join(
-                              ", ",
-                            )
-                          : "No strong CTA labels were found in the visible page sample."}
-                      </p>
-                    </div>
+
+                    {showManualReviewChecklist(audit) && (
+                      <div className="mt-6 rounded-2xl border border-amber-300/30 bg-amber-400/5 p-5">
+                        <p className="font-semibold text-amber-100">
+                          Platform Manual Review Checklist
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          Since platform visibility is limited, use this
+                          checklist to manually identify the storefront
+                          platform:
+                        </p>
+                        <ul className="mt-4 space-y-3">
+                          <li className="flex items-start gap-3">
+                            <span className="text-amber-300">✓</span>
+                            <span className="text-sm text-secondary">
+                              Review page source code for platform-specific
+                              asset domains or script references
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-amber-300">✓</span>
+                            <span className="text-sm text-secondary">
+                              Examine cart and checkout URL structure for
+                              platform indicators (e.g., /cart.php, checkout/)
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-amber-300">✓</span>
+                            <span className="text-sm text-secondary">
+                              Check product page URL patterns for clues about
+                              platform architecture
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-amber-300">✓</span>
+                            <span className="text-sm text-secondary">
+                              Review frontend asset domains for hosted scripts
+                              or CDN patterns
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-amber-300">✓</span>
+                            <span className="text-sm text-secondary">
+                              Confirm from known CMS, admin panel, or team
+                              knowledge if available
+                            </span>
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowVisibilityDetails((current) => !current)
+                      }
+                      className="mt-6 inline-flex w-full items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary sm:w-auto"
+                    >
+                      <ChevronDown
+                        className={`mr-2 h-4 w-4 transition-transform ${
+                          showVisibilityDetails ? "rotate-180" : ""
+                        }`}
+                      />
+                      {showVisibilityDetails ? "Hide details" : "View details"}
+                    </button>
+
+                    {showVisibilityDetails && (
+                      <div className="mt-5 grid gap-4 rounded-2xl border border-dark-border bg-dark-deep/70 p-5 text-sm leading-relaxed text-secondary lg:grid-cols-3">
+                        <div>
+                          <p className="font-semibold text-primary">
+                            Platform evidence
+                          </p>
+                          <ul className="mt-3 list-disc space-y-2 pl-4">
+                            {audit.diagnostics.platformDetection.details.map(
+                              (detail) => (
+                                <li key={detail}>{detail}</li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-primary">
+                            Marketing tool evidence
+                          </p>
+                          <div className="mt-3 space-y-3">
+                            {visibleMarketingTools.length > 0 ? (
+                              visibleMarketingTools.map((tool) => (
+                                <div key={tool.key}>
+                                  <p className="font-semibold text-secondary">
+                                    {tool.label}
+                                  </p>
+                                  <p className="mt-1 text-muted">
+                                    {tool.signals.length > 0
+                                      ? tool.signals.join(", ")
+                                      : tool.description}
+                                  </p>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-muted">
+                                No supported marketing tools were detected from
+                                public page markup, visible DOM content, or
+                                loaded frontend asset references.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-primary">
+                            Customer journey evidence
+                          </p>
+                          <div className="mt-3 space-y-2 text-muted">
+                            <p>Cart: {signalLabel(commerce.cartVisible)}</p>
+                            <p>
+                              Checkout: {signalLabel(commerce.checkoutVisible)}
+                            </p>
+                            <p>
+                              Product/catalog:{" "}
+                              {signalLabel(commerce.productCatalogVisible)}
+                            </p>
+                            <p>Forms: {signalLabel(commerce.formVisible)}</p>
+                            <p>
+                              CTA labels:{" "}
+                              {commerce.ctaLabels.length > 0
+                                ? commerce.ctaLabels.join(", ")
+                                : "No strong CTA labels were found in the visible page sample."}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
                 <div className="card-elevated p-6 md:p-8">
@@ -1317,16 +1472,62 @@ export default function EcommerceAuditScannerPage() {
                       <AlertTriangle className="h-6 w-6 flex-none text-brand-cyan" />
                     </div>
 
-                    <div className="space-y-3">
-                      {category.issues.map((issue) => (
-                        <div
-                          key={issue}
-                          className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-secondary"
-                        >
-                          <Check className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
-                          <p className="leading-relaxed">{issue}</p>
-                        </div>
-                      ))}
+                    <div className="space-y-4">
+                      {category.findings && category.findings.length > 0 ? (
+                        category.findings.map((finding) => (
+                          <div
+                            key={finding.title}
+                            className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="text-lg font-bold text-primary">
+                                  {finding.title}
+                                </p>
+                                <p className="mt-2 text-sm leading-relaxed text-secondary">
+                                  {finding.businessImpact}
+                                </p>
+                              </div>
+                              <span
+                                className={`inline-flex w-fit rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
+                                  finding.severity,
+                                )}`}
+                              >
+                                {finding.severity}
+                              </span>
+                            </div>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              <div className="rounded-xl border border-dark-border bg-dark-deep/60 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                                  Evidence
+                                </p>
+                                <p className="mt-2 text-sm leading-relaxed text-secondary">
+                                  {finding.evidenceSummary}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
+                                  First action
+                                </p>
+                                <p className="mt-2 text-sm leading-relaxed text-primary">
+                                  {finding.recommendedAction}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        category.issues.map((issue) => (
+                          <div
+                            key={issue}
+                            className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-secondary"
+                          >
+                            <Check className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
+                            <p className="leading-relaxed">{issue}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 ))}

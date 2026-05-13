@@ -20,6 +20,7 @@ type ViewportMetadata = {
   platformDetection: PlatformDetection;
   commerceFlowSignals: CommerceFlowSignals;
   conversionSignals: ConversionSignals;
+  storefrontSignals: StorefrontReviewSignals;
 };
 
 export type PlatformName =
@@ -29,10 +30,19 @@ export type PlatformName =
   | "Magento / Adobe Commerce"
   | "Unknown";
 
+export type PlatformConfidenceLabel =
+  | "High confidence"
+  | "Moderate confidence"
+  | "Low confidence"
+  | "Needs Review"
+  | "Unknown";
+
 export type PlatformDetection = {
   name: PlatformName;
   confidence: number;
+  confidenceLabel: PlatformConfidenceLabel;
   details: string[];
+  explanation?: string;
 };
 
 export type CommerceFlowSignals = {
@@ -55,6 +65,7 @@ export type LiveDiagnosticsResult = {
   platformDetection: PlatformDetection;
   commerceFlowSignals: CommerceFlowSignals;
   conversionSignals: ConversionSignals;
+  storefrontSignals: StorefrontReviewSignals;
   consoleErrors: string[];
   failedRequests: string[];
   warnings: string[];
@@ -83,6 +94,26 @@ export type ConversionSignals = {
   inputCount: number;
   ctaCount: number;
   ctaLabels: string[];
+};
+
+export type StorefrontReviewSignals = {
+  mobileCtaVisibleAboveFold: boolean;
+  mobileCtaLabels: string[];
+  mobileAboveFoldLinkCount: number;
+  mobileVisibleTextLength: number;
+  mobileCrowdingRisk: boolean;
+  searchVisible: boolean;
+  reviewSignalsVisible: boolean;
+  shippingReturnsVisible: boolean;
+  warrantyGuaranteeVisible: boolean;
+  paymentTrustVisible: boolean;
+  contactSupportVisible: boolean;
+  policyVisible: boolean;
+  productNavigationVisible: boolean;
+  collectionLinksVisible: boolean;
+  genericNavigationCount: number;
+  leadCaptureVisible: boolean;
+  orderReturnsLanguageVisible: boolean;
 };
 
 type ViewportDefinition = {
@@ -169,6 +200,10 @@ export async function runLightweightEcommerceDiagnostics(
       platformDetection: desktop.platformDetection,
       commerceFlowSignals: desktop.commerceFlowSignals,
       conversionSignals: desktop.conversionSignals,
+      storefrontSignals: combineStorefrontSignals(
+        desktop.storefrontSignals,
+        mobile.storefrontSignals,
+      ),
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
@@ -184,6 +219,7 @@ export async function runLightweightEcommerceDiagnostics(
       platformDetection: defaultPlatformDetection(),
       commerceFlowSignals: defaultCommerceFlowSignals(),
       conversionSignals: defaultConversionSignals(),
+      storefrontSignals: defaultStorefrontReviewSignals(),
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
@@ -250,6 +286,7 @@ async function scanViewport({
             platformDetection: defaultPlatformDetection(),
             commerceFlowSignals: defaultCommerceFlowSignals(),
             conversionSignals: defaultConversionSignals(),
+            storefrontSignals: await extractStorefrontReviewSignals(page),
           };
 
     const screenshot = await captureScreenshot(page, scanId, viewport);
@@ -351,48 +388,75 @@ const trackingToolRules = [
   },
 ] as const;
 
-const platformIndicatorRules = [
+type PlatformIndicatorRule = {
+  key: "shopify" | "bigCommerce" | "wooCommerce" | "magento";
+  label: string;
+  description: string;
+  strong: RegExp[];
+  weak: RegExp[];
+};
+
+const platformIndicatorRules: readonly PlatformIndicatorRule[] = [
   {
     key: "shopify",
     label: "Shopify Indicators",
     description:
-      "Looks for Shopify CDN assets, theme objects, Shopify analytics, or cart endpoints.",
-    patterns: [
+      "Looks for Shopify-specific theme objects, CDN assets, and script globals rather than generic storefront terms.",
+    strong: [
       /cdn\.shopify\.com/i,
-      /ShopifyAnalytics/i,
+      /\bShopify\b/i,
       /Shopify\.theme/i,
+      /Shopify\.routes/i,
+      /ShopifyAnalytics/i,
       /myshopify\.com/i,
-      /\/cart\.js/i,
+    ],
+    weak: [
       /\/products\//i,
       /\/collections\//i,
+      /\/cart(?:\.js)?/i,
+      /\bcheckout\b/i,
+      /\bcart\b/i,
     ],
   },
   {
     key: "bigCommerce",
     label: "BigCommerce Indicators",
     description:
-      "Looks for BigCommerce stencil assets, store APIs, or checkout/cart patterns.",
-    patterns: [
+      "Looks for BigCommerce storefront assets, stencil references, and BigCommerce-specific cart or checkout endpoints.",
+    strong: [
+      /cdn11\.bigcommerce\.com/i,
       /cdn\d*\.bigcommerce\.com/i,
+      /\bbcData\b/i,
       /bigcommerce\.com/i,
-      /stencil\.io/i,
-      /checkout\.php/i,
+      /\bStencil\b/i,
+      /\bstencil\b/i,
       /cart\.php/i,
+      /checkout\.php/i,
       /cartAction\.php/i,
       /bcapp/i,
+    ],
+    weak: [
+      /\bcheckout\b/i,
+      /\bcart\b/i,
+      /\/cart\/|\/checkout\//i,
+      /checkout\/cart/i,
     ],
   },
   {
     key: "wooCommerce",
     label: "WooCommerce Indicators",
     description:
-      "Looks for WordPress WooCommerce assets, plugin paths, or add-to-cart parameters.",
-    patterns: [
-      /woocommerce/i,
+      "Looks for WooCommerce plugin paths, WordPress storefront assets, and WooCommerce cart fragments.",
+    strong: [
       /wp-content\/plugins\/woocommerce/i,
-      /add-to-cart=/i,
-      /wc-add-to-cart/i,
+      /\bwoocommerce\b/i,
+      /wc_cart_fragments/i,
+      /wc-ajax/i,
       /wp-json\/wc\/store/i,
+    ],
+    weak: [
+      /\/cart\//i,
+      /\/checkout\//i,
       /checkout\/order-received/i,
     ],
   },
@@ -400,14 +464,21 @@ const platformIndicatorRules = [
     key: "magento",
     label: "Magento Indicators",
     description:
-      "Looks for Magento or Adobe Commerce storefront scripts, checkout paths, and UI components.",
-    patterns: [
+      "Looks for Magento and Adobe Commerce storefront modules, requirejs configs, and static asset versioning.",
+    strong: [
+      /Magento_/i,
       /mage\.js/i,
-      /Magento/i,
-      /checkout\/cart/i,
-      /minicart/i,
+      /mage\//i,
+      /requirejs-config\.js/i,
+      /customer-data/i,
+      /\/static\/version/i,
       /Magento_Ui/i,
-      /requirejs\.config/i,
+      /minicart/i,
+    ],
+    weak: [
+      /checkout\/cart/i,
+      /\bcheckout\b/i,
+      /\bcart\b/i,
     ],
   },
 ] as const;
@@ -416,7 +487,9 @@ export function detectTechnologyDetections(signalText: string): TechnologyDetect
   const checks = [...trackingToolRules, ...platformIndicatorRules] as const;
 
   return checks.map((check) => {
-    const signals = check.patterns
+    const patterns =
+      "patterns" in check ? check.patterns : [...check.strong, ...check.weak];
+    const signals = patterns
       .filter((pattern) => pattern.test(signalText))
       .map((pattern) => pattern.source)
       .slice(0, 3);
@@ -431,48 +504,106 @@ export function detectTechnologyDetections(signalText: string): TechnologyDetect
   });
 }
 
+function platformNameFromKey(key: PlatformIndicatorRule["key"]): PlatformName {
+  return key === "shopify"
+    ? "Shopify"
+    : key === "bigCommerce"
+    ? "BigCommerce"
+    : key === "wooCommerce"
+    ? "WooCommerce"
+    : "Magento / Adobe Commerce";
+}
+
+function getConfidenceLabel(score: number): PlatformConfidenceLabel {
+  if (score >= 65) {
+    return "High confidence";
+  }
+
+  if (score >= 45) {
+    return "Moderate confidence";
+  }
+
+  if (score >= 20) {
+    return "Low confidence";
+  }
+
+  return "Unknown";
+}
+
 export function detectEcommercePlatform(signalText: string): PlatformDetection {
-  const platformScores: Array<{
-    name: PlatformName;
-    count: number;
-    details: string[];
-  }> = platformIndicatorRules.map((rule) => {
-    const matches = rule.patterns.filter((pattern) => pattern.test(signalText));
+  const platformScores = platformIndicatorRules.map((rule) => {
+    const strongMatches = rule.strong.filter((pattern) => pattern.test(signalText));
+    const weakMatches = rule.weak.filter((pattern) => pattern.test(signalText));
+    let score = strongMatches.length * 22 + weakMatches.length * 6;
+
+    if (strongMatches.length > 0) {
+      score += 10;
+    }
+
+    if (rule.key === "shopify" && strongMatches.length === 0 && weakMatches.length > 0) {
+      score = Math.min(score, 18);
+    }
+
     return {
-      name:
-        rule.key === "shopify"
-          ? "Shopify"
-          : rule.key === "bigCommerce"
-          ? "BigCommerce"
-          : rule.key === "wooCommerce"
-          ? "WooCommerce"
-          : "Magento / Adobe Commerce",
-      count: matches.length,
-      details: matches.map((pattern) => `Matched ${pattern.source}`),
+      name: platformNameFromKey(rule.key),
+      score,
+      strongCount: strongMatches.length,
+      weakCount: weakMatches.length,
+      details: [
+        ...strongMatches.map((pattern) => `Strong signal: ${pattern.source}`),
+        ...weakMatches.map((pattern) => `Weak signal: ${pattern.source}`),
+      ],
     };
   });
 
-  const best = platformScores.sort((a, b) => b.count - a.count)[0];
+  const sorted = [...platformScores].sort((a, b) => b.score - a.score);
+  const top = sorted[0];
+  const runnerUp = sorted[1] ?? { score: 0 };
 
-  if (!best || best.count === 0) {
+  if (!top || top.score < 20) {
     return {
       name: "Unknown",
       confidence: 0,
+      confidenceLabel: "Unknown",
       details: [
         "No clear storefront platform indicators were detected from page assets or scripts.",
       ],
+      explanation:
+        "Platform detection did not find enough specific signals to identify the storefront platform confidently.",
     };
   }
 
+  if (
+    runnerUp.score >= 20 &&
+    top.score - runnerUp.score < 12 ||
+    (top.name === "Shopify" && top.strongCount === 0)
+  ) {
+    return {
+      name: "Unknown",
+      confidence: Math.min(95, Math.round(top.score)),
+      confidenceLabel: "Needs Review",
+      details: top.details,
+      explanation:
+        "Multiple storefront indicators were found, so platform should be manually reviewed.",
+    };
+  }
+
+  const confidence = Math.min(95, Math.round(top.score));
   return {
-    name: best.name,
-    confidence: Math.min(100, 40 + best.count * 25),
+    name: top.name,
+    confidence,
+    confidenceLabel: getConfidenceLabel(confidence),
     details:
-      best.details.length > 0
-        ? best.details
+      top.details.length > 0
+        ? top.details
         : [
-            `Detected a strong ${best.name} storefront signal based on visible platform indicators.`,
+            `Detected ${top.name} storefront signals based on visible platform indicators.`,
           ],
+    explanation:
+      getConfidenceLabel(confidence) === "Low confidence"
+        ?
+          `Detected ${top.name}, but the signal strength is low and should be confirmed manually.`
+        : `Detected ${top.name} storefront signals with ${getConfidenceLabel(confidence).toLowerCase()}.`,
   };
 }
 
@@ -500,6 +631,206 @@ export function detectCommerceFlowSignals(
     ctaVisible: ctaLabels.length > 0,
     ctaCount: ctaLabels.length,
     ctaLabels,
+  };
+}
+
+async function extractStorefrontReviewSignals(
+  page: Page,
+): Promise<StorefrontReviewSignals> {
+  try {
+    return await page.evaluate(() => {
+      const visibleElements = Array.from(document.querySelectorAll("body *"))
+        .map((element) => {
+          const htmlElement = element as HTMLElement;
+          const style = window.getComputedStyle(htmlElement);
+          const rect = htmlElement.getBoundingClientRect();
+          const text = (
+            htmlElement.textContent ||
+            htmlElement.getAttribute("aria-label") ||
+            htmlElement.getAttribute("title") ||
+            ""
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+
+          return {
+            element,
+            text,
+            top: rect.top,
+            bottom: rect.bottom,
+            height: rect.height,
+            isVisible:
+              Boolean(text) &&
+              style.display !== "none" &&
+              style.visibility !== "hidden" &&
+              rect.width > 0 &&
+              rect.height > 0,
+          };
+        })
+        .filter((item) => item.isVisible);
+
+      const visibleText = visibleElements.map((item) => item.text).join(" ");
+      const visibleTextLower = visibleText.toLowerCase();
+      const aboveFoldElements = visibleElements.filter(
+        (item) => item.top >= 0 && item.top < window.innerHeight,
+      );
+      const ctaPattern =
+        /add to cart|add to bag|buy now|checkout|shop now|view products|view collection|get started|subscribe|sign up|contact|request|quote|book|learn more/i;
+      const genericNavigationPattern =
+        /about|blog|news|press|careers|privacy|terms|account|login|sign in/i;
+
+      const mobileCtaLabels = Array.from(
+        document.querySelectorAll("a, button, input[type='submit']"),
+      )
+        .map((element) => {
+          const htmlElement = element as HTMLElement;
+          const rect = htmlElement.getBoundingClientRect();
+          const label = (
+            htmlElement.textContent ||
+            htmlElement.getAttribute("aria-label") ||
+            htmlElement.getAttribute("value") ||
+            ""
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+
+          return {
+            label,
+            top: rect.top,
+            visible: rect.width > 0 && rect.height > 0,
+          };
+        })
+        .filter(
+          (item) =>
+            item.visible &&
+            item.top >= 0 &&
+            item.top < window.innerHeight * 0.9 &&
+            ctaPattern.test(item.label),
+        )
+        .map((item) => item.label)
+        .slice(0, 5);
+
+      const linkData = Array.from(document.querySelectorAll("a[href]")).map(
+        (element) => {
+          const htmlElement = element as HTMLAnchorElement;
+          const label = (htmlElement.textContent || htmlElement.getAttribute("aria-label") || "")
+            .replace(/\s+/g, " ")
+            .trim();
+          const href = htmlElement.href || htmlElement.getAttribute("href") || "";
+
+          return { label, href };
+        },
+      );
+
+      const navLinks = Array.from(document.querySelectorAll("nav a, header a"))
+        .map((element) =>
+          (element.textContent || element.getAttribute("aria-label") || "")
+            .replace(/\s+/g, " ")
+            .trim(),
+        )
+        .filter(Boolean);
+
+      const productPattern =
+        /shop|product|products|collection|collections|category|categories|catalog|new arrivals|sale|bestseller/i;
+      const collectionLinksVisible = linkData.some((link) =>
+        /\/products|\/collections|\/category|\/catalog|\/shop/i.test(
+          `${link.href} ${link.label}`,
+        ),
+      );
+
+      return {
+        mobileCtaVisibleAboveFold: mobileCtaLabels.length > 0,
+        mobileCtaLabels,
+        mobileAboveFoldLinkCount: aboveFoldElements.filter(
+          (item) => item.element instanceof HTMLAnchorElement,
+        ).length,
+        mobileVisibleTextLength: aboveFoldElements
+          .map((item) => item.text)
+          .join(" ").length,
+        mobileCrowdingRisk:
+          aboveFoldElements.length > 65 ||
+          aboveFoldElements.map((item) => item.text).join(" ").length > 1800,
+        searchVisible:
+          document.querySelector('input[type="search"], input[placeholder*="Search" i], [aria-label*="search" i]') !==
+            null || /\bsearch\b/i.test(navLinks.join(" ")),
+        reviewSignalsVisible:
+          /reviews?|testimonials?|star rating|rated|customer stories|verified buyer/i.test(
+            visibleTextLower,
+          ),
+        shippingReturnsVisible:
+          /shipping|delivery|returns?|exchange|refund/i.test(visibleTextLower),
+        warrantyGuaranteeVisible:
+          /warranty|guarantee|guaranteed|satisfaction|money back/i.test(
+            visibleTextLower,
+          ),
+        paymentTrustVisible:
+          /secure checkout|secure payment|shop pay|paypal|klarna|afterpay|apple pay|google pay|visa|mastercard|amex/i.test(
+            visibleTextLower,
+          ),
+        contactSupportVisible:
+          /contact|support|help center|customer service|live chat|email us|call us/i.test(
+            visibleTextLower,
+          ),
+        policyVisible:
+          /privacy policy|terms|return policy|shipping policy|refund policy/i.test(
+            visibleTextLower,
+          ),
+        productNavigationVisible:
+          navLinks.some((label) => productPattern.test(label)) ||
+          productPattern.test(visibleTextLower),
+        collectionLinksVisible,
+        genericNavigationCount: navLinks.filter((label) =>
+          genericNavigationPattern.test(label),
+        ).length,
+        leadCaptureVisible:
+          document.querySelector("form") !== null ||
+          /newsletter|subscribe|email signup|sign up for emails|join our list/i.test(
+            visibleTextLower,
+          ),
+        orderReturnsLanguageVisible:
+          /order status|track order|shipping|delivery|returns?|exchange|refund/i.test(
+            visibleTextLower,
+          ),
+      };
+    });
+  } catch {
+    return defaultStorefrontReviewSignals();
+  }
+}
+
+function combineStorefrontSignals(
+  desktop: StorefrontReviewSignals,
+  mobile: StorefrontReviewSignals,
+): StorefrontReviewSignals {
+  return {
+    mobileCtaVisibleAboveFold: mobile.mobileCtaVisibleAboveFold,
+    mobileCtaLabels: mobile.mobileCtaLabels,
+    mobileAboveFoldLinkCount: mobile.mobileAboveFoldLinkCount,
+    mobileVisibleTextLength: mobile.mobileVisibleTextLength,
+    mobileCrowdingRisk: mobile.mobileCrowdingRisk,
+    searchVisible: desktop.searchVisible || mobile.searchVisible,
+    reviewSignalsVisible:
+      desktop.reviewSignalsVisible || mobile.reviewSignalsVisible,
+    shippingReturnsVisible:
+      desktop.shippingReturnsVisible || mobile.shippingReturnsVisible,
+    warrantyGuaranteeVisible:
+      desktop.warrantyGuaranteeVisible || mobile.warrantyGuaranteeVisible,
+    paymentTrustVisible:
+      desktop.paymentTrustVisible || mobile.paymentTrustVisible,
+    contactSupportVisible:
+      desktop.contactSupportVisible || mobile.contactSupportVisible,
+    policyVisible: desktop.policyVisible || mobile.policyVisible,
+    productNavigationVisible:
+      desktop.productNavigationVisible || mobile.productNavigationVisible,
+    collectionLinksVisible:
+      desktop.collectionLinksVisible || mobile.collectionLinksVisible,
+    genericNavigationCount: Math.max(
+      desktop.genericNavigationCount,
+      mobile.genericNavigationCount,
+    ),
+    leadCaptureVisible: desktop.leadCaptureVisible || mobile.leadCaptureVisible,
+    orderReturnsLanguageVisible:
+      desktop.orderReturnsLanguageVisible || mobile.orderReturnsLanguageVisible,
   };
 }
 
@@ -600,6 +931,7 @@ async function detectPageSignals(page: Page) {
         ctaCount: pageData.ctaLabels.length,
         ctaLabels: pageData.ctaLabels,
       },
+      storefrontSignals: await extractStorefrontReviewSignals(page),
     };
   } catch {
     return {
@@ -607,6 +939,7 @@ async function detectPageSignals(page: Page) {
       platformDetection: defaultPlatformDetection(),
       commerceFlowSignals: defaultCommerceFlowSignals(),
       conversionSignals: defaultConversionSignals(),
+      storefrontSignals: defaultStorefrontReviewSignals(),
     };
   }
 }
@@ -683,9 +1016,12 @@ function defaultPlatformDetection(): PlatformDetection {
   return {
     name: "Unknown",
     confidence: 0,
+    confidenceLabel: "Unknown",
     details: [
       "No clear storefront platform indicators were detected from the lightweight scan.",
     ],
+    explanation:
+      "No platform indicators were available from the lightweight scan, so the storefront platform could not be identified.",
   };
 }
 
@@ -707,6 +1043,28 @@ function defaultConversionSignals(): ConversionSignals {
     inputCount: 0,
     ctaCount: 0,
     ctaLabels: [],
+  };
+}
+
+function defaultStorefrontReviewSignals(): StorefrontReviewSignals {
+  return {
+    mobileCtaVisibleAboveFold: false,
+    mobileCtaLabels: [],
+    mobileAboveFoldLinkCount: 0,
+    mobileVisibleTextLength: 0,
+    mobileCrowdingRisk: false,
+    searchVisible: false,
+    reviewSignalsVisible: false,
+    shippingReturnsVisible: false,
+    warrantyGuaranteeVisible: false,
+    paymentTrustVisible: false,
+    contactSupportVisible: false,
+    policyVisible: false,
+    productNavigationVisible: false,
+    collectionLinksVisible: false,
+    genericNavigationCount: 0,
+    leadCaptureVisible: false,
+    orderReturnsLanguageVisible: false,
   };
 }
 

@@ -1,0 +1,1370 @@
+[
+  {
+    "name": "Steve Madden",
+    "url": "https://www.stevemadden.com",
+    "expectedPlatform": "Shopify",
+    "detectedPlatform": "Shopify",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel",
+      "Klaviyo"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 62,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Stone Equinox",
+    "url": "https://www.stoneequinox.com",
+    "expectedPlatform": "Shopify",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "Shop Delta",
+    "url": "https://shop.delta.com",
+    "expectedPlatform": "Shopify",
+    "detectedPlatform": "Shopify",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 63,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Perlin Packaging",
+    "url": "https://perlpackaging.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The page responded with an error status. Try a public storefront page instead."
+  },
+  {
+    "name": "Omni Sponsors",
+    "url": "https://omnisponsors.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "Shop Barbershop",
+    "url": "https://shopbarbershop.org",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "Real Tree",
+    "url": "https://realtree.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel",
+      "Klaviyo"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 62,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Cafe Appliances",
+    "url": "https://cafeappliances.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The page responded with an error status. Try a public storefront page instead."
+  },
+  {
+    "name": "Career Step",
+    "url": "https://careerstep.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Magento / Adobe Commerce",
+    "confidence": 32,
+    "platformMatch": "no",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager"
+    ],
+    "overallScore": 63,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 66,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 54,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Mizuno USA",
+    "url": "https://usa.mizuno.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel"
+    ],
+    "overallScore": 65,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 58,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "LifeEasy Store",
+    "url": "https://store.lifeeasy.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "no",
+    "marketingTools": [],
+    "overallScore": 64,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 68,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 60,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 75,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 56,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Lions Shop",
+    "url": "https://shop.lions.com.au",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 62,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "US Pilot Store",
+    "url": "https://store.pfu-us.icoh.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "Penn Retail",
+    "url": "https://store.pennretail.com.au",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "As Colour",
+    "url": "https://ascolour.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel",
+      "Mailchimp"
+    ],
+    "overallScore": 65,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 60,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 58,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Precious Moments",
+    "url": "https://preciousmoments.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Shopify",
+    "confidence": 95,
+    "platformMatch": "no",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Meta Pixel"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 63,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Blue Force Gear",
+    "url": "https://blueforcegear.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel",
+      "Klaviyo"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 62,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Team Store Fremantle",
+    "url": "https://teamstore.fremantlefc.com.au",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 63,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Destaco",
+    "url": "https://destaco.com",
+    "expectedPlatform": "Magento / Adobe Commerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 88,
+    "platformMatch": "no",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager"
+    ],
+    "overallScore": 64,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 69,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 56,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Revolution Dance",
+    "url": "https://revolutiondance.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager",
+      "Meta Pixel",
+      "Klaviyo",
+      "Mailchimp"
+    ],
+    "overallScore": 63,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 66,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 54,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "TruLite Tools",
+    "url": "https://trulitetools.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "Greatland",
+    "url": "https://greatland.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager"
+    ],
+    "overallScore": 65,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 58,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Donald Russell",
+    "url": "https://donaldrussell.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Shopify",
+    "confidence": 95,
+    "platformMatch": "no",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Klaviyo"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 62,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "ColdB Custom",
+    "url": "https://coldb.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The page took too long to respond. Try again later or use a faster-loading URL."
+  },
+  {
+    "name": "Shop Melbourne FC",
+    "url": "https://shop.melbournefc.com.au",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "yes",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager"
+    ],
+    "overallScore": 62,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 62,
+        "status": "High Priority"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 52,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Americas Bossa",
+    "url": "https://americas.bossard.com",
+    "expectedPlatform": "Magento / Adobe Commerce",
+    "detectedPlatform": "BigCommerce",
+    "confidence": 95,
+    "platformMatch": "no",
+    "marketingTools": [
+      "Google Analytics / GA4",
+      "Google Tag Manager"
+    ],
+    "overallScore": 64,
+    "categoryScores": [
+      {
+        "key": "uxUiIssues",
+        "label": "UX/UI Issues",
+        "score": 72,
+        "status": "Needs Review"
+      },
+      {
+        "key": "conversionIssues",
+        "label": "Conversion Issues",
+        "score": 64,
+        "status": "High Priority"
+      },
+      {
+        "key": "technicalIssues",
+        "label": "Technical Issues",
+        "score": 68,
+        "status": "Needs Review"
+      },
+      {
+        "key": "trackingIssues",
+        "label": "Tracking Issues",
+        "score": 54,
+        "status": "High Priority"
+      },
+      {
+        "key": "operationsIssues",
+        "label": "Ecommerce Operations Issues",
+        "score": 61,
+        "status": "High Priority"
+      }
+    ],
+    "topPriorityIssues": [
+      {
+        "title": "Highest Revenue Risk",
+        "riskLabel": "Checkout/cart path should be reviewed",
+        "severity": "High Priority",
+        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
+        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+      },
+      {
+        "title": "Highest UX Friction",
+        "riskLabel": "Mobile conversion path should be reviewed",
+        "severity": "Needs Review",
+        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
+        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+      },
+      {
+        "title": "Highest Operational Friction",
+        "riskLabel": "Backend/operations workflow should be mapped",
+        "severity": "High Priority",
+        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
+        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+      }
+    ],
+    "status": "success",
+    "errorMessage": null
+  },
+  {
+    "name": "Garnet Popcorn",
+    "url": "https://garnetpopcorn.com",
+    "expectedPlatform": "BigCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "Shop NFL",
+    "url": "https://shop.nfl.com",
+    "expectedPlatform": "Salesforce Commerce Cloud",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The URL could not be reached. Check that the domain is public and accessible."
+  },
+  {
+    "name": "Coin Circuit",
+    "url": "https://coincircuit.com",
+    "expectedPlatform": "WooCommerce",
+    "detectedPlatform": "Unknown",
+    "confidence": 0,
+    "platformMatch": "unknown",
+    "marketingTools": [],
+    "overallScore": null,
+    "categoryScores": [],
+    "topPriorityIssues": [],
+    "status": "failed",
+    "errorMessage": "The page responded with an error status. Try a public storefront page instead."
+  }
+]
