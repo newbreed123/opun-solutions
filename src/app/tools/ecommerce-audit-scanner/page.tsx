@@ -4,7 +4,6 @@ import { FormEvent, useState } from "react";
 import Button from "@/components/Button";
 import Section from "@/components/Section";
 import {
-  AlertTriangle,
   BarChart3,
   ChevronDown,
   Check,
@@ -32,6 +31,7 @@ type AuditCategory = {
   score: number;
   status: string;
   statusDetail?: string;
+  purpose?: string;
   explanation: string;
   scoreExplanation?: {
     whyAssigned: string;
@@ -41,6 +41,7 @@ type AuditCategory = {
   priority: "Low" | "Medium" | "High";
   issues: string[];
   findings?: HeuristicFinding[];
+  influencingFindings?: string[];
 };
 
 type AuditResult = {
@@ -53,16 +54,22 @@ type AuditResult = {
   summary: string;
   executiveSummary: ExecutiveSummary;
   auditNarrative?: string;
+  connectedInsight?: ConnectedInsight | null;
+  primaryOperationalConcern?: PrimaryOperationalConcern | null;
   topPriorityRisks: TopPriorityRisk[];
   heuristicFindings?: HeuristicFinding[];
   diagnostics: LiveDiagnostics;
   categories: AuditCategory[];
   recommendedNextSteps: RecommendedNextStep[];
+  benchmarkTags?: string[];
+  benchmarkContext?: BenchmarkContext;
 };
 
 type HeuristicFinding = {
   title: string;
   category: string;
+  primaryCategory?: string;
+  secondaryCategories?: string[];
   severity: "Low" | "Medium" | "High" | "Critical";
   confidence: "Low" | "Moderate" | "High" | "Needs Review";
   businessImpact: string;
@@ -84,6 +91,41 @@ type TopPriorityRisk = {
   explanation: string;
   evidenceSummary?: string;
   recommendedFirstAction: string;
+};
+
+type ConnectedInsight = {
+  title: string;
+  insight: string;
+  findingTitles: string[];
+};
+
+type PrimaryOperationalConcern = {
+  title: string;
+  riskLabel: string;
+  severity: string;
+  confidence?: string;
+  explanation: string;
+  evidenceSummary?: string;
+  recommendedFirstAction: string;
+  supportingFindings: string[];
+};
+
+type OperationalConcernView = PrimaryOperationalConcern | TopPriorityRisk | null;
+
+type BenchmarkNote = {
+  message: string;
+  evidence: string;
+  tags: string[];
+  tone: "positive" | "negative" | "mixed";
+};
+
+type BenchmarkContext = {
+  summary: string;
+  notes: BenchmarkNote[];
+  benchmarkTags: string[];
+  recurringPositivePatterns: string[];
+  recurringNegativePatterns: string[];
+  signalScore: number;
 };
 
 type RecommendedNextStep = {
@@ -194,29 +236,21 @@ function isValidHttpUrl(value: string) {
   }
 }
 
-function priorityClasses(priority: AuditCategory["priority"]) {
-  if (priority === "High") {
-    return "border-red-300/30 bg-red-400/10 text-red-100";
-  }
-
-  if (priority === "Medium") {
-    return "border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan";
-  }
-
-  return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
-}
-
 function statusBadgeClasses(status: string) {
   if (status === "Critical") {
-    return "border-red-300/40 bg-red-500/15 text-red-100";
+    return "border-red-300/45 bg-red-500/15 text-red-100 shadow-[0_0_0_1px_rgba(248,113,113,0.08)]";
   }
 
   if (status === "High Priority" || status === "High") {
-    return "border-red-300/30 bg-red-400/10 text-red-100";
+    return "border-orange-300/35 bg-orange-400/10 text-orange-100";
   }
 
   if (status === "Needs Review" || status === "Medium") {
-    return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+    return "border-amber-300/35 bg-amber-400/10 text-amber-100";
+  }
+
+  if (status === "Low") {
+    return "border-brand-cyan/25 bg-brand-cyan/10 text-brand-cyan";
   }
 
   return "border-emerald-300/30 bg-emerald-400/10 text-emerald-100";
@@ -366,6 +400,30 @@ function scoreMainEvidence(category: AuditCategory) {
   }
 
   return evidence.split(";")[0] ?? evidence;
+}
+
+function primaryOperationalConcern(audit: AuditResult): OperationalConcernView {
+  return audit.primaryOperationalConcern ?? audit.topPriorityRisks[0] ?? null;
+}
+
+function primaryOperationalSupportingFindings(concern: OperationalConcernView) {
+  if (concern && "supportingFindings" in concern) {
+    return concern.supportingFindings;
+  }
+
+  return [];
+}
+
+function benchmarkNoteClasses(tone: BenchmarkNote["tone"]) {
+  if (tone === "positive") {
+    return "border-emerald-300/25 bg-emerald-400/5";
+  }
+
+  if (tone === "negative") {
+    return "border-amber-300/25 bg-amber-400/5";
+  }
+
+  return "border-dark-border bg-white/[0.035]";
 }
 
 export default function EcommerceAuditScannerPage() {
@@ -633,7 +691,7 @@ export default function EcommerceAuditScannerPage() {
               </div>
 
               <div className="card-elevated p-6 md:p-8">
-                <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="grid gap-7 lg:grid-cols-[1.15fr_0.85fr]">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
                       Executive View
@@ -641,24 +699,24 @@ export default function EcommerceAuditScannerPage() {
                     <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
                       Executive Summary
                     </h3>
-                    <p className="mt-5 text-lg leading-relaxed text-secondary">
+                    <p className="mt-5 max-w-3xl text-lg leading-8 text-secondary">
                       {audit.executiveSummary.summary}
                     </p>
-                    <p className="mt-4 leading-relaxed text-muted">
+                    <p className="mt-5 max-w-3xl border-l border-brand-cyan/30 pl-4 leading-7 text-muted">
                       {audit.executiveSummary.businessInterpretation}
                     </p>
                   </div>
 
-                  <div className="rounded-[2rem] border border-dark-border bg-dark-deep/70 p-5">
+                  <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
                     <p className="text-sm font-bold text-primary">
                       Highest-impact opportunities
                     </p>
                     <div className="mt-4 space-y-3">
-                      {audit.executiveSummary.highestImpactOpportunities.map(
+                      {audit.executiveSummary.highestImpactOpportunities.slice(0, 3).map(
                         (opportunity) => (
                           <div
                             key={opportunity}
-                            className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm leading-relaxed text-secondary"
+                            className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-sm leading-6 text-secondary"
                           >
                             <Target className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
                             <span>{opportunity}</span>
@@ -671,7 +729,7 @@ export default function EcommerceAuditScannerPage() {
               </div>
 
               <div className="card-elevated p-6 md:p-8">
-                <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+                <div className="grid gap-7 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
                       Audit Narrative
@@ -679,34 +737,90 @@ export default function EcommerceAuditScannerPage() {
                     <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
                       The story behind this scan
                     </h3>
-                    <p className="mt-5 text-lg leading-relaxed text-secondary">
+                    <p className="mt-5 max-w-3xl text-lg leading-8 text-secondary">
                       {audit.auditNarrative ??
                         audit.executiveSummary.summary}
                     </p>
+                    {audit.connectedInsight && (
+                      <div className="mt-5 rounded-2xl border border-brand-cyan/25 bg-brand-cyan/10 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                          Connected Insight
+                        </p>
+                        <h4 className="mt-2 text-lg font-bold leading-snug text-primary">
+                          {audit.connectedInsight.title}
+                        </h4>
+                        <p className="mt-2 text-sm leading-6 text-secondary">
+                          {audit.connectedInsight.insight}
+                        </p>
+                      </div>
+                    )}
+                    {primaryOperationalConcern(audit) && (
+                      <div className="mt-6 rounded-2xl border border-amber-300/30 bg-amber-400/5 p-5">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-100">
+                              Primary Operational Concern
+                            </p>
+                            <h4 className="mt-2 text-xl font-bold leading-snug text-primary">
+                              {primaryOperationalConcern(audit)?.riskLabel}
+                            </h4>
+                          </div>
+                          <span
+                            className={`inline-flex w-fit flex-none rounded-full border px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
+                              primaryOperationalConcern(audit)?.severity ?? "Needs Review",
+                            )}`}
+                          >
+                            {primaryOperationalConcern(audit)?.severity}
+                          </span>
+                        </div>
+                        <p className="mt-4 max-w-2xl text-sm leading-6 text-secondary">
+                          {primaryOperationalConcern(audit)?.explanation}
+                        </p>
+                        {primaryOperationalSupportingFindings(
+                          primaryOperationalConcern(audit),
+                        ).length > 0 ? (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {primaryOperationalSupportingFindings(
+                                primaryOperationalConcern(audit),
+                              ).map((finding) => (
+                                <span
+                                  key={finding}
+                                  className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-secondary"
+                                >
+                                  {finding}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        <p className="mt-4 rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3 text-sm font-semibold leading-6 text-primary">
+                          {primaryOperationalConcern(audit)?.recommendedFirstAction}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-3 rounded-[2rem] border border-dark-border bg-dark-deep/70 p-5">
+                  <div className="space-y-3 rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
                     <p className="text-sm font-bold text-primary">
                       Priority evidence snapshot
                     </p>
                     {audit.topPriorityRisks.slice(0, 3).map((risk) => (
                       <div
                         key={risk.title}
-                        className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+                        className="rounded-xl border border-white/10 bg-white/[0.035] p-3"
                       >
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <p className="font-semibold leading-relaxed text-primary">
+                          <p className="font-semibold leading-snug text-primary">
                             {risk.riskLabel}
                           </p>
                           <span
-                            className={`inline-flex w-fit rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
+                            className={`inline-flex w-fit flex-none rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
                               risk.severity,
                             )}`}
                           >
                             {risk.severity}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm leading-relaxed text-secondary">
+                        <p className="mt-2 text-sm leading-6 text-secondary">
                           {risk.evidenceSummary ?? risk.explanation}
                         </p>
                       </div>
@@ -715,55 +829,55 @@ export default function EcommerceAuditScannerPage() {
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/15 via-dark-card to-brand-cyan/10 p-6 shadow-[0_30px_80px_rgba(6,182,212,0.12)] md:p-8">
+              <div className="rounded-[2rem] border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/12 via-dark-card to-brand-cyan/8 p-6 shadow-[0_24px_70px_rgba(6,182,212,0.1)] md:p-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
                   Action Plan
                 </p>
                 <h3 className="mt-3 text-3xl font-bold text-primary">
                   What to Review First
                 </h3>
-                <div className="mt-6 grid gap-4 lg:grid-cols-3">
+                <div className="mt-7 grid gap-4 lg:grid-cols-3">
                   {audit.recommendedNextSteps.map((step, index) => (
                     <div
                       key={step.action}
-                      className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4"
+                      className="rounded-2xl border border-dark-border bg-dark-deep/75 p-5"
                     >
-                      <div className="mb-4 flex items-center gap-3">
-                        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-bold text-white">
+                      <div className="mb-5 flex items-center gap-3">
+                        <div className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-cyan/15 text-sm font-bold text-brand-cyan">
                           {index + 1}
                         </div>
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
                           {actionPlanLabel(index)}
                         </p>
                       </div>
-                      <p className="font-semibold leading-relaxed text-primary">
+                      <p className="text-lg font-semibold leading-snug text-primary">
                         {step.title ?? step.action}
                       </p>
-                      <div className="mt-3 space-y-3">
+                      <div className="mt-5 space-y-4">
                         {step.evidenceClue && (
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                              Evidence clue
+                              Evidence
                             </p>
-                            <p className="mt-1 text-sm leading-relaxed text-secondary">
+                            <p className="mt-1 text-sm leading-6 text-secondary">
                               {step.evidenceClue}
                             </p>
                           </div>
                         )}
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                            Why it matters
+                            Impact
                           </p>
-                          <p className="mt-1 text-sm leading-relaxed text-muted">
+                          <p className="mt-1 text-sm leading-6 text-muted">
                             {step.why}
                           </p>
                         </div>
                         {step.title && (
-                          <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3">
+                          <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3.5">
                             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
                               First action
                             </p>
-                            <p className="mt-1 text-sm font-semibold leading-relaxed text-primary">
+                            <p className="mt-1 text-sm font-semibold leading-6 text-primary">
                               {step.action}
                             </p>
                           </div>
@@ -797,12 +911,17 @@ export default function EcommerceAuditScannerPage() {
                       key={category.key}
                       className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-3">
                         <p className="text-sm font-bold text-primary">
                           {category.label}
                         </p>
+                        {category.purpose && (
+                          <p className="text-xs leading-5 text-muted">
+                            {category.purpose}
+                          </p>
+                        )}
                         <span
-                          className={`rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
+                          className={`inline-flex w-fit rounded-full border px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
                             category.status,
                           )}`}
                         >
@@ -1653,14 +1772,46 @@ export default function EcommerceAuditScannerPage() {
                     Internal comparison context
                   </h3>
                   <p className="mt-4 leading-relaxed text-secondary">
-                    This scanner will become more useful as we compare results
-                    across strong and weak ecommerce stores.
+                    {audit.benchmarkContext?.summary ??
+                      "This scanner will become more useful as we compare results across strong and weak ecommerce stores."}
                   </p>
-                  <p className="mt-4 rounded-2xl border border-dark-border bg-white/[0.035] p-4 text-sm leading-relaxed text-muted">
+                  {audit.benchmarkContext?.benchmarkTags?.length ? (
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {audit.benchmarkContext.benchmarkTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full border border-dark-border bg-white/[0.04] px-3 py-1 text-xs font-semibold text-secondary"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {audit.benchmarkContext?.notes?.length ? (
+                    <div className="mt-5 grid gap-3 md:grid-cols-2">
+                      {audit.benchmarkContext.notes.map((note) => (
+                        <div
+                          key={`${note.message}-${note.tags.join("-")}`}
+                          className={`rounded-2xl border p-4 ${benchmarkNoteClasses(note.tone)}`}
+                        >
+                          <p className="text-sm font-semibold leading-6 text-primary">
+                            {note.message}
+                          </p>
+                          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                            Evidence
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-secondary">
+                            {note.evidence}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="mt-5 rounded-2xl border border-dark-border bg-white/[0.035] p-4 text-sm leading-relaxed text-muted">
                     For now, treat benchmarks as directional rather than
-                    definitive. The best use is comparing score drivers,
-                    evidence quality, and priority order across multiple manual
-                    audit examples.
+                    definitive. These notes reflect current internal comparison
+                    criteria and observed public-page evidence, not percentile
+                    rankings or market-wide claims.
                   </p>
                 </div>
               </div>
@@ -1681,37 +1832,45 @@ export default function EcommerceAuditScannerPage() {
 
               <div className="grid gap-6 lg:grid-cols-2">
                 {audit.categories.map((category) => (
-                  <div key={category.key} className="card-elevated p-6">
-                    <div className="mb-5 flex items-start justify-between gap-4">
+                  <div key={category.key} className="card-elevated p-5 md:p-6">
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
                           Priority Review
                         </p>
-                        <h3 className="mt-2 text-2xl font-bold text-primary">
+                        <h3 className="mt-2 text-2xl font-bold leading-tight text-primary">
                           {category.label}
                         </h3>
+                        {category.purpose && (
+                          <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
+                            {category.purpose}
+                          </p>
+                        )}
                       </div>
-                      <AlertTriangle className="h-6 w-6 flex-none text-brand-cyan" />
+                      <span
+                        className={`inline-flex w-fit rounded-full border px-3 py-1 text-[0.68rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
+                          category.status,
+                        )}`}
+                      >
+                        {category.status}
+                      </span>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                       {category.findings && category.findings.length > 0 ? (
                         category.findings.map((finding) => (
                           <div
                             key={finding.title}
-                            className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+                            className="rounded-2xl border border-white/10 bg-white/[0.035] p-5"
                           >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div>
-                                <p className="text-lg font-bold text-primary">
+                                <p className="text-lg font-bold leading-snug text-primary">
                                   {finding.title}
-                                </p>
-                                <p className="mt-2 text-sm leading-relaxed text-secondary">
-                                  {finding.businessImpact}
                                 </p>
                               </div>
                               <span
-                                className={`inline-flex w-fit rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
+                                className={`inline-flex w-fit flex-none rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
                                   finding.severity,
                                 )}`}
                               >
@@ -1719,22 +1878,33 @@ export default function EcommerceAuditScannerPage() {
                               </span>
                             </div>
 
-                            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                              <div className="rounded-xl border border-dark-border bg-dark-deep/60 p-3">
+                            <div className="mt-5 grid gap-3">
+                              <div className="rounded-xl border border-dark-border bg-dark-deep/60 p-4">
                                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
                                   Evidence
                                 </p>
-                                <p className="mt-2 text-sm leading-relaxed text-secondary">
+                                <p className="mt-2 text-sm leading-6 text-secondary">
                                   {finding.evidenceSummary}
                                 </p>
                               </div>
-                              <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3">
-                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
-                                  First action
-                                </p>
-                                <p className="mt-2 text-sm leading-relaxed text-primary">
-                                  {finding.recommendedFirstAction}
-                                </p>
+
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <div className="rounded-xl border border-dark-border bg-dark-deep/50 p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                                    Impact
+                                  </p>
+                                  <p className="mt-2 text-sm leading-6 text-secondary">
+                                    {finding.businessImpact}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-4">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
+                                    First action
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold leading-6 text-primary">
+                                    {finding.recommendedFirstAction}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1746,7 +1916,7 @@ export default function EcommerceAuditScannerPage() {
                             className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-secondary"
                           >
                             <Check className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
-                            <p className="leading-relaxed">{issue}</p>
+                            <p className="leading-6">{issue}</p>
                           </div>
                         ))
                       )}

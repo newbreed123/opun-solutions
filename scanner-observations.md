@@ -81,3 +81,19 @@ Internal notes on the Opun Ecommerce Audit Scanner performance and improvements.
 - Reordered the visible report hierarchy around executive readability: Executive Summary, Audit Narrative, What to Review First, Score Cards, Platform & Marketing Visibility, Live Diagnostics, Detailed Findings, and CTA.
 - Simplified category score cards so they show score, status, a short contextual explanation, and the main evidence driver without duplicating the full finding text.
 - Added a lightweight `Benchmark Notes` placeholder for future internal comparison across strong and weak ecommerce stores.
+
+## Recommendation Narrative Cohesion
+
+- Updated the audit narrative so it connects the top related findings into a strategic ecommerce story instead of listing isolated issues.
+- Added `Connected Insight` logic for common relationship patterns such as mobile CTA plus trust visibility, discovery plus checkout continuity, tracking plus conversion, and product discovery plus search clarity.
+- Improved `Primary Operational Concern` so it explains the main business concern, the supporting findings behind it, and why it should be addressed before lower-impact refinements.
+- Reworked `What to Review First` ordering so the plan starts with the highest-impact customer journey issue, moves to a supporting trust or discovery issue, then follows with measurement, operations, or technical follow-through.
+- Preserved category ownership rules so related findings can shape the strategic story without reintroducing duplicate full finding cards across categories.
+
+## Benchmark Intelligence Foundation
+
+- Added deterministic `benchmarkTags` for mobile clarity, CTA visibility, product discovery, trust signals, checkout continuity, tracking visibility, and operational clarity.
+- Added comparative benchmark context to the report with conservative, evidence-backed notes instead of percentile claims or fake market positioning.
+- Added recurring positive and negative operational pattern tracking so validation sweeps can identify which storefront qualities appear repeatedly across strong and weak examples.
+- Created `benchmark-observations.md` as the internal structure for recording strong and weak ecommerce patterns over time.
+- Updated validation scripts so future validation runs capture benchmark tags, strongest examples, weakest examples, and recurring operational patterns.

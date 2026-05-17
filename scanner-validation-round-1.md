@@ -10,20 +10,11 @@ This summary is updated after the latest validation sweep.
 
 ## Common issues
 
-- Mobile Readability May Be Crowded (12)
+- Mobile Readability May Be Crowded (11)
 - Mobile CTA Visibility Needs Review (6)
 - Product Discovery Clarity Needs Review (4)
 - Cart / Checkout Path Needs Review (2)
 - Store Search Visibility Needs Review (2)
-
-## Evidence-Based Recommendation Layer
-
-- Top-priority generic category labels decreased to `0` across 33 successful-scan top-priority risks. The scanner preserved specific issue labels rather than falling back to `Conversion Issues`, `UX/UI Issues`, or `Ecommerce Operations Issues`.
-- Recommendations now include evidence-backed structure: issue title, category, severity, confidence, evidence summary, business impact, and recommended first action.
-- Category score explanations are present for UX/UI, Conversion, Technical, Tracking, and Ecommerce Operations. Each explanation states why the score was assigned, which evidence influenced it, and what would improve the score.
-- Deterministic score variation improved. The 17 successful scans produced 17 unique category score combinations, compared with prior repeated combinations such as `65 / 61 / 62 / 64 / 70`.
-- Platform confidence explanations are clearer. High-confidence detections include concrete supporting signals, while low-confidence or uncertain platform results tell auditors why manual confirmation is needed before platform-specific recommendations.
-- `What to Review First` is generated from highest business-impact findings and now carries the specific issue title, evidence clue, why it matters, and the first action.
 
 ## Sites needing manual review
 
@@ -45,3 +36,22 @@ This summary is updated after the latest validation sweep.
 - Garnet Popcorn (https://garnetpopcorn.com)
 - Shop NFL (https://shop.nfl.com)
 - Coin Circuit (https://coincircuit.com)
+
+## Benchmark Intelligence Validation
+
+Future validation sweeps now capture benchmark fields in addition to platform, score, and priority issue data.
+
+- `benchmarkTags` generated for strong and weak signals such as mobile clarity, CTA visibility, product discovery, trust signals, checkout continuity, tracking visibility, and operational clarity.
+- Strongest benchmark examples should be reviewed by counting stores with multiple `strong-*` tags and confirming the evidence behind each tag.
+- Weakest benchmark examples should be reviewed by counting stores with multiple `weak-*` tags and checking whether the action plan reflects the same operational pattern.
+- Recurring operational patterns should be summarized from `benchmarkRecurringPositivePatterns` and `benchmarkRecurringNegativePatterns` in `scanner-validation-results.json`.
+- Benchmark language should remain conservative: directional internal comparison only, no percentile rankings, no market-wide claims, and no unsupported revenue projections.
+
+## Local Benchmark QA Notes
+
+- `/` generated `strong-mobile-clarity`, `strong-cta-visibility`, `weak-product-discovery`, `strong-checkout-continuity`, `weak-tracking-visibility`, and `strong-operational-clarity`.
+- `/services/ecommerce-solutions` generated mixed tags including `weak-mobile-clarity`, `strong-trust-signals`, `strong-tracking-visibility`, and `weak-product-discovery`.
+- `/tools/ecommerce-audit-scanner` generated weaker journey tags including `weak-mobile-clarity`, `weak-cta-visibility`, `weak-product-discovery`, and `weak-tracking-visibility`.
+- Strongest local examples came from pages with visible mobile CTA evidence, cart/checkout continuity, and operational clarity.
+- Weakest local examples came from pages with missing above-fold mobile CTA evidence, weaker product discovery, and thin public tracking visibility.
+- Recurring negative local pattern: product discovery remains weaker when collection/product links or search are not visible in the public-page sample.

@@ -94,3 +94,11 @@ Based on `scanner-validation-results.json` and `scanner-validation-round-1.md`.
 1. Strengthen platform detection handling and confidence signaling, especially for mismatches with high confidence.
 2. Add more nuanced, evidence-backed category score explanations to reduce repeated score patterns.
 3. Make recommendations more actionable and specific, avoiding repeated `review screenshot` boilerplate.
+
+## Benchmark Intelligence Validation Addendum
+
+- Future validation should record generated `benchmarkTags` for each successful scan.
+- Strong benchmark examples should be identified by multiple `strong-*` tags plus evidence that supports the tag.
+- Weak benchmark examples should be identified by multiple `weak-*` tags plus action-plan alignment.
+- Recurring positive and negative operational patterns should be reviewed across validation results before changing scanner heuristics.
+- Benchmark notes must stay directional and internal until a larger, intentionally curated comparison set exists.

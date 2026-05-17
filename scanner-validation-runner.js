@@ -90,6 +90,49 @@ function topPriorityIssues(topPriorityRisks) {
   }));
 }
 
+function benchmarkTagCounts(results) {
+  return results
+    .filter((item) => item.status === "success")
+    .flatMap((item) => item.benchmarkTags ?? [])
+    .reduce((acc, tag) => {
+      acc[tag] = (acc[tag] || 0) + 1;
+      return acc;
+    }, {});
+}
+
+function benchmarkExamples(results, prefix) {
+  return results
+    .filter((item) => item.status === "success")
+    .map((item) => ({
+      name: item.name,
+      url: item.url,
+      tags: (item.benchmarkTags ?? []).filter((tag) => tag.startsWith(prefix)),
+    }))
+    .filter((item) => item.tags.length > 0)
+    .sort((a, b) => b.tags.length - a.tags.length)
+    .slice(0, 5)
+    .map((item) => `${item.name}: ${item.tags.join(", ")}`);
+}
+
+function recurringBenchmarkPatterns(results, type) {
+  const field =
+    type === "positive"
+      ? "benchmarkRecurringPositivePatterns"
+      : "benchmarkRecurringNegativePatterns";
+  const counts = results
+    .filter((item) => item.status === "success")
+    .flatMap((item) => item[field] ?? [])
+    .reduce((acc, pattern) => {
+      acc[pattern] = (acc[pattern] || 0) + 1;
+      return acc;
+    }, {});
+
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([pattern, count]) => `${pattern} (${count})`);
+}
+
 async function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -115,6 +158,11 @@ async function runValidation() {
       overallScore: null,
       categoryScores: [],
       topPriorityIssues: [],
+      benchmarkTags: [],
+      benchmarkContextSummary: null,
+      benchmarkNotes: [],
+      benchmarkRecurringPositivePatterns: [],
+      benchmarkRecurringNegativePatterns: [],
       status: "failed",
       errorMessage: null,
     };
@@ -141,6 +189,13 @@ async function runValidation() {
         item.overallScore = audit.overallScore;
         item.categoryScores = categoryScores(audit.categories);
         item.topPriorityIssues = topPriorityIssues(audit.topPriorityRisks);
+        item.benchmarkTags = audit.benchmarkTags ?? audit.benchmarkContext?.benchmarkTags ?? [];
+        item.benchmarkContextSummary = audit.benchmarkContext?.summary ?? null;
+        item.benchmarkNotes = audit.benchmarkContext?.notes ?? [];
+        item.benchmarkRecurringPositivePatterns =
+          audit.benchmarkContext?.recurringPositivePatterns ?? [];
+        item.benchmarkRecurringNegativePatterns =
+          audit.benchmarkContext?.recurringNegativePatterns ?? [];
         item.status = "success";
       }
     } catch (error) {
@@ -178,6 +233,14 @@ async function runValidation() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([label, count]) => `${label} (${count})`);
+  const tagCountsSorted = Object.entries(benchmarkTagCounts(results))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([tag, count]) => `${tag} (${count})`);
+  const strongestBenchmarkExamples = benchmarkExamples(results, "strong-");
+  const weakestBenchmarkExamples = benchmarkExamples(results, "weak-");
+  const positivePatterns = recurringBenchmarkPatterns(results, "positive");
+  const negativePatterns = recurringBenchmarkPatterns(results, "negative");
 
   const markdownLines = [
     "# Scanner Validation Round 1 Results",
@@ -205,6 +268,35 @@ async function runValidation() {
     manualReviewSites.forEach((site) => markdownLines.push(`- ${site}`));
   } else {
     markdownLines.push("- None");
+  }
+
+  markdownLines.push("", "## Benchmark tags generated", "");
+  if (tagCountsSorted.length > 0) {
+    tagCountsSorted.forEach((tag) => markdownLines.push(`- ${tag}`));
+  } else {
+    markdownLines.push("- No benchmark tags were generated.");
+  }
+
+  markdownLines.push("", "## Strongest benchmark examples", "");
+  if (strongestBenchmarkExamples.length > 0) {
+    strongestBenchmarkExamples.forEach((site) => markdownLines.push(`- ${site}`));
+  } else {
+    markdownLines.push("- No strong benchmark examples were detected.");
+  }
+
+  markdownLines.push("", "## Weakest benchmark examples", "");
+  if (weakestBenchmarkExamples.length > 0) {
+    weakestBenchmarkExamples.forEach((site) => markdownLines.push(`- ${site}`));
+  } else {
+    markdownLines.push("- No weak benchmark examples were detected.");
+  }
+
+  markdownLines.push("", "## Recurring operational patterns", "");
+  [...positivePatterns, ...negativePatterns].forEach((pattern) =>
+    markdownLines.push(`- ${pattern}`),
+  );
+  if (positivePatterns.length === 0 && negativePatterns.length === 0) {
+    markdownLines.push("- No recurring benchmark patterns were found.");
   }
 
   await fs.writeFile(reportFile, markdownLines.join("\n"), "utf8");
@@ -235,6 +327,35 @@ async function runValidation() {
     manualReviewSites.forEach((site) => summaryContent.push(`- ${site}`));
   } else {
     summaryContent.push("- None");
+  }
+
+  summaryContent.push("", "## Benchmark tags generated", "");
+  if (tagCountsSorted.length > 0) {
+    tagCountsSorted.forEach((tag) => summaryContent.push(`- ${tag}`));
+  } else {
+    summaryContent.push("- No benchmark tags were generated.");
+  }
+
+  summaryContent.push("", "## Strongest benchmark examples", "");
+  if (strongestBenchmarkExamples.length > 0) {
+    strongestBenchmarkExamples.forEach((site) => summaryContent.push(`- ${site}`));
+  } else {
+    summaryContent.push("- No strong benchmark examples were detected.");
+  }
+
+  summaryContent.push("", "## Weakest benchmark examples", "");
+  if (weakestBenchmarkExamples.length > 0) {
+    weakestBenchmarkExamples.forEach((site) => summaryContent.push(`- ${site}`));
+  } else {
+    summaryContent.push("- No weak benchmark examples were detected.");
+  }
+
+  summaryContent.push("", "## Recurring operational patterns", "");
+  [...positivePatterns, ...negativePatterns].forEach((pattern) =>
+    summaryContent.push(`- ${pattern}`),
+  );
+  if (positivePatterns.length === 0 && negativePatterns.length === 0) {
+    summaryContent.push("- No recurring benchmark patterns were found.");
   }
 
   await fs.writeFile(summaryFile, summaryContent.join("\n"), "utf8");

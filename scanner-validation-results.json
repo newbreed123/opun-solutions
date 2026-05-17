@@ -6,7 +6,7 @@
     "detectedPlatform": "Shopify",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets; Shopify frontend objects or analytics; Shopify frontend objects or analytics.",
     "platformEvidence": [
       "Signal count: 6 strong and 5 weak Shopify indicators.",
       "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
@@ -38,8 +38,8 @@
         "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 21; first-screen text estimate: 1445 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 18; first-screen text estimate: 713 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -47,11 +47,11 @@
         "label": "Conversion",
         "score": 73,
         "status": "Needs Review",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: yes. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -86,8 +86,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -98,8 +98,8 @@
         "severity": "Medium",
         "confidence": "Needs Review",
         "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
-        "evidenceSummary": "The mobile first viewport showed 21 visible links and about 1445 visible text characters, which triggered a crowding risk.",
-        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 21 links and about 1445 text characters before scroll."
+        "evidenceSummary": "The mobile first viewport showed 18 visible links and about 713 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 18 links and about 713 text characters before scroll."
       }
     ],
     "status": "success",
@@ -129,7 +129,7 @@
     "detectedPlatform": "Shopify",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets; Shopify frontend objects or analytics; Shopify frontend objects or analytics.",
     "platformEvidence": [
       "Signal count: 6 strong and 5 weak Shopify indicators.",
       "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
@@ -158,8 +158,8 @@
         "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 12; first-screen text estimate: 2119 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 12; first-screen text estimate: 2119 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -167,11 +167,11 @@
         "label": "Conversion",
         "score": 69,
         "status": "Needs Review",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -194,7 +194,7 @@
         "statusDetail": "Tracking Stack Appears Limited",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority from visible analytics, tag manager, pixel, and email/lead-capture signals.",
-          "evidenceInfluenced": "Detected 1 supported marketing tool: Google Analytics / GA4. Lead capture visible: yes.",
+          "evidenceInfluenced": "Tracking Stack Appears Limited; detected 1 supported marketing tool: Google Analytics / GA4.",
           "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
         }
       },
@@ -206,21 +206,12 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
     "topPriorityIssues": [
-      {
-        "title": "Mobile Readability May Be Crowded",
-        "riskLabel": "Mobile Readability May Be Crowded",
-        "severity": "Medium",
-        "confidence": "Needs Review",
-        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
-        "evidenceSummary": "The mobile first viewport showed 12 visible links and about 2119 visible text characters, which triggered a crowding risk.",
-        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 12 links and about 2119 text characters before scroll."
-      },
       {
         "title": "Tracking Stack Appears Limited",
         "riskLabel": "Tracking Stack Appears Limited",
@@ -229,6 +220,15 @@
         "explanation": "A thin visible tracking stack may leave gaps in attribution, retargeting, or customer follow-up visibility.",
         "evidenceSummary": "Visible supported marketing tool: Google Analytics / GA4.",
         "recommendedFirstAction": "Map the visible tag to the full purchase path and confirm whether missing analytics, pixel, or email events are intentionally handled server-side."
+      },
+      {
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 12 visible links and about 2119 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 12 links and about 2119 text characters before scroll."
       }
     ],
     "status": "success",
@@ -292,7 +292,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 3 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -324,8 +324,8 @@
         "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 229; first-screen text estimate: 13188 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 229; first-screen text estimate: 13188 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -333,11 +333,11 @@
         "label": "Conversion",
         "score": 69,
         "status": "Needs Review",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -372,8 +372,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -418,14 +418,14 @@
     "platformExplanation": "Detected Magento / Adobe Commerce, but the signal strength is low and should be confirmed manually because the scan found only limited platform-specific evidence.",
     "platformEvidence": [
       "Signal count: 1 strong and 0 weak Magento / Adobe Commerce indicators.",
-      "Strong signal: platform pattern mage\\/ (mage\\/)"
+      "Strong signal: Magento / Adobe Commerce frontend module or static asset signal (mage\\/)"
     ],
     "platformMatch": "no",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager"
     ],
-    "overallScore": 69,
+    "overallScore": 66,
     "categoryScores": [
       {
         "key": "uxUiIssues",
@@ -435,20 +435,20 @@
         "statusDetail": "Store Search Visibility Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Store Search Visibility Needs Review; mobile CTA above fold: yes; search visible: no; first-screen links: 4; first-screen text estimate: 1529 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Store Search Visibility Needs Review; search visible: no; first-screen links: 4; first-screen text estimate: 1529 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
         "key": "conversionIssues",
         "label": "Conversion",
-        "score": 77,
-        "status": "Needs Review",
-        "statusDetail": "Conversion Evidence Needs Confirmation",
+        "score": 64,
+        "status": "High Priority",
+        "statusDetail": "Cart / Checkout Path Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as high-priority based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Cart / Checkout Path Needs Review; trust-signal groups visible: 4 of 6; cart: not visible; checkout: not visible. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -459,7 +459,7 @@
         "statusDetail": "Platform Visibility Needs Manual Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority from platform confidence, metadata, console errors, and failed request evidence.",
-          "evidenceInfluenced": "Platform: Magento / Adobe Commerce (Low confidence, 32%); console errors: 2; failed requests: 6.",
+          "evidenceInfluenced": "Platform Visibility Needs Manual Review; platform: Magento / Adobe Commerce (Low confidence, 32%); console errors: 2; failed requests: 6.",
           "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
         }
       },
@@ -480,11 +480,11 @@
         "label": "Ecommerce Operations",
         "score": 59,
         "status": "High Priority",
-        "statusDetail": "Cart / Checkout Path Needs Review",
+        "statusDetail": "Cart and Checkout Entry Points Not Clear",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: not visible; checkout: not visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -527,7 +527,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 3 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -548,30 +548,30 @@
       "Google Tag Manager",
       "Meta Pixel"
     ],
-    "overallScore": 74,
+    "overallScore": 76,
     "categoryScores": [
       {
         "key": "uxUiIssues",
         "label": "UX/UI",
-        "score": 65,
+        "score": 75,
         "status": "Needs Review",
-        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "statusDetail": "Mobile Primary Action Not Evident Above Fold",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 0; first-screen text estimate: 2338 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Search visible: yes; first-screen links: 0; generic navigation cues: 2; first-screen text estimate: 761 characters. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
         "key": "conversionIssues",
         "label": "Conversion",
-        "score": 64,
-        "status": "High Priority",
+        "score": 68,
+        "status": "Needs Review",
         "statusDetail": "Mobile CTA Visibility Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, secure payment cues; mobile CTA above fold: no.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; trust-signal groups visible: 4 of 6; cart: visible; checkout: visible.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -606,8 +606,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -620,15 +620,6 @@
         "explanation": "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
         "evidenceSummary": "No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: Find Demo Events, Find Demo Events, Learn more, Shop now; mobile first-screen links: 0.",
         "recommendedFirstAction": "Reuse the strongest existing CTA (Find Demo Events or Find Demo Events) inside the first mobile viewport and make it visually distinct from secondary links."
-      },
-      {
-        "title": "Mobile Readability May Be Crowded",
-        "riskLabel": "Mobile Readability May Be Crowded",
-        "severity": "Medium",
-        "confidence": "Needs Review",
-        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
-        "evidenceSummary": "The mobile first viewport showed 0 visible links and about 2338 visible text characters, which triggered a crowding risk.",
-        "recommendedFirstAction": "Trim first-screen mobile copy and promotional text; this scan counted about 2338 visible text characters before scroll."
       }
     ],
     "status": "success",
@@ -647,7 +638,7 @@
     ],
     "platformMatch": "no",
     "marketingTools": [],
-    "overallScore": 57,
+    "overallScore": 56,
     "categoryScores": [
       {
         "key": "uxUiIssues",
@@ -657,20 +648,20 @@
         "statusDetail": "Product Discovery Clarity Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Product Discovery Clarity Needs Review; mobile CTA above fold: yes; search visible: yes; first-screen links: 1; first-screen text estimate: 319 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Product Discovery Clarity Needs Review; search visible: yes; first-screen links: 1; first-screen text estimate: 319 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
         "key": "conversionIssues",
         "label": "Conversion",
-        "score": 48,
+        "score": 44,
         "status": "High Priority",
-        "statusDetail": "Trust Signal Visibility Needs Review",
+        "statusDetail": "Cart / Checkout Path Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "0 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, shipping or returns, warranty or guarantee, secure payment cues, support or contact, policy links; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as high-priority based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Cart / Checkout Path Needs Review; trust-signal groups visible: 0 of 6; cart: not visible; checkout: not visible. 2 related cross-category signals also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -681,7 +672,7 @@
         "statusDetail": "Platform Visibility Needs Manual Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority from platform confidence, metadata, console errors, and failed request evidence.",
-          "evidenceInfluenced": "Platform: Unknown (Unknown, 0%); console errors: 1; failed requests: 0.",
+          "evidenceInfluenced": "Platform Visibility Needs Manual Review; platform: Unknown (Unknown, 0%); console errors: 1; failed requests: 0.",
           "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
         }
       },
@@ -693,20 +684,20 @@
         "statusDetail": "Marketing Attribution Visibility Appears Limited",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority from visible analytics, tag manager, pixel, and email/lead-capture signals.",
-          "evidenceInfluenced": "Detected 0 supported marketing tools: none detected. Lead capture visible: yes.",
+          "evidenceInfluenced": "Marketing Attribution Visibility Appears Limited; detected 0 supported marketing tools: none detected.",
           "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
         }
       },
       {
         "key": "operationsIssues",
         "label": "Ecommerce Operations",
-        "score": 40,
+        "score": 39,
         "status": "High Priority",
-        "statusDetail": "Cart / Checkout Path Needs Review",
+        "statusDetail": "Order and Returns Communication Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: not visible; checkout: not visible; support/contact: not visible; order/returns language: not visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Order and Returns Communication Needs Review; support/contact: not visible; order/returns language: not visible; shipping/returns: not visible. 2 related cross-category signals also influenced the score.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -721,15 +712,6 @@
         "recommendedFirstAction": "Add clear cart and checkout entry points to the header, product area, or cart drawer so shoppers can move from browsing to buying."
       },
       {
-        "title": "Product Discovery Clarity Needs Review",
-        "riskLabel": "Product Discovery Clarity Needs Review",
-        "severity": "High",
-        "confidence": "Moderate",
-        "explanation": "Customers may need too many steps to find products, categories, or collections from the first storefront experience.",
-        "evidenceSummary": "Product/category navigation: visible; collection/product links: not visible.",
-        "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
-      },
-      {
         "title": "Trust Signal Visibility Needs Review",
         "riskLabel": "Trust Signal Visibility Needs Review",
         "severity": "High",
@@ -737,6 +719,15 @@
         "explanation": "Weak early trust cues can reduce purchase confidence, especially for new visitors comparing unfamiliar stores.",
         "evidenceSummary": "0 of 6 common trust-signal groups were visible. Missing or weak groups: reviews or testimonials, shipping or returns, warranty or guarantee, secure payment cues, support or contact, policy links.",
         "recommendedFirstAction": "Add the strongest reassurance cues near product decisions: reviews, shipping/returns, support, guarantee, secure payment, or policies."
+      },
+      {
+        "title": "Product Discovery Clarity Needs Review",
+        "riskLabel": "Product Discovery Clarity Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Customers may need too many steps to find products, categories, or collections from the first storefront experience.",
+        "evidenceSummary": "Product/category navigation: visible; collection/product links: not visible.",
+        "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
       }
     ],
     "status": "success",
@@ -749,7 +740,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 2 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -776,11 +767,11 @@
         "label": "UX/UI",
         "score": 76,
         "status": "Needs Review",
-        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "statusDetail": "Mobile Primary Action Not Evident Above Fold",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 7; first-screen text estimate: 591 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Search visible: yes; first-screen links: 7; generic navigation cues: 1; first-screen text estimate: 591 characters. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -790,9 +781,9 @@
         "status": "Needs Review",
         "statusDetail": "Mobile CTA Visibility Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; trust-signal groups visible: 4 of 6; cart: visible; checkout: visible.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -827,8 +818,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -887,7 +878,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 2 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -908,30 +899,30 @@
       "Meta Pixel",
       "Mailchimp"
     ],
-    "overallScore": 72,
+    "overallScore": 71,
     "categoryScores": [
       {
         "key": "uxUiIssues",
         "label": "UX/UI",
         "score": 56,
         "status": "High Priority",
-        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "statusDetail": "Product Discovery Clarity Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 20; first-screen text estimate: 1844 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Product Discovery Clarity Needs Review; search visible: yes; first-screen links: 20; first-screen text estimate: 1844 characters. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
         "key": "conversionIssues",
         "label": "Conversion",
-        "score": 64,
+        "score": 60,
         "status": "High Priority",
         "statusDetail": "Mobile CTA Visibility Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as high-priority based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; trust-signal groups visible: 4 of 6; cart: visible; checkout: visible. 2 related cross-category signals also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -942,7 +933,7 @@
         "statusDetail": "Search Snippet Clarity Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
-          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 0; failed requests: 5.",
+          "evidenceInfluenced": "Search Snippet Clarity Needs Review; platform: BigCommerce (High confidence, 95%); console errors: 0; failed requests: 5.",
           "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
         }
       },
@@ -966,8 +957,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1010,7 +1001,7 @@
     "detectedPlatform": "Shopify",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets; Shopify frontend objects or analytics; Shopify frontend objects or analytics.",
     "platformEvidence": [
       "Signal count: 6 strong and 5 weak Shopify indicators.",
       "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
@@ -1040,8 +1031,8 @@
         "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 5; first-screen text estimate: 2306 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 5; first-screen text estimate: 2025 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -1049,11 +1040,11 @@
         "label": "Conversion",
         "score": 82,
         "status": "Healthy",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Purchase Confidence Signals Look Stable",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as healthy based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "6 of 6 trust-signal groups were visible; missing or weak groups: no major trust groups missing; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as healthy based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "6 of 6 trust-signal groups were visible; missing or weak groups: no major trust groups missing; mobile CTA above fold: yes. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -1088,8 +1079,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1100,8 +1091,8 @@
         "severity": "Medium",
         "confidence": "Needs Review",
         "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
-        "evidenceSummary": "The mobile first viewport showed 5 visible links and about 2306 visible text characters, which triggered a crowding risk.",
-        "recommendedFirstAction": "Trim first-screen mobile copy and promotional text; this scan counted about 2306 visible text characters before scroll."
+        "evidenceSummary": "The mobile first viewport showed 5 visible links and about 2025 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 5 links and about 2025 text characters before scroll."
       }
     ],
     "status": "success",
@@ -1114,7 +1105,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 3 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -1136,7 +1127,7 @@
       "Meta Pixel",
       "Klaviyo"
     ],
-    "overallScore": 75,
+    "overallScore": 73,
     "categoryScores": [
       {
         "key": "uxUiIssues",
@@ -1146,20 +1137,20 @@
         "statusDetail": "Product Discovery Clarity Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Product Discovery Clarity Needs Review; mobile CTA above fold: yes; search visible: no; first-screen links: 6; first-screen text estimate: 2033 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Product Discovery Clarity Needs Review; search visible: no; first-screen links: 6; first-screen text estimate: 2033 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
         "key": "conversionIssues",
         "label": "Conversion",
-        "score": 77,
+        "score": 67,
         "status": "Needs Review",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: secure payment cues; mobile CTA above fold: yes. 3 related cross-category signals also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -1194,8 +1185,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1210,15 +1201,6 @@
         "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
       },
       {
-        "title": "Mobile Readability May Be Crowded",
-        "riskLabel": "Mobile Readability May Be Crowded",
-        "severity": "Medium",
-        "confidence": "Needs Review",
-        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
-        "evidenceSummary": "The mobile first viewport showed 6 visible links and about 2033 visible text characters, which triggered a crowding risk.",
-        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 6 links and about 2033 text characters before scroll."
-      },
-      {
         "title": "Store Search Visibility Needs Review",
         "riskLabel": "Store Search Visibility Needs Review",
         "severity": "Medium",
@@ -1226,6 +1208,15 @@
         "explanation": "Store search does not appear prominently in the visible navigation, which may slow product discovery for catalog-heavy stores.",
         "evidenceSummary": "No visible search input or search-labeled navigation item was detected in the public page sample.",
         "recommendedFirstAction": "Expose search in the desktop header and mobile menu, then confirm it returns useful product and category results."
+      },
+      {
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 6 visible links and about 2033 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 6 links and about 2033 text characters before scroll."
       }
     ],
     "status": "success",
@@ -1238,7 +1229,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 3 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -1259,30 +1250,30 @@
       "Google Tag Manager",
       "Meta Pixel"
     ],
-    "overallScore": 69,
+    "overallScore": 67,
     "categoryScores": [
       {
         "key": "uxUiIssues",
         "label": "UX/UI",
         "score": 66,
         "status": "Needs Review",
-        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "statusDetail": "Product Discovery Clarity Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 2; first-screen text estimate: 731 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Product Discovery Clarity Needs Review; search visible: yes; first-screen links: 2; first-screen text estimate: 731 characters. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
         "key": "conversionIssues",
         "label": "Conversion",
-        "score": 58,
+        "score": 54,
         "status": "High Priority",
         "statusDetail": "Mobile CTA Visibility Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: shipping or returns, warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as high-priority based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; trust-signal groups visible: 3 of 6; cart: visible; checkout: visible. 2 related cross-category signals also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -1312,13 +1303,13 @@
       {
         "key": "operationsIssues",
         "label": "Ecommerce Operations",
-        "score": 74,
+        "score": 70,
         "status": "Needs Review",
         "statusDetail": "Order and Returns Communication Needs Review",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: not visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Order and Returns Communication Needs Review; support/contact: visible; order/returns language: not visible; shipping/returns: not visible. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1342,13 +1333,13 @@
         "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
       },
       {
-        "title": "Order and Returns Communication Needs Review",
-        "riskLabel": "Order and Returns Communication Needs Review",
+        "title": "Shipping and Returns Messaging Not Prominent",
+        "riskLabel": "Shipping and Returns Messaging Not Prominent",
         "severity": "Medium",
         "confidence": "Moderate",
-        "explanation": "Clear order, delivery, and returns communication reduces support load and post-purchase uncertainty.",
-        "evidenceSummary": "No strong order status, delivery, shipping, return, exchange, or refund language was detected.",
-        "recommendedFirstAction": "Surface order status, delivery, shipping, return, exchange, or refund information before checkout."
+        "explanation": "Shipping and returns clarity helps customers decide whether buying now feels low-risk.",
+        "evidenceSummary": "The scan did not find prominent shipping, delivery, returns, exchange, or refund wording in visible page content.",
+        "recommendedFirstAction": "Place shipping, delivery, returns, or exchange messaging near product detail decisions and in the cart path."
       }
     ],
     "status": "success",
@@ -1361,7 +1352,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 88,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce asset or domain reference (bigcommerce\\.com).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce asset or domain reference.",
     "platformEvidence": [
       "Signal count: 3 strong and 2 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -1385,8 +1376,8 @@
         "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 4; first-screen text estimate: 4343 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 4; first-screen text estimate: 4343 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -1394,29 +1385,29 @@
         "label": "Conversion",
         "score": 69,
         "status": "Needs Review",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
         "key": "technicalIssues",
         "label": "Technical",
-        "score": 75,
+        "score": 74,
         "status": "Needs Review",
         "statusDetail": "Frontend Console Issues Observed",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
-          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 88%); console errors: 1; failed requests: 3.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 88%); console errors: 1; failed requests: 4.",
           "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
         }
       },
       {
         "key": "trackingIssues",
         "label": "Tracking",
-        "score": 75,
+        "score": 74,
         "status": "Needs Review",
         "statusDetail": "Tracking Evidence Needs Confirmation",
         "scoreExplanation": {
@@ -1433,8 +1424,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1459,7 +1450,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 3 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -1489,11 +1480,11 @@
         "label": "UX/UI",
         "score": 63,
         "status": "High Priority",
-        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 6; first-screen text estimate: 3452 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 6; first-screen text estimate: 3452 characters. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -1503,9 +1494,9 @@
         "status": "High Priority",
         "statusDetail": "Mobile CTA Visibility Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as high-priority based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; trust-signal groups visible: 3 of 6; cart: visible; checkout: visible. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -1540,8 +1531,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1592,7 +1583,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 2 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -1621,8 +1612,8 @@
         "statusDetail": "Mobile Journey Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile CTA above fold: yes; search visible: yes; first-screen links: 7; generic navigation cues: 3.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Search visible: yes; first-screen links: 7; generic navigation cues: 3; first-screen text estimate: 618 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -1632,9 +1623,9 @@
         "status": "Needs Review",
         "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
           "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -1669,8 +1660,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1713,7 +1704,7 @@
     "detectedPlatform": "Shopify",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets; Shopify frontend objects or analytics; Shopify frontend objects or analytics.",
     "platformEvidence": [
       "Signal count: 6 strong and 5 weak Shopify indicators.",
       "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
@@ -1743,8 +1734,8 @@
         "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 5; first-screen text estimate: 1822 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 5; first-screen text estimate: 1822 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -1752,11 +1743,11 @@
         "label": "Conversion",
         "score": 78,
         "status": "Needs Review",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee; mobile CTA above fold: yes. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -1791,8 +1782,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1834,7 +1825,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 2 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -1860,11 +1851,11 @@
         "label": "UX/UI",
         "score": 64,
         "status": "High Priority",
-        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 12; first-screen text estimate: 3043 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 12; first-screen text estimate: 3043 characters. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -1874,9 +1865,9 @@
         "status": "Needs Review",
         "statusDetail": "Mobile CTA Visibility Needs Review",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee; mobile CTA above fold: no.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; trust-signal groups visible: 5 of 6; cart: visible; checkout: visible. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -1911,8 +1902,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],
@@ -1946,7 +1937,7 @@
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
     "platformConfidenceLabel": "High confidence",
-    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference; BigCommerce asset or domain reference; BigCommerce storefront data or stencil signal.",
     "platformEvidence": [
       "Signal count: 8 strong and 2 weak BigCommerce indicators.",
       "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
@@ -1975,8 +1966,8 @@
         "statusDetail": "Mobile Readability May Be Crowded",
         "scoreExplanation": {
           "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
-          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 8; first-screen text estimate: 1161 characters.",
-          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; search visible: yes; first-screen links: 8; first-screen text estimate: 1161 characters.",
+          "whatWouldImprove": "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score."
         }
       },
       {
@@ -1984,11 +1975,11 @@
         "label": "Conversion",
         "score": 69,
         "status": "Needs Review",
-        "statusDetail": "Mobile Readability May Be Crowded",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
         "scoreExplanation": {
-          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
-          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
-          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+          "whyAssigned": "Assigned as needs-review based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes. 1 related cross-category signal also influenced the score.",
+          "whatWouldImprove": "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it."
         }
       },
       {
@@ -2023,8 +2014,8 @@
         "statusDetail": "Commerce Operations Signals Look Stable",
         "scoreExplanation": {
           "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
-          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
-          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+          "evidenceInfluenced": "Support/contact: visible; order/returns language: visible; shipping/returns: visible.",
+          "whatWouldImprove": "Visible support, order status, shipping, returns, and fulfillment communication would improve it."
         }
       }
     ],

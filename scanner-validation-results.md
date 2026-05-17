@@ -8,7 +8,7 @@
 
 ## Common issues
 
-- Mobile Readability May Be Crowded (12)
+- Mobile Readability May Be Crowded (11)
 - Mobile CTA Visibility Needs Review (6)
 - Product Discovery Clarity Needs Review (4)
 - Cart / Checkout Path Needs Review (2)

@@ -32,6 +32,13 @@ async function main() {
     });
   });
   const issueSorted = Object.entries(issueCounts).sort((a, b) => b[1] - a[1]);
+  const benchmarkTagCounts = {};
+  data.filter((i) => i.status === 'success').forEach((item) => {
+    (item.benchmarkTags || []).forEach((tag) => {
+      benchmarkTagCounts[tag] = (benchmarkTagCounts[tag] || 0) + 1;
+    });
+  });
+  const benchmarkTagsSorted = Object.entries(benchmarkTagCounts).sort((a, b) => b[1] - a[1]);
 
   console.log('SUMMARY');
   console.log('total', data.length);
@@ -43,6 +50,7 @@ async function main() {
   console.log('MISMATCHES', JSON.stringify(mismatches, null, 2));
   console.log('FAILURES', JSON.stringify(failures, null, 2));
   console.log('ISSUES', JSON.stringify(issueSorted.slice(0, 20), null, 2));
+  console.log('BENCHMARK_TAGS', JSON.stringify(benchmarkTagsSorted.slice(0, 20), null, 2));
 }
 
 main().catch((err) => {

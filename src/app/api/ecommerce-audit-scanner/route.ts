@@ -33,9 +33,18 @@ type HeuristicCategory =
   | "platformVisibility"
   | "metadataClarity";
 
+type AuditCategoryKey =
+  | "uxUiIssues"
+  | "conversionIssues"
+  | "technicalIssues"
+  | "trackingIssues"
+  | "operationsIssues";
+
 type HeuristicFinding = {
   title: string;
   category: HeuristicCategory;
+  primaryCategory: AuditCategoryKey;
+  secondaryCategories?: AuditCategoryKey[];
   severity: HeuristicSeverity;
   confidence: HeuristicConfidence;
   evidenceSummary: string;
@@ -49,38 +58,81 @@ type ScoreExplanation = {
   whatWouldImprove: string;
 };
 
+type ConnectedInsight = {
+  title: string;
+  insight: string;
+  findingTitles: string[];
+};
+
+type PrimaryOperationalConcern = {
+  title: string;
+  riskLabel: string;
+  severity: HeuristicSeverity;
+  confidence: HeuristicConfidence;
+  explanation: string;
+  evidenceSummary: string;
+  recommendedFirstAction: string;
+  supportingFindings: string[];
+};
+
+type BenchmarkNote = {
+  message: string;
+  evidence: string;
+  tags: string[];
+  tone: "positive" | "negative" | "mixed";
+};
+
+type BenchmarkContext = {
+  summary: string;
+  notes: BenchmarkNote[];
+  benchmarkTags: string[];
+  recurringPositivePatterns: string[];
+  recurringNegativePatterns: string[];
+  signalScore: number;
+};
+
 const auditCategoryTemplates = [
   {
     key: "uxUiIssues",
     label: "UX/UI",
     score: 88,
-    findingCategories: ["mobileConversion", "productDiscovery"],
+    purpose:
+      "Readability, spacing, visual hierarchy, navigation clarity, layout crowding, and discoverability.",
   },
   {
     key: "conversionIssues",
     label: "Conversion",
     score: 86,
-    findingCategories: ["trustSignals", "mobileConversion"],
+    purpose:
+      "CTA visibility, purchase momentum, cart/checkout continuity, trust, and conversion friction.",
   },
   {
     key: "technicalIssues",
     label: "Technical",
     score: 84,
-    findingCategories: ["platformVisibility", "metadataClarity"],
+    purpose:
+      "Console errors, failed requests, metadata, rendering confidence, and technical reliability.",
   },
   {
     key: "trackingIssues",
     label: "Tracking",
     score: 84,
-    findingCategories: ["marketingVisibility"],
+    purpose:
+      "Analytics visibility, attribution visibility, marketing tags, and event tracking concerns.",
   },
   {
     key: "operationsIssues",
     label: "Ecommerce Operations",
     score: 86,
-    findingCategories: ["operationsContinuity"],
+    purpose:
+      "Support/contact visibility, fulfillment communication, operational continuity, and workflow handoff.",
   },
-];
+] satisfies Array<{
+  key: AuditCategoryKey;
+  label: string;
+  score: number;
+  purpose: string;
+}>;
 
 function adjustedStatus(score: number) {
   if (score < 65) {
@@ -144,16 +196,39 @@ function confidenceRank(confidence: HeuristicConfidence) {
 
 function findingImpactScore(finding: HeuristicFinding) {
   const categoryWeight =
-    finding.category === "mobileConversion" ||
-    finding.category === "operationsContinuity"
+    finding.primaryCategory === "conversionIssues" ||
+    finding.primaryCategory === "operationsIssues"
       ? 3
-      : finding.category === "trustSignals" ||
-          finding.category === "productDiscovery" ||
-          finding.category === "marketingVisibility"
+      : finding.primaryCategory === "uxUiIssues" ||
+          finding.primaryCategory === "trackingIssues"
         ? 2
         : 1;
 
   return impactRank(finding.severity) * 10 + categoryWeight + confidenceRank(finding.confidence);
+}
+
+function findingInfluencesCategory(
+  finding: HeuristicFinding,
+  categoryKey: AuditCategoryKey,
+) {
+  return (
+    finding.primaryCategory === categoryKey ||
+    finding.secondaryCategories?.includes(categoryKey) === true
+  );
+}
+
+function findingsOwnedByCategory(
+  findings: HeuristicFinding[],
+  categoryKey: AuditCategoryKey,
+) {
+  return findings.filter((finding) => finding.primaryCategory === categoryKey);
+}
+
+function findingsInfluencingCategory(
+  findings: HeuristicFinding[],
+  categoryKey: AuditCategoryKey,
+) {
+  return findings.filter((finding) => findingInfluencesCategory(finding, categoryKey));
 }
 
 function visibleMarketingTools(diagnostics: LiveDiagnosticsResult) {
@@ -319,6 +394,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Mobile CTA Visibility Needs Review",
       category: "mobileConversion",
+      primaryCategory: "conversionIssues",
+      secondaryCategories: ["uxUiIssues"],
       severity: "High",
       confidence: "Moderate",
       businessImpact:
@@ -333,6 +410,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Mobile Readability May Be Crowded",
       category: "mobileConversion",
+      primaryCategory: "uxUiIssues",
+      secondaryCategories: ["conversionIssues"],
       severity: "Medium",
       confidence: "Needs Review",
       businessImpact:
@@ -347,6 +426,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Cart / Checkout Path Needs Review",
       category: "operationsContinuity",
+      primaryCategory: "conversionIssues",
+      secondaryCategories: ["operationsIssues"],
       severity: !commerce.cartVisible && !commerce.checkoutVisible ? "Critical" : "High",
       confidence: "Moderate",
       businessImpact:
@@ -360,6 +441,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Product Discovery Clarity Needs Review",
       category: "productDiscovery",
+      primaryCategory: "uxUiIssues",
+      secondaryCategories: ["conversionIssues"],
       severity: "High",
       confidence: "Moderate",
       businessImpact:
@@ -374,6 +457,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Store Search Visibility Needs Review",
       category: "productDiscovery",
+      primaryCategory: "uxUiIssues",
+      secondaryCategories: ["conversionIssues"],
       severity: "Medium",
       confidence: "Moderate",
       businessImpact:
@@ -389,6 +474,7 @@ function buildHeuristicFindings(
     addFinding({
       title: "Trust Signal Visibility Needs Review",
       category: "trustSignals",
+      primaryCategory: "conversionIssues",
       severity: "High",
       confidence: "Moderate",
       businessImpact:
@@ -403,6 +489,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Shipping and Returns Messaging Not Prominent",
       category: "trustSignals",
+      primaryCategory: "conversionIssues",
+      secondaryCategories: ["operationsIssues"],
       severity: "Medium",
       confidence: "Moderate",
       businessImpact:
@@ -418,6 +506,7 @@ function buildHeuristicFindings(
     addFinding({
       title: "Marketing Attribution Visibility Appears Limited",
       category: "marketingVisibility",
+      primaryCategory: "trackingIssues",
       severity: "High",
       confidence: "Moderate",
       businessImpact:
@@ -431,6 +520,7 @@ function buildHeuristicFindings(
     addFinding({
       title: "Tracking Stack Appears Limited",
       category: "marketingVisibility",
+      primaryCategory: "trackingIssues",
       severity: "Medium",
       confidence: "Moderate",
       businessImpact:
@@ -445,6 +535,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Support or Lead Path Visibility Limited",
       category: "operationsContinuity",
+      primaryCategory: "operationsIssues",
+      secondaryCategories: ["conversionIssues"],
       severity: "Medium",
       confidence: "Moderate",
       businessImpact:
@@ -460,6 +552,8 @@ function buildHeuristicFindings(
     addFinding({
       title: "Order and Returns Communication Needs Review",
       category: "operationsContinuity",
+      primaryCategory: "operationsIssues",
+      secondaryCategories: ["conversionIssues"],
       severity: "Medium",
       confidence: "Moderate",
       businessImpact:
@@ -475,6 +569,7 @@ function buildHeuristicFindings(
     addFinding({
       title: "Platform Visibility Needs Manual Review",
       category: "platformVisibility",
+      primaryCategory: "technicalIssues",
       severity: "Medium",
       confidence: "Needs Review",
       businessImpact:
@@ -491,6 +586,7 @@ function buildHeuristicFindings(
     addFinding({
       title: "Search Snippet Clarity Needs Review",
       category: "metadataClarity",
+      primaryCategory: "technicalIssues",
       severity: "Low",
       confidence: "High",
       businessImpact:
@@ -517,10 +613,10 @@ function categoryEvidencePenalty(
   const commerce = diagnostics.commerceFlowSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
   const trustSignalsVisible = trustSignalCount(diagnostics);
-  const categoryFindings = findings.filter((finding) => {
-    const template = auditCategoryTemplates.find((item) => item.key === key);
-    return template?.findingCategories.includes(finding.category) ?? false;
-  });
+  const categoryFindings = findingsInfluencingCategory(
+    findings,
+    key as AuditCategoryKey,
+  );
   const findingPressure = Math.min(
     14,
     categoryFindings.reduce(
@@ -610,11 +706,20 @@ function buildScoreExplanation({
   const commerce = diagnostics.commerceFlowSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
   const trustSignalsVisible = trustSignalCount(diagnostics);
-  const categoryFindings = findings.filter((finding) => {
-    const template = auditCategoryTemplates.find((item) => item.key === key);
-    return template?.findingCategories.includes(finding.category) ?? false;
-  });
-  const driver = categoryFindings[0]?.title;
+  const primaryFindings = findingsOwnedByCategory(findings, key as AuditCategoryKey);
+  const influencingFindings = findingsInfluencingCategory(
+    findings,
+    key as AuditCategoryKey,
+  );
+  const driver = primaryFindings[0]?.title;
+  const secondaryInfluenceCount = Math.max(
+    0,
+    influencingFindings.length - primaryFindings.length,
+  );
+  const secondaryContext =
+    secondaryInfluenceCount > 0
+      ? ` ${secondaryInfluenceCount} related cross-category signal${secondaryInfluenceCount === 1 ? "" : "s"} also influenced the score.`
+      : "";
   const scoreBand =
     score < 65 ? "high-priority" : score < 80 ? "needs-review" : "healthy";
 
@@ -622,26 +727,30 @@ function buildScoreExplanation({
     return {
       whyAssigned: `Assigned as ${scoreBand} because mobile CTA, navigation, search, and first-screen density signals were evaluated together.`,
       evidenceInfluenced: driver
-        ? `${driver}; mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}; search visible: ${signals.searchVisible ? "yes" : "no"}; first-screen links: ${signals.mobileAboveFoldLinkCount}; first-screen text estimate: ${signals.mobileVisibleTextLength} characters.`
-        : `Mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}; search visible: ${signals.searchVisible ? "yes" : "no"}; first-screen links: ${signals.mobileAboveFoldLinkCount}; generic navigation cues: ${signals.genericNavigationCount}.`,
+        ? `${driver}; search visible: ${signals.searchVisible ? "yes" : "no"}; first-screen links: ${signals.mobileAboveFoldLinkCount}; first-screen text estimate: ${signals.mobileVisibleTextLength} characters.${secondaryContext}`
+        : `Search visible: ${signals.searchVisible ? "yes" : "no"}; first-screen links: ${signals.mobileAboveFoldLinkCount}; generic navigation cues: ${signals.genericNavigationCount}; first-screen text estimate: ${signals.mobileVisibleTextLength} characters.${secondaryContext}`,
       whatWouldImprove:
-        "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score.",
+        "Lighter mobile density, clearer visual hierarchy, visible search, and clearer product/category paths would raise this score.",
     };
   }
 
   if (key === "conversionIssues") {
     return {
-      whyAssigned: `Assigned as ${scoreBand} based on visible reassurance, CTA clarity, and purchase-confidence cues.`,
-      evidenceInfluenced: `${trustSignalsVisible} of 6 trust-signal groups were visible; missing or weak groups: ${missingTrustSignalLabels(diagnostics)}; mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}.`,
+      whyAssigned: `Assigned as ${scoreBand} based on purchase momentum, CTA visibility, checkout continuity, and purchase-confidence cues.`,
+      evidenceInfluenced: driver
+        ? `${driver}; trust-signal groups visible: ${trustSignalsVisible} of 6; cart: ${commerce.cartVisible ? "visible" : "not visible"}; checkout: ${commerce.checkoutVisible ? "visible" : "not visible"}.${secondaryContext}`
+        : `${trustSignalsVisible} of 6 trust-signal groups were visible; missing or weak groups: ${missingTrustSignalLabels(diagnostics)}; mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}.${secondaryContext}`,
       whatWouldImprove:
-        "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it.",
+        "A prominent buying action, clear cart or checkout path, reviews, shipping/returns clarity, and payment reassurance near product decisions would improve it.",
     };
   }
 
   if (key === "technicalIssues") {
     return {
       whyAssigned: `Assigned as ${scoreBand} from platform confidence, metadata, console errors, and failed request evidence.`,
-      evidenceInfluenced: `Platform: ${diagnostics.platformDetection.name} (${diagnostics.platformDetection.confidenceLabel}, ${diagnostics.platformDetection.confidence}%); console errors: ${diagnostics.consoleErrors.length}; failed requests: ${diagnostics.failedRequests.length}.`,
+      evidenceInfluenced: driver
+        ? `${driver}; platform: ${diagnostics.platformDetection.name} (${diagnostics.platformDetection.confidenceLabel}, ${diagnostics.platformDetection.confidence}%); console errors: ${diagnostics.consoleErrors.length}; failed requests: ${diagnostics.failedRequests.length}.`
+        : `Platform: ${diagnostics.platformDetection.name} (${diagnostics.platformDetection.confidenceLabel}, ${diagnostics.platformDetection.confidence}%); console errors: ${diagnostics.consoleErrors.length}; failed requests: ${diagnostics.failedRequests.length}.`,
       whatWouldImprove:
         "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score.",
     };
@@ -650,7 +759,9 @@ function buildScoreExplanation({
   if (key === "trackingIssues") {
     return {
       whyAssigned: `Assigned as ${scoreBand} from visible analytics, tag manager, pixel, and email/lead-capture signals.`,
-      evidenceInfluenced: `Detected ${marketingTools.length} supported marketing tool${marketingTools.length === 1 ? "" : "s"}: ${visibleEvidenceList(marketingTools.map((tool) => tool.label))}. Lead capture visible: ${signals.leadCaptureVisible ? "yes" : "no"}.`,
+      evidenceInfluenced: driver
+        ? `${driver}; detected ${marketingTools.length} supported marketing tool${marketingTools.length === 1 ? "" : "s"}: ${visibleEvidenceList(marketingTools.map((tool) => tool.label))}.`
+        : `Detected ${marketingTools.length} supported marketing tool${marketingTools.length === 1 ? "" : "s"}: ${visibleEvidenceList(marketingTools.map((tool) => tool.label))}. Lead capture visible: ${signals.leadCaptureVisible ? "yes" : "no"}.`,
       whatWouldImprove:
         "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score.",
     };
@@ -658,9 +769,11 @@ function buildScoreExplanation({
 
   return {
     whyAssigned: `Assigned as ${scoreBand} from cart, checkout, support, returns, and order communication visibility.`,
-    evidenceInfluenced: `Cart: ${commerce.cartVisible ? "visible" : "not visible"}; checkout: ${commerce.checkoutVisible ? "visible" : "not visible"}; support/contact: ${signals.contactSupportVisible ? "visible" : "not visible"}; order/returns language: ${signals.orderReturnsLanguageVisible ? "visible" : "not visible"}.`,
+    evidenceInfluenced: driver
+      ? `${driver}; support/contact: ${signals.contactSupportVisible ? "visible" : "not visible"}; order/returns language: ${signals.orderReturnsLanguageVisible ? "visible" : "not visible"}; shipping/returns: ${signals.shippingReturnsVisible ? "visible" : "not visible"}.${secondaryContext}`
+      : `Support/contact: ${signals.contactSupportVisible ? "visible" : "not visible"}; order/returns language: ${signals.orderReturnsLanguageVisible ? "visible" : "not visible"}; shipping/returns: ${signals.shippingReturnsVisible ? "visible" : "not visible"}.${secondaryContext}`,
     whatWouldImprove:
-      "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it.",
+      "Visible support, order status, shipping, returns, and fulfillment communication would improve it.",
   };
 }
 
@@ -669,9 +782,8 @@ function applyLiveDiagnosticScoring(
   findings: HeuristicFinding[],
 ) {
   return auditCategoryTemplates.map((category) => {
-    const categoryFindings = findings.filter((finding) =>
-      category.findingCategories.includes(finding.category),
-    );
+    const categoryFindings = findingsOwnedByCategory(findings, category.key);
+    const influencingFindings = findingsInfluencingCategory(findings, category.key);
     const score = Math.max(
       35,
       Math.min(96, category.score - categoryEvidencePenalty(category.key, diagnostics, findings)),
@@ -697,8 +809,15 @@ function applyLiveDiagnosticScoring(
       issues:
         categoryFindings.length > 0
           ? categoryFindings.map((finding) => finding.title)
-          : ["No high-impact public-page issue was detected in this category during the lightweight review."],
+          : influencingFindings.length > 0
+            ? [
+                `Related signals influenced this score but are owned by other sections: ${influencingFindings
+                  .map((finding) => finding.title)
+                  .join(", ")}.`,
+              ]
+            : ["No high-impact public-page issue was detected in this category during the lightweight review."],
       findings: categoryFindings,
+      influencingFindings: influencingFindings.map((finding) => finding.title),
     };
   });
 }
@@ -772,16 +891,160 @@ function buildExecutiveSummary({
   };
 }
 
+function findByTitle(findings: HeuristicFinding[], title: string) {
+  return findings.find((finding) => finding.title === title);
+}
+
+function hasFinding(findings: HeuristicFinding[], title: string) {
+  return Boolean(findByTitle(findings, title));
+}
+
+function connectedFindingTitles(
+  findings: HeuristicFinding[],
+  titles: string[],
+) {
+  return titles.filter((title) => hasFinding(findings, title));
+}
+
+function buildConnectedInsight(findings: HeuristicFinding[]): ConnectedInsight | null {
+  const mobileCta = "Mobile CTA Visibility Needs Review";
+  const trust = "Trust Signal Visibility Needs Review";
+  const discovery = "Product Discovery Clarity Needs Review";
+  const search = "Store Search Visibility Needs Review";
+  const checkout = "Cart / Checkout Path Needs Review";
+  const attribution = "Marketing Attribution Visibility Appears Limited";
+  const tracking = "Tracking Stack Appears Limited";
+  const support = "Support or Lead Path Visibility Limited";
+  const returns = "Order and Returns Communication Needs Review";
+
+  if (hasFinding(findings, mobileCta) && hasFinding(findings, trust)) {
+    return {
+      title: "Mobile Purchase Confidence Gap",
+      insight:
+        "Mobile shoppers may see the offer before they see enough confidence-building signals to act.",
+      findingTitles: connectedFindingTitles(findings, [mobileCta, trust]),
+    };
+  }
+
+  if (
+    (hasFinding(findings, discovery) || hasFinding(findings, search)) &&
+    hasFinding(findings, checkout)
+  ) {
+    return {
+      title: "Browse-to-Buy Continuity Gap",
+      insight:
+        "Customers may struggle to move from browsing to buying without a clearer product discovery and purchase path.",
+      findingTitles: connectedFindingTitles(findings, [discovery, search, checkout]),
+    };
+  }
+
+  if (
+    (hasFinding(findings, attribution) || hasFinding(findings, tracking)) &&
+    findings.some((finding) => finding.primaryCategory === "conversionIssues")
+  ) {
+    return {
+      title: "Conversion Measurement Confidence Gap",
+      insight:
+        "Conversion improvements may be harder to measure until attribution visibility is cleaned up.",
+      findingTitles: connectedFindingTitles(findings, [
+        attribution,
+        tracking,
+        mobileCta,
+        trust,
+        checkout,
+      ]),
+    };
+  }
+
+  if (hasFinding(findings, discovery) && hasFinding(findings, search)) {
+    return {
+      title: "Product Discovery Clarity Gap",
+      insight:
+        "Shoppers may need extra effort to understand where products live and how to search the catalog.",
+      findingTitles: connectedFindingTitles(findings, [discovery, search]),
+    };
+  }
+
+  if (hasFinding(findings, mobileCta) && hasFinding(findings, discovery)) {
+    return {
+      title: "Mobile Decision Path Gap",
+      insight:
+        "The mobile path may ask shoppers to understand the catalog before the next purchase action is clear.",
+      findingTitles: connectedFindingTitles(findings, [mobileCta, discovery, search]),
+    };
+  }
+
+  if (
+    hasFinding(findings, trust) &&
+    (hasFinding(findings, support) || hasFinding(findings, returns))
+  ) {
+    return {
+      title: "Confidence and Support Visibility Gap",
+      insight:
+        "Purchase confidence and post-purchase reassurance appear connected, so trust and support cues should be reviewed together.",
+      findingTitles: connectedFindingTitles(findings, [trust, support, returns]),
+    };
+  }
+
+  return null;
+}
+
+function buildPrimaryOperationalConcern(
+  findings: HeuristicFinding[],
+  connectedInsight: ConnectedInsight | null,
+): PrimaryOperationalConcern | null {
+  const supportingFindings = connectedInsight
+    ? connectedInsight.findingTitles
+        .map((title) => findByTitle(findings, title))
+        .filter((finding): finding is HeuristicFinding => Boolean(finding))
+    : findings.slice(0, 2);
+
+  const leadFinding = supportingFindings[0] ?? findings[0];
+
+  if (!leadFinding) {
+    return null;
+  }
+
+  const relatedTitles = supportingFindings
+    .map((finding) => finding.title)
+    .filter((title, index, titles) => titles.indexOf(title) === index)
+    .slice(0, 4);
+  const relatedPhrase =
+    relatedTitles.length > 1
+      ? relatedTitles.join(", ")
+      : leadFinding.title;
+  const concernTitle = connectedInsight?.title ?? leadFinding.title;
+  const concernInsight =
+    connectedInsight?.insight ??
+    "The highest-impact public-page evidence points to a focused customer journey review before broader optimization work.";
+
+  return {
+    title: concernTitle,
+    riskLabel: concernTitle,
+    severity: leadFinding.severity,
+    confidence: leadFinding.confidence,
+    explanation: `${concernInsight} Supporting findings: ${relatedPhrase}. Addressing this first should clarify the customer journey before lower-impact refinements are prioritized.`,
+    evidenceSummary: supportingFindings
+      .map((finding) => finding.evidenceSummary)
+      .slice(0, 2)
+      .join(" "),
+    recommendedFirstAction: `${leadFinding.recommendedFirstAction} Then confirm the related ${relatedTitles.length > 1 ? "signals" : "signal"} in the same journey walkthrough.`,
+    supportingFindings: relatedTitles,
+  };
+}
+
 function buildAuditNarrative({
   diagnostics,
   findings,
   overallScore,
+  connectedInsight,
 }: {
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore: number;
+  connectedInsight: ConnectedInsight | null;
 }) {
-  const priorityFindings = findings.slice(0, 3);
+  const priorityFindings = findings.slice(0, 4);
   const commerce = diagnostics.commerceFlowSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
   const commerceStructure =
@@ -806,12 +1069,17 @@ function buildAuditNarrative({
     return `The store shows ${commerceStructure} and ${urgency}. No single public-page issue dominated the scan, so the next useful step is a manual walkthrough of product discovery, purchase path, support visibility, and tracking confidence. ${platformContext} ${trackingContext}`;
   }
 
-  const focusAreas = priorityFindings
-    .map((finding) => finding.title.toLowerCase())
-    .join(", ");
+  const focusAreas = priorityFindings.map((finding) => finding.title.toLowerCase());
+  const focusPhrase =
+    focusAreas.length > 1
+      ? `${focusAreas.slice(0, -1).join(", ")}, and ${focusAreas[focusAreas.length - 1]}`
+      : focusAreas[0];
   const highestImpact = priorityFindings[0];
+  const relationshipSentence =
+    connectedInsight?.insight ??
+    `${highestImpact.title} is the lead issue, while the related findings shape how quickly shoppers understand what to do next.`;
 
-  return `The store shows ${commerceStructure} and ${urgency}. The audit story is led by ${highestImpact.title.toLowerCase()}: ${highestImpact.evidenceSummary} The highest-value improvements appear to be ${focusAreas}. ${platformContext} ${trackingContext}`;
+  return `The store shows ${commerceStructure} and ${urgency}. The audit story is led by ${highestImpact.title.toLowerCase()}, but the main opportunity is how the findings work together: ${relationshipSentence} The highest-value review areas are ${focusPhrase}. ${platformContext} ${trackingContext}`;
 }
 
 function findCategory(
@@ -867,11 +1135,6 @@ function buildTopPriorityRisks(
 }
 
 function buildRecommendedNextSteps(findings: HeuristicFinding[]) {
-  const priorityFindings = findings
-    .slice()
-    .sort((a, b) => findingImpactScore(b) - findingImpactScore(a))
-    .slice(0, 5);
-
   if (findings.length === 0) {
     return [
       {
@@ -885,12 +1148,257 @@ function buildRecommendedNextSteps(findings: HeuristicFinding[]) {
     ];
   }
 
-  return priorityFindings.map((finding) => ({
+  const sortedFindings = findings
+    .slice()
+    .sort((a, b) => findingImpactScore(b) - findingImpactScore(a));
+  const selected: HeuristicFinding[] = [];
+  const addFirstMatch = (predicate: (finding: HeuristicFinding) => boolean) => {
+    const match = sortedFindings.find(
+      (finding) => !selected.includes(finding) && predicate(finding),
+    );
+
+    if (match) {
+      selected.push(match);
+    }
+  };
+
+  addFirstMatch(
+    (finding) =>
+      finding.primaryCategory === "conversionIssues" ||
+      finding.primaryCategory === "uxUiIssues",
+  );
+  addFirstMatch(
+    (finding) =>
+      finding.category === "trustSignals" ||
+      finding.category === "productDiscovery" ||
+      finding.title === "Store Search Visibility Needs Review",
+  );
+  addFirstMatch(
+    (finding) =>
+      finding.primaryCategory === "trackingIssues" ||
+      finding.primaryCategory === "operationsIssues" ||
+      finding.primaryCategory === "technicalIssues",
+  );
+
+  for (const finding of sortedFindings) {
+    if (selected.length >= 3) {
+      break;
+    }
+
+    if (!selected.includes(finding)) {
+      selected.push(finding);
+    }
+  }
+
+  return selected.slice(0, 3).map((finding) => ({
     title: finding.title,
     evidenceClue: finding.evidenceSummary,
     action: finding.recommendedFirstAction,
     why: finding.businessImpact,
   }));
+}
+
+function pushUnique(items: string[], item: string) {
+  if (!items.includes(item)) {
+    items.push(item);
+  }
+}
+
+function buildBenchmarkContext(
+  diagnostics: LiveDiagnosticsResult,
+  findings: HeuristicFinding[],
+): BenchmarkContext {
+  const signals = diagnostics.storefrontSignals;
+  const commerce = diagnostics.commerceFlowSignals;
+  const marketingTools = visibleMarketingTools(diagnostics);
+  const trustSignalsVisible = trustSignalCount(diagnostics);
+  const tags: string[] = [];
+  const notes: BenchmarkNote[] = [];
+  const positivePatterns: string[] = [];
+  const negativePatterns: string[] = [];
+  const addNote = (note: BenchmarkNote) => notes.push(note);
+  const findingTitles = findings.map((finding) => finding.title);
+  const has = (title: string) => findingTitles.includes(title);
+
+  const mobileIsStrong =
+    signals.mobileCtaVisibleAboveFold &&
+    !signals.mobileCrowdingRisk &&
+    signals.mobileAboveFoldLinkCount <= 18 &&
+    signals.mobileVisibleTextLength <= 1800;
+  const mobileIsWeak =
+    has("Mobile CTA Visibility Needs Review") ||
+    has("Mobile Readability May Be Crowded");
+
+  if (mobileIsStrong) {
+    pushUnique(tags, "strong-mobile-clarity");
+    positivePatterns.push("Mobile clarity is supported by visible CTA evidence and controlled first-screen density.");
+    addNote({
+      message:
+        "This storefront shows stronger mobile clarity against the scanner's current internal comparison criteria.",
+      evidence: `Mobile CTA above fold: yes; first-screen links: ${signals.mobileAboveFoldLinkCount}; crowding risk: no.`,
+      tags: ["strong-mobile-clarity"],
+      tone: "positive",
+    });
+  } else if (mobileIsWeak) {
+    pushUnique(tags, "weak-mobile-clarity");
+    negativePatterns.push("Mobile clarity is pressured by CTA visibility or first-screen density signals.");
+    addNote({
+      message:
+        "Mobile clarity appears weaker than stronger internal examples and should be reviewed before interpreting conversion friction.",
+      evidence: `Mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}; first-screen links: ${signals.mobileAboveFoldLinkCount}; crowding risk: ${signals.mobileCrowdingRisk ? "yes" : "no"}.`,
+      tags: ["weak-mobile-clarity"],
+      tone: "negative",
+    });
+  }
+
+  if (signals.mobileCtaVisibleAboveFold && commerce.ctaCount >= 2) {
+    pushUnique(tags, "strong-cta-visibility");
+    positivePatterns.push("CTA visibility is supported by above-fold mobile evidence and multiple action labels.");
+  } else if (has("Mobile CTA Visibility Needs Review") || commerce.ctaCount <= 1) {
+    pushUnique(tags, "weak-cta-visibility");
+    negativePatterns.push("CTA visibility may require manual review because the primary action is not strongly evidenced.");
+    addNote({
+      message:
+        "The primary action appears less visible than strong internal examples where the next step is clear early.",
+      evidence: `Mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}; detected CTA labels: ${visibleEvidenceList(commerce.ctaLabels.slice(0, 4))}.`,
+      tags: ["weak-cta-visibility"],
+      tone: "negative",
+    });
+  }
+
+  if (
+    signals.productNavigationVisible &&
+    signals.collectionLinksVisible &&
+    signals.searchVisible
+  ) {
+    pushUnique(tags, "strong-product-discovery");
+    positivePatterns.push("Product discovery has visible navigation, collection/product links, and search.");
+    addNote({
+      message:
+        "Product discovery appears comparatively clear under the scanner's current internal criteria.",
+      evidence:
+        "Product/category navigation, collection/product links, and search were all visible in the public-page sample.",
+      tags: ["strong-product-discovery"],
+      tone: "positive",
+    });
+  } else if (
+    has("Product Discovery Clarity Needs Review") ||
+    has("Store Search Visibility Needs Review")
+  ) {
+    pushUnique(tags, "weak-product-discovery");
+    negativePatterns.push("Product discovery is pressured by missing category, collection, or search visibility.");
+    addNote({
+      message:
+        "This storefront appears to rely heavily on discovery before purchase confidence becomes clear.",
+      evidence: `Product/category navigation: ${signals.productNavigationVisible ? "visible" : "not visible"}; collection/product links: ${signals.collectionLinksVisible ? "visible" : "not visible"}; search: ${signals.searchVisible ? "visible" : "not visible"}.`,
+      tags: ["weak-product-discovery"],
+      tone: "negative",
+    });
+  }
+
+  if (trustSignalsVisible >= 4) {
+    pushUnique(tags, "strong-trust-signals");
+    positivePatterns.push("Trust visibility is supported by several reassurance groups.");
+  } else if (
+    has("Trust Signal Visibility Needs Review") ||
+    has("Shipping and Returns Messaging Not Prominent")
+  ) {
+    pushUnique(tags, "weak-trust-signals");
+    negativePatterns.push("Trust visibility is limited around reassurance, policy, support, or shipping signals.");
+    addNote({
+      message:
+        "Trust-building elements appear less visible than stronger internal review examples.",
+      evidence: `${trustSignalsVisible} of 6 trust-signal groups were visible; missing or weak groups: ${missingTrustSignalLabels(diagnostics)}.`,
+      tags: ["weak-trust-signals"],
+      tone: "negative",
+    });
+  }
+
+  if (commerce.cartVisible && commerce.checkoutVisible) {
+    pushUnique(tags, "strong-checkout-continuity");
+    positivePatterns.push("Checkout continuity is supported by visible cart and checkout cues.");
+  } else if (has("Cart / Checkout Path Needs Review")) {
+    pushUnique(tags, "weak-checkout-continuity");
+    negativePatterns.push("Checkout continuity is pressured by limited cart or checkout visibility.");
+    addNote({
+      message:
+        "The browse-to-buy path appears less continuous than strong internal examples.",
+      evidence: `Cart visibility: ${commerce.cartVisible ? "visible" : "not visible"}; checkout visibility: ${commerce.checkoutVisible ? "visible" : "not visible"}.`,
+      tags: ["weak-checkout-continuity"],
+      tone: "negative",
+    });
+  }
+
+  if (marketingTools.length >= 2) {
+    pushUnique(tags, "strong-tracking-visibility");
+    positivePatterns.push("Tracking visibility is supported by multiple detected analytics or marketing tools.");
+    addNote({
+      message:
+        "Tracking visibility appears stronger than the scanner's baseline internal examples, which may make follow-up measurement easier to validate.",
+      evidence: `Detected supported marketing tools: ${visibleEvidenceList(marketingTools.map((tool) => tool.label))}.`,
+      tags: ["strong-tracking-visibility"],
+      tone: "positive",
+    });
+  } else if (
+    has("Marketing Attribution Visibility Appears Limited") ||
+    has("Tracking Stack Appears Limited")
+  ) {
+    pushUnique(tags, "weak-tracking-visibility");
+    negativePatterns.push("Tracking visibility is limited or thin in public-page evidence.");
+    addNote({
+      message:
+        "Measurement confidence may be weaker than strong internal examples until attribution visibility is confirmed.",
+      evidence: `Detected ${marketingTools.length} supported marketing tool${marketingTools.length === 1 ? "" : "s"}: ${visibleEvidenceList(marketingTools.map((tool) => tool.label))}.`,
+      tags: ["weak-tracking-visibility"],
+      tone: "negative",
+    });
+  }
+
+  if (
+    signals.contactSupportVisible &&
+    signals.orderReturnsLanguageVisible &&
+    signals.shippingReturnsVisible
+  ) {
+    pushUnique(tags, "strong-operational-clarity");
+    positivePatterns.push("Operational clarity is supported by support, returns, and shipping/order language.");
+  } else if (
+    has("Support or Lead Path Visibility Limited") ||
+    has("Order and Returns Communication Needs Review") ||
+    has("Shipping and Returns Messaging Not Prominent")
+  ) {
+    pushUnique(tags, "weak-operational-clarity");
+    negativePatterns.push("Operational clarity is pressured by support, returns, or fulfillment communication gaps.");
+    addNote({
+      message:
+        "Operational reassurance appears less explicit than strong internal examples.",
+      evidence: `Support/contact: ${signals.contactSupportVisible ? "visible" : "not visible"}; order/returns language: ${signals.orderReturnsLanguageVisible ? "visible" : "not visible"}; shipping/returns: ${signals.shippingReturnsVisible ? "visible" : "not visible"}.`,
+      tags: ["weak-operational-clarity"],
+      tone: "negative",
+    });
+  }
+
+  const signalScore = tags.reduce((score, tag) => {
+    if (tag.startsWith("strong-")) return score + 1;
+    if (tag.startsWith("weak-")) return score - 1;
+    return score;
+  }, 0);
+  const strongCount = tags.filter((tag) => tag.startsWith("strong-")).length;
+  const weakCount = tags.filter((tag) => tag.startsWith("weak-")).length;
+  const summary =
+    weakCount > strongCount
+      ? "Directional benchmark context leans toward improvement opportunities in the current internal comparison model."
+      : strongCount > weakCount
+        ? "Directional benchmark context shows several stronger signals under the current internal comparison model."
+        : "Directional benchmark context is mixed, with strengths and review areas both visible in the public-page evidence.";
+
+  return {
+    summary,
+    notes: notes.slice(0, 5),
+    benchmarkTags: tags,
+    recurringPositivePatterns: positivePatterns.slice(0, 5),
+    recurringNegativePatterns: negativePatterns.slice(0, 5),
+    signalScore,
+  };
 }
 
 export async function POST(request: Request) {
@@ -959,13 +1467,20 @@ export async function POST(request: Request) {
       findings: heuristicFindings,
       overallScore,
     });
+    const connectedInsight = buildConnectedInsight(heuristicFindings);
     const auditNarrative = buildAuditNarrative({
       diagnostics,
       findings: heuristicFindings,
       overallScore,
+      connectedInsight,
     });
+    const primaryOperationalConcern = buildPrimaryOperationalConcern(
+      heuristicFindings,
+      connectedInsight,
+    );
     const topPriorityRisks = buildTopPriorityRisks(heuristicFindings, categories);
     const recommendedNextSteps = buildRecommendedNextSteps(heuristicFindings);
+    const benchmarkContext = buildBenchmarkContext(diagnostics, heuristicFindings);
 
     logDevelopmentSubmission("Ecommerce audit scanner", {
       website: values.website,
@@ -988,11 +1503,15 @@ export async function POST(request: Request) {
             "This internal review uses public-page diagnostics and rule-based ecommerce heuristics. Findings should guide practical review priorities while uncertain signals remain marked for manual confirmation.",
           executiveSummary,
           auditNarrative,
+          connectedInsight,
+          primaryOperationalConcern,
           topPriorityRisks,
           heuristicFindings,
           diagnostics,
           categories,
           recommendedNextSteps,
+          benchmarkTags: benchmarkContext.benchmarkTags,
+          benchmarkContext,
         },
       },
       { status: 200 }
