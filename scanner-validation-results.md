@@ -8,9 +8,11 @@
 
 ## Common issues
 
-- Checkout/cart path should be reviewed (17)
-- Mobile conversion path should be reviewed (17)
-- Backend/operations workflow should be mapped (17)
+- Mobile Readability May Be Crowded (12)
+- Mobile CTA Visibility Needs Review (6)
+- Product Discovery Clarity Needs Review (4)
+- Cart / Checkout Path Needs Review (2)
+- Store Search Visibility Needs Review (2)
 
 ## Sites needing manual review
 

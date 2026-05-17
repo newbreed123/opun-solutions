@@ -31,7 +31,13 @@ type AuditCategory = {
   label: string;
   score: number;
   status: string;
+  statusDetail?: string;
   explanation: string;
+  scoreExplanation?: {
+    whyAssigned: string;
+    evidenceInfluenced: string;
+    whatWouldImprove: string;
+  };
   priority: "Low" | "Medium" | "High";
   issues: string[];
   findings?: HeuristicFinding[];
@@ -46,6 +52,7 @@ type AuditResult = {
   overallExplanation: string;
   summary: string;
   executiveSummary: ExecutiveSummary;
+  auditNarrative?: string;
   topPriorityRisks: TopPriorityRisk[];
   heuristicFindings?: HeuristicFinding[];
   diagnostics: LiveDiagnostics;
@@ -59,7 +66,7 @@ type HeuristicFinding = {
   severity: "Low" | "Medium" | "High" | "Critical";
   confidence: "Low" | "Moderate" | "High" | "Needs Review";
   businessImpact: string;
-  recommendedAction: string;
+  recommendedFirstAction: string;
   evidenceSummary: string;
 };
 
@@ -80,6 +87,8 @@ type TopPriorityRisk = {
 };
 
 type RecommendedNextStep = {
+  title?: string;
+  evidenceClue?: string;
   action: string;
   why: string;
 };
@@ -159,27 +168,6 @@ const scoreCards = [
     label: "Checkout Path",
     description: "Cart, checkout, support, returns visibility",
     icon: ShoppingCart,
-  },
-];
-
-const recentScans = [
-  {
-    website: "https://example-store.com",
-    score: 67,
-    date: "Mock data",
-    status: "Needs Review",
-  },
-  {
-    website: "https://demo-fashion.co",
-    score: 74,
-    date: "Mock data",
-    status: "Needs Review",
-  },
-  {
-    website: "https://sample-homegoods.com",
-    score: 59,
-    date: "Mock data",
-    status: "High Priority",
   },
 ];
 
@@ -356,6 +344,28 @@ function scoreTone(score: number) {
   }
 
   return "text-emerald-100";
+}
+
+function actionPlanLabel(index: number) {
+  return index === 0 ? "First" : index === 1 ? "Next" : "Then";
+}
+
+function scoreContext(category: AuditCategory) {
+  if (category.statusDetail) {
+    return category.statusDetail;
+  }
+
+  return category.scoreExplanation?.whyAssigned ?? category.status;
+}
+
+function scoreMainEvidence(category: AuditCategory) {
+  const evidence = category.scoreExplanation?.evidenceInfluenced;
+
+  if (!evidence) {
+    return category.issues[0] ?? "No high-impact public-page issue detected.";
+  }
+
+  return evidence.split(";")[0] ?? evidence;
 }
 
 export default function EcommerceAuditScannerPage() {
@@ -660,49 +670,49 @@ export default function EcommerceAuditScannerPage() {
                 </div>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-3">
-                {audit.topPriorityRisks.map((risk) => (
-                  <div key={risk.title} className="card-elevated p-6">
-                    <div className="mb-5 flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
-                          {risk.title}
-                        </p>
-                        <h3 className="mt-3 text-xl font-bold text-primary">
-                          {risk.riskLabel}
-                        </h3>
-                      </div>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
-                          risk.severity,
-                        )}`}
-                      >
-                        {risk.severity}
-                      </span>
-                    </div>
-                    <p className="leading-relaxed text-secondary">
-                      {risk.explanation}
+              <div className="card-elevated p-6 md:p-8">
+                <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                      Audit Narrative
                     </p>
-                    {risk.evidenceSummary && (
-                      <div className="mt-4 rounded-2xl border border-dark-border bg-white/[0.035] p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-                          Evidence
-                        </p>
+                    <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
+                      The story behind this scan
+                    </h3>
+                    <p className="mt-5 text-lg leading-relaxed text-secondary">
+                      {audit.auditNarrative ??
+                        audit.executiveSummary.summary}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 rounded-[2rem] border border-dark-border bg-dark-deep/70 p-5">
+                    <p className="text-sm font-bold text-primary">
+                      Priority evidence snapshot
+                    </p>
+                    {audit.topPriorityRisks.slice(0, 3).map((risk) => (
+                      <div
+                        key={risk.title}
+                        className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+                      >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <p className="font-semibold leading-relaxed text-primary">
+                            {risk.riskLabel}
+                          </p>
+                          <span
+                            className={`inline-flex w-fit rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${statusBadgeClasses(
+                              risk.severity,
+                            )}`}
+                          >
+                            {risk.severity}
+                          </span>
+                        </div>
                         <p className="mt-2 text-sm leading-relaxed text-secondary">
-                          {risk.evidenceSummary}
+                          {risk.evidenceSummary ?? risk.explanation}
                         </p>
                       </div>
-                    )}
-                    <div className="mt-5 rounded-2xl border border-brand-cyan/25 bg-brand-cyan/10 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
-                        Recommended next step
-                      </p>
-                      <p className="mt-2 text-sm leading-relaxed text-primary">
-                        {risk.recommendedFirstAction}
-                      </p>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
 
               <div className="rounded-[2rem] border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/15 via-dark-card to-brand-cyan/10 p-6 shadow-[0_30px_80px_rgba(6,182,212,0.12)] md:p-8">
@@ -712,63 +722,327 @@ export default function EcommerceAuditScannerPage() {
                 <h3 className="mt-3 text-3xl font-bold text-primary">
                   What to Review First
                 </h3>
-                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <div className="mt-6 grid gap-4 lg:grid-cols-3">
                   {audit.recommendedNextSteps.map((step, index) => (
                     <div
                       key={step.action}
-                      className="flex gap-4 rounded-2xl border border-dark-border bg-dark-deep/70 p-4"
+                      className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4"
                     >
-                      <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-bold text-white">
-                        {index + 1}
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-bold text-white">
+                          {index + 1}
+                        </div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                          {actionPlanLabel(index)}
+                        </p>
                       </div>
-                      <div>
-                        <p className="font-semibold leading-relaxed text-primary">
-                          {step.action}
-                        </p>
-                        <p className="mt-2 text-sm leading-relaxed text-muted">
-                          {step.why}
-                        </p>
+                      <p className="font-semibold leading-relaxed text-primary">
+                        {step.title ?? step.action}
+                      </p>
+                      <div className="mt-3 space-y-3">
+                        {step.evidenceClue && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                              Evidence clue
+                            </p>
+                            <p className="mt-1 text-sm leading-relaxed text-secondary">
+                              {step.evidenceClue}
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                            Why it matters
+                          </p>
+                          <p className="mt-1 text-sm leading-relaxed text-muted">
+                            {step.why}
+                          </p>
+                        </div>
+                        {step.title && (
+                          <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
+                              First action
+                            </p>
+                            <p className="mt-1 text-sm font-semibold leading-relaxed text-primary">
+                              {step.action}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-5">
-                {audit.categories.map((category) => (
-                  <div key={category.key} className="card p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-bold text-primary">
-                        {category.label}
-                      </p>
-                      <span
-                        className={`rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
-                          category.status,
-                        )}`}
-                      >
-                        {category.status}
-                      </span>
-                    </div>
-                    <p
-                      className={`mt-5 text-4xl font-black ${scoreTone(category.score)}`}
-                    >
-                      {category.score}
+              <div className="card-elevated p-6 md:p-8">
+                <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                      Score Cards
                     </p>
-                    <p className="mt-2 text-sm font-bold text-primary">
-                      {category.status}
-                    </p>
-                    <p className="mt-2 text-xs leading-relaxed text-muted">
-                      {category.explanation}
-                    </p>
-                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-brand-blue to-brand-cyan"
-                        style={{ width: `${category.score}%` }}
-                      />
-                    </div>
+                    <h3 className="mt-3 text-3xl font-bold text-primary">
+                      Category score drivers
+                    </h3>
                   </div>
-                ))}
+                  <p className="max-w-2xl text-sm leading-relaxed text-muted">
+                    Scores summarize public-page evidence only. Each card shows
+                    the main reason behind the number without turning the
+                    summary into a raw diagnostics log.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  {audit.categories.map((category) => (
+                    <div
+                      key={category.key}
+                      className="rounded-2xl border border-dark-border bg-dark-deep/70 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-bold text-primary">
+                          {category.label}
+                        </p>
+                        <span
+                          className={`rounded-full border px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${statusBadgeClasses(
+                            category.status,
+                          )}`}
+                        >
+                          {category.status}
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-5 text-4xl font-black ${scoreTone(category.score)}`}
+                      >
+                        {category.score}
+                      </p>
+                      <p className="mt-2 text-sm font-bold leading-snug text-primary">
+                        {scoreContext(category)}
+                      </p>
+                      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                          Main driver
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-secondary">
+                          {scoreMainEvidence(category)}
+                        </p>
+                      </div>
+                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-brand-blue to-brand-cyan"
+                          style={{ width: `${category.score}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {(() => {
+                const visibleMarketingTools = getVisibleMarketingTools(
+                  audit.diagnostics,
+                );
+                const marketingStatus = marketingStatusLabel(
+                  visibleMarketingTools.length,
+                );
+                const commerce = audit.diagnostics.commerceFlowSignals;
+
+                return (
+                  <div className="card-elevated p-6 md:p-8">
+                    <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                          Platform & Marketing Visibility
+                        </p>
+                        <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
+                          What the storefront makes visible
+                        </h3>
+                        <p className="mt-4 text-lg leading-relaxed text-secondary">
+                          {platformMarketingInterpretation(audit)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 p-5">
+                        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                          Executive use
+                        </p>
+                        <p className="mt-3 leading-relaxed text-secondary">
+                          This section separates what the public storefront
+                          exposes from what still needs manual confirmation, so
+                          platform assumptions do not overtake the audit story.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
+                          <ServerCog className="h-4 w-4" />
+                          Storefront platform
+                        </div>
+                        <p className="text-2xl font-semibold text-secondary">
+                          {platformDisplayName(audit)}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-muted">
+                          {confidenceLevel(
+                            audit.diagnostics.platformDetection.confidence,
+                          )}
+                          {" - "}
+                          {audit.diagnostics.platformDetection.confidence}%
+                        </p>
+                        {audit.diagnostics.platformDetection.explanation && (
+                          <p className="mt-3 text-sm leading-relaxed text-muted">
+                            {audit.diagnostics.platformDetection.explanation}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
+                            <BarChart3 className="h-4 w-4" />
+                            Marketing visibility
+                          </div>
+                          <span
+                            className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] ${marketingStatusClasses(
+                              marketingStatus,
+                            )}`}
+                          >
+                            {marketingStatus}
+                          </span>
+                        </div>
+                        <p className="text-2xl font-semibold text-secondary">
+                          {visibleMarketingTools.length} visible
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          {visibleMarketingTools.length > 0
+                            ? visibleMarketingTools
+                                .map((tool) => tool.label)
+                                .join(", ")
+                            : "No supported marketing tools were visible in the loaded page context."}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
+                        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
+                          <Target className="h-4 w-4" />
+                          Commerce path
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
+                            Cart: {signalLabel(commerce.cartVisible)}
+                          </p>
+                          <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
+                            Checkout: {signalLabel(commerce.checkoutVisible)}
+                          </p>
+                          <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
+                            Catalog: {signalLabel(commerce.productCatalogVisible)}
+                          </p>
+                          <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
+                            CTA/form:{" "}
+                            {signalLabel(commerce.ctaVisible || commerce.formVisible)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {showManualReviewChecklist(audit) && (
+                      <div className="mt-6 rounded-2xl border border-amber-300/30 bg-amber-400/5 p-5">
+                        <p className="font-semibold text-amber-100">
+                          Platform Manual Review Checklist
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          Confirm source assets, cart and checkout URL
+                          structure, product URL patterns, frontend asset
+                          domains, and team knowledge before making
+                          platform-specific recommendations.
+                        </p>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowVisibilityDetails((current) => !current)
+                      }
+                      className="mt-6 inline-flex w-full items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary sm:w-auto"
+                    >
+                      <ChevronDown
+                        className={`mr-2 h-4 w-4 transition-transform ${
+                          showVisibilityDetails ? "rotate-180" : ""
+                        }`}
+                      />
+                      {showVisibilityDetails ? "Hide evidence" : "View evidence"}
+                    </button>
+
+                    {showVisibilityDetails && (
+                      <div className="mt-5 grid gap-4 rounded-2xl border border-dark-border bg-dark-deep/70 p-5 text-sm leading-relaxed text-secondary lg:grid-cols-3">
+                        <div>
+                          <p className="font-semibold text-primary">
+                            Platform evidence
+                          </p>
+                          <ul className="mt-3 list-disc space-y-2 pl-4">
+                            {audit.diagnostics.platformDetection.details.map(
+                              (detail) => (
+                                <li key={detail}>{detail}</li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-primary">
+                            Marketing tool evidence
+                          </p>
+                          <div className="mt-3 space-y-3">
+                            {visibleMarketingTools.length > 0 ? (
+                              visibleMarketingTools.map((tool) => (
+                                <div key={tool.key}>
+                                  <p className="font-semibold text-secondary">
+                                    {tool.label}
+                                  </p>
+                                  <p className="mt-1 text-muted">
+                                    {tool.signals.length > 0
+                                      ? tool.signals.join(", ")
+                                      : tool.description}
+                                  </p>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-muted">
+                                No supported marketing tools were detected from
+                                public page markup, visible DOM content, or
+                                loaded frontend asset references.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-primary">
+                            Customer journey evidence
+                          </p>
+                          <div className="mt-3 space-y-2 text-muted">
+                            <p>Cart: {signalLabel(commerce.cartVisible)}</p>
+                            <p>
+                              Checkout: {signalLabel(commerce.checkoutVisible)}
+                            </p>
+                            <p>
+                              Product/catalog:{" "}
+                              {signalLabel(commerce.productCatalogVisible)}
+                            </p>
+                            <p>Forms: {signalLabel(commerce.formVisible)}</p>
+                            <p>
+                              CTA labels:{" "}
+                              {commerce.ctaLabels.length > 0
+                                ? commerce.ctaLabels.join(", ")
+                                : "No strong CTA labels were found in the visible page sample."}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="card-elevated p-5 sm:p-6 md:p-8">
                 <div className="mb-8 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -1055,7 +1329,7 @@ export default function EcommerceAuditScannerPage() {
                 const commerce = audit.diagnostics.commerceFlowSignals;
 
                 return (
-                  <div className="card-elevated p-6 md:p-8">
+                  <div className="hidden">
                     <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
@@ -1372,89 +1646,37 @@ export default function EcommerceAuditScannerPage() {
                 </div>
 
                 <div className="card-elevated p-6 md:p-8">
-                  <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-                        Placeholder Storage
-                      </p>
-                      <h3 className="mt-3 text-3xl font-bold text-primary">
-                        Recent Scans
-                      </h3>
-                    </div>
-                    <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                      Mock data
-                    </span>
-                  </div>
-                  <p className="mb-5 text-sm leading-relaxed text-muted">
-                    This table is a placeholder until database storage is added.
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                    Benchmark Notes
                   </p>
-
-                  <div className="hidden overflow-hidden rounded-2xl border border-dark-border md:block">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-white/[0.04] text-muted">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold">
-                            Website URL
-                          </th>
-                          <th className="px-4 py-3 font-semibold">Score</th>
-                          <th className="px-4 py-3 font-semibold">Date</th>
-                          <th className="px-4 py-3 font-semibold">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-dark-border">
-                        {recentScans.map((scan) => (
-                          <tr key={scan.website}>
-                            <td className="px-4 py-3 text-secondary">
-                              {scan.website}
-                            </td>
-                            <td className="px-4 py-3 font-bold text-brand-cyan">
-                              {scan.score}
-                            </td>
-                            <td className="px-4 py-3 text-muted">
-                              {scan.date}
-                            </td>
-                            <td className="px-4 py-3 text-secondary">
-                              {scan.status}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="grid gap-3 md:hidden">
-                    {recentScans.map((scan) => (
-                      <div
-                        key={scan.website}
-                        className="rounded-2xl border border-dark-border bg-white/[0.035] p-4"
-                      >
-                        <p className="break-words text-sm font-bold text-primary">
-                          {scan.website}
-                        </p>
-                        <div className="mt-3 grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
-                          <div>
-                            <p className="text-muted">Score</p>
-                            <p className="mt-1 font-bold text-brand-cyan">
-                              {scan.score}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted">Date</p>
-                            <p className="mt-1 font-semibold text-secondary">
-                              {scan.date}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted">Status</p>
-                            <p className="mt-1 font-semibold text-secondary">
-                              {scan.status}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <h3 className="mt-3 text-3xl font-bold text-primary">
+                    Internal comparison context
+                  </h3>
+                  <p className="mt-4 leading-relaxed text-secondary">
+                    This scanner will become more useful as we compare results
+                    across strong and weak ecommerce stores.
+                  </p>
+                  <p className="mt-4 rounded-2xl border border-dark-border bg-white/[0.035] p-4 text-sm leading-relaxed text-muted">
+                    For now, treat benchmarks as directional rather than
+                    definitive. The best use is comparing score drivers,
+                    evidence quality, and priority order across multiple manual
+                    audit examples.
+                  </p>
                 </div>
+              </div>
+
+              <div className="border-t border-dark-border pt-8">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                  Detailed Findings
+                </p>
+                <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
+                  Evidence by category
+                </h3>
+                <p className="mt-3 max-w-3xl leading-relaxed text-secondary">
+                  Use these findings when the executive action plan needs more
+                  supporting detail. This keeps the top of the report readable
+                  while preserving the audit trail.
+                </p>
               </div>
 
               <div className="grid gap-6 lg:grid-cols-2">
@@ -1511,7 +1733,7 @@ export default function EcommerceAuditScannerPage() {
                                   First action
                                 </p>
                                 <p className="mt-2 text-sm leading-relaxed text-primary">
-                                  {finding.recommendedAction}
+                                  {finding.recommendedFirstAction}
                                 </p>
                               </div>
                             </div>

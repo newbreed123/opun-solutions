@@ -28,6 +28,7 @@ export type PlatformName =
   | "BigCommerce"
   | "WooCommerce"
   | "Magento / Adobe Commerce"
+  | "Needs Manual Review"
   | "Unknown";
 
 export type PlatformConfidenceLabel =
@@ -530,6 +531,55 @@ function getConfidenceLabel(score: number): PlatformConfidenceLabel {
   return "Unknown";
 }
 
+function describePlatformPattern(pattern: RegExp) {
+  const source = pattern.source;
+
+  if (/cdn\\\.shopify\\\.com/i.test(source)) return "Shopify CDN assets";
+  if (/ShopifyAnalytics|Shopify\\\.theme|Shopify\\\.routes|\\bShopify\\b/i.test(source)) {
+    return "Shopify frontend objects or analytics";
+  }
+  if (/myshopify/i.test(source)) return "myshopify.com domain reference";
+  if (/bigcommerce|cdn\\d\*\\\.bigcommerce|cdn11\\\.bigcommerce/i.test(source)) {
+    return "BigCommerce asset or domain reference";
+  }
+  if (/bcData|Stencil|stencil|bcapp/i.test(source)) return "BigCommerce storefront data or stencil signal";
+  if (/cart\\\.php|checkout\\\.php|cartAction\\\.php/i.test(source)) {
+    return "BigCommerce cart or checkout endpoint";
+  }
+  if (/woocommerce|wc_cart_fragments|wc-ajax|wp-json\\\/wc/i.test(source)) {
+    return "WooCommerce plugin or cart fragment signal";
+  }
+  if (/Magento_|Magento_Ui|mage|requirejs-config|customer-data|static|version|minicart/i.test(source)) {
+    return "Magento / Adobe Commerce frontend module or static asset signal";
+  }
+  if (/products|collections|category|catalog|shop/i.test(source)) {
+    return "generic product or collection URL pattern";
+  }
+  if (/checkout|cart/i.test(source)) return "generic cart or checkout wording";
+
+  return `platform pattern ${source}`;
+}
+
+function platformEvidenceDetails({
+  name,
+  strongMatches,
+  weakMatches,
+}: {
+  name: PlatformName;
+  strongMatches: RegExp[];
+  weakMatches: RegExp[];
+}) {
+  return [
+    `Signal count: ${strongMatches.length} strong and ${weakMatches.length} weak ${name} indicators.`,
+    ...strongMatches.map(
+      (pattern) => `Strong signal: ${describePlatformPattern(pattern)} (${pattern.source})`,
+    ),
+    ...weakMatches.map(
+      (pattern) => `Weak signal: ${describePlatformPattern(pattern)} (${pattern.source})`,
+    ),
+  ];
+}
+
 export function detectEcommercePlatform(signalText: string): PlatformDetection {
   const platformScores = platformIndicatorRules.map((rule) => {
     const strongMatches = rule.strong.filter((pattern) => pattern.test(signalText));
@@ -549,10 +599,13 @@ export function detectEcommercePlatform(signalText: string): PlatformDetection {
       score,
       strongCount: strongMatches.length,
       weakCount: weakMatches.length,
-      details: [
-        ...strongMatches.map((pattern) => `Strong signal: ${pattern.source}`),
-        ...weakMatches.map((pattern) => `Weak signal: ${pattern.source}`),
-      ],
+      strongMatches,
+      weakMatches,
+      details: platformEvidenceDetails({
+        name: platformNameFromKey(rule.key),
+        strongMatches,
+        weakMatches,
+      }),
     };
   });
 
@@ -573,37 +626,55 @@ export function detectEcommercePlatform(signalText: string): PlatformDetection {
     };
   }
 
+  const hasCompetingStrongSignals =
+    "strongCount" in runnerUp &&
+    runnerUp.strongCount > 0 &&
+    top.strongCount > 0 &&
+    top.score - runnerUp.score < 30;
+  const weakSignalsOutweighStrongSignals =
+    top.strongCount > 0 && top.weakCount >= top.strongCount * 3;
+
   if (
-    runnerUp.score >= 20 &&
-    top.score - runnerUp.score < 12 ||
+    (runnerUp.score >= 20 && top.score - runnerUp.score < 12) ||
+    hasCompetingStrongSignals ||
+    weakSignalsOutweighStrongSignals ||
     (top.name === "Shopify" && top.strongCount === 0)
   ) {
+    const runnerUpName = "name" in runnerUp ? runnerUp.name : "another platform";
     return {
-      name: "Unknown",
+      name: "Needs Manual Review",
       confidence: Math.min(95, Math.round(top.score)),
       confidenceLabel: "Needs Review",
-      details: top.details,
+      details: [
+        `Needs manual review: ${top.name} signals were strongest, but ${runnerUpName} signals or generic commerce patterns also appeared.`,
+        `Top candidate signal count: ${top.strongCount} strong and ${top.weakCount} weak ${top.name} indicators.`,
+        ...top.details,
+      ],
       explanation:
-        "Multiple storefront indicators were found, so platform should be manually reviewed.",
+        `Platform signals conflict or rely too heavily on generic commerce patterns. The strongest candidate was ${top.name}, but the evidence is not clean enough for a confident platform label.`,
     };
   }
 
   const confidence = Math.min(95, Math.round(top.score));
+  const confidenceLabel = getConfidenceLabel(confidence);
+  const strongestEvidence = top.details
+    .filter((detail) => detail.startsWith("Strong signal"))
+    .slice(0, 3)
+    .map((detail) => detail.replace(/^Strong signal: /, "").replace(/\s+\(.+\)$/, ""))
+    .join("; ");
+
   return {
     name: top.name,
     confidence,
-    confidenceLabel: getConfidenceLabel(confidence),
-    details:
-      top.details.length > 0
-        ? top.details
-        : [
-            `Detected ${top.name} storefront signals based on visible platform indicators.`,
-          ],
+    confidenceLabel,
+    details: top.details,
     explanation:
-      getConfidenceLabel(confidence) === "Low confidence"
+      confidenceLabel === "High confidence"
+        ? `Detected ${top.name} with high confidence because platform-specific evidence was visible: ${strongestEvidence || "multiple strong storefront signals"}.`
+        : confidenceLabel === "Low confidence"
         ?
-          `Detected ${top.name}, but the signal strength is low and should be confirmed manually.`
-        : `Detected ${top.name} storefront signals with ${getConfidenceLabel(confidence).toLowerCase()}.`,
+          `Detected ${top.name}, but the signal strength is low and should be confirmed manually because the scan found only limited platform-specific evidence.`
+        : `Detected ${top.name} with ${confidenceLabel.toLowerCase()} from visible public-page indicators; confirm manually before making platform-specific recommendations.`,
   };
 }
 
@@ -673,6 +744,17 @@ async function extractStorefrontReviewSignals(
       const visibleTextLower = visibleText.toLowerCase();
       const aboveFoldElements = visibleElements.filter(
         (item) => item.top >= 0 && item.top < window.innerHeight,
+      );
+      const aboveFoldTextSnippets = Array.from(
+        new Set(
+          aboveFoldElements
+            .map((item) => item.text)
+            .filter((text) => Boolean(text) && text.length <= 500),
+        ),
+      );
+      const aboveFoldTextLength = aboveFoldTextSnippets.reduce(
+        (total, text) => total + Math.min(text.length, 220),
+        0,
       );
       const ctaPattern =
         /add to cart|add to bag|buy now|checkout|shop now|view products|view collection|get started|subscribe|sign up|contact|request|quote|book|learn more/i;
@@ -744,12 +826,10 @@ async function extractStorefrontReviewSignals(
         mobileAboveFoldLinkCount: aboveFoldElements.filter(
           (item) => item.element instanceof HTMLAnchorElement,
         ).length,
-        mobileVisibleTextLength: aboveFoldElements
-          .map((item) => item.text)
-          .join(" ").length,
+        mobileVisibleTextLength: aboveFoldTextLength,
         mobileCrowdingRisk:
           aboveFoldElements.length > 65 ||
-          aboveFoldElements.map((item) => item.text).join(" ").length > 1800,
+          aboveFoldTextLength > 1800,
         searchVisible:
           document.querySelector('input[type="search"], input[placeholder*="Search" i], [aria-label*="search" i]') !==
             null || /\bsearch\b/i.test(navLinks.join(" ")),

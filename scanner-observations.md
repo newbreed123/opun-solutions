@@ -62,3 +62,22 @@ Internal notes on the Opun Ecommerce Audit Scanner performance and improvements.
 - Added operational continuity heuristics for cart visibility, checkout visibility, support/contact paths, order/shipping/returns language, and lead/contact workflow cues.
 - Added weighted recommendation logic so Critical and High findings drive top risks, action-plan ordering, and category score adjustments before lower-impact metadata items.
 - Kept uncertainty honest by using `Needs Review` when visual or public-page evidence is suggestive but not conclusive.
+
+## Evidence-Based Recommendation Layer
+
+- Added a structured recommendation model across scanner findings: `title`, `category`, `severity`, `confidence`, `evidenceSummary`, `businessImpact`, and `recommendedFirstAction`.
+- Reduced boilerplate by grounding recommendations in observed signals such as mobile CTA presence, first-screen link count, visible search, trust-signal groups, cart/checkout visibility, marketing-tool count, platform confidence, console errors, and failed requests.
+- Preserved specific top-risk labels such as `Mobile CTA Visibility Needs Review`, `Product Discovery Clarity Needs Review`, `Trust Signal Visibility Needs Review`, `Cart / Checkout Path Needs Review`, and `Marketing Attribution Visibility Appears Limited`.
+- Avoided generic top-risk fallbacks like `Conversion Issues`, `UX/UI Issues`, and `Ecommerce Operations Issues`; the latest validation run reported `0` generic category labels across top-priority risks.
+- Added category score explanations for UX/UI, Conversion, Technical, Tracking, and Ecommerce Operations. Each score now explains why it was assigned, which evidence influenced it, and what would improve it.
+- Added deterministic score variation from observed evidence counts. The latest successful validation scans produced unique category score combinations across all 17 successful scans, reducing repeated-score credibility issues.
+- Improved platform confidence explanations. High-confidence labels now list supporting evidence such as Shopify CDN/theme signals or BigCommerce stencil/CDN signals; uncertain or conflicting signals are positioned for manual review instead of platform-specific recommendations.
+- Generated `What to Review First` from the highest business-impact findings, with each item carrying the issue title, evidence clue, business reason, and first action.
+
+## Audit Narrative Refinement
+
+- Added an `Audit Narrative` section near the top of the report to connect the highest-impact findings into one cohesive ecommerce audit story.
+- Improved `What to Review First` into a clearer prioritized action plan using `First`, `Next`, and `Then` ordering, with issue title, evidence clue, business reason, and first action.
+- Reordered the visible report hierarchy around executive readability: Executive Summary, Audit Narrative, What to Review First, Score Cards, Platform & Marketing Visibility, Live Diagnostics, Detailed Findings, and CTA.
+- Simplified category score cards so they show score, status, a short contextual explanation, and the main evidence driver without duplicating the full finding text.
+- Added a lightweight `Benchmark Notes` placeholder for future internal comparison across strong and weak ecommerce stores.

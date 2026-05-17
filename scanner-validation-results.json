@@ -5,6 +5,22 @@
     "expectedPlatform": "Shopify",
     "detectedPlatform": "Shopify",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformEvidence": [
+      "Signal count: 6 strong and 5 weak Shopify indicators.",
+      "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
+      "Strong signal: Shopify frontend objects or analytics (\\bShopify\\b)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.theme)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.routes)",
+      "Strong signal: Shopify frontend objects or analytics (ShopifyAnalytics)",
+      "Strong signal: myshopify.com domain reference (myshopify\\.com)",
+      "Weak signal: generic product or collection URL pattern (\\/products\\/)",
+      "Weak signal: generic product or collection URL pattern (\\/collections\\/)",
+      "Weak signal: generic cart or checkout wording (\\/cart(?:\\.js)?)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
@@ -12,60 +28,78 @@
       "Meta Pixel",
       "Klaviyo"
     ],
-    "overallScore": 62,
+    "overallScore": 76,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 78,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 21; first-screen text estimate: 1445 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 73,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 62,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 67,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: Shopify (High confidence, 95%); console errors: 6; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 75,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 4 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel, Klaviyo. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 21 visible links and about 1445 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 21 links and about 1445 text characters before scroll."
       }
     ],
     "status": "success",
@@ -77,6 +111,9 @@
     "expectedPlatform": "Shopify",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -91,64 +128,107 @@
     "expectedPlatform": "Shopify",
     "detectedPlatform": "Shopify",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformEvidence": [
+      "Signal count: 6 strong and 5 weak Shopify indicators.",
+      "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
+      "Strong signal: Shopify frontend objects or analytics (\\bShopify\\b)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.theme)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.routes)",
+      "Strong signal: Shopify frontend objects or analytics (ShopifyAnalytics)",
+      "Strong signal: myshopify.com domain reference (myshopify\\.com)",
+      "Weak signal: generic product or collection URL pattern (\\/products\\/)",
+      "Weak signal: generic product or collection URL pattern (\\/collections\\/)",
+      "Weak signal: generic cart or checkout wording (\\/cart(?:\\.js)?)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4"
     ],
-    "overallScore": 62,
+    "overallScore": 73,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 12; first-screen text estimate: 2119 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 69,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 63,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 68,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: Shopify (High confidence, 95%); console errors: 3; failed requests: 5.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 63,
+        "status": "High Priority",
+        "statusDetail": "Tracking Stack Appears Limited",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 1 supported marketing tool: Google Analytics / GA4. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 12 visible links and about 2119 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 12 links and about 2119 text characters before scroll."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Tracking Stack Appears Limited",
+        "riskLabel": "Tracking Stack Appears Limited",
+        "severity": "Medium",
+        "confidence": "Moderate",
+        "explanation": "A thin visible tracking stack may leave gaps in attribution, retargeting, or customer follow-up visibility.",
+        "evidenceSummary": "Visible supported marketing tool: Google Analytics / GA4.",
+        "recommendedFirstAction": "Map the visible tag to the full purchase path and confirm whether missing analytics, pixel, or email events are intentionally handled server-side."
       }
     ],
     "status": "success",
@@ -160,6 +240,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -174,6 +257,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -188,6 +274,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -202,6 +291,22 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 3 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)",
+      "Weak signal: generic cart or checkout wording (\\/cart\\/|\\/checkout\\/)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
@@ -209,60 +314,78 @@
       "Meta Pixel",
       "Klaviyo"
     ],
-    "overallScore": 62,
+    "overallScore": 73,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 70,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 229; first-screen text estimate: 13188 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 69,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 62,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 67,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 5; failed requests: 4.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 75,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 4 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel, Klaviyo. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 229 visible links and about 13188 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Reduce first-screen mobile link clusters; this scan saw 229 visible links before scroll, so secondary navigation should move behind a clearer menu hierarchy."
       }
     ],
     "status": "success",
@@ -274,6 +397,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -288,65 +414,107 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Magento / Adobe Commerce",
     "confidence": 32,
+    "platformConfidenceLabel": "Low confidence",
+    "platformExplanation": "Detected Magento / Adobe Commerce, but the signal strength is low and should be confirmed manually because the scan found only limited platform-specific evidence.",
+    "platformEvidence": [
+      "Signal count: 1 strong and 0 weak Magento / Adobe Commerce indicators.",
+      "Strong signal: platform pattern mage\\/ (mage\\/)"
+    ],
     "platformMatch": "no",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager"
     ],
-    "overallScore": 63,
+    "overallScore": 69,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 79,
+        "status": "Needs Review",
+        "statusDetail": "Store Search Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Store Search Visibility Needs Review; mobile CTA above fold: yes; search visible: no; first-screen links: 4; first-screen text estimate: 1529 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 66,
-        "status": "Needs Review"
+        "label": "Technical",
+        "score": 56,
+        "status": "High Priority",
+        "statusDetail": "Platform Visibility Needs Manual Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: Magento / Adobe Commerce (Low confidence, 32%); console errors: 2; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 54,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 73,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 2 supported marketing tools: Google Analytics / GA4, Google Tag Manager. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 59,
+        "status": "High Priority",
+        "statusDetail": "Cart / Checkout Path Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: not visible; checkout: not visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Cart / Checkout Path Needs Review",
+        "riskLabel": "Cart / Checkout Path Needs Review",
+        "severity": "Critical",
+        "confidence": "Moderate",
+        "explanation": "If cart or checkout cues are not easy to find, purchase intent can leak before a customer reaches the buying path.",
+        "evidenceSummary": "Cart visibility: not visible; checkout visibility: not visible.",
+        "recommendedFirstAction": "Add clear cart and checkout entry points to the header, product area, or cart drawer so shoppers can move from browsing to buying."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+        "title": "Store Search Visibility Needs Review",
+        "riskLabel": "Store Search Visibility Needs Review",
+        "severity": "Medium",
+        "confidence": "Moderate",
+        "explanation": "Store search does not appear prominently in the visible navigation, which may slow product discovery for catalog-heavy stores.",
+        "evidenceSummary": "No visible search input or search-labeled navigation item was detected in the public page sample.",
+        "recommendedFirstAction": "Expose search in the desktop header and mobile menu, then confirm it returns useful product and category results."
       },
       {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Platform Visibility Needs Manual Review",
+        "riskLabel": "Platform Visibility Needs Manual Review",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Platform-specific recommendations should wait until the storefront foundation is confirmed.",
+        "evidenceSummary": "Detected Magento / Adobe Commerce, but the signal strength is low and should be confirmed manually because the scan found only limited platform-specific evidence.",
+        "recommendedFirstAction": "Confirm platform clues from source assets, cart and checkout URLs, product URL patterns, and admin or team knowledge before making platform-specific recommendations."
       }
     ],
     "status": "success",
@@ -358,66 +526,109 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 3 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)",
+      "Weak signal: generic cart or checkout wording (\\/cart\\/|\\/checkout\\/)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager",
       "Meta Pixel"
     ],
-    "overallScore": 65,
+    "overallScore": 74,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 65,
+        "status": "Needs Review",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 0; first-screen text estimate: 2338 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
+        "label": "Conversion",
         "score": 64,
-        "status": "High Priority"
+        "status": "High Priority",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, secure payment cues; mobile CTA above fold: no.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "Technical",
+        "score": 74,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 1; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 58,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 79,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 3 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Mobile CTA Visibility Needs Review",
+        "riskLabel": "Mobile CTA Visibility Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
+        "evidenceSummary": "No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: Find Demo Events, Find Demo Events, Learn more, Shop now; mobile first-screen links: 0.",
+        "recommendedFirstAction": "Reuse the strongest existing CTA (Find Demo Events or Find Demo Events) inside the first mobile viewport and make it visually distinct from secondary links."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 0 visible links and about 2338 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Trim first-screen mobile copy and promotional text; this scan counted about 2338 visible text characters before scroll."
       }
     ],
     "status": "success",
@@ -429,62 +640,103 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": "Platform detection did not find enough specific signals to identify the storefront platform confidently.",
+    "platformEvidence": [
+      "No clear storefront platform indicators were detected from page assets or scripts."
+    ],
     "platformMatch": "no",
     "marketingTools": [],
-    "overallScore": 64,
+    "overallScore": 57,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 68,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Product Discovery Clarity Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Product Discovery Clarity Needs Review; mobile CTA above fold: yes; search visible: yes; first-screen links: 1; first-screen text estimate: 319 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 60,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 48,
+        "status": "High Priority",
+        "statusDetail": "Trust Signal Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "0 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, shipping or returns, warranty or guarantee, secure payment cues, support or contact, policy links; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 75,
-        "status": "Needs Review"
+        "label": "Technical",
+        "score": 61,
+        "status": "High Priority",
+        "statusDetail": "Platform Visibility Needs Manual Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: Unknown (Unknown, 0%); console errors: 1; failed requests: 0.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 56,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 57,
+        "status": "High Priority",
+        "statusDetail": "Marketing Attribution Visibility Appears Limited",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 0 supported marketing tools: none detected. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 40,
+        "status": "High Priority",
+        "statusDetail": "Cart / Checkout Path Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: not visible; checkout: not visible; support/contact: not visible; order/returns language: not visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Cart / Checkout Path Needs Review",
+        "riskLabel": "Cart / Checkout Path Needs Review",
+        "severity": "Critical",
+        "confidence": "Moderate",
+        "explanation": "If cart or checkout cues are not easy to find, purchase intent can leak before a customer reaches the buying path.",
+        "evidenceSummary": "Cart visibility: not visible; checkout visibility: not visible.",
+        "recommendedFirstAction": "Add clear cart and checkout entry points to the header, product area, or cart drawer so shoppers can move from browsing to buying."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+        "title": "Product Discovery Clarity Needs Review",
+        "riskLabel": "Product Discovery Clarity Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Customers may need too many steps to find products, categories, or collections from the first storefront experience.",
+        "evidenceSummary": "Product/category navigation: visible; collection/product links: not visible.",
+        "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
       },
       {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Trust Signal Visibility Needs Review",
+        "riskLabel": "Trust Signal Visibility Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Weak early trust cues can reduce purchase confidence, especially for new visitors comparing unfamiliar stores.",
+        "evidenceSummary": "0 of 6 common trust-signal groups were visible. Missing or weak groups: reviews or testimonials, shipping or returns, warranty or guarantee, secure payment cues, support or contact, policy links.",
+        "recommendedFirstAction": "Add the strongest reassurance cues near product decisions: reviews, shipping/returns, support, guarantee, secure payment, or policies."
       }
     ],
     "status": "success",
@@ -496,66 +748,99 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 2 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager",
       "Meta Pixel"
     ],
-    "overallScore": 62,
+    "overallScore": 75,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 76,
+        "status": "Needs Review",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 7; first-screen text estimate: 591 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 68,
+        "status": "Needs Review",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 62,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 67,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 4; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 76,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 3 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile CTA Visibility Needs Review",
+        "riskLabel": "Mobile CTA Visibility Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
+        "evidenceSummary": "No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: Contact Us, Add to Cart, Add to Cart, Add to Cart; mobile first-screen links: 7.",
+        "recommendedFirstAction": "Reuse the strongest existing CTA (Contact Us or Add to Cart) inside the first mobile viewport and make it visually distinct from secondary links."
       }
     ],
     "status": "success",
@@ -567,6 +852,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -581,6 +869,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -595,6 +886,21 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 2 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
@@ -602,60 +908,96 @@
       "Meta Pixel",
       "Mailchimp"
     ],
-    "overallScore": 65,
+    "overallScore": 72,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 56,
+        "status": "High Priority",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 20; first-screen text estimate: 1844 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 60,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 64,
+        "status": "High Priority",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
+        "label": "Technical",
         "score": 72,
-        "status": "Needs Review"
+        "status": "Needs Review",
+        "statusDetail": "Search Snippet Clarity Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 0; failed requests: 5.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 58,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 80,
+        "status": "Healthy",
+        "statusDetail": "Tracking Visibility Looks Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 4 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel, Mailchimp. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Mobile CTA Visibility Needs Review",
+        "riskLabel": "Mobile CTA Visibility Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
+        "evidenceSummary": "No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: Contact / Help., Contact us, Contact / Help., Contact us; mobile first-screen links: 20.",
+        "recommendedFirstAction": "Reuse the strongest existing CTA (Contact / Help. or Contact us) inside the first mobile viewport and make it visually distinct from secondary links."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+        "title": "Product Discovery Clarity Needs Review",
+        "riskLabel": "Product Discovery Clarity Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Customers may need too many steps to find products, categories, or collections from the first storefront experience.",
+        "evidenceSummary": "Product/category navigation: visible; collection/product links: not visible.",
+        "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
       },
       {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 20 visible links and about 1844 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 20 links and about 1844 text characters before scroll."
       }
     ],
     "status": "success",
@@ -667,65 +1009,99 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Shopify",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformEvidence": [
+      "Signal count: 6 strong and 5 weak Shopify indicators.",
+      "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
+      "Strong signal: Shopify frontend objects or analytics (\\bShopify\\b)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.theme)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.routes)",
+      "Strong signal: Shopify frontend objects or analytics (ShopifyAnalytics)",
+      "Strong signal: myshopify.com domain reference (myshopify\\.com)",
+      "Weak signal: generic product or collection URL pattern (\\/products\\/)",
+      "Weak signal: generic product or collection URL pattern (\\/collections\\/)",
+      "Weak signal: generic cart or checkout wording (\\/cart(?:\\.js)?)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "no",
     "marketingTools": [
       "Google Analytics / GA4",
       "Meta Pixel"
     ],
-    "overallScore": 62,
+    "overallScore": 77,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 76,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 5; first-screen text estimate: 2306 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 82,
+        "status": "Healthy",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "6 of 6 trust-signal groups were visible; missing or weak groups: no major trust groups missing; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 63,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 68,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: Shopify (High confidence, 95%); console errors: 3; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 72,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 2 supported marketing tools: Google Analytics / GA4, Meta Pixel. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 5 visible links and about 2306 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Trim first-screen mobile copy and promotional text; this scan counted about 2306 visible text characters before scroll."
       }
     ],
     "status": "success",
@@ -737,6 +1113,22 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 3 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)",
+      "Weak signal: generic cart or checkout wording (\\/cart\\/|\\/checkout\\/)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
@@ -744,60 +1136,96 @@
       "Meta Pixel",
       "Klaviyo"
     ],
-    "overallScore": 62,
+    "overallScore": 75,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 60,
+        "status": "High Priority",
+        "statusDetail": "Product Discovery Clarity Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Product Discovery Clarity Needs Review; mobile CTA above fold: yes; search visible: no; first-screen links: 6; first-screen text estimate: 2033 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 62,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 74,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 1; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 79,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 4 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel, Klaviyo. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 85,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Product Discovery Clarity Needs Review",
+        "riskLabel": "Product Discovery Clarity Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Customers may need too many steps to find products, categories, or collections from the first storefront experience.",
+        "evidenceSummary": "Product/category navigation: visible; collection/product links: not visible.",
+        "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 6 visible links and about 2033 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 6 links and about 2033 text characters before scroll."
       },
       {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Store Search Visibility Needs Review",
+        "riskLabel": "Store Search Visibility Needs Review",
+        "severity": "Medium",
+        "confidence": "Moderate",
+        "explanation": "Store search does not appear prominently in the visible navigation, which may slow product discovery for catalog-heavy stores.",
+        "evidenceSummary": "No visible search input or search-labeled navigation item was detected in the public page sample.",
+        "recommendedFirstAction": "Expose search in the desktop header and mobile menu, then confirm it returns useful product and category results."
       }
     ],
     "status": "success",
@@ -809,66 +1237,118 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 3 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)",
+      "Weak signal: generic cart or checkout wording (\\/cart\\/|\\/checkout\\/)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager",
       "Meta Pixel"
     ],
-    "overallScore": 62,
+    "overallScore": 69,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 66,
+        "status": "Needs Review",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 2; first-screen text estimate: 731 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 58,
+        "status": "High Priority",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: shipping or returns, warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 63,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 68,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 3; failed requests: 4.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 3 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 74,
+        "status": "Needs Review",
+        "statusDetail": "Order and Returns Communication Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: not visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Mobile CTA Visibility Needs Review",
+        "riskLabel": "Mobile CTA Visibility Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
+        "evidenceSummary": "No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: Add to Cart, Add to Cart, Add to Cart, Add to Cart; mobile first-screen links: 2.",
+        "recommendedFirstAction": "Reuse the strongest existing CTA (Add to Cart or Add to Cart) inside the first mobile viewport and make it visually distinct from secondary links."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+        "title": "Product Discovery Clarity Needs Review",
+        "riskLabel": "Product Discovery Clarity Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Customers may need too many steps to find products, categories, or collections from the first storefront experience.",
+        "evidenceSummary": "Product/category navigation: visible; collection/product links: not visible.",
+        "recommendedFirstAction": "Add collection or product links in the early browsing path so category intent does not depend only on generic navigation."
       },
       {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Order and Returns Communication Needs Review",
+        "riskLabel": "Order and Returns Communication Needs Review",
+        "severity": "Medium",
+        "confidence": "Moderate",
+        "explanation": "Clear order, delivery, and returns communication reduces support load and post-purchase uncertainty.",
+        "evidenceSummary": "No strong order status, delivery, shipping, return, exchange, or refund language was detected.",
+        "recommendedFirstAction": "Surface order status, delivery, shipping, return, exchange, or refund information before checkout."
       }
     ],
     "status": "success",
@@ -880,65 +1360,93 @@
     "expectedPlatform": "Magento / Adobe Commerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 88,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce asset or domain reference (bigcommerce\\.com).",
+    "platformEvidence": [
+      "Signal count: 3 strong and 2 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "no",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager"
     ],
-    "overallScore": 64,
+    "overallScore": 76,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 76,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 4; first-screen text estimate: 4343 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 69,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 69,
-        "status": "Needs Review"
+        "label": "Technical",
+        "score": 75,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 88%); console errors: 1; failed requests: 3.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 56,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 75,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 2 supported marketing tools: Google Analytics / GA4, Google Tag Manager. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 4 visible links and about 4343 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Trim first-screen mobile copy and promotional text; this scan counted about 4343 visible text characters before scroll."
       }
     ],
     "status": "success",
@@ -950,6 +1458,22 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 3 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)",
+      "Weak signal: generic cart or checkout wording (\\/cart\\/|\\/checkout\\/)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
@@ -958,60 +1482,87 @@
       "Klaviyo",
       "Mailchimp"
     ],
-    "overallScore": 63,
+    "overallScore": 73,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 63,
+        "status": "High Priority",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 6; first-screen text estimate: 3452 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 60,
+        "status": "High Priority",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: no.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 66,
-        "status": "Needs Review"
+        "label": "Technical",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Failed Frontend Requests Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 0; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 54,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 80,
+        "status": "Healthy",
+        "statusDetail": "Tracking Visibility Looks Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 5 supported marketing tools: Google Analytics / GA4, Google Tag Manager, Meta Pixel, Klaviyo, Mailchimp. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Mobile CTA Visibility Needs Review",
+        "riskLabel": "Mobile CTA Visibility Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
+        "evidenceSummary": "No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: Contact Revolution, LEARN MORE, LEARN MORE, LOG IN + LEARN MORE; mobile first-screen links: 6.",
+        "recommendedFirstAction": "Reuse the strongest existing CTA (Contact Revolution or LEARN MORE) inside the first mobile viewport and make it visually distinct from secondary links."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 6 visible links and about 3452 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Trim first-screen mobile copy and promotional text; this scan counted about 3452 visible text characters before scroll."
       }
     ],
     "status": "success",
@@ -1023,6 +1574,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -1037,65 +1591,116 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 2 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager"
     ],
-    "overallScore": 65,
+    "overallScore": 80,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 85,
+        "status": "Healthy",
+        "statusDetail": "Mobile Journey Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile CTA above fold: yes; search visible: yes; first-screen links: 7; generic navigation cues: 3.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Conversion Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "4 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "Technical",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Failed Frontend Requests Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 0; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 58,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 75,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 2 supported marketing tools: Google Analytics / GA4, Google Tag Manager. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
+        "title": "Manual Journey Review",
+        "riskLabel": "Tracking Evidence Needs Manual Confirmation",
         "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
+        "confidence": "Needs Review",
+        "explanation": "No high-impact public-page heuristic finding was detected, so this area should be manually confirmed in context.",
+        "evidenceSummary": "The lightweight scan did not find a specific issue with enough evidence to escalate.",
+        "recommendedFirstAction": "Walk the visible customer journey from homepage to product discovery, cart or lead path, and support before making platform-specific recommendations."
       },
       {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Manual Journey Review",
+        "riskLabel": "Conversion Evidence Needs Manual Confirmation",
+        "severity": "Needs Review",
+        "confidence": "Needs Review",
+        "explanation": "No high-impact public-page heuristic finding was detected, so this area should be manually confirmed in context.",
+        "evidenceSummary": "The lightweight scan did not find a specific issue with enough evidence to escalate.",
+        "recommendedFirstAction": "Walk the visible customer journey from homepage to product discovery, cart or lead path, and support before making platform-specific recommendations."
+      },
+      {
+        "title": "Manual Journey Review",
+        "riskLabel": "Technical Signal Evidence Needs Manual Confirmation",
+        "severity": "Needs Review",
+        "confidence": "Needs Review",
+        "explanation": "No high-impact public-page heuristic finding was detected, so this area should be manually confirmed in context.",
+        "evidenceSummary": "The lightweight scan did not find a specific issue with enough evidence to escalate.",
+        "recommendedFirstAction": "Walk the visible customer journey from homepage to product discovery, cart or lead path, and support before making platform-specific recommendations."
       }
     ],
     "status": "success",
@@ -1107,65 +1712,99 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Shopify",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected Shopify with high confidence because platform-specific evidence was visible: Shopify CDN assets (cdn\\.shopify\\.com); Shopify frontend objects or analytics (\\bShopify\\b); Shopify frontend objects or analytics (Shopify\\.theme).",
+    "platformEvidence": [
+      "Signal count: 6 strong and 5 weak Shopify indicators.",
+      "Strong signal: Shopify CDN assets (cdn\\.shopify\\.com)",
+      "Strong signal: Shopify frontend objects or analytics (\\bShopify\\b)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.theme)",
+      "Strong signal: Shopify frontend objects or analytics (Shopify\\.routes)",
+      "Strong signal: Shopify frontend objects or analytics (ShopifyAnalytics)",
+      "Strong signal: myshopify.com domain reference (myshopify\\.com)",
+      "Weak signal: generic product or collection URL pattern (\\/products\\/)",
+      "Weak signal: generic product or collection URL pattern (\\/collections\\/)",
+      "Weak signal: generic cart or checkout wording (\\/cart(?:\\.js)?)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "no",
     "marketingTools": [
       "Google Analytics / GA4",
       "Klaviyo"
     ],
-    "overallScore": 62,
+    "overallScore": 76,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 5; first-screen text estimate: 1822 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 78,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 62,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 67,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: Shopify (High confidence, 95%); console errors: 4; failed requests: 6.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 71,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 2 supported marketing tools: Google Analytics / GA4, Klaviyo. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 5 visible links and about 1822 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 5 links and about 1822 text characters before scroll."
       }
     ],
     "status": "success",
@@ -1177,6 +1816,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -1191,65 +1833,107 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 2 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "yes",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager"
     ],
-    "overallScore": 62,
+    "overallScore": 71,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 64,
+        "status": "High Priority",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as high-priority because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile CTA Visibility Needs Review; mobile CTA above fold: no; search visible: yes; first-screen links: 12; first-screen text estimate: 3043 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 69,
+        "status": "Needs Review",
+        "statusDetail": "Mobile CTA Visibility Needs Review",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "5 of 6 trust-signal groups were visible; missing or weak groups: warranty or guarantee; mobile CTA above fold: no.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 62,
-        "status": "High Priority"
+        "label": "Technical",
+        "score": 67,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 4; failed requests: 5.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 52,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 71,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 2 supported marketing tools: Google Analytics / GA4, Google Tag Manager. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
+        "title": "Mobile CTA Visibility Needs Review",
+        "riskLabel": "Mobile CTA Visibility Needs Review",
+        "severity": "High",
+        "confidence": "Moderate",
+        "explanation": "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
+        "evidenceSummary": "No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: Melbourne Demons NB 26 Adult Home Guernsey, Add to Cart, Melbourne Demons NB 26 Player Run Out Tee, Add to Cart; mobile first-screen links: 12.",
+        "recommendedFirstAction": "Reuse the strongest existing CTA (Melbourne Demons NB 26 Adult Home Guernsey or Add to Cart) inside the first mobile viewport and make it visually distinct from secondary links."
       },
       {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 12 visible links and about 3043 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Trim first-screen mobile copy and promotional text; this scan counted about 3043 visible text characters before scroll."
       }
     ],
     "status": "success",
@@ -1261,65 +1945,98 @@
     "expectedPlatform": "Magento / Adobe Commerce",
     "detectedPlatform": "BigCommerce",
     "confidence": 95,
+    "platformConfidenceLabel": "High confidence",
+    "platformExplanation": "Detected BigCommerce with high confidence because platform-specific evidence was visible: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com); BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com); BigCommerce storefront data or stencil signal (\\bbcData\\b).",
+    "platformEvidence": [
+      "Signal count: 8 strong and 2 weak BigCommerce indicators.",
+      "Strong signal: BigCommerce asset or domain reference (cdn11\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce asset or domain reference (cdn\\d*\\.bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bbcData\\b)",
+      "Strong signal: BigCommerce asset or domain reference (bigcommerce\\.com)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bStencil\\b)",
+      "Strong signal: BigCommerce storefront data or stencil signal (\\bstencil\\b)",
+      "Strong signal: BigCommerce cart or checkout endpoint (cart\\.php)",
+      "Strong signal: BigCommerce cart or checkout endpoint (checkout\\.php)",
+      "Weak signal: generic cart or checkout wording (\\bcheckout\\b)",
+      "Weak signal: generic cart or checkout wording (\\bcart\\b)"
+    ],
     "platformMatch": "no",
     "marketingTools": [
       "Google Analytics / GA4",
       "Google Tag Manager"
     ],
-    "overallScore": 64,
+    "overallScore": 76,
     "categoryScores": [
       {
         "key": "uxUiIssues",
-        "label": "UX/UI Issues",
-        "score": 72,
-        "status": "Needs Review"
+        "label": "UX/UI",
+        "score": 77,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review because mobile CTA, navigation, search, and first-screen density signals were evaluated together.",
+          "evidenceInfluenced": "Mobile Readability May Be Crowded; mobile CTA above fold: yes; search visible: yes; first-screen links: 8; first-screen text estimate: 1161 characters.",
+          "whatWouldImprove": "A clearer first-screen CTA, lighter mobile header density, visible search, and clearer product/category paths would raise this score."
+        }
       },
       {
         "key": "conversionIssues",
-        "label": "Conversion Issues",
-        "score": 64,
-        "status": "High Priority"
+        "label": "Conversion",
+        "score": 69,
+        "status": "Needs Review",
+        "statusDetail": "Mobile Readability May Be Crowded",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review based on visible reassurance, CTA clarity, and purchase-confidence cues.",
+          "evidenceInfluenced": "3 of 6 trust-signal groups were visible; missing or weak groups: reviews or testimonials, warranty or guarantee, secure payment cues; mobile CTA above fold: yes.",
+          "whatWouldImprove": "More visible reviews, shipping/returns clarity, payment reassurance, support, and policy cues near product decisions would improve it."
+        }
       },
       {
         "key": "technicalIssues",
-        "label": "Technical Issues",
-        "score": 68,
-        "status": "Needs Review"
+        "label": "Technical",
+        "score": 74,
+        "status": "Needs Review",
+        "statusDetail": "Frontend Console Issues Observed",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from platform confidence, metadata, console errors, and failed request evidence.",
+          "evidenceInfluenced": "Platform: BigCommerce (High confidence, 95%); console errors: 2; failed requests: 2.",
+          "whatWouldImprove": "Clearer platform evidence, clean metadata, fewer console errors, and fewer failed frontend requests would improve this score."
+        }
       },
       {
         "key": "trackingIssues",
-        "label": "Tracking Issues",
-        "score": 54,
-        "status": "High Priority"
+        "label": "Tracking",
+        "score": 75,
+        "status": "Needs Review",
+        "statusDetail": "Tracking Evidence Needs Confirmation",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as needs-review from visible analytics, tag manager, pixel, and email/lead-capture signals.",
+          "evidenceInfluenced": "Detected 2 supported marketing tools: Google Analytics / GA4, Google Tag Manager. Lead capture visible: yes.",
+          "whatWouldImprove": "Visible GA4/GTM, ad pixels, email capture, and confirmed conversion events across the buying path would improve this score."
+        }
       },
       {
         "key": "operationsIssues",
-        "label": "Ecommerce Operations Issues",
-        "score": 61,
-        "status": "High Priority"
+        "label": "Ecommerce Operations",
+        "score": 86,
+        "status": "Healthy",
+        "statusDetail": "Commerce Operations Signals Look Stable",
+        "scoreExplanation": {
+          "whyAssigned": "Assigned as healthy from cart, checkout, support, returns, and order communication visibility.",
+          "evidenceInfluenced": "Cart: visible; checkout: visible; support/contact: visible; order/returns language: visible.",
+          "whatWouldImprove": "Clear cart and checkout entry points, visible support, and accessible shipping, returns, and order-status communication would improve it."
+        }
       }
     ],
     "topPriorityIssues": [
       {
-        "title": "Highest Revenue Risk",
-        "riskLabel": "Checkout/cart path should be reviewed",
-        "severity": "High Priority",
-        "explanation": "Checkout/cart path should be reviewed for friction and clarity.",
-        "recommendedFirstAction": "Review the primary offer, CTA path, trust signals, and checkout or inquiry steps first."
-      },
-      {
-        "title": "Highest UX Friction",
-        "riskLabel": "Mobile conversion path should be reviewed",
-        "severity": "Needs Review",
-        "explanation": "Weak CTA visibility on key entry pages may reduce the number of visitors who take the next step.",
-        "recommendedFirstAction": "Check the mobile path, navigation clarity, and above-the-fold decision support."
-      },
-      {
-        "title": "Highest Operational Friction",
-        "riskLabel": "Backend/operations workflow should be mapped",
-        "severity": "High Priority",
-        "explanation": "Backend/operations workflow should be mapped to reduce manual order handling and support handoffs.",
-        "recommendedFirstAction": "Map order handling, support routing, backend handoffs, and team notifications."
+        "title": "Mobile Readability May Be Crowded",
+        "riskLabel": "Mobile Readability May Be Crowded",
+        "severity": "Medium",
+        "confidence": "Needs Review",
+        "explanation": "Dense first-screen content can make the primary action compete with navigation, promotional copy, or secondary links.",
+        "evidenceSummary": "The mobile first viewport showed 8 visible links and about 1161 visible text characters, which triggered a crowding risk.",
+        "recommendedFirstAction": "Rebalance the first mobile viewport around one primary action; this scan saw 8 links and about 1161 text characters before scroll."
       }
     ],
     "status": "success",
@@ -1331,6 +2048,9 @@
     "expectedPlatform": "BigCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -1345,6 +2065,9 @@
     "expectedPlatform": "Salesforce Commerce Cloud",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,
@@ -1359,6 +2082,9 @@
     "expectedPlatform": "WooCommerce",
     "detectedPlatform": "Unknown",
     "confidence": 0,
+    "platformConfidenceLabel": "Unknown",
+    "platformExplanation": null,
+    "platformEvidence": [],
     "platformMatch": "unknown",
     "marketingTools": [],
     "overallScore": null,

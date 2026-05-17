@@ -6,7 +6,9 @@ const sitesFile = path.join(root, "scanner-validation-sites.json");
 const resultsFile = path.join(root, "scanner-validation-results.json");
 const reportFile = path.join(root, "scanner-validation-results.md");
 const summaryFile = path.join(root, "scanner-validation-round-1.md");
-const apiUrl = "http://localhost:3000/api/ecommerce-audit-scanner";
+const apiUrl =
+  process.env.SCANNER_VALIDATION_API_URL ??
+  "http://localhost:3000/api/ecommerce-audit-scanner";
 
 const expectedPlatformMap = {
   shopify: "Shopify",
@@ -15,6 +17,7 @@ const expectedPlatformMap = {
   magento: "Magento / Adobe Commerce",
   "magento / adobe commerce": "Magento / Adobe Commerce",
   "salesforce commerce cloud": "Salesforce Commerce Cloud",
+  "needs manual review": "Needs Manual Review",
   unknown: "Unknown",
 };
 
@@ -30,6 +33,10 @@ function platformMatches(expected, detected) {
 
   if (normalizedExpected === "Unknown") {
     return normalizedDetected === "Unknown" ? "yes" : "unknown";
+  }
+
+  if (normalizedDetected === "Needs Manual Review") {
+    return "unknown";
   }
 
   if (normalizedDetected === "Unknown") {
@@ -66,6 +73,8 @@ function categoryScores(categories) {
     label: category.label,
     score: category.score,
     status: category.status,
+    statusDetail: category.statusDetail,
+    scoreExplanation: category.scoreExplanation,
   }));
 }
 
@@ -74,7 +83,9 @@ function topPriorityIssues(topPriorityRisks) {
     title: risk.title,
     riskLabel: risk.riskLabel,
     severity: risk.severity,
+    confidence: risk.confidence,
     explanation: risk.explanation,
+    evidenceSummary: risk.evidenceSummary,
     recommendedFirstAction: risk.recommendedFirstAction,
   }));
 }
@@ -96,6 +107,9 @@ async function runValidation() {
       expectedPlatform: normalizePlatform(site.expectedPlatform),
       detectedPlatform: "Unknown",
       confidence: 0,
+      platformConfidenceLabel: "Unknown",
+      platformExplanation: null,
+      platformEvidence: [],
       platformMatch: "unknown",
       marketingTools: [],
       overallScore: null,
@@ -119,6 +133,9 @@ async function runValidation() {
         const audit = body.audit;
         item.detectedPlatform = audit.diagnostics.platformDetection.name;
         item.confidence = audit.diagnostics.platformDetection.confidence;
+        item.platformConfidenceLabel = audit.diagnostics.platformDetection.confidenceLabel;
+        item.platformExplanation = audit.diagnostics.platformDetection.explanation ?? null;
+        item.platformEvidence = audit.diagnostics.platformDetection.details ?? [];
         item.platformMatch = platformMatches(item.expectedPlatform, item.detectedPlatform);
         item.marketingTools = detectedMarketingTools(audit.diagnostics.technologyDetections);
         item.overallScore = audit.overallScore;
@@ -131,7 +148,7 @@ async function runValidation() {
     }
 
     results.push(item);
-    await wait(2500 + Math.floor(Math.random() * 2000));
+    await wait(3000);
   }
 
   await fs.writeFile(resultsFile, JSON.stringify(results, null, 2), "utf8");
