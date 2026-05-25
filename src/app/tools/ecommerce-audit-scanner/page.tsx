@@ -2,7 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import Button from "@/components/Button";
+import PostScanAssistant from "@/components/PostScanAssistant";
 import Section from "@/components/Section";
+import { sanitizeEvidenceText, summarizeCtaLabels } from "@/lib/evidence-cleanup";
 import {
   BarChart3,
   ChevronDown,
@@ -396,10 +398,24 @@ function scoreMainEvidence(category: AuditCategory) {
   const evidence = category.scoreExplanation?.evidenceInfluenced;
 
   if (!evidence) {
-    return category.issues[0] ?? "No high-impact public-page issue detected.";
+    return sanitizeEvidenceText(
+      category.issues[0] ?? "No high-impact public-page issue detected.",
+    );
   }
 
-  return evidence.split(";")[0] ?? evidence;
+  return sanitizeEvidenceText(evidence.split(";")[0] ?? evidence);
+}
+
+function parseExecutiveOpportunity(opportunity: string) {
+  const [rawTitle, ...rawRest] = opportunity.split(":");
+  const rest = rawRest.join(":").trim();
+  const [rawEvidence, rawAction] = rest.split(/First action:/i);
+
+  return {
+    title: rawTitle.trim() || "Review opportunity",
+    evidence: sanitizeEvidenceText(rawEvidence || rest, { maxLength: 130 }),
+    action: sanitizeEvidenceText(rawAction, { maxLength: 140 }),
+  };
 }
 
 function primaryOperationalConcern(audit: AuditResult): OperationalConcernView {
@@ -713,15 +729,32 @@ export default function EcommerceAuditScannerPage() {
                     </p>
                     <div className="mt-4 space-y-3">
                       {audit.executiveSummary.highestImpactOpportunities.slice(0, 3).map(
-                        (opportunity) => (
-                          <div
-                            key={opportunity}
-                            className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-sm leading-6 text-secondary"
-                          >
-                            <Target className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
-                            <span>{opportunity}</span>
-                          </div>
-                        ),
+                        (opportunity) => {
+                          const parsedOpportunity =
+                            parseExecutiveOpportunity(opportunity);
+
+                          return (
+                            <div
+                              key={opportunity}
+                              className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-3 text-sm leading-6 text-secondary"
+                            >
+                              <Target className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
+                              <div className="min-w-0 space-y-2">
+                                <p className="font-bold leading-snug text-primary">
+                                  {parsedOpportunity.title}
+                                </p>
+                                {parsedOpportunity.evidence ? (
+                                  <p>{parsedOpportunity.evidence}</p>
+                                ) : null}
+                                {parsedOpportunity.action ? (
+                                  <p className="font-semibold text-brand-cyan">
+                                    First action: {parsedOpportunity.action}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        },
                       )}
                     </div>
                   </div>
@@ -821,7 +854,9 @@ export default function EcommerceAuditScannerPage() {
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-secondary">
-                          {risk.evidenceSummary ?? risk.explanation}
+                          {sanitizeEvidenceText(
+                            risk.evidenceSummary ?? risk.explanation,
+                          )}
                         </p>
                       </div>
                     ))}
@@ -860,7 +895,7 @@ export default function EcommerceAuditScannerPage() {
                               Evidence
                             </p>
                             <p className="mt-1 text-sm leading-6 text-secondary">
-                              {step.evidenceClue}
+                              {sanitizeEvidenceText(step.evidenceClue)}
                             </p>
                           </div>
                         )}
@@ -869,7 +904,7 @@ export default function EcommerceAuditScannerPage() {
                             Impact
                           </p>
                           <p className="mt-1 text-sm leading-6 text-muted">
-                            {step.why}
+                            {sanitizeEvidenceText(step.why, { maxLength: 180 })}
                           </p>
                         </div>
                         {step.title && (
@@ -878,7 +913,9 @@ export default function EcommerceAuditScannerPage() {
                               First action
                             </p>
                             <p className="mt-1 text-sm font-semibold leading-6 text-primary">
-                              {step.action}
+                              {sanitizeEvidenceText(step.action, {
+                                maxLength: 180,
+                              })}
                             </p>
                           </div>
                         )}
@@ -887,6 +924,8 @@ export default function EcommerceAuditScannerPage() {
                   ))}
                 </div>
               </div>
+
+              <PostScanAssistant audit={audit} />
 
               <div className="card-elevated p-6 md:p-8">
                 <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -1152,7 +1191,7 @@ export default function EcommerceAuditScannerPage() {
                             <p>
                               CTA labels:{" "}
                               {commerce.ctaLabels.length > 0
-                                ? commerce.ctaLabels.join(", ")
+                                ? summarizeCtaLabels(commerce.ctaLabels)
                                 : "No strong CTA labels were found in the visible page sample."}
                             </p>
                           </div>
@@ -1714,7 +1753,7 @@ export default function EcommerceAuditScannerPage() {
                             <p>
                               CTA labels:{" "}
                               {commerce.ctaLabels.length > 0
-                                ? commerce.ctaLabels.join(", ")
+                                ? summarizeCtaLabels(commerce.ctaLabels)
                                 : "No strong CTA labels were found in the visible page sample."}
                             </p>
                           </div>
@@ -1884,7 +1923,7 @@ export default function EcommerceAuditScannerPage() {
                                   Evidence
                                 </p>
                                 <p className="mt-2 text-sm leading-6 text-secondary">
-                                  {finding.evidenceSummary}
+                                  {sanitizeEvidenceText(finding.evidenceSummary)}
                                 </p>
                               </div>
 

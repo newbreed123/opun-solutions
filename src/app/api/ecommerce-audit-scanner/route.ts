@@ -14,6 +14,11 @@ import {
   runLightweightEcommerceDiagnostics,
   type LiveDiagnosticsResult,
 } from "@/lib/ecommerce-audit-scanner";
+import {
+  buildExecutiveOpportunityText,
+  sanitizeEvidenceText,
+  summarizeCtaLabels,
+} from "@/lib/evidence-cleanup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -328,7 +333,9 @@ function categoryStatusDetailFallback(
 }
 
 function mobileCtaFirstAction(diagnostics: LiveDiagnosticsResult) {
-  const labels = diagnostics.commerceFlowSignals.ctaLabels.slice(0, 2);
+  const labels = diagnostics.commerceFlowSignals.ctaLabels
+    .filter((label, index, labels) => labels.indexOf(label) === index)
+    .slice(0, 2);
 
   if (labels.length > 0) {
     return `Reuse the strongest existing CTA (${labels.join(" or ")}) inside the first mobile viewport and make it visually distinct from secondary links.`;
@@ -388,7 +395,15 @@ function buildHeuristicFindings(
   const marketingTools = visibleMarketingTools(diagnostics);
   const trustSignalsVisible = trustSignalCount(diagnostics);
 
-  const addFinding = (finding: HeuristicFinding) => findings.push(finding);
+  const addFinding = (finding: HeuristicFinding) =>
+    findings.push({
+      ...finding,
+      evidenceSummary: sanitizeEvidenceText(finding.evidenceSummary),
+      recommendedFirstAction: sanitizeEvidenceText(
+        finding.recommendedFirstAction,
+        { maxLength: 220 },
+      ),
+    });
 
   if (!signals.mobileCtaVisibleAboveFold) {
     addFinding({
@@ -402,7 +417,7 @@ function buildHeuristicFindings(
         "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
       recommendedFirstAction: mobileCtaFirstAction(diagnostics),
       evidenceSummary:
-        `No strong CTA was detected in the first mobile viewport. Desktop CTA labels sampled: ${visibleEvidenceList(commerce.ctaLabels.slice(0, 4))}; mobile first-screen links: ${signals.mobileAboveFoldLinkCount}.`,
+        `No strong CTA was detected in the first mobile viewport. ${summarizeCtaLabels(commerce.ctaLabels)} Mobile first-screen links: ${signals.mobileAboveFoldLinkCount}.`,
     });
   }
 
@@ -876,7 +891,11 @@ function buildExecutiveSummary({
       highestImpactFindings.length > 0
         ? highestImpactFindings.map(
             (finding) =>
-              `${finding.title}: ${finding.evidenceSummary} ${finding.businessImpact} First action: ${finding.recommendedFirstAction}`,
+              buildExecutiveOpportunityText({
+                title: finding.title,
+                evidence: finding.evidenceSummary,
+                action: finding.recommendedFirstAction,
+              }),
           )
         : categories
             .slice()
@@ -1024,11 +1043,16 @@ function buildPrimaryOperationalConcern(
     severity: leadFinding.severity,
     confidence: leadFinding.confidence,
     explanation: `${concernInsight} Supporting findings: ${relatedPhrase}. Addressing this first should clarify the customer journey before lower-impact refinements are prioritized.`,
-    evidenceSummary: supportingFindings
-      .map((finding) => finding.evidenceSummary)
-      .slice(0, 2)
-      .join(" "),
-    recommendedFirstAction: `${leadFinding.recommendedFirstAction} Then confirm the related ${relatedTitles.length > 1 ? "signals" : "signal"} in the same journey walkthrough.`,
+    evidenceSummary: sanitizeEvidenceText(
+      supportingFindings
+        .map((finding) => finding.evidenceSummary)
+        .slice(0, 2)
+        .join(" "),
+    ),
+    recommendedFirstAction: sanitizeEvidenceText(
+      `${leadFinding.recommendedFirstAction} Then confirm the related ${relatedTitles.length > 1 ? "signals" : "signal"} in the same journey walkthrough.`,
+      { maxLength: 240 },
+    ),
     supportingFindings: relatedTitles,
   };
 }
@@ -1260,7 +1284,7 @@ function buildBenchmarkContext(
     addNote({
       message:
         "The primary action appears less visible than strong internal examples where the next step is clear early.",
-      evidence: `Mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}; detected CTA labels: ${visibleEvidenceList(commerce.ctaLabels.slice(0, 4))}.`,
+      evidence: `Mobile CTA above fold: ${signals.mobileCtaVisibleAboveFold ? "yes" : "no"}; ${summarizeCtaLabels(commerce.ctaLabels)}`,
       tags: ["weak-cta-visibility"],
       tone: "negative",
     });
