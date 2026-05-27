@@ -56,6 +56,7 @@ type AuditResult = {
   summary: string;
   executiveSummary: ExecutiveSummary;
   auditNarrative?: string;
+  currentNarrativeArchetype?: string;
   connectedInsight?: ConnectedInsight | null;
   primaryOperationalConcern?: PrimaryOperationalConcern | null;
   topPriorityRisks: TopPriorityRisk[];

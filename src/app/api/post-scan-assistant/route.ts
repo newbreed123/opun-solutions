@@ -54,6 +54,7 @@ You should:
 - explain findings in plain English
 - sound like an experienced ecommerce operator reviewing the scan live
 - use short natural paragraphs, not diagnostic field dumps
+- use scanContext.currentNarrativeArchetype as the dominant framing when it is present, especially for technical-risk, trust-deficit, discovery-breakdown, conversion-friction, and operational-clarity
 - use phrases like "What stands out to me is", "If I were reviewing this manually", and "The bigger concern is" when they fit naturally
 - preserve priority and severity; high-priority and critical findings should still sound important without sounding alarmist
 - connect findings to conversion, trust, tracking, operations, or the customer journey
@@ -517,6 +518,40 @@ function consultantMeaning(value: string) {
 
   return `This usually matters because ${clean.charAt(0).toLowerCase()}${clean.slice(1)}`;
 }
+
+function currentArchetype(scanContext: Record<string, unknown>) {
+  return asString(scanContext.currentNarrativeArchetype);
+}
+
+function archetypeFrame(scanContext: Record<string, unknown>) {
+  const archetype = currentArchetype(scanContext);
+
+  if (archetype === "technical-risk") {
+    return "That matches the report's technical-risk framing, so platform confidence, storefront stability, script execution, and measurement confidence should stay central.";
+  }
+
+  if (archetype === "trust-deficit") {
+    return "That matches the report's trust-deficit framing, so reassurance, purchase confidence, and buying comfort should stay central.";
+  }
+
+  if (archetype === "discovery-breakdown") {
+    return "That matches the report's discovery-breakdown framing, so product intent, navigation clarity, search visibility, and category flow should stay central.";
+  }
+
+  if (archetype === "conversion-friction" || archetype === "mobile-clarity-risk" || archetype === "checkout-continuity-risk") {
+    return "That matches the report's conversion-friction framing, so action path, CTA hierarchy, checkout readiness, and purchase momentum should stay central.";
+  }
+
+  if (archetype === "operational-clarity") {
+    return "That matches the report's operational-clarity framing, so order communication, support handoff, returns clarity, and fulfillment expectations should stay central.";
+  }
+
+  if (archetype === "measurement-confidence-gap") {
+    return "That matches the report's measurement-confidence framing, so tracking visibility, attribution evidence, and signal trust should stay central.";
+  }
+
+  return "";
+}
 function formatExactAnswer(answer: ExactAnswer) {
   return buildConsultantResponse(answer);
 }
@@ -691,7 +726,7 @@ function buildFindingsAnswer(
     } in this area, and this ${priority.phrase}.`,
     evidence: `${findingEvidence(topFinding)} Related ${label} findings to keep nearby: ${titles}.`,
     businessMeaning:
-      `${priority.sentence} ${
+      `${archetypeFrame(scanContext)} ${priority.sentence} ${
         asString(topFinding.explanation) ||
         "This area can influence how clearly shoppers understand the journey and move toward purchase."
       }`,
@@ -881,7 +916,7 @@ function technicalExactAnswer(scanContext: Record<string, unknown>): ExactAnswer
       ? findingEvidence(finding)
       : "The scan only uses public storefront signals, so I would verify these in a browser and platform-aware walkthrough.",
     businessMeaning:
-      `${priority.sentence} This is worth prioritizing because technical uncertainty can affect how confidently the team interprets checkout, tracking, and storefront-structure recommendations.`,
+      `${archetypeFrame(scanContext)} ${priority.sentence} This is worth prioritizing because technical uncertainty can affect how confidently the team interprets checkout, tracking, and storefront-structure recommendations.`,
     suggestedFollowUp:
       "Do you want me to compare the technical signals with tracking visibility?",
     severity: classifyTechnicalSeverity(scanContext),
@@ -930,7 +965,7 @@ function ctaExactAnswer(
     )}, but the action path may still need a clearer hierarchy.`,
     evidence,
     businessMeaning:
-      `${priority.sentence} Shoppers can see an action, but the bigger concern is whether the primary next step is obvious enough on a small screen.`,
+      `${archetypeFrame(scanContext)} ${priority.sentence} Shoppers can see an action, but the bigger concern is whether the primary next step is obvious enough on a small screen.`,
     suggestedFollowUp: actionText
       ? `Do you want me to walk through the first action: ${sanitizeEvidenceText(actionText, { maxLength: 120 })}?`
       : "Do you want me to compare the CTA issue with the conversion findings?",
@@ -1041,8 +1076,11 @@ function getExactAnswer(
 
     const evidence = evidenceLines.join(" ");
 
-    const business =
-      "Failed requests and console errors can affect script execution, tracking, and storefront consistency. If I were reviewing this manually, I'd look at the platform signals and compare them with what you see in your dev tools.";
+    const technicalPriority =
+      classifyTechnicalSeverity(scanContext) === "High"
+        ? "I would treat this as a high-priority review item, not proof the store is broken."
+        : "I would treat this as a technical review item before making platform-specific recommendations.";
+    const business = `${archetypeFrame(scanContext)} ${technicalPriority} Failed requests and console errors can affect script execution, tracking, and storefront consistency. If I were reviewing this manually, I'd look at the platform signals and compare them with what you see in your dev tools.`;
 
     const suggested =
       "Want me to compare this with the tracking visibility findings?";
@@ -1375,7 +1413,7 @@ function getExactAnswer(
         asString(action.evidenceClue) ||
         "The scan ranked this as the clearest next review area.",
       businessMeaning:
-        `${priority.sentence} ${
+        `${archetypeFrame(scanContext)} ${priority.sentence} ${
           asString(primary.explanation) ||
           asString(action.why) ||
           "Starting here keeps the review focused on the highest-friction part of the customer journey."
@@ -1409,7 +1447,7 @@ function getExactAnswer(
         asString(primary.evidenceSummary) ||
         "The scan included this as the primary operational concern.",
       businessMeaning:
-        `${asString(primary.explanation) ||
+        `${archetypeFrame(scanContext)} ${asString(primary.explanation) ||
           "This is the finding the scan suggests reviewing before broader optimization work."}`,
       suggestedFollowUp:
         "Do you want me to show what Opun would review first from that concern?",

@@ -73,6 +73,7 @@ type AssistantAudit = {
   overallScore: number;
   overallStatus: string;
   auditNarrative?: string;
+  currentNarrativeArchetype?: string;
   executiveSummary: {
     summary: string;
     businessInterpretation: string;
@@ -245,6 +246,7 @@ type AnswerSection = {
 type ScanContext = {
   score: number;
   status: string;
+  currentNarrativeArchetype?: string;
   platform: AssistantAudit["diagnostics"]["platformDetection"];
   trackingTools: AssistantAudit["diagnostics"]["technologyDetections"];
   benchmarkTags: string[];
@@ -612,6 +614,38 @@ function priorityTone(severity?: Severity) {
   };
 }
 
+function archetypeFrame(archetype?: string) {
+  if (archetype === "technical-risk") {
+    return "This matches the report's technical-risk framing, so platform confidence, storefront stability, script execution, and measurement confidence should stay central.";
+  }
+
+  if (archetype === "trust-deficit") {
+    return "This matches the report's trust-deficit framing, so reassurance, purchase confidence, and buying comfort should stay central.";
+  }
+
+  if (archetype === "discovery-breakdown") {
+    return "This matches the report's discovery-breakdown framing, so product intent, navigation clarity, search visibility, and category flow should stay central.";
+  }
+
+  if (
+    archetype === "conversion-friction" ||
+    archetype === "mobile-clarity-risk" ||
+    archetype === "checkout-continuity-risk"
+  ) {
+    return "This matches the report's conversion-friction framing, so action path, CTA hierarchy, checkout readiness, and purchase momentum should stay central.";
+  }
+
+  if (archetype === "operational-clarity") {
+    return "This matches the report's operational-clarity framing, so order communication, support handoff, returns clarity, and fulfillment expectations should stay central.";
+  }
+
+  if (archetype === "measurement-confidence-gap") {
+    return "This matches the report's measurement-confidence framing, so tracking visibility, attribution evidence, and signal trust should stay central.";
+  }
+
+  return "";
+}
+
 function allScanEvidence(audit: AssistantAudit) {
   return [
     audit.auditNarrative,
@@ -773,6 +807,7 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
   return {
     score: audit.overallScore,
     status: audit.overallStatus,
+    currentNarrativeArchetype: audit.currentNarrativeArchetype,
     platform: audit.diagnostics.platformDetection,
     trackingTools: audit.diagnostics.technologyDetections.filter(
       (tool) => tool.detected,
@@ -871,6 +906,7 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
     url: audit.website,
     score: context.score,
     status: context.status,
+    currentNarrativeArchetype: context.currentNarrativeArchetype,
     auditNarrative:
       context.auditNarrative ?? audit.executiveSummary.businessInterpretation,
     primaryOperationalConcern: context.primaryOperationalConcern,
@@ -1988,13 +2024,14 @@ function buildTopicResponse(
   const title = humanFindingTitle(finding, topic);
   const topicName = humanTopicName(topic);
   const priority = priorityTone(finding.severity);
+  const frame = archetypeFrame(audit.currentNarrativeArchetype);
 
   const paragraphs = [
     `What stands out to me in ${topicName} is ${title}. Based on the report priority, this ${priority.phrase}.`,
     finding.evidenceSummary
       ? `If I were reviewing this manually, I would use this as the first clue: ${finding.evidenceSummary}`
       : `The scan is pointing to this pattern: ${finding.explanation}`,
-    `${priority.sentence} The bigger concern is that ${finding.explanation} I would start here: ${
+    `${frame ? `${frame} ` : ""}${priority.sentence} The bigger concern is that ${finding.explanation} I would start here: ${
       finding.recommendedFirstAction ?? "Review the related storefront flow."
     }`,
     related.length > 0
@@ -2017,13 +2054,14 @@ function buildTechnicalResponse(audit: AssistantAudit): AssistantTurn {
   const summary = technicalSignalsSummary(audit);
   const priority = priorityTone(finding.severity);
   const title = humanFindingTitle(finding, "technical");
+  const frame = archetypeFrame(audit.currentNarrativeArchetype);
 
   return {
     message: buildMessage(
       `assistant-technical-${Date.now()}`,
       [
         `The main technical concern is ${title}. What stands out technically is that ${summary}.`,
-        `I would not treat this as proof the store is broken, but I would still treat it as ${priority.label === "High Priority" ? "a high-priority review item" : `something that ${priority.phrase}`} because technical uncertainty can affect checkout, tracking, and storefront-structure recommendations.`,
+        `${frame ? `${frame} ` : ""}I would not treat this as proof the store is broken, but I would still treat it as ${priority.label === "High Priority" ? "a high-priority review item" : `something that ${priority.phrase}`} because technical uncertainty can affect checkout, tracking, and storefront-structure recommendations.`,
         finding.evidenceSummary
           ? `The useful clue from the report is: ${finding.evidenceSummary}`
           : "If I were reviewing this manually, I would check the failed requests, platform signal, page templates, and tracking scripts in the browser first.",
@@ -2044,13 +2082,14 @@ function buildPriorityResponse(audit: AssistantAudit): AssistantTurn {
   const priorities = getTopActionItems(audit);
   const finding = getHighestImpactFinding(audit);
   const priority = priorityTone(finding.severity);
+  const frame = archetypeFrame(audit.currentNarrativeArchetype);
 
   return {
     message: buildMessage(
       `assistant-priority-${Date.now()}`,
       [
         `I would start with ${finding.title}, because it is the clearest operational signal in this scan and it ${priority.phrase}.`,
-        priority.sentence,
+        `${frame ? `${frame} ` : ""}${priority.sentence}`,
         finding.evidenceSummary
           ? `The practical clue is: ${finding.evidenceSummary}`
           : "The scan is pointing to this as the first area to validate before changing campaigns or tooling.",

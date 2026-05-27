@@ -212,6 +212,88 @@ function findingImpactScore(finding: HeuristicFinding) {
   return impactRank(finding.severity) * 10 + categoryWeight + confidenceRank(finding.confidence);
 }
 
+function archetypeTextForFinding(finding: HeuristicFinding) {
+  return [
+    finding.title,
+    finding.category,
+    finding.primaryCategory,
+    finding.secondaryCategories?.join(" "),
+    finding.evidenceSummary,
+    finding.businessImpact,
+    finding.recommendedFirstAction,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function calculateNarrativeWeight(
+  finding: HeuristicFinding,
+  archetype: NarrativeArchetype,
+) {
+  const affinity = archetypeAffinity[archetype] ?? archetypeAffinity["balanced-review"];
+  const text = archetypeTextForFinding(finding);
+  const severityScore = severityWeight(finding.severity) * 2.4;
+  const impactScore = findingImpactScore(finding);
+  const confidenceScore =
+    finding.confidence === "High"
+      ? 7
+      : finding.confidence === "Moderate"
+        ? 5
+        : finding.confidence === "Needs Review"
+          ? 4
+          : 1;
+  const categoryAffinity = affinity.findingCategories.includes(finding.category)
+    ? 24
+    : 0;
+  const ownerAffinity = affinity.primaryCategories.includes(finding.primaryCategory)
+    ? 18
+    : 0;
+  const secondaryAffinity = (finding.secondaryCategories ?? []).some((category) =>
+    affinity.primaryCategories.includes(category),
+  )
+    ? 8
+    : 0;
+  const keywordMatches = affinity.keywords.filter((keyword) =>
+    text.includes(keyword),
+  ).length;
+  const vocabularyMatches = affinity.vocabulary.filter((keyword) =>
+    text.includes(keyword.toLowerCase()),
+  ).length;
+  const businessImpactAffinity = affinity.keywords.some((keyword) =>
+    finding.businessImpact.toLowerCase().includes(keyword),
+  )
+    ? 8
+    : 0;
+
+  return (
+    severityScore +
+    impactScore +
+    confidenceScore +
+    categoryAffinity +
+    ownerAffinity +
+    secondaryAffinity +
+    keywordMatches * 4 +
+    vocabularyMatches * 3 +
+    businessImpactAffinity
+  );
+}
+
+function narrativeSortedFindings(
+  findings: HeuristicFinding[],
+  archetype: NarrativeArchetype,
+) {
+  return findings
+    .slice()
+    .sort(
+      (left, right) =>
+        calculateNarrativeWeight(right, archetype) -
+          calculateNarrativeWeight(left, archetype) ||
+        findingImpactScore(right) - findingImpactScore(left) ||
+        severityWeight(right.severity) - severityWeight(left.severity),
+    );
+}
+
 function findingInfluencesCategory(
   finding: HeuristicFinding,
   categoryKey: AuditCategoryKey,
@@ -852,6 +934,7 @@ type NarrativeArchetypeProfile = {
   archetype: NarrativeArchetype;
   concernOrder: string[];
   emphasis: string[];
+  vocabulary: string[];
   toneHints: {
     headline: string;
     interpretation: string;
@@ -865,6 +948,200 @@ type Interpretation = {
   operationalConcern: string;
   customerImpact: string;
   reviewDirection: string;
+};
+
+type ArchetypeAffinity = {
+  findingCategories: HeuristicCategory[];
+  primaryCategories: AuditCategoryKey[];
+  keywords: string[];
+  vocabulary: string[];
+};
+
+const archetypeAffinity: Record<NarrativeArchetype, ArchetypeAffinity> = {
+  "technical-risk": {
+    findingCategories: ["platformVisibility", "metadataClarity", "marketingVisibility"],
+    primaryCategories: ["technicalIssues", "trackingIssues"],
+    keywords: [
+      "platform",
+      "confidence",
+      "failed",
+      "request",
+      "console",
+      "diagnostic",
+      "frontend",
+      "reliability",
+      "stability",
+      "script",
+      "tracking",
+      "measurement",
+      "metadata",
+    ],
+    vocabulary: [
+      "operational reliability",
+      "platform confidence",
+      "script execution",
+      "storefront stability",
+      "implementation certainty",
+      "measurement confidence",
+    ],
+  },
+  "measurement-confidence-gap": {
+    findingCategories: ["marketingVisibility", "platformVisibility"],
+    primaryCategories: ["trackingIssues", "technicalIssues"],
+    keywords: [
+      "tracking",
+      "attribution",
+      "analytics",
+      "measurement",
+      "tag",
+      "pixel",
+      "conversion event",
+      "campaign",
+    ],
+    vocabulary: [
+      "measurement confidence",
+      "signal trust",
+      "attribution evidence",
+      "campaign visibility",
+      "conversion-event certainty",
+    ],
+  },
+  "trust-deficit": {
+    findingCategories: ["trustSignals", "operationsContinuity"],
+    primaryCategories: ["conversionIssues", "operationsIssues"],
+    keywords: [
+      "trust",
+      "review",
+      "guarantee",
+      "warranty",
+      "shipping",
+      "returns",
+      "support",
+      "payment",
+      "confidence",
+      "reassurance",
+    ],
+    vocabulary: [
+      "reassurance",
+      "purchase confidence",
+      "hesitation",
+      "decision certainty",
+      "buying comfort",
+    ],
+  },
+  "discovery-breakdown": {
+    findingCategories: ["productDiscovery"],
+    primaryCategories: ["uxUiIssues", "conversionIssues"],
+    keywords: [
+      "search",
+      "category",
+      "collection",
+      "product",
+      "navigation",
+      "discovery",
+      "browse",
+      "find",
+    ],
+    vocabulary: [
+      "product intent",
+      "navigation clarity",
+      "browse-to-buy path",
+      "search visibility",
+      "category flow",
+    ],
+  },
+  "conversion-friction": {
+    findingCategories: ["mobileConversion", "operationsContinuity", "trustSignals"],
+    primaryCategories: ["conversionIssues", "uxUiIssues"],
+    keywords: [
+      "cta",
+      "action",
+      "cart",
+      "checkout",
+      "purchase",
+      "conversion",
+      "buy",
+      "friction",
+      "momentum",
+    ],
+    vocabulary: [
+      "action path",
+      "purchase momentum",
+      "CTA hierarchy",
+      "checkout readiness",
+      "conversion flow",
+    ],
+  },
+  "checkout-continuity-risk": {
+    findingCategories: ["operationsContinuity", "mobileConversion"],
+    primaryCategories: ["conversionIssues", "operationsIssues"],
+    keywords: ["cart", "checkout", "purchase", "buy", "path", "continuity"],
+    vocabulary: [
+      "purchase continuity",
+      "cart visibility",
+      "checkout readiness",
+      "intent handoff",
+      "conversion flow",
+    ],
+  },
+  "mobile-clarity-risk": {
+    findingCategories: ["mobileConversion", "productDiscovery"],
+    primaryCategories: ["uxUiIssues", "conversionIssues"],
+    keywords: ["mobile", "cta", "action", "readability", "crowding", "first screen", "hierarchy"],
+    vocabulary: [
+      "first-screen clarity",
+      "mobile action path",
+      "CTA hierarchy",
+      "screen density",
+      "purchase momentum",
+    ],
+  },
+  "operational-clarity": {
+    findingCategories: ["operationsContinuity", "trustSignals"],
+    primaryCategories: ["operationsIssues", "conversionIssues"],
+    keywords: [
+      "order",
+      "returns",
+      "shipping",
+      "support",
+      "fulfillment",
+      "handoff",
+      "workflow",
+      "contact",
+    ],
+    vocabulary: [
+      "order communication",
+      "support handoff",
+      "returns clarity",
+      "fulfillment expectations",
+      "post-purchase confidence",
+    ],
+  },
+  "balanced-review": {
+    findingCategories: [
+      "mobileConversion",
+      "trustSignals",
+      "productDiscovery",
+      "marketingVisibility",
+      "operationsContinuity",
+      "platformVisibility",
+      "metadataClarity",
+    ],
+    primaryCategories: [
+      "uxUiIssues",
+      "conversionIssues",
+      "technicalIssues",
+      "trackingIssues",
+      "operationsIssues",
+    ],
+    keywords: ["journey", "confidence", "conversion", "tracking", "support"],
+    vocabulary: [
+      "customer journey balance",
+      "signal confidence",
+      "review priority",
+      "storefront readiness",
+    ],
+  },
 };
 
 function resolveNarrativeArchetype({
@@ -894,16 +1171,17 @@ function resolveNarrativeArchetype({
   let archetype: NarrativeArchetype = "balanced-review";
 
   if (
+    diagnostics.consoleErrors.length > 0 ||
+    diagnostics.failedRequests.length > 0 ||
+    platformNeedsManualReview(diagnostics) ||
+    technicalScore <= Math.min(trackingScore, operationsScore, conversionScore, uxScore)
+  ) {
+    archetype = "technical-risk";
+  } else if (
     trackingToolCount <= 1 ||
     topFindingTitles.some((title) => title.includes("tracking") || title.includes("attribution"))
   ) {
     archetype = "measurement-confidence-gap";
-  } else if (
-    diagnostics.consoleErrors.length > 0 ||
-    diagnostics.failedRequests.length > 0 ||
-    technicalScore <= Math.min(trackingScore, operationsScore, conversionScore, uxScore)
-  ) {
-    archetype = "technical-risk";
   } else if (
     !cartVisible ||
     !checkoutVisible ||
@@ -1051,6 +1329,7 @@ function resolveNarrativeArchetype({
     archetype,
     concernOrder,
     emphasis,
+    vocabulary: archetypeAffinity[archetype].vocabulary,
     toneHints,
     operationalFraming,
   };
@@ -1219,8 +1498,15 @@ function buildExecutiveSummary({
   overallScore: number;
 }) {
   const profile = resolveNarrativeArchetype({ categories, diagnostics, findings });
+  const weightedFindings = narrativeSortedFindings(findings, profile.archetype);
   const summaryBuilder = summaryBuilders[profile.archetype] ?? buildBalancedReviewSummary;
-  return summaryBuilder({ profile, categories, diagnostics, findings, overallScore });
+  return summaryBuilder({
+    profile,
+    categories,
+    diagnostics,
+    findings: weightedFindings,
+    overallScore,
+  });
 }
 
 function buildTechnicalRiskSummary({
@@ -1642,12 +1928,19 @@ function buildConnectedInsight(findings: HeuristicFinding[]): ConnectedInsight |
 function buildPrimaryOperationalConcern(
   findings: HeuristicFinding[],
   connectedInsight: ConnectedInsight | null,
+  profile: NarrativeArchetypeProfile,
 ): PrimaryOperationalConcern | null {
-  const supportingFindings = connectedInsight
+  const weightedFindings = narrativeSortedFindings(findings, profile.archetype);
+  const connectedFindings = connectedInsight
     ? connectedInsight.findingTitles
         .map((title) => findByTitle(findings, title))
         .filter((finding): finding is HeuristicFinding => Boolean(finding))
-    : findings.slice(0, 2);
+    : [];
+  const leadCandidate = weightedFindings[0];
+  const supportingFindings =
+    connectedFindings.some((finding) => finding.title === leadCandidate?.title)
+      ? narrativeSortedFindings(connectedFindings, profile.archetype)
+      : weightedFindings.slice(0, 2);
 
   const leadFinding = supportingFindings[0] ?? findings[0];
 
@@ -1665,8 +1958,9 @@ function buildPrimaryOperationalConcern(
       : leadFinding.title;
   const concernTitle = connectedInsight?.title ?? leadFinding.title;
   const concernInsight =
-    connectedInsight?.insight ??
-    "The highest-impact public-page evidence points to a focused customer journey review before broader optimization work.";
+    connectedInsight && supportingFindings.some((finding) => connectedInsight.findingTitles.includes(finding.title))
+      ? connectedInsight.insight
+      : `The dominant ${profile.archetype.replace(/-/g, " ")} pattern should lead the review before secondary issues are treated as the main story.`;
 
   return {
     title: concernTitle,
@@ -1701,7 +1995,10 @@ function buildAuditNarrative({
   overallScore: number;
   connectedInsight: ConnectedInsight | null;
 }) {
-  const priorityFindings = findings.slice(0, 4);
+  const profile = resolveNarrativeArchetype({ categories, diagnostics, findings });
+  const priorityFindings = narrativeSortedFindings(findings, profile.archetype).slice(0, 4);
+  const leadFinding = priorityFindings[0];
+  const secondaryFindings = priorityFindings.slice(1, 4);
   const marketingTools = visibleMarketingTools(diagnostics);
   const platformContext = platformNeedsManualReview(diagnostics)
     ? "Platform evidence needs manual confirmation before platform-specific fixes are planned."
@@ -1710,20 +2007,22 @@ function buildAuditNarrative({
     marketingTools.length === 0
       ? "Marketing attribution visibility appears limited in the loaded storefront."
       : `${marketingTools.length} supported marketing signal${marketingTools.length === 1 ? "" : "s"} ${marketingTools.length === 1 ? "was" : "were"} visible.`;
-  const profile = resolveNarrativeArchetype({ categories, diagnostics, findings });
 
   const opening = profile.toneHints.opening;
+  const vocabularyPhrase = profile.vocabulary.slice(0, 3).join(", ");
   const connectionSentence =
-    connectedInsight?.insight || priorityFindings.length > 0
-      ? `${priorityFindings[0].title} is the lead issue, and its meaning becomes clearer when the related findings are viewed together.`
+    leadFinding
+      ? `${leadFinding.title} is the lead issue for this ${profile.archetype.replace(/-/g, " ")} story, with ${vocabularyPhrase} as the main lens.`
       : "The next useful step is to map the visible signals against the customer journey in a manual walkthrough.";
-  const additionalFocus = priorityFindings.length > 0
-    ? `The highest-value review areas are ${priorityFindings
+  const secondaryFocus = secondaryFindings.length > 0
+    ? `Secondary issues to keep in view are ${secondaryFindings
         .map((finding) => finding.title.toLowerCase())
         .join(", ")}.`
-    : "No single high-impact public-page issue dominated the scan.";
+    : connectedInsight?.insight
+      ? connectedInsight.insight
+      : "No secondary issue should overpower the dominant story until a manual review confirms it.";
 
-  return `${opening} ${connectionSentence} ${additionalFocus} ${profile.operationalFraming} ${platformContext} ${trackingContext}`;
+  return `${opening} ${connectionSentence} ${secondaryFocus} ${profile.operationalFraming} ${platformContext} ${trackingContext}`;
 }
 
 function findCategory(
@@ -1736,8 +2035,9 @@ function findCategory(
 function buildTopPriorityRisks(
   findings: HeuristicFinding[],
   categories: ReturnType<typeof applyLiveDiagnosticScoring>,
+  profile: NarrativeArchetypeProfile,
 ) {
-  const priorityFindings = findings.slice(0, 3);
+  const priorityFindings = narrativeSortedFindings(findings, profile.archetype).slice(0, 3);
 
   if (priorityFindings.length > 0) {
     return priorityFindings.map((finding) => ({
@@ -1778,7 +2078,10 @@ function buildTopPriorityRisks(
     }));
 }
 
-function buildRecommendedNextSteps(findings: HeuristicFinding[]) {
+function buildRecommendedNextSteps(
+  findings: HeuristicFinding[],
+  profile: NarrativeArchetypeProfile,
+) {
   if (findings.length === 0) {
     return [
       {
@@ -1792,9 +2095,7 @@ function buildRecommendedNextSteps(findings: HeuristicFinding[]) {
     ];
   }
 
-  const sortedFindings = findings
-    .slice()
-    .sort((a, b) => findingImpactScore(b) - findingImpactScore(a));
+  const sortedFindings = narrativeSortedFindings(findings, profile.archetype);
   const selected: HeuristicFinding[] = [];
   const addFirstMatch = (predicate: (finding: HeuristicFinding) => boolean) => {
     const match = sortedFindings.find(
@@ -1806,22 +2107,16 @@ function buildRecommendedNextSteps(findings: HeuristicFinding[]) {
     }
   };
 
+  const affinity = archetypeAffinity[profile.archetype];
   addFirstMatch(
     (finding) =>
-      finding.primaryCategory === "conversionIssues" ||
-      finding.primaryCategory === "uxUiIssues",
+      affinity.findingCategories.includes(finding.category) ||
+      affinity.primaryCategories.includes(finding.primaryCategory),
   );
-  addFirstMatch(
-    (finding) =>
-      finding.category === "trustSignals" ||
-      finding.category === "productDiscovery" ||
-      finding.title === "Store Search Visibility Needs Review",
-  );
-  addFirstMatch(
-    (finding) =>
-      finding.primaryCategory === "trackingIssues" ||
-      finding.primaryCategory === "operationsIssues" ||
-      finding.primaryCategory === "technicalIssues",
+  addFirstMatch((finding) =>
+    (finding.secondaryCategories ?? []).some((category) =>
+      affinity.primaryCategories.includes(category),
+    ),
   );
 
   for (const finding of sortedFindings) {
@@ -2105,6 +2400,11 @@ export async function POST(request: Request) {
       categories.reduce((total, category) => total + category.score, 0) /
         categories.length,
     );
+    const narrativeProfile = resolveNarrativeArchetype({
+      categories,
+      diagnostics,
+      findings: heuristicFindings,
+    });
     const executiveSummary = buildExecutiveSummary({
       categories,
       diagnostics,
@@ -2122,9 +2422,17 @@ export async function POST(request: Request) {
     const primaryOperationalConcern = buildPrimaryOperationalConcern(
       heuristicFindings,
       connectedInsight,
+      narrativeProfile,
     );
-    const topPriorityRisks = buildTopPriorityRisks(heuristicFindings, categories);
-    const recommendedNextSteps = buildRecommendedNextSteps(heuristicFindings);
+    const topPriorityRisks = buildTopPriorityRisks(
+      heuristicFindings,
+      categories,
+      narrativeProfile,
+    );
+    const recommendedNextSteps = buildRecommendedNextSteps(
+      heuristicFindings,
+      narrativeProfile,
+    );
     const benchmarkContext = buildBenchmarkContext(diagnostics, heuristicFindings);
 
     logDevelopmentSubmission("Ecommerce audit scanner", {
@@ -2148,6 +2456,7 @@ export async function POST(request: Request) {
             "This internal review uses public-page diagnostics and rule-based ecommerce heuristics. Findings should guide practical review priorities while uncertain signals remain marked for manual confirmation.",
           executiveSummary,
           auditNarrative,
+          currentNarrativeArchetype: narrativeProfile.archetype,
           connectedInsight,
           primaryOperationalConcern,
           topPriorityRisks,
