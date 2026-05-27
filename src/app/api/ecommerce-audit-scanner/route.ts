@@ -837,7 +837,37 @@ function applyLiveDiagnosticScoring(
   });
 }
 
-function pickExecutiveSummaryPattern({
+type NarrativeArchetype =
+  | "conversion-friction"
+  | "trust-deficit"
+  | "technical-risk"
+  | "operational-clarity"
+  | "discovery-breakdown"
+  | "measurement-confidence-gap"
+  | "mobile-clarity-risk"
+  | "checkout-continuity-risk"
+  | "balanced-review";
+
+type NarrativeArchetypeProfile = {
+  archetype: NarrativeArchetype;
+  concernOrder: string[];
+  emphasis: string[];
+  toneHints: {
+    headline: string;
+    interpretation: string;
+    opening: string;
+  };
+  operationalFraming: string;
+};
+
+type Interpretation = {
+  businessMeaning: string;
+  operationalConcern: string;
+  customerImpact: string;
+  reviewDirection: string;
+};
+
+function resolveNarrativeArchetype({
   categories,
   diagnostics,
   findings,
@@ -845,68 +875,336 @@ function pickExecutiveSummaryPattern({
   categories: ReturnType<typeof applyLiveDiagnosticScoring>;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
-}) {
+}): NarrativeArchetypeProfile {
   const trackingScore = categories.find((category) => category.key === "trackingIssues")?.score ?? 100;
   const technicalScore = categories.find((category) => category.key === "technicalIssues")?.score ?? 100;
   const operationsScore = categories.find((category) => category.key === "operationsIssues")?.score ?? 100;
   const conversionScore = categories.find((category) => category.key === "conversionIssues")?.score ?? 100;
   const uxScore = categories.find((category) => category.key === "uxUiIssues")?.score ?? 100;
-
   const topFindingTitles = findings.map((finding) => finding.title.toLowerCase());
   const trackingToolCount = diagnostics.technologyDetections.filter((tool) => tool.detected).length;
   const productDiscoveryVisible =
     diagnostics.storefrontSignals.productNavigationVisible ||
     diagnostics.storefrontSignals.collectionLinksVisible ||
     diagnostics.storefrontSignals.searchVisible;
+  const trustSignalsVisible = trustSignalCount(diagnostics);
+  const cartVisible = diagnostics.commerceFlowSignals.cartVisible;
+  const checkoutVisible = diagnostics.commerceFlowSignals.checkoutVisible;
+
+  let archetype: NarrativeArchetype = "balanced-review";
 
   if (
-    trackingScore <= Math.min(technicalScore, operationsScore, conversionScore, uxScore) ||
     trackingToolCount <= 1 ||
     topFindingTitles.some((title) => title.includes("tracking") || title.includes("attribution"))
   ) {
-    return "tracking-risk-heavy";
-  }
-
-  if (
-    technicalScore <= Math.min(trackingScore, operationsScore, conversionScore, uxScore) ||
+    archetype = "measurement-confidence-gap";
+  } else if (
     diagnostics.consoleErrors.length > 0 ||
-    diagnostics.failedRequests.length > 0
+    diagnostics.failedRequests.length > 0 ||
+    technicalScore <= Math.min(trackingScore, operationsScore, conversionScore, uxScore)
   ) {
-    return "technical-reliability-heavy";
-  }
-
-  if (
-    operationsScore <= Math.min(trackingScore, technicalScore, conversionScore, uxScore) ||
-    !diagnostics.commerceFlowSignals.cartVisible ||
-    !diagnostics.commerceFlowSignals.checkoutVisible ||
+    archetype = "technical-risk";
+  } else if (
+    !cartVisible ||
+    !checkoutVisible ||
     topFindingTitles.some((title) => title.includes("checkout") || title.includes("cart"))
   ) {
-    return "operations/checkout-heavy";
-  }
-
-  if (
-    conversionScore <= Math.min(trackingScore, technicalScore, operationsScore, uxScore) ||
-    topFindingTitles.some((title) => title.includes("mobile cta") || title.includes("mobile")) ||
-    diagnostics.storefrontSignals.mobileCrowdingRisk
+    archetype = "checkout-continuity-risk";
+  } else if (
+    diagnostics.storefrontSignals.mobileCrowdingRisk ||
+    topFindingTitles.some((title) => title.includes("mobile cta") || title.includes("mobile"))
   ) {
-    return "mobile-journey-heavy";
-  }
-
-  if (
+    archetype = "mobile-clarity-risk";
+  } else if (
     !productDiscoveryVisible ||
     topFindingTitles.some((title) => title.includes("product discovery") || title.includes("search") || title.includes("navigation"))
   ) {
-    return "product-discovery-heavy";
-  }
-
-  if (
-    trustSignalCount(diagnostics) <= 3 ||
+    archetype = "discovery-breakdown";
+  } else if (
+    trustSignalsVisible <= 3 ||
     topFindingTitles.some((title) => title.includes("trust"))
   ) {
-    return "trust-confidence-heavy";
+    archetype = "trust-deficit";
+  } else if (operationsScore < 80) {
+    archetype = "operational-clarity";
+  } else if (conversionScore < 80) {
+    archetype = "conversion-friction";
   }
 
-  return "balanced-needs-review";
+  const toneHints = {
+    headline:
+      archetype === "measurement-confidence-gap"
+        ? "This scan shows visible storefront structure, but the main risk is whether the public tracking and attribution signals are reliable enough to trust next-step decisions."
+        : archetype === "technical-risk"
+          ? "This scan shows a functioning storefront shell, but the stronger concern is operational reliability and frontend stability before optimization work proceeds."
+          : archetype === "checkout-continuity-risk"
+            ? "This scan points to a store where the purchase path exists, but the cart and checkout continuity should be reviewed before scaling traffic."
+            : archetype === "mobile-clarity-risk"
+              ? "This scan points to a mobile experience that needs clearer action hierarchy so shoppers know what to do next."
+              : archetype === "discovery-breakdown"
+                ? "This scan points to a storefront with visible commerce signals, but the product discovery path is the most likely source of shopper friction."
+                : archetype === "trust-deficit"
+                  ? "This scan points to a storefront that should build more purchase confidence before treating the findings as optimization-ready."
+                  : archetype === "operational-clarity"
+                    ? "This scan points to a storefront that may be workable, but the operational story still needs clearer support, shipping, and follow-up cues."
+                    : archetype === "conversion-friction"
+                      ? "This scan points to a storefront that has conversion elements, but the customer path still feels harder to follow than it should."
+                      : "This scan points to a storefront with multiple visible commerce signals, but several areas still need closer review before deeper optimization.",
+    interpretation:
+      archetype === "measurement-confidence-gap"
+        ? "That matters because marketing and conversion teams need clean signal paths before they can trust campaign and funnel analysis."
+        : archetype === "technical-risk"
+          ? "That matters because platform uncertainty and frontend errors can distort both customer experience and measurement."
+          : archetype === "checkout-continuity-risk"
+            ? "That matters because purchase intent can leak when the cart and checkout path are not clearly connected."
+            : archetype === "mobile-clarity-risk"
+              ? "That matters because mobile shoppers decide on the first visible action, and unclear mobile hierarchy can stall the path to purchase."
+              : archetype === "discovery-breakdown"
+                ? productDiscoveryVisible
+                  ? "That matters because shoppers need a smoother discovery path to turn browsing into buying."
+                  : "That matters because a weaker discovery path can make the store feel harder to use than it actually is."
+                : archetype === "trust-deficit"
+                  ? "That matters because purchase confidence is often the difference between clicking and converting on a public storefront."
+                  : archetype === "operational-clarity"
+                    ? "That matters because operational gaps in support, returns, and shipping language can reduce shopper trust before checkout."
+                    : archetype === "conversion-friction"
+                      ? "That matters because conversion friction is often the first thing that keeps good traffic from turning into actual customers."
+                      : "That matters because the team needs to understand not just what is visible, but what should be prioritized next in the customer journey.",
+    opening:
+      archetype === "measurement-confidence-gap"
+        ? "This scan shows visible storefront elements, but the more important review is whether the data behind them is reliable enough to act on."
+        : archetype === "technical-risk"
+          ? "This scan shows the storefront from a public-page perspective, and the stronger concern is technical reliability rather than just interface polish."
+          : archetype === "checkout-continuity-risk"
+            ? "This scan shows the purchase path is present, and the key question is whether cart and checkout stay connected for the shopper."
+            : archetype === "mobile-clarity-risk"
+              ? "This scan shows mobile commerce signals, but the key story is whether the first screen makes the next action clear."
+              : archetype === "discovery-breakdown"
+                ? "This scan shows some visible commerce signals, but the discovery path is the area most likely to slow shoppers down."
+                : archetype === "trust-deficit"
+                  ? "This scan shows a storefront with visible signals, but the more important review is whether shoppers feel confident enough to move forward."
+                  : archetype === "operational-clarity"
+                    ? "This scan shows a store that can function, but the real question is how clearly it communicates support, shipping, and next-step logistics."
+                    : archetype === "conversion-friction"
+                      ? "This scan shows the storefront has conversion elements, but the focus should be on how easy it is to follow the customer path."
+                      : "This scan shows visible commerce structure and a few review areas that matter before deeper optimization.",
+  };
+
+  const concernOrder =
+    archetype === "technical-risk"
+      ? ["operational reliability", "measurement confidence", "storefront continuity"]
+      : archetype === "trust-deficit"
+        ? ["customer hesitation", "reassurance clarity", "conversion confidence"]
+        : archetype === "discovery-breakdown"
+          ? ["product intent friction", "navigation clarity", "browse-to-buy continuity"]
+          : archetype === "checkout-continuity-risk"
+            ? ["path continuity", "cart visibility", "checkout confidence"]
+            : archetype === "mobile-clarity-risk"
+              ? ["first-screen clarity", "CTA visibility", "mobile hierarchy"]
+              : archetype === "measurement-confidence-gap"
+                ? ["tracking visibility", "attribution evidence", "signal trust"]
+                : archetype === "operational-clarity"
+                  ? ["support and fulfillment clarity", "returns visibility", "handoff confidence"]
+                  : archetype === "conversion-friction"
+                    ? ["action clarity", "trust cues", "checkout path"]
+                    : ["customer journey balance", "signal confidence", "review priority"];
+
+  const emphasis =
+    archetype === "technical-risk"
+      ? ["front-end stability", "platform confidence", "operational review"]
+      : archetype === "trust-deficit"
+        ? ["trust cues", "reassurance messaging", "early purchase confidence"]
+        : archetype === "discovery-breakdown"
+          ? ["product findability", "navigation cues", "browse flow"]
+          : archetype === "checkout-continuity-risk"
+            ? ["cart and checkout", "purchase path", "intent handoff"]
+            : archetype === "mobile-clarity-risk"
+              ? ["mobile action signal", "screen hierarchy", "primary action visibility"]
+              : archetype === "measurement-confidence-gap"
+                ? ["tracking tools", "analytics visibility", "campaign trust"]
+                : archetype === "operational-clarity"
+                  ? ["support and shipping", "post-purchase clarity", "handoff confidence"]
+                  : archetype === "conversion-friction"
+                    ? ["CTA clarity", "economic friction", "checkout readiness"]
+                    : ["journey clarity", "signal confidence", "review readiness"];
+
+  const operationalFraming =
+    archetype === "technical-risk"
+      ? "Review the platform signal, any failed requests, and frontend errors before making optimization recommendations."
+      : archetype === "trust-deficit"
+        ? "Review how reassurance signals are presented before treating the experience as optimization-ready."
+        : archetype === "discovery-breakdown"
+          ? "Review the product discovery path, search, and navigation before assuming shoppers can easily find what they came for."
+          : archetype === "checkout-continuity-risk"
+            ? "Review the path from product selection to checkout as one connected flow before scaling traffic."
+            : archetype === "mobile-clarity-risk"
+              ? "Review the first mobile viewport and primary action hierarchy before drawing conclusions about conversion fixes."
+              : archetype === "measurement-confidence-gap"
+                ? "Review tracking tool visibility and attribution evidence before trusting conversion signals."
+                : archetype === "operational-clarity"
+                  ? "Review support, returns, and fulfillment messaging as part of operational readiness."
+                  : archetype === "conversion-friction"
+                    ? "Review action clarity and trust cues before optimizing for more traffic."
+                    : "Review the most visible customer journey gaps and signal confidence before deeper recommendations.";
+
+  return {
+    archetype,
+    concernOrder,
+    emphasis,
+    toneHints,
+    operationalFraming,
+  };
+}
+
+function interpretTechnicalFinding({
+  diagnostics,
+  findings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}): Interpretation {
+  const technicalFinding =
+    findings.find((finding) => finding.primaryCategory === "technicalIssues") ||
+    findings.find((finding) => finding.category === "platformVisibility") ||
+    findings[0];
+  const platform = diagnostics.platformDetection.name;
+  const foundPlatform = platform && platform !== "Unknown" ? platform : "an unknown platform";
+  const issueCount = diagnostics.failedRequests.length + diagnostics.consoleErrors.length;
+
+  return {
+    businessMeaning: `The public scan suggests platform reliability and script execution are the key operational risks. ${foundPlatform === "an unknown platform" ? "That makes it harder to plan specific fixes." : `That means we should verify whether the detected platform assumptions are accurate.`}`,
+    operationalConcern: `If the storefront is not stable, fixes in tracking, checkout, or product discovery may not behave consistently.`,
+    customerImpact: issueCount > 0
+      ? `Shoppers may experience inconsistent behavior or interrupted checkout if these frontend issues remain. `
+      : `This remains a moderate concern because platform confidence affects how reliably the storefront will behave under traffic.`,
+    reviewDirection: `Review the detected platform evidence, failed frontend requests, and console noise before moving to conversion or trust recommendations.`,
+  };
+}
+
+function interpretTrustFinding({
+  diagnostics,
+  findings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}): Interpretation {
+  const trustSignalsVisible = trustSignalCount(diagnostics);
+  const trustFinding = findings.find((finding) => finding.category === "trustSignals");
+
+  return {
+    businessMeaning: trustSignalsVisible >= 4
+      ? "The store shows enough reassurance signals to support shoppers through the early buying decision."
+      : "The store is missing enough trust cues that shoppers may hesitate before committing to a purchase.",
+    operationalConcern: trustFinding
+      ? `The evidence points to ${trustFinding.title.toLowerCase()} as the review area. `
+      : "The evidence points to trust building as a broader gap in the visible experience. ",
+    customerImpact: trustSignalsVisible >= 4
+      ? "Shoppers are more likely to feel confident enough to continue toward checkout."
+      : "Shoppers may abandon if they do not see clear reassurance around shipping, returns, or support.",
+    reviewDirection: "Review the visible trust and reassurance cues, especially reviews, shipping, returns, contact, and payment signals, before making confidence-based recommendations.",
+  };
+}
+
+function interpretDiscoveryFinding({
+  diagnostics,
+  findings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}): Interpretation {
+  const discoveryFinding =
+    findings.find((finding) => finding.category === "productDiscovery") ||
+    findings.find((finding) => finding.title.includes("Search")) ||
+    findings[0];
+  const discoveryVisible =
+    diagnostics.storefrontSignals.productNavigationVisible ||
+    diagnostics.storefrontSignals.collectionLinksVisible ||
+    diagnostics.storefrontSignals.searchVisible;
+
+  return {
+    businessMeaning: discoveryVisible
+      ? "There is a recognizable browse path, but it may still force shoppers to work harder than necessary." 
+      : "The store may be asking customers to find products without enough discovery cues, which slows decision making.",
+    operationalConcern: discoveryFinding
+      ? `The scan highlights ${discoveryFinding.title.toLowerCase()} as the main discovery concern. `
+      : "The discovery path is the main area to review. ",
+    customerImpact: discoveryVisible
+      ? "Shoppers may still struggle to find the right products quickly."
+      : "Shoppers may drop out before they can reach product detail or checkout.",
+    reviewDirection: "Review navigation, category cues, collection visibility, and search presence before assuming product intent is easy to capture.",
+  };
+}
+
+function interpretTrackingFinding({
+  diagnostics,
+  findings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}): Interpretation {
+  const trackingTools = visibleMarketingTools(diagnostics);
+  const trackingFinding = findings.find((finding) => finding.primaryCategory === "trackingIssues");
+
+  return {
+    businessMeaning: trackingTools.length >= 2
+      ? "Tracking visibility looks more reliable, which supports measurement and attribution confidence." 
+      : "Limited visible tracking tools can make campaign performance and conversion signals harder to trust.",
+    operationalConcern: trackingFinding
+      ? `The evidence points to ${trackingFinding.title.toLowerCase()} as the most important measurement review. `
+      : "The tracking layer needs a manual review to confirm what is actually being captured. ",
+    customerImpact: trackingTools.length >= 2
+      ? "This makes it easier to interpret results when you optimize traffic."
+      : "This raises the risk that good traffic improvements may not be visible in analytics.",
+    reviewDirection: "Review visible analytics and marketing tags before treating the scan as a reliable signal source for conversion decisions.",
+  };
+}
+
+function interpretOperationalFinding({
+  diagnostics,
+  findings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}): Interpretation {
+  const commerce = diagnostics.commerceFlowSignals;
+  const operationalFinding = findings.find((finding) => finding.primaryCategory === "operationsIssues") || findings[0];
+
+  return {
+    businessMeaning: commerce.cartVisible && commerce.checkoutVisible
+      ? "The experience has the basic purchase path, but the handoff from browsing to buying still needs scrutiny." 
+      : "The purchase path is not clearly visible enough to move ahead without a deeper customer journey review.",
+    operationalConcern: operationalFinding
+      ? `The evidence points to ${operationalFinding.title.toLowerCase()} as the operational risk. `
+      : "The operational path is the most important thing to validate before optimization. ",
+    customerImpact: commerce.cartVisible && commerce.checkoutVisible
+      ? "Shoppers have a route to buy, but they may still lose confidence if the path feels disjointed."
+      : "Shoppers may never reach checkout if they can't find the cart or payment path clearly.",
+    reviewDirection: "Review cart, checkout, support, and post-purchase messaging together as a connected operations story.",
+  };
+}
+
+function interpretCTAFinding({
+  diagnostics,
+  findings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}): Interpretation {
+  const mobileCtaFinding = findings.find((finding) => finding.title.includes("Mobile CTA")) || findings[0];
+  const ctaVisible = diagnostics.storefrontSignals.mobileCtaVisibleAboveFold;
+
+  return {
+    businessMeaning: ctaVisible
+      ? "A visible primary action is a good start, but it still needs clarity in how it leads shoppers through the next step." 
+      : "Without a clear mobile action, shoppers may hesitate and the purchase path may stall early.",
+    operationalConcern: mobileCtaFinding
+      ? `The evidence points to ${mobileCtaFinding.title.toLowerCase()} as the mobile clarity concern. `
+      : "The mobile action path is the main issue to validate. ",
+    customerImpact: ctaVisible
+      ? "Shoppers are more likely to know what to do next, but only if the action is unmistakable."
+      : "Shoppers may lose momentum before they can choose a product or proceed to checkout.",
+    reviewDirection: "Review mobile action placement, label clarity, and visual hierarchy before assuming the mobile path is ready."
+  };
 }
 
 function buildExecutiveSummary({
@@ -920,13 +1218,276 @@ function buildExecutiveSummary({
   findings: HeuristicFinding[];
   overallScore: number;
 }) {
-  const highestImpactFindings = findings.slice(0, 3);
-  const diagnosticFlags = [
-    !diagnostics.title ? "missing page title" : "",
-    !diagnostics.metaDescription ? "missing meta description" : "",
-    diagnostics.consoleErrors.length > 0 ? "console errors" : "",
-    diagnostics.failedRequests.length > 0 ? "failed network requests" : "",
-  ].filter(Boolean);
+  const profile = resolveNarrativeArchetype({ categories, diagnostics, findings });
+  const summaryBuilder = summaryBuilders[profile.archetype] ?? buildBalancedReviewSummary;
+  return summaryBuilder({ profile, categories, diagnostics, findings, overallScore });
+}
+
+function buildTechnicalRiskSummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}): {
+  summary: string;
+  highestImpactOpportunities: string[];
+  businessInterpretation: string;
+} {
+  const interpretation = interpretTechnicalFinding({ diagnostics, findings });
+  const topFinding = findings.find((finding) => finding.primaryCategory === "technicalIssues") ?? findings[0];
+  const summary = `${profile.toneHints.headline} ${interpretation.operationalConcern} ${profile.operationalFraming} ${interpretation.customerImpact}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: topFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: topFinding.title,
+            evidence: topFinding.evidenceSummary,
+            action: topFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildTrustDeficitSummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}) {
+  const interpretation = interpretTrustFinding({ diagnostics, findings });
+  const topFinding = findings.find((finding) => finding.category === "trustSignals");
+  const summary = `${profile.toneHints.headline} ${interpretation.operationalConcern} ${interpretation.customerImpact} ${profile.operationalFraming}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: topFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: topFinding.title,
+            evidence: topFinding.evidenceSummary,
+            action: topFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildDiscoveryBreakdownSummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}) {
+  const interpretation = interpretDiscoveryFinding({ diagnostics, findings });
+  const discoveryFinding = findings.find((finding) => finding.category === "productDiscovery") ?? findings[0];
+  const summary = `${profile.toneHints.headline} ${interpretation.operationalConcern} ${interpretation.customerImpact} ${profile.operationalFraming}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: discoveryFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: discoveryFinding.title,
+            evidence: discoveryFinding.evidenceSummary,
+            action: discoveryFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildCheckoutContinuityRiskSummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}) {
+  const interpretation = interpretOperationalFinding({ diagnostics, findings });
+  const checkoutFinding = findings.find((finding) => finding.title.includes("Cart / Checkout")) ?? findings[0];
+  const summary = `${profile.toneHints.headline} ${profile.operationalFraming} ${interpretation.customerImpact}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: checkoutFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: checkoutFinding.title,
+            evidence: checkoutFinding.evidenceSummary,
+            action: checkoutFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildMobileClarityRiskSummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}) {
+  const interpretation = interpretCTAFinding({ diagnostics, findings });
+  const mobileFinding = findings.find((finding) => finding.title.includes("Mobile CTA")) ?? findings[0];
+  const summary = `${profile.toneHints.headline} ${interpretation.operationalConcern} ${interpretation.customerImpact} ${profile.operationalFraming}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: mobileFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: mobileFinding.title,
+            evidence: mobileFinding.evidenceSummary,
+            action: mobileFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildMeasurementConfidenceGapSummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}) {
+  const interpretation = interpretTrackingFinding({ diagnostics, findings });
+  const trackingFinding = findings.find((finding) => finding.primaryCategory === "trackingIssues") ?? findings[0];
+  const summary = `${profile.toneHints.headline} ${interpretation.operationalConcern} ${interpretation.customerImpact} ${profile.operationalFraming}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: trackingFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: trackingFinding.title,
+            evidence: trackingFinding.evidenceSummary,
+            action: trackingFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildOperationalClaritySummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}) {
+  const interpretation = interpretOperationalFinding({ diagnostics, findings });
+  const operationalFinding = findings.find((finding) => finding.primaryCategory === "operationsIssues") ?? findings[0];
+  const summary = `${profile.toneHints.headline} ${interpretation.operationalConcern} ${profile.operationalFraming} ${interpretation.customerImpact}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: operationalFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: operationalFinding.title,
+            evidence: operationalFinding.evidenceSummary,
+            action: operationalFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildConversionFrictionSummary({
+  profile,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore?: number;
+}) {
+  const interpretation = interpretCTAFinding({ diagnostics, findings });
+  const conversionFinding = findings.find((finding) => finding.primaryCategory === "conversionIssues") ?? findings[0];
+  const summary = `${profile.toneHints.headline} ${interpretation.operationalConcern} ${interpretation.customerImpact} ${profile.operationalFraming}`;
+  const businessInterpretation = `${interpretation.businessMeaning} ${interpretation.reviewDirection}`;
+
+  return {
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: conversionFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: conversionFinding.title,
+            evidence: conversionFinding.evidenceSummary,
+            action: conversionFinding.recommendedFirstAction,
+          }),
+        ]
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
+  };
+}
+
+function buildBalancedReviewSummary({
+  profile,
+  categories,
+  diagnostics,
+  findings,
+  overallScore,
+}: {
+  profile: NarrativeArchetypeProfile;
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  overallScore: number;
+}) {
   const trackingToolCount = diagnostics.technologyDetections.filter((tool) => tool.detected).length;
   const cartVisible = diagnostics.commerceFlowSignals.cartVisible;
   const checkoutVisible = diagnostics.commerceFlowSignals.checkoutVisible;
@@ -934,99 +1495,51 @@ function buildExecutiveSummary({
     diagnostics.storefrontSignals.productNavigationVisible ||
     diagnostics.storefrontSignals.collectionLinksVisible ||
     diagnostics.storefrontSignals.searchVisible;
-  const trustSignalsVisible = trustSignalCount(diagnostics);
-  const mobileReadability = diagnostics.storefrontSignals.mobileCrowdingRisk
-    ? "crowded"
-    : diagnostics.storefrontSignals.mobileVisibleTextLength > 2200
-      ? "dense"
-      : "clear";
 
-  const pattern = pickExecutiveSummaryPattern({
-    categories,
-    diagnostics,
-    findings,
-  });
+  const summary = `${profile.toneHints.headline} The scan shows ${trackingToolCount} visible marketing tool${trackingToolCount === 1 ? "" : "s"}, ${cartVisible && checkoutVisible ? "a visible purchase path" : "a purchase path that still needs confirmation"}, and ${productDiscoveryVisible ? "product discovery signals" : "limited discovery signals"}. ${profile.operationalFraming}`;
 
-  const platformEvidence =
-    diagnostics.platformDetection.name !== "Unknown"
-      ? `${diagnostics.platformDetection.name} detection is ${diagnostics.platformDetection.confidenceLabel.toLowerCase()} (${diagnostics.platformDetection.confidence}%)`
-      : "platform visibility is limited";
-
-  const cartCheckoutSentence = cartVisible && checkoutVisible
-    ? "The public scan shows both cart and checkout entry points." 
-    : !cartVisible && !checkoutVisible
-      ? "The scan did not clearly detect cart or checkout entry points." 
-      : `The scan shows cart visibility as ${cartVisible ? "visible" : "not visible"} and checkout visibility as ${checkoutVisible ? "visible" : "not visible"}.`;
-
-  const trackingSentence = trackingToolCount > 0
-    ? `Public-page evidence shows ${trackingToolCount} visible marketing tool${trackingToolCount === 1 ? "" : "s"}.`
-    : "Public-page evidence did not show supported tracking tools.";
-
-  const productDiscoverySentence = productDiscoveryVisible
-    ? "Product discovery signals are present, though the clarity of the path should still be reviewed."
-    : "Product discovery signals are limited in this scan.";
-
-  const issueHeadline = {
-    "tracking-risk-heavy":
-      `This scan points to a storefront with visible commerce structure, but tracking visibility and attribution confidence should be reviewed before relying on the data.`,
-    "mobile-journey-heavy":
-      `The main concern in this scan is not the existence of ecommerce elements, but how clearly they guide shoppers through the mobile journey toward purchase.`,
-    "trust-confidence-heavy":
-      `This storefront appears to have enough visible signals for a practical review, but the trust and measurement paths should be confirmed more carefully.`,
-    "product-discovery-heavy":
-      `This scan points to a storefront that has some visible commerce structure, but the product discovery path is the weakest part of the public review.`,
-    "operations/checkout-heavy":
-      `This scan points to a storefront with some visible commerce structure, but the checkout path and operational continuity should be reviewed carefully.`,
-    "technical-reliability-heavy":
-      `This scan points to a storefront that has some visible commerce structure, but public-page reliability signals suggest the page should be reviewed for technical risk first.`,
-    "balanced-needs-review":
-      `This scan points to a storefront with multiple visible commerce signals, but several areas still need closer review before deeper optimization.`,
-  }[pattern];
-
-  const summaryDetails = [
-    issueHeadline,
-    platformEvidence ? `${platformEvidence}.` : "",
-    cartCheckoutSentence,
-    trackingSentence,
-    productDiscoverySentence,
-    diagnosticFlags.length > 0
-      ? `The scan also found ${diagnosticFlags.join(", ")} on the public page.`
-      : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const prioritySentence =
-    highestImpactFindings.length > 0
-      ? `The top findings include ${highestImpactFindings
-          .map((finding) => finding.title.toLowerCase())
-          .join(", ")}.`
-      : "No single highest-impact finding was detected from the lightweight review.";
+  const topFindings = findings.slice(0, 3);
+  const businessInterpretation = `${profile.toneHints.interpretation} Review the strongest visible findings and verify them against the customer journey before making deeper recommendations.`;
 
   return {
-    summary: `${summaryDetails} ${prioritySentence}`.trim(),
-    highestImpactOpportunities:
-      highestImpactFindings.length > 0
-        ? highestImpactFindings.map(
-            (finding) =>
-              buildExecutiveOpportunityText({
-                title: finding.title,
-                evidence: finding.evidenceSummary,
-                action: finding.recommendedFirstAction,
-              }),
-          )
-        : categories
-            .slice()
-            .sort((a, b) => a.score - b.score)
-            .slice(0, 2)
-            .map(
-              (category) =>
-                `${category.label}: manually confirm the customer journey because no high-impact heuristic finding was detected.`,
-            ),
-    businessInterpretation:
-      `The practical business question is whether visitors can understand the offer, move through the buying path, and leave usable data for the team. ${platformEvidence}. ${cartCheckoutSentence} ${trackingSentence} ${productDiscoverySentence} Mobile readability appears ${mobileReadability}.`,
+    summary: sanitizeEvidenceText(summary),
+    highestImpactOpportunities: topFindings.length > 0
+      ? topFindings.map((finding) =>
+          buildExecutiveOpportunityText({
+            title: finding.title,
+            evidence: finding.evidenceSummary,
+            action: finding.recommendedFirstAction,
+          }),
+        )
+      : [],
+    businessInterpretation: sanitizeEvidenceText(businessInterpretation),
   };
 }
+
+const summaryBuilders: Record<
+  NarrativeArchetype,
+  (args: {
+    profile: NarrativeArchetypeProfile;
+    categories: ReturnType<typeof applyLiveDiagnosticScoring>;
+    diagnostics: LiveDiagnosticsResult;
+    findings: HeuristicFinding[];
+    overallScore: number;
+  }) => {
+    summary: string;
+    highestImpactOpportunities: string[];
+    businessInterpretation: string;
+  }
+> = {
+  "technical-risk": buildTechnicalRiskSummary,
+  "trust-deficit": buildTrustDeficitSummary,
+  "discovery-breakdown": buildDiscoveryBreakdownSummary,
+  "checkout-continuity-risk": buildCheckoutContinuityRiskSummary,
+  "mobile-clarity-risk": buildMobileClarityRiskSummary,
+  "measurement-confidence-gap": buildMeasurementConfidenceGapSummary,
+  "operational-clarity": buildOperationalClaritySummary,
+  "conversion-friction": buildConversionFrictionSummary,
+  "balanced-review": buildBalancedReviewSummary,
+};
 
 function findByTitle(findings: HeuristicFinding[], title: string) {
   return findings.find((finding) => finding.title === title);
@@ -1176,29 +1689,20 @@ function buildPrimaryOperationalConcern(
 }
 
 function buildAuditNarrative({
+  categories,
   diagnostics,
   findings,
   overallScore,
   connectedInsight,
 }: {
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore: number;
   connectedInsight: ConnectedInsight | null;
 }) {
   const priorityFindings = findings.slice(0, 4);
-  const commerce = diagnostics.commerceFlowSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
-  const commerceStructure =
-    commerce.cartVisible || commerce.checkoutVisible || commerce.productCatalogVisible
-      ? "visible commerce structure"
-      : "limited visible commerce structure";
-  const urgency =
-    overallScore < 65
-      ? "should be treated as a high-priority ecommerce systems review"
-      : overallScore < 80
-        ? "has a workable base, but needs focused review before scaling traffic"
-        : "appears structurally healthy, with the best gains likely coming from focused optimization";
   const platformContext = platformNeedsManualReview(diagnostics)
     ? "Platform evidence needs manual confirmation before platform-specific fixes are planned."
     : `${diagnostics.platformDetection.name} evidence is visible enough to support a platform-aware discussion.`;
@@ -1206,22 +1710,20 @@ function buildAuditNarrative({
     marketingTools.length === 0
       ? "Marketing attribution visibility appears limited in the loaded storefront."
       : `${marketingTools.length} supported marketing signal${marketingTools.length === 1 ? "" : "s"} ${marketingTools.length === 1 ? "was" : "were"} visible.`;
+  const profile = resolveNarrativeArchetype({ categories, diagnostics, findings });
 
-  if (priorityFindings.length === 0) {
-    return `The store shows ${commerceStructure} and ${urgency}. No single public-page issue dominated the scan, so the next useful step is a manual walkthrough of product discovery, purchase path, support visibility, and tracking confidence. ${platformContext} ${trackingContext}`;
-  }
+  const opening = profile.toneHints.opening;
+  const connectionSentence =
+    connectedInsight?.insight || priorityFindings.length > 0
+      ? `${priorityFindings[0].title} is the lead issue, and its meaning becomes clearer when the related findings are viewed together.`
+      : "The next useful step is to map the visible signals against the customer journey in a manual walkthrough.";
+  const additionalFocus = priorityFindings.length > 0
+    ? `The highest-value review areas are ${priorityFindings
+        .map((finding) => finding.title.toLowerCase())
+        .join(", ")}.`
+    : "No single high-impact public-page issue dominated the scan.";
 
-  const focusAreas = priorityFindings.map((finding) => finding.title.toLowerCase());
-  const focusPhrase =
-    focusAreas.length > 1
-      ? `${focusAreas.slice(0, -1).join(", ")}, and ${focusAreas[focusAreas.length - 1]}`
-      : focusAreas[0];
-  const highestImpact = priorityFindings[0];
-  const relationshipSentence =
-    connectedInsight?.insight ??
-    `${highestImpact.title} is the lead issue, while the related findings shape how quickly shoppers understand what to do next.`;
-
-  return `The store shows ${commerceStructure} and ${urgency}. The audit story is led by ${highestImpact.title.toLowerCase()}, but the main opportunity is how the findings work together: ${relationshipSentence} The highest-value review areas are ${focusPhrase}. ${platformContext} ${trackingContext}`;
+  return `${opening} ${connectionSentence} ${additionalFocus} ${profile.operationalFraming} ${platformContext} ${trackingContext}`;
 }
 
 function findCategory(
@@ -1528,10 +2030,10 @@ function buildBenchmarkContext(
   const weakCount = tags.filter((tag) => tag.startsWith("weak-")).length;
   const summary =
     weakCount > strongCount
-      ? "Directional benchmark context leans toward improvement opportunities in the current internal comparison model."
+      ? "Compared with stronger storefront patterns in the current internal review set, this scan leans toward improvement opportunities."
       : strongCount > weakCount
-        ? "Directional benchmark context shows several stronger signals under the current internal comparison model."
-        : "Directional benchmark context is mixed, with strengths and review areas both visible in the public-page evidence.";
+        ? "Compared with stronger storefront patterns in the current internal review set, this scan shows several more positive signals."
+        : "Compared with stronger storefront patterns in the current internal review set, this scan is mixed, with both clearer signals and review areas visible.";
 
   return {
     summary,
@@ -1611,6 +2113,7 @@ export async function POST(request: Request) {
     });
     const connectedInsight = buildConnectedInsight(heuristicFindings);
     const auditNarrative = buildAuditNarrative({
+      categories,
       diagnostics,
       findings: heuristicFindings,
       overallScore,

@@ -38,6 +38,9 @@ type ExactAnswer = {
   evidence: string;
   businessMeaning: string;
   suggestedFollowUp: string;
+  severity?: "Low" | "Medium" | "High";
+  archetype?: string;
+  followUpIntent?: string;
 };
 
 const assistantInstructions = `
@@ -177,6 +180,34 @@ const ecommerceGlossary: Record<
     whyItMatters:
       "Attribution matters because it helps teams decide which channels are driving sales and where to invest marketing budget.",
   },
+  attributionConfidence: {
+    label: "Attribution confidence",
+    definition:
+      "Attribution confidence means how reliably a storefront can trace conversions to visible marketing and analytics signals.",
+    whyItMatters:
+      "Attribution confidence matters because low confidence can make it hard to tell which campaigns or channels are truly generating value.",
+  },
+  conversionFriction: {
+    label: "Conversion friction",
+    definition:
+      "Conversion friction means anything in the shopping path that makes it harder for a visitor to understand what to do next and complete a purchase.",
+    whyItMatters:
+      "Conversion friction matters because even small hesitations can reduce the percentage of visitors who move from interest to action.",
+  },
+  operationalClarity: {
+    label: "Operational clarity",
+    definition:
+      "Operational clarity means how clearly the storefront communicates order, support, returns, and shipping information to shoppers.",
+    whyItMatters:
+      "Operational clarity matters because purchase confidence and post-purchase experience depend on clear logistics and support cues.",
+  },
+  measurementConfidence: {
+    label: "Measurement confidence",
+    definition:
+      "Measurement confidence means how much trust the business can place in the visible public analytics signals to understand traffic and conversions.",
+    whyItMatters:
+      "Measurement confidence matters because weak tracking visibility makes it harder to know whether optimizations are working or not.",
+  },
 };
 
 function isDefinitionQuery(normalized: string) {
@@ -193,8 +224,6 @@ function isDefinitionQuery(normalized: string) {
     "problem",
     "fix",
     "improve",
-    "why is",
-    "why are",
     "where is",
     "when is",
   ];
@@ -205,6 +234,20 @@ function isDefinitionQuery(normalized: string) {
   );
 }
 
+function isConceptExplanationQuery(normalized: string) {
+  const conceptTriggers = [
+    "what is",
+    "what does",
+    "why does",
+    "why is",
+    "why should i care",
+    "explain",
+    "meaning of",
+  ];
+
+  return conceptTriggers.some((trigger) => normalized.includes(trigger));
+}
+
 function findGlossaryTerm(normalized: string) {
   if (hasAny(normalized, ["mobile cta", "mobile call to action"])) {
     return "mobileCta";
@@ -212,6 +255,26 @@ function findGlossaryTerm(normalized: string) {
 
   if (hasAny(normalized, ["checkout continuity", "checkout path", "cart checkout", "cart/checkout"])) {
     return "checkoutContinuity";
+  }
+
+  if (hasAny(normalized, ["trust visibility", "trust signal visibility", "trust signals"])) {
+    return "trustVisibility";
+  }
+
+  if (hasAny(normalized, ["attribution confidence", "marketing attribution confidence"]) ) {
+    return "attributionConfidence";
+  }
+
+  if (hasAny(normalized, ["measurement confidence", "tracking confidence", "conversion measurement"])) {
+    return "measurementConfidence";
+  }
+
+  if (hasAny(normalized, ["conversion friction", "checkout friction", "buying friction"])) {
+    return "conversionFriction";
+  }
+
+  if (hasAny(normalized, ["operational clarity", "operations clarity", "operational visibility"])) {
+    return "operationalClarity";
   }
 
   if (hasAny(normalized, ["operational visibility", "operations visibility", "operations continuity"])) {
@@ -298,13 +361,39 @@ function glossaryObservation(term: string, scanContext: Record<string, unknown>)
     return "This scan did not highlight strong public trust signals.";
   }
 
-  if (term === "conversionPath") {
-    const cartVisible = asBoolean(getExactVisibilityValue(scanContext, "cartVisible"));
-    const checkoutVisible = asBoolean(getExactVisibilityValue(scanContext, "checkoutVisible"));
-    const mobileVisible = asBoolean(getExactVisibilityValue(scanContext, "mobileCtaVisibleAboveFold"));
-    return `In this scan, the conversion path ${
-      cartVisible || checkoutVisible || mobileVisible ? "shows some access points" : "was not clearly connected"
-    } from action to cart/checkout.`;
+  if (term === "trustVisibility") {
+    const trustFindings = getCategoryFindings(scanContext, "trust");
+    if (trustFindings.length > 0) {
+      return `In this scan, the trust signals are most visible through ${findingTitle(trustFindings[0])}.`;
+    }
+    return "In this scan, public trust visibility was not a strong signal.";
+  }
+
+  if (term === "attributionConfidence") {
+    const tools = getTrackingTools(scanContext);
+    return tools.length
+      ? `In this scan, attribution confidence is tied to visible tools like ${tools.join(", ")}.`
+      : "In this scan, attribution confidence is limited by the lack of visible tracking tools.";
+  }
+
+  if (term === "measurementConfidence") {
+    const tools = getTrackingTools(scanContext);
+    return tools.length
+      ? `In this scan, measurement confidence is tied to the tracking tools visible on the page.`
+      : "In this scan, measurement confidence is low because public tracking visibility is limited.";
+  }
+
+  if (term === "conversionFriction") {
+    const ctaVisible = asBoolean(getExactVisibilityValue(scanContext, "mobileCtaVisibleAboveFold"));
+    return ctaVisible
+      ? "In this scan, the friction is more likely about clarity than the absence of a CTA."
+      : "In this scan, the friction could come from the mobile action being hard to find.";
+  }
+
+  if (term === "operationalClarity") {
+    const contactVisible = asBoolean(getExactVisibilityValue(scanContext, "contactSupportVisible"));
+    const orderReturnsVisible = asBoolean(getExactVisibilityValue(scanContext, "orderReturnsLanguageVisible"));
+    return `In this scan, operational clarity is ${contactVisible || orderReturnsVisible ? "partially visible" : "not clearly visible"} through support and order information cues.`;
   }
 
   if (term === "trackingVisibility") {
@@ -342,7 +431,10 @@ function buildGlossaryExactAnswer(message: string, scanContext: Record<string, u
   const normalized = normalizeText(message);
   const term = findGlossaryTerm(normalized);
 
-  if (!term || !isDefinitionQuery(normalized)) {
+  if (
+    !term ||
+    !(isDefinitionQuery(normalized) || isConceptExplanationQuery(normalized))
+  ) {
     return {
       matched: false,
       topic: "",
@@ -355,16 +447,20 @@ function buildGlossaryExactAnswer(message: string, scanContext: Record<string, u
 
   const glossary = ecommerceGlossary[term];
   const observation = glossaryObservation(term, scanContext);
+  const scanContextNote = observation
+    ? `In this scan, ${observation.replace(/^In this scan, /i, "")}`
+    : "The scan did not include enough visible evidence for this concept.";
 
   return {
     matched: true,
     topic: term,
-    directAnswer: glossary.definition,
+    directAnswer: `${glossary.definition} ${scanContextNote}`,
     evidence:
       observation || "The scan context did not include direct public-page evidence for this term.",
-    businessMeaning: glossary.whyItMatters,
+    businessMeaning:
+      `${glossary.whyItMatters} ${observation ? "That means this is worth reviewing as part of the current storefront story." : "I would treat this as a follow-up point in a manual storefront walkthrough."}`,
     suggestedFollowUp:
-      "Do you want me to explain how this applies to the current store scan?",
+      `Want me to connect ${glossary.label.toLowerCase()} with the current scan findings?`,
   };
 }
 
@@ -422,26 +518,7 @@ function consultantMeaning(value: string) {
   return `This usually matters because ${clean.charAt(0).toLowerCase()}${clean.slice(1)}`;
 }
 function formatExactAnswer(answer: ExactAnswer) {
-  const parts: string[] = [];
-
-  if (answer.directAnswer) {
-    parts.push(sanitizeEvidenceText(answer.directAnswer, { maxLength: 420 }));
-  }
-
-  if (answer.evidence) {
-    // Present evidence as a short human-friendly observation rather than a field dump.
-    parts.push(`What I see in the scan: ${sanitizeEvidenceText(answer.evidence, { maxLength: 420 })}`);
-  }
-
-  if (answer.businessMeaning) {
-    parts.push(consultantMeaning(answer.businessMeaning));
-  }
-
-  if (answer.suggestedFollowUp) {
-    parts.push(`If I were reviewing this manually, I would ask: ${sanitizeEvidenceText(answer.suggestedFollowUp, { maxLength: 200 })}`);
-  }
-
-  return parts.filter(Boolean).join("\n\n");
+  return buildConsultantResponse(answer);
 }
 
 function flattenFindings(value: unknown) {
@@ -700,6 +777,88 @@ function technicalSignalsSummary(scanContext: Record<string, unknown>) {
   return signals.join(", ");
 }
 
+function classifyTechnicalSeverity(scanContext: Record<string, unknown>): "Low" | "Medium" | "High" {
+  const rawDiagnostics = getNestedRecord(scanContext, "rawDiagnostics");
+  const failedCount = asArray(rawDiagnostics.failedRequests).length;
+  const consoleCount = asArray(rawDiagnostics.consoleErrors).length;
+  const warningCount = asArray(rawDiagnostics.warnings).length;
+
+  if (failedCount > 0 || consoleCount > 2) {
+    return "High";
+  }
+
+  if (consoleCount > 0 || warningCount > 0) {
+    return "Medium";
+  }
+
+  return "Low";
+}
+
+function buildConsultantResponse(answer: ExactAnswer) {
+  const parts: string[] = [];
+  const direct = sanitizeEvidenceText(answer.directAnswer, { maxLength: 420 });
+  if (direct) {
+    parts.push(direct);
+  }
+
+  if (answer.severity) {
+    parts.push(
+      answer.severity === "High"
+        ? "This is a high-priority technical concern that should be understood before moving to optimization recommendations."
+        : answer.severity === "Medium"
+          ? "This is a medium-priority signal worth checking before you assume the issue is only about customer experience."
+          : "This is a low-priority technical detail that still helps explain the scan context."
+    );
+  }
+
+  if (answer.evidence) {
+    parts.push(
+      `What I see in the scan: ${sanitizeEvidenceText(answer.evidence, { maxLength: 420 })}`,
+    );
+  }
+
+  if (answer.businessMeaning) {
+    parts.push(consultantMeaning(answer.businessMeaning));
+  }
+
+  if (answer.suggestedFollowUp) {
+    const followUp = answer.suggestedFollowUp.trim();
+    if (followUp.endsWith("?")) {
+      parts.push(sanitizeEvidenceText(followUp, { maxLength: 200 }));
+    } else {
+      parts.push(
+        `If I were reviewing this manually, I’d look at ${sanitizeEvidenceText(
+          followUp,
+          { maxLength: 200 },
+        )}`,
+      );
+    }
+  }
+
+  return parts.filter(Boolean).join("\n\n");
+}
+
+function technicalSeverityPhrase(scanContext: Record<string, unknown>) {
+  const rawDiagnostics = getNestedRecord(scanContext, "rawDiagnostics");
+  const failedCount = asArray(rawDiagnostics.failedRequests).length;
+  const consoleCount = asArray(rawDiagnostics.consoleErrors).length;
+  const warningCount = asArray(rawDiagnostics.warnings).length;
+
+  if (failedCount > 0 && consoleCount > 0) {
+    return "meaningful operational instability";
+  }
+
+  if (failedCount > 0 || consoleCount > 0) {
+    return "moderate technical friction";
+  }
+
+  if (warningCount > 0) {
+    return "some frontend noise worth checking";
+  }
+
+  return "relatively quiet surface-level signals";
+}
+
 function technicalExactAnswer(scanContext: Record<string, unknown>): ExactAnswer {
   const summary = technicalSignalsSummary(scanContext);
   const technicalFindings = getCategoryFindings(scanContext, "technical");
@@ -717,7 +876,7 @@ function technicalExactAnswer(scanContext: Record<string, unknown>): ExactAnswer
   return {
     matched: true,
     topic: "technical",
-    directAnswer: `The main technical concern is ${title}. What stands out technically is that ${summary}.`,
+    directAnswer: `The main technical concern is ${title}. In this scan, the evidence points to ${technicalSeverityPhrase(scanContext)} and ${summary}.`,
     evidence: finding
       ? findingEvidence(finding)
       : "The scan only uses public storefront signals, so I would verify these in a browser and platform-aware walkthrough.",
@@ -725,6 +884,8 @@ function technicalExactAnswer(scanContext: Record<string, unknown>): ExactAnswer
       `${priority.sentence} This is worth prioritizing because technical uncertainty can affect how confidently the team interprets checkout, tracking, and storefront-structure recommendations.`,
     suggestedFollowUp:
       "Do you want me to compare the technical signals with tracking visibility?",
+    severity: classifyTechnicalSeverity(scanContext),
+    archetype: "technical-risk",
   };
 }
 
@@ -1382,7 +1543,15 @@ export async function POST(request: NextRequest) {
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { reply: "", suggestedReplies: [], fallback: true },
+        {
+          reply:
+            "I can handle direct scan questions locally, but I can’t generate a broader consultant response without the OpenAI key.",
+          suggestedReplies: [
+            "What is the primary concern?",
+            "Can you explain the business impact?",
+          ],
+          fallback: true,
+        },
         { status: 503 },
       );
     }
