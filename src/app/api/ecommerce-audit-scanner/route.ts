@@ -837,6 +837,78 @@ function applyLiveDiagnosticScoring(
   });
 }
 
+function pickExecutiveSummaryPattern({
+  categories,
+  diagnostics,
+  findings,
+}: {
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}) {
+  const trackingScore = categories.find((category) => category.key === "trackingIssues")?.score ?? 100;
+  const technicalScore = categories.find((category) => category.key === "technicalIssues")?.score ?? 100;
+  const operationsScore = categories.find((category) => category.key === "operationsIssues")?.score ?? 100;
+  const conversionScore = categories.find((category) => category.key === "conversionIssues")?.score ?? 100;
+  const uxScore = categories.find((category) => category.key === "uxUiIssues")?.score ?? 100;
+
+  const topFindingTitles = findings.map((finding) => finding.title.toLowerCase());
+  const trackingToolCount = diagnostics.technologyDetections.filter((tool) => tool.detected).length;
+  const productDiscoveryVisible =
+    diagnostics.storefrontSignals.productNavigationVisible ||
+    diagnostics.storefrontSignals.collectionLinksVisible ||
+    diagnostics.storefrontSignals.searchVisible;
+
+  if (
+    trackingScore <= Math.min(technicalScore, operationsScore, conversionScore, uxScore) ||
+    trackingToolCount <= 1 ||
+    topFindingTitles.some((title) => title.includes("tracking") || title.includes("attribution"))
+  ) {
+    return "tracking-risk-heavy";
+  }
+
+  if (
+    technicalScore <= Math.min(trackingScore, operationsScore, conversionScore, uxScore) ||
+    diagnostics.consoleErrors.length > 0 ||
+    diagnostics.failedRequests.length > 0
+  ) {
+    return "technical-reliability-heavy";
+  }
+
+  if (
+    operationsScore <= Math.min(trackingScore, technicalScore, conversionScore, uxScore) ||
+    !diagnostics.commerceFlowSignals.cartVisible ||
+    !diagnostics.commerceFlowSignals.checkoutVisible ||
+    topFindingTitles.some((title) => title.includes("checkout") || title.includes("cart"))
+  ) {
+    return "operations/checkout-heavy";
+  }
+
+  if (
+    conversionScore <= Math.min(trackingScore, technicalScore, operationsScore, uxScore) ||
+    topFindingTitles.some((title) => title.includes("mobile cta") || title.includes("mobile")) ||
+    diagnostics.storefrontSignals.mobileCrowdingRisk
+  ) {
+    return "mobile-journey-heavy";
+  }
+
+  if (
+    !productDiscoveryVisible ||
+    topFindingTitles.some((title) => title.includes("product discovery") || title.includes("search") || title.includes("navigation"))
+  ) {
+    return "product-discovery-heavy";
+  }
+
+  if (
+    trustSignalCount(diagnostics) <= 3 ||
+    topFindingTitles.some((title) => title.includes("trust"))
+  ) {
+    return "trust-confidence-heavy";
+  }
+
+  return "balanced-needs-review";
+}
+
 function buildExecutiveSummary({
   categories,
   diagnostics,
@@ -855,38 +927,84 @@ function buildExecutiveSummary({
     diagnostics.consoleErrors.length > 0 ? "console errors" : "",
     diagnostics.failedRequests.length > 0 ? "failed network requests" : "",
   ].filter(Boolean);
+  const trackingToolCount = diagnostics.technologyDetections.filter((tool) => tool.detected).length;
+  const cartVisible = diagnostics.commerceFlowSignals.cartVisible;
+  const checkoutVisible = diagnostics.commerceFlowSignals.checkoutVisible;
+  const productDiscoveryVisible =
+    diagnostics.storefrontSignals.productNavigationVisible ||
+    diagnostics.storefrontSignals.collectionLinksVisible ||
+    diagnostics.storefrontSignals.searchVisible;
+  const trustSignalsVisible = trustSignalCount(diagnostics);
+  const mobileReadability = diagnostics.storefrontSignals.mobileCrowdingRisk
+    ? "crowded"
+    : diagnostics.storefrontSignals.mobileVisibleTextLength > 2200
+      ? "dense"
+      : "clear";
 
-  const condition =
-    overallScore < 65
-      ? "This store should be treated as a high-priority systems review before more traffic is pushed into the funnel."
-      : overallScore < 80
-        ? "This store has a workable foundation, but several conversion, tracking, or operations signals need review before scaling."
-        : "This store appears to have a healthy foundation, with the biggest value likely coming from focused optimization rather than urgent repair.";
+  const pattern = pickExecutiveSummaryPattern({
+    categories,
+    diagnostics,
+    findings,
+  });
 
-  const diagnosticsSentence =
-    diagnosticFlags.length > 0
-      ? `The live diagnostics flagged ${diagnosticFlags.join(", ")}, which may create uncertainty for conversion measurement or page reliability.`
-      : "The lightweight live diagnostics did not detect critical console or metadata issues during this scan.";
-
-  const platformSentence =
+  const platformEvidence =
     diagnostics.platformDetection.name !== "Unknown"
-      ? `The scan detected ${diagnostics.platformDetection.name} as the likely storefront platform with ${diagnostics.platformDetection.confidenceLabel.toLowerCase()} (${diagnostics.platformDetection.confidence}%).`
-      : "Platform visibility is limited and should be manually confirmed before making platform-specific recommendations.";
+      ? `${diagnostics.platformDetection.name} detection is ${diagnostics.platformDetection.confidenceLabel.toLowerCase()} (${diagnostics.platformDetection.confidence}%)`
+      : "platform visibility is limited";
 
-  const flowSentence =
-    diagnostics.commerceFlowSignals.checkoutVisible || diagnostics.commerceFlowSignals.cartVisible
-      ? "The cart and checkout path are visible enough to suggest a working commerce flow in this review."
-      : "Commerce flow signals are not clearly visible, which can make it harder to assess checkout readiness and conversion friction.";
+  const cartCheckoutSentence = cartVisible && checkoutVisible
+    ? "The public scan shows both cart and checkout entry points." 
+    : !cartVisible && !checkoutVisible
+      ? "The scan did not clearly detect cart or checkout entry points." 
+      : `The scan shows cart visibility as ${cartVisible ? "visible" : "not visible"} and checkout visibility as ${checkoutVisible ? "visible" : "not visible"}.`;
+
+  const trackingSentence = trackingToolCount > 0
+    ? `Public-page evidence shows ${trackingToolCount} visible marketing tool${trackingToolCount === 1 ? "" : "s"}.`
+    : "Public-page evidence did not show supported tracking tools.";
+
+  const productDiscoverySentence = productDiscoveryVisible
+    ? "Product discovery signals are present, though the clarity of the path should still be reviewed."
+    : "Product discovery signals are limited in this scan.";
+
+  const issueHeadline = {
+    "tracking-risk-heavy":
+      `This scan points to a storefront with visible commerce structure, but tracking visibility and attribution confidence should be reviewed before relying on the data.`,
+    "mobile-journey-heavy":
+      `The main concern in this scan is not the existence of ecommerce elements, but how clearly they guide shoppers through the mobile journey toward purchase.`,
+    "trust-confidence-heavy":
+      `This storefront appears to have enough visible signals for a practical review, but the trust and measurement paths should be confirmed more carefully.`,
+    "product-discovery-heavy":
+      `This scan points to a storefront that has some visible commerce structure, but the product discovery path is the weakest part of the public review.`,
+    "operations/checkout-heavy":
+      `This scan points to a storefront with some visible commerce structure, but the checkout path and operational continuity should be reviewed carefully.`,
+    "technical-reliability-heavy":
+      `This scan points to a storefront that has some visible commerce structure, but public-page reliability signals suggest the page should be reviewed for technical risk first.`,
+    "balanced-needs-review":
+      `This scan points to a storefront with multiple visible commerce signals, but several areas still need closer review before deeper optimization.`,
+  }[pattern];
+
+  const summaryDetails = [
+    issueHeadline,
+    platformEvidence ? `${platformEvidence}.` : "",
+    cartCheckoutSentence,
+    trackingSentence,
+    productDiscoverySentence,
+    diagnosticFlags.length > 0
+      ? `The scan also found ${diagnosticFlags.join(", ")} on the public page.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const prioritySentence =
     highestImpactFindings.length > 0
-      ? `The highest-impact review items are ${highestImpactFindings
+      ? `The top findings include ${highestImpactFindings
           .map((finding) => finding.title.toLowerCase())
           .join(", ")}.`
-      : "No high-impact public-page issue was detected, so the next review should focus on manual journey confirmation.";
+      : "No single highest-impact finding was detected from the lightweight review.";
 
   return {
-    summary: `${condition} ${diagnosticsSentence} ${prioritySentence}`,
+    summary: `${summaryDetails} ${prioritySentence}`.trim(),
     highestImpactOpportunities:
       highestImpactFindings.length > 0
         ? highestImpactFindings.map(
@@ -906,7 +1024,7 @@ function buildExecutiveSummary({
                 `${category.label}: manually confirm the customer journey because no high-impact heuristic finding was detected.`,
             ),
     businessInterpretation:
-      `The practical business question is not only whether the storefront looks good, but whether visitors can understand the offer, move through the buying path, and leave clean data for the team to act on. ${platformSentence} ${flowSentence} Tracking and marketing tool visibility matters because it determines whether decision-makers can trust the conversion data and optimize media spend effectively.`,
+      `The practical business question is whether visitors can understand the offer, move through the buying path, and leave usable data for the team. ${platformEvidence}. ${cartCheckoutSentence} ${trackingSentence} ${productDiscoverySentence} Mobile readability appears ${mobileReadability}.`,
   };
 }
 

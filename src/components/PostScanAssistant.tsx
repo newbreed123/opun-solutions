@@ -514,6 +514,104 @@ function getBenchmarkSummary(audit: AssistantAudit) {
   return "The scan did not return detailed benchmark context, so I would treat the benchmark view as directional and focus on the concrete findings first.";
 }
 
+function humanTopicName(topic: ConversationTopic) {
+  if (topic === "ux") return "UX";
+  if (topic === "conversion") return "conversion";
+  if (topic === "tracking") return "tracking";
+  if (topic === "trust") return "trust";
+  if (topic === "operations") return "operations";
+  if (topic === "technical") return "technical";
+  return topicLabel(topic)?.toLowerCase() ?? "this area";
+}
+
+function humanFindingTitle(finding: RetrievedFinding, topic: ConversationTopic) {
+  const title = finding.title.trim();
+  const genericTitles = ["technical", "conversion", "tracking", "operations", "ux/ui", "trust"];
+
+  if (!title || genericTitles.includes(title.toLowerCase())) {
+    return `${humanTopicName(topic)} signals`;
+  }
+
+  return title;
+}
+
+function technicalSignalsSummary(audit: AssistantAudit) {
+  const platform = audit.diagnostics.platformDetection;
+  const failedCount = audit.diagnostics.failedRequests?.length ?? 0;
+  const consoleCount = audit.diagnostics.consoleErrors?.length ?? 0;
+  const warningCount = audit.diagnostics.warnings?.length ?? 0;
+  const signals: string[] = [];
+
+  if (
+    platform.confidence < 70 ||
+    /low|needs review/i.test(platform.confidenceLabel)
+  ) {
+    signals.push(
+      `the storefront platform was only identified with ${platform.confidenceLabel.toLowerCase()} confidence`,
+    );
+  } else if (platform.name && platform.name !== "Unknown") {
+    signals.push(
+      `${platform.name} was the likely platform with ${platform.confidenceLabel.toLowerCase()} confidence`,
+    );
+  }
+
+  if (failedCount > 0) {
+    signals.push(
+      `the scan found ${failedCount === 1 ? "one failed frontend request" : "a few failed frontend requests"}`,
+    );
+  }
+
+  if (consoleCount > 0) {
+    signals.push(
+      `${consoleCount === 1 ? "one console error was" : "some console errors were"} visible during the page load`,
+    );
+  } else if (warningCount > 0) {
+    signals.push("there were frontend warnings worth checking in context");
+  }
+
+  return signals.length > 0
+    ? signals.join(", ")
+    : "the public technical signals look relatively quiet in this lightweight scan";
+}
+
+function priorityTone(severity?: Severity) {
+  const normalized = String(severity ?? "").toLowerCase();
+
+  if (normalized.includes("critical")) {
+    return {
+      label: "Critical",
+      phrase: "needs immediate review",
+      sentence:
+        "This does not prove everything is failing, but it does need immediate review before more traffic or operational changes are pushed through the journey.",
+    };
+  }
+
+  if (normalized.includes("high")) {
+    return {
+      label: "High Priority",
+      phrase: "should be prioritized",
+      sentence:
+        "This is not proof the store is broken, but I would still treat it as a high-priority review item before pushing more traffic or making platform-specific decisions.",
+    };
+  }
+
+  if (normalized.includes("medium") || normalized.includes("needs review")) {
+    return {
+      label: "Medium",
+      phrase: "is worth reviewing",
+      sentence:
+        "This is worth reviewing because it can still affect confidence in the customer journey, even if it is not the most urgent item.",
+    };
+  }
+
+  return {
+    label: "Low",
+    phrase: "is lower-priority polish",
+    sentence:
+      "I would treat this as lower-priority polish unless it shows up again during a manual storefront walkthrough.",
+  };
+}
+
 function allScanEvidence(audit: AssistantAudit) {
   return [
     audit.auditNarrative,
@@ -784,6 +882,7 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
       status: category.status,
       statusDetail: category.statusDetail,
       purpose: category.purpose,
+      priority: category.priority,
       scoreExplanation: category.scoreExplanation,
     })),
     categoryFindings: context.categoryFindings,
@@ -811,6 +910,9 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
       commerceFlowSignals: audit.diagnostics.commerceFlowSignals,
       conversionSignals: audit.diagnostics.conversionSignals,
       storefrontSignals: audit.diagnostics.storefrontSignals,
+      consoleErrors: audit.diagnostics.consoleErrors ?? [],
+      failedRequests: audit.diagnostics.failedRequests ?? [],
+      warnings: audit.diagnostics.warnings ?? [],
     },
   };
 }
@@ -1547,18 +1649,23 @@ function buildFindingListAnswer(
     });
   }
 
+  const priority = priorityTone(topFinding.severity);
+
   return buildMessage(
     `assistant-direct-${topic}-${Date.now()}`,
     [
-      `Direct answer: The scan found ${findings.length} ${label.toLowerCase()} finding${
+      `Direct answer: What stands out to me in ${label.toLowerCase()} is ${humanFindingTitle(
+        topFinding,
+        topic,
+      )}. The scan found ${findings.length} relevant finding${
         findings.length === 1 ? "" : "s"
-      }. The strongest is ${topFinding.title}.`,
+      } in this area, and this ${priority.phrase}.`,
       `Evidence: ${
         topFinding.evidenceSummary ??
         topFinding.explanation ??
         "The scan surfaced this through the current report findings."
       }`,
-      `Business meaning: ${topFinding.explanation}`,
+      `Business meaning: ${priority.sentence} This usually matters because ${topFinding.explanation}`,
       continueQuestion(topic),
     ],
     {
@@ -1871,20 +1978,27 @@ function buildTopicResponse(
   audit: AssistantAudit,
   topic: ConversationTopic,
 ): AssistantTurn {
+  if (topic === "technical") {
+    return buildTechnicalResponse(audit);
+  }
+
   const finding = getFindingByTopic(audit, topic);
   const related = getRelatedFindings(audit, finding);
   const label = topicLabel(topic);
+  const title = humanFindingTitle(finding, topic);
+  const topicName = humanTopicName(topic);
+  const priority = priorityTone(finding.severity);
 
   const paragraphs = [
-    `The strongest ${label?.toLowerCase()} finding I see is ${finding.title}.`,
+    `What stands out to me in ${topicName} is ${title}. Based on the report priority, this ${priority.phrase}.`,
     finding.evidenceSummary
-      ? `The scan evidence is: ${finding.evidenceSummary}`
-      : `The scan context says: ${finding.explanation}`,
-    `${finding.explanation} First action: ${
+      ? `If I were reviewing this manually, I would use this as the first clue: ${finding.evidenceSummary}`
+      : `The scan is pointing to this pattern: ${finding.explanation}`,
+    `${priority.sentence} The bigger concern is that ${finding.explanation} I would start here: ${
       finding.recommendedFirstAction ?? "Review the related storefront flow."
     }`,
     related.length > 0
-      ? `Related findings to keep nearby: ${related.map((item) => item.title).join(", ")}.`
+      ? `I would keep ${related.map((item) => item.title).join(" and ")} nearby, because these issues often show up together in the customer journey.`
       : "I would keep this connected to the broader customer journey rather than treating it as an isolated issue.",
     continueQuestion(topic),
   ];
@@ -1898,20 +2012,50 @@ function buildTopicResponse(
   };
 }
 
+function buildTechnicalResponse(audit: AssistantAudit): AssistantTurn {
+  const finding = getFindingByTopic(audit, "technical");
+  const summary = technicalSignalsSummary(audit);
+  const priority = priorityTone(finding.severity);
+  const title = humanFindingTitle(finding, "technical");
+
+  return {
+    message: buildMessage(
+      `assistant-technical-${Date.now()}`,
+      [
+        `The main technical concern is ${title}. What stands out technically is that ${summary}.`,
+        `I would not treat this as proof the store is broken, but I would still treat it as ${priority.label === "High Priority" ? "a high-priority review item" : `something that ${priority.phrase}`} because technical uncertainty can affect checkout, tracking, and storefront-structure recommendations.`,
+        finding.evidenceSummary
+          ? `The useful clue from the report is: ${finding.evidenceSummary}`
+          : "If I were reviewing this manually, I would check the failed requests, platform signal, page templates, and tracking scripts in the browser first.",
+        continueQuestion("technical"),
+      ],
+      { topic: "technical", finding },
+    ),
+    nextState: createNextState(
+      "technical",
+      "ask_technical",
+      finding,
+      finding.categoryLabel ?? "Technical",
+    ),
+  };
+}
+
 function buildPriorityResponse(audit: AssistantAudit): AssistantTurn {
   const priorities = getTopActionItems(audit);
   const finding = getHighestImpactFinding(audit);
+  const priority = priorityTone(finding.severity);
 
   return {
     message: buildMessage(
       `assistant-priority-${Date.now()}`,
       [
-        `I would start with ${finding.title}, because it is the clearest operational signal in this scan.`,
+        `I would start with ${finding.title}, because it is the clearest operational signal in this scan and it ${priority.phrase}.`,
+        priority.sentence,
         finding.evidenceSummary
-          ? `The evidence clue is: ${finding.evidenceSummary}`
+          ? `The practical clue is: ${finding.evidenceSummary}`
           : "The scan is pointing to this as the first area to validate before changing campaigns or tooling.",
         finding.recommendedFirstAction
-          ? `The first practical action is: ${finding.recommendedFirstAction}`
+          ? `If I were reviewing this manually, I would start by doing this: ${finding.recommendedFirstAction}`
           : "The first practical action is to review the customer journey around this finding and confirm whether it shows up in the full storefront flow.",
         continueQuestion("priority"),
       ],
@@ -1941,17 +2085,19 @@ function buildClarificationResponse(
   if (state.currentTopic) {
     const topic = state.currentTopic;
     const finding = state.lastFindingDiscussed ?? getFindingByTopic(audit, topic);
+    const priority = priorityTone(finding.severity);
 
     return {
       message: buildMessage(
         `assistant-clarify-${Date.now()}`,
         [
-          `Continuing on ${topicLabel(topic)?.toLowerCase()}: ${finding.title} is important because ${finding.explanation}`,
-          finding.evidenceSummary
-            ? `The scan clue behind that is: ${finding.evidenceSummary}`
+          `Continuing on ${topicLabel(topic)?.toLowerCase()}: ${finding.title} ${priority.phrase}.`,
+          `${priority.sentence} It matters because ${finding.explanation}`,
+        finding.evidenceSummary
+            ? `The useful scan clue behind that is: ${finding.evidenceSummary}`
             : "The scan did not expose every internal detail, so I would treat this as a public-page signal to verify in a deeper review.",
-          finding.recommendedFirstAction
-            ? `The next sensible action is: ${finding.recommendedFirstAction}`
+        finding.recommendedFirstAction
+            ? `If I were reviewing this manually, I would check this next: ${finding.recommendedFirstAction}`
             : "The next sensible action is to inspect this part of the customer journey manually.",
           continueQuestion(topic),
         ],
@@ -1969,8 +2115,8 @@ function buildClarificationResponse(
 
   return {
     message: buildMessage(`assistant-clarify-${Date.now()}`, [
-      "I can explain the scan by area: UX issues, conversion issues, tracking visibility, trust signals, operations, or what Opun would fix first.",
-      "Which area do you want me to walk through first?",
+      "I can walk through the scan like a human review: UX, conversion, tracking, trust, operations, or what I would fix first.",
+      "Where should we start?",
     ]),
     nextState: createNextState(null, "ask_clarification", null, null, state.conversationStep),
   };
@@ -1979,17 +2125,18 @@ function buildClarificationResponse(
 function buildSeriousnessResponse(audit: AssistantAudit): AssistantTurn {
   const finding = getHighestImpactFinding(audit);
   const severity = finding.severity ?? getPrimaryConcern(audit)?.severity ?? audit.overallStatus;
+  const priority = priorityTone(severity);
 
   return {
     message: buildMessage(
       `assistant-serious-${Date.now()}`,
       [
-        `I would treat this as ${String(severity).toLowerCase()} priority based on the scan score of ${audit.overallScore}/100 and status of ${audit.overallStatus}.`,
+        `I would treat this as ${priority.label.toLowerCase()} based on the scan score of ${audit.overallScore}/100 and status of ${audit.overallStatus}.`,
         `The main finding behind that read is ${finding.title}.`,
         finding.evidenceSummary
-          ? `The clearest evidence is: ${finding.evidenceSummary}`
+          ? `The clue I would pay attention to is: ${finding.evidenceSummary}`
           : "The scan found enough public evidence to justify a closer human review.",
-        "That does not mean the store is broken. It means the public scan found friction worth validating before investing more into traffic, campaigns, or new tools.",
+        priority.sentence,
         continueQuestion("priority"),
       ],
       { topic: "priority", finding, cta: true },
@@ -2069,11 +2216,11 @@ function buildTrackingResponse(audit: AssistantAudit): AssistantTurn {
       `assistant-tracking-${Date.now()}`,
       [
         trackingSummary,
-        `The strongest tracking-related scan finding is ${finding.title}.`,
+        `What stands out on tracking is ${humanFindingTitle(finding, "tracking")}.`,
         finding.evidenceSummary
-          ? `The evidence clue is: ${finding.evidenceSummary}`
+          ? `The useful clue is: ${finding.evidenceSummary}`
           : "The scan only sees public signals, so hidden server-side tracking may still exist.",
-        `${finding.explanation} ${continueQuestion("tracking")}`,
+        `The bigger concern is measurement confidence: ${finding.explanation} ${continueQuestion("tracking")}`,
       ],
       { topic: "tracking", finding },
     ),
@@ -2113,7 +2260,7 @@ function buildFallbackResponse(
 ): AssistantTurn {
   return {
     message: buildMessage(`assistant-fallback-${Date.now()}`, [
-      "I do not see that exact item in this scan, but I can explain UX, conversion, tracking, trust, operations, platform visibility, or what to fix first.",
+      "I may not have enough from this scan to answer that exact question, but I can walk through UX, conversion, tracking, trust, operations, or what I would fix first.",
     ]),
     nextState: createNextState(
       state.currentTopic,

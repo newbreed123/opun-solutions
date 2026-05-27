@@ -49,9 +49,19 @@ Start with the direct answer if the user asks about a specific item. Do not answ
 
 You should:
 - explain findings in plain English
+- sound like an experienced ecommerce operator reviewing the scan live
+- use short natural paragraphs, not diagnostic field dumps
+- use phrases like "What stands out to me is", "If I were reviewing this manually", and "The bigger concern is" when they fit naturally
+- preserve priority and severity; high-priority and critical findings should still sound important without sounding alarmist
 - connect findings to conversion, trust, tracking, operations, or the customer journey
 - ask one helpful follow-up question when useful
 - recommend booking a free audit only when it is a natural next step
+
+Avoid:
+- robotic phrasing such as "The strongest technical finding is Technical"
+- raw field-name dumps such as "console errors: 0; failed requests: 6"
+- repeating metrics unless the number meaningfully changes the recommendation
+- softening high-priority findings with phrases like "I would not panic" unless immediately followed by a clear priority statement
 
 Guardrails:
 - Do not claim you inspected private systems, admin panels, analytics accounts, checkout internals, or backend data.
@@ -96,6 +106,268 @@ function hasAny(value: string, keywords: string[]) {
   return keywords.some((keyword) => normalized.includes(keyword));
 }
 
+const ecommerceGlossary: Record<
+  string,
+  {
+    label: string;
+    definition: string;
+    whyItMatters: string;
+  }
+> = {
+  cta: {
+    label: "CTA",
+    definition:
+      "CTA means the primary call-to-action button or link a shopper sees when they are ready to act, such as Shop Now, Add to Cart, Contact Us, Book Now, or Learn More.",
+    whyItMatters:
+      "A clear CTA matters because shoppers often decide quickly on mobile, and one strong primary action helps move them toward the next step without distraction.",
+  },
+  mobileCta: {
+    label: "Mobile CTA",
+    definition:
+      "Mobile CTA means the main call-to-action button or link a shopper sees on a mobile screen, such as Shop Now, Add to Cart, Book, Contact, or Learn More.",
+    whyItMatters:
+      "Mobile shoppers have less screen space and attention, so the primary mobile action should be obvious and outweigh competing links or buttons.",
+  },
+  productDiscovery: {
+    label: "Product discovery",
+    definition:
+      "Product discovery means the signals and navigation that help shoppers find relevant products, such as search, category navigation, collection links, and visible product pathways.",
+    whyItMatters:
+      "Strong product discovery helps shoppers move from browsing to buying without feeling lost on the storefront.",
+  },
+  trustSignal: {
+    label: "Trust signal",
+    definition:
+      "Trust signal means a visible reassurance cue such as reviews, shipping policies, payment trust badges, warranties, or customer support links.",
+    whyItMatters:
+      "Trust signals reduce shopper uncertainty and help more visitors feel comfortable moving forward with a purchase.",
+  },
+  conversionPath: {
+    label: "Conversion path",
+    definition:
+      "Conversion path means the shopper journey from interest to action, including visible CTAs, product discovery, cart access, and checkout entry points.",
+    whyItMatters:
+      "A clear conversion path reduces friction and makes it more likely that visitors complete the purchase journey.",
+  },
+  trackingVisibility: {
+    label: "Tracking visibility",
+    definition:
+      "Tracking visibility means whether public-page analytics and marketing tags are detectable, such as GA4, GTM, Meta Pixel, or other measurement tools.",
+    whyItMatters:
+      "Tracking visibility matters because it determines how confidently a business can interpret traffic, campaigns, and conversion performance.",
+  },
+  operationalVisibility: {
+    label: "Operational visibility",
+    definition:
+      "Operational visibility means how obvious operational touchpoints are, such as contact/support links, order status, returns, and shipping information.",
+    whyItMatters:
+      "Operational visibility matters because it helps shoppers trust the store and supports post-purchase service, reducing doubt before checkout.",
+  },
+  checkoutContinuity: {
+    label: "Checkout continuity",
+    definition:
+      "Checkout continuity means how clearly shoppers can move from cart to checkout and whether the purchase path stays connected from product selection through payment.",
+    whyItMatters:
+      "A smooth checkout continuity reduces abandonment and makes the buying journey easier to complete.",
+  },
+  attribution: {
+    label: "Attribution",
+    definition:
+      "Attribution means knowing which marketing touchpoints or campaigns led a shopper to convert, usually through visible analytics or tag manager signals.",
+    whyItMatters:
+      "Attribution matters because it helps teams decide which channels are driving sales and where to invest marketing budget.",
+  },
+};
+
+function isDefinitionQuery(normalized: string) {
+  const positiveTriggers = [
+    "what is",
+    "define",
+    "what does",
+    "meaning of",
+    "means",
+  ];
+  const negativeTriggers = [
+    "wrong",
+    "issue",
+    "problem",
+    "fix",
+    "improve",
+    "why is",
+    "why are",
+    "where is",
+    "when is",
+  ];
+
+  return (
+    positiveTriggers.some((trigger) => normalized.includes(trigger)) &&
+    !negativeTriggers.some((trigger) => normalized.includes(trigger))
+  );
+}
+
+function findGlossaryTerm(normalized: string) {
+  if (hasAny(normalized, ["mobile cta", "mobile call to action"])) {
+    return "mobileCta";
+  }
+
+  if (hasAny(normalized, ["checkout continuity", "checkout path", "cart checkout", "cart/checkout"])) {
+    return "checkoutContinuity";
+  }
+
+  if (hasAny(normalized, ["operational visibility", "operations visibility", "operations continuity"])) {
+    return "operationalVisibility";
+  }
+
+  if (hasAny(normalized, ["tracking visibility", "tracking visible", "analytics visibility"])) {
+    return "trackingVisibility";
+  }
+
+  if (hasAny(normalized, ["conversion path", "purchase path"])) {
+    return "conversionPath";
+  }
+
+  if (hasAny(normalized, ["trust signal", "trust signals"])) {
+    return "trustSignal";
+  }
+
+  if (hasAny(normalized, ["product discovery", "product discover"])) {
+    return "productDiscovery";
+  }
+
+  if (hasAny(normalized, ["attribution", "marketing attribution", "conversion attribution"])) {
+    return "attribution";
+  }
+
+  if (hasAny(normalized, ["cta", "call to action"])) {
+    return "cta";
+  }
+
+  return null;
+}
+
+function glossaryObservation(term: string, scanContext: Record<string, unknown>) {
+  const exact = getNestedRecord(scanContext, "exactCommerceVisibility");
+  const signal = getNestedRecord(scanContext, "commerceSignals");
+
+  if (term === "mobileCta") {
+    const mobileVisible = asBoolean(getExactVisibilityValue(scanContext, "mobileCtaVisibleAboveFold"));
+    const mobileLabels = getExactArray(scanContext, "mobileCtaLabels");
+    if (mobileVisible) {
+      return `In this scan, a mobile CTA was visible above the fold${
+        mobileLabels.length ? ` with labels like ${mobileLabels.join(", ")}` : ""
+      }.`;
+    }
+    return "In this scan, a strong mobile CTA was not clearly visible above the fold.";
+  }
+
+  if (term === "cta") {
+    const mobileVisible = asBoolean(getExactVisibilityValue(scanContext, "mobileCtaVisibleAboveFold"));
+    const desktopVisible = asBoolean(getExactVisibilityValue(scanContext, "desktopCtaVisible"));
+    const mobileLabels = getExactArray(scanContext, "mobileCtaLabels");
+    const desktopLabels = getExactArray(scanContext, "ctaLabels");
+    const visibleLabel = mobileVisible
+      ? `mobile CTA was visible${mobileLabels.length ? ` with labels like ${mobileLabels.join(", ")}` : ""}`
+      : desktopVisible
+      ? `desktop CTA was visible${desktopLabels.length ? ` with labels like ${desktopLabels.join(", ")}` : ""}`
+      : "a CTA was not clearly visible";
+
+    return `In this scan, ${visibleLabel}.`;
+  }
+
+  if (term === "productDiscovery") {
+    const navVisible = asBoolean(getExactVisibilityValue(scanContext, "productNavigationVisible"));
+    const collectionVisible = asBoolean(getExactVisibilityValue(scanContext, "collectionLinksVisible"));
+    const searchVisible = asBoolean(getExactVisibilityValue(scanContext, "searchVisible"));
+    const pieces = [];
+
+    if (navVisible) pieces.push("category navigation");
+    if (collectionVisible) pieces.push("collection or product links");
+    if (searchVisible) pieces.push("store search");
+
+    if (pieces.length > 0) {
+      return `In this scan, product discovery cues were visible through ${pieces.join(", ")}.`;
+    }
+    return "In this scan, product discovery cues were not clearly visible.";
+  }
+
+  if (term === "trustSignal") {
+    const trustFindings = getCategoryFindings(scanContext, "trust");
+    if (trustFindings.length > 0) {
+      return `In this scan, trust-related evidence included ${findingTitle(trustFindings[0])}.`;
+    }
+    return "This scan did not highlight strong public trust signals.";
+  }
+
+  if (term === "conversionPath") {
+    const cartVisible = asBoolean(getExactVisibilityValue(scanContext, "cartVisible"));
+    const checkoutVisible = asBoolean(getExactVisibilityValue(scanContext, "checkoutVisible"));
+    const mobileVisible = asBoolean(getExactVisibilityValue(scanContext, "mobileCtaVisibleAboveFold"));
+    return `In this scan, the conversion path ${
+      cartVisible || checkoutVisible || mobileVisible ? "shows some access points" : "was not clearly connected"
+    } from action to cart/checkout.`;
+  }
+
+  if (term === "trackingVisibility") {
+    const tools = getTrackingTools(scanContext);
+    return tools.length
+      ? `In this scan, visible tracking tools included ${tools.join(", ")}.`
+      : "In this scan, no supported public tracking tools were clearly visible.";
+  }
+
+  if (term === "operationalVisibility") {
+    const contactVisible = asBoolean(getExactVisibilityValue(scanContext, "contactSupportVisible"));
+    const orderReturnsVisible = asBoolean(getExactVisibilityValue(scanContext, "orderReturnsLanguageVisible"));
+    return `In this scan, operational cues were ${
+      contactVisible || orderReturnsVisible ? "partially visible" : "not clearly visible"
+    } on the public page.`;
+  }
+
+  if (term === "checkoutContinuity") {
+    const cartVisible = asBoolean(getExactVisibilityValue(scanContext, "cartVisible"));
+    const checkoutVisible = asBoolean(getExactVisibilityValue(scanContext, "checkoutVisible"));
+    return `In this scan, cart visibility was ${boolPhrase(cartVisible)} and checkout visibility was ${boolPhrase(checkoutVisible)}.`;
+  }
+
+  if (term === "attribution") {
+    const tools = getTrackingTools(scanContext);
+    return tools.length
+      ? `In this scan, attribution signals were inferred from ${tools.join(", ")} on the public page.`
+      : "In this scan, attribution signals were not clearly visible from public tracking evidence.";
+  }
+
+  return "";
+}
+
+function buildGlossaryExactAnswer(message: string, scanContext: Record<string, unknown>): ExactAnswer {
+  const normalized = normalizeText(message);
+  const term = findGlossaryTerm(normalized);
+
+  if (!term || !isDefinitionQuery(normalized)) {
+    return {
+      matched: false,
+      topic: "",
+      directAnswer: "",
+      evidence: "",
+      businessMeaning: "",
+      suggestedFollowUp: "",
+    };
+  }
+
+  const glossary = ecommerceGlossary[term];
+  const observation = glossaryObservation(term, scanContext);
+
+  return {
+    matched: true,
+    topic: term,
+    directAnswer: glossary.definition,
+    evidence:
+      observation || "The scan context did not include direct public-page evidence for this term.",
+    businessMeaning: glossary.whyItMatters,
+    suggestedFollowUp:
+      "Do you want me to explain how this applies to the current store scan?",
+  };
+}
+
 function boolPhrase(value: boolean | null) {
   if (value === true) return "visible";
   if (value === false) return "not visible";
@@ -136,13 +408,40 @@ function signalMeaning(signal: Record<string, unknown>, fallback: string) {
   return asString(signal.businessMeaning) || fallback;
 }
 
+function consultantMeaning(value: string) {
+  const clean = sanitizeEvidenceText(value, { maxLength: 220 });
+
+  if (!clean) {
+    return "This is a useful public-page clue, but I would validate it in a manual storefront walkthrough before treating it as final.";
+  }
+
+  if (/^(this usually matters|the bigger concern|i would|this is not|this does not|that does not)/i.test(clean)) {
+    return clean;
+  }
+
+  return `This usually matters because ${clean.charAt(0).toLowerCase()}${clean.slice(1)}`;
+}
 function formatExactAnswer(answer: ExactAnswer) {
-  return [
-    `Direct answer: ${sanitizeEvidenceText(answer.directAnswer, { maxLength: 180 })}`,
-    `Evidence from scan: ${sanitizeEvidenceText(answer.evidence, { maxLength: 260 })}`,
-    `What it means: ${sanitizeEvidenceText(answer.businessMeaning, { maxLength: 220 })}`,
-    `Next question: ${sanitizeEvidenceText(answer.suggestedFollowUp, { maxLength: 180 })}`,
-  ].join("\n\n");
+  const parts: string[] = [];
+
+  if (answer.directAnswer) {
+    parts.push(sanitizeEvidenceText(answer.directAnswer, { maxLength: 420 }));
+  }
+
+  if (answer.evidence) {
+    // Present evidence as a short human-friendly observation rather than a field dump.
+    parts.push(`What I see in the scan: ${sanitizeEvidenceText(answer.evidence, { maxLength: 420 })}`);
+  }
+
+  if (answer.businessMeaning) {
+    parts.push(consultantMeaning(answer.businessMeaning));
+  }
+
+  if (answer.suggestedFollowUp) {
+    parts.push(`If I were reviewing this manually, I would ask: ${sanitizeEvidenceText(answer.suggestedFollowUp, { maxLength: 200 })}`);
+  }
+
+  return parts.filter(Boolean).join("\n\n");
 }
 
 function flattenFindings(value: unknown) {
@@ -174,6 +473,99 @@ function findingEvidence(finding: Record<string, unknown>) {
     asString(finding.evidenceSummary) ||
     asString(finding.explanation) ||
       "The scan context included this as a finding.",
+  );
+}
+
+function priorityTone(value: unknown) {
+  const normalized = String(value ?? "").toLowerCase();
+
+  if (normalized.includes("critical")) {
+    return {
+      label: "Critical",
+      phrase: "needs immediate review",
+      sentence:
+        "This does not prove everything is failing, but it does need immediate review before more traffic or operational changes are pushed through the journey.",
+    };
+  }
+
+  if (normalized.includes("high")) {
+    return {
+      label: "High Priority",
+      phrase: "should be prioritized",
+      sentence:
+        "This is not proof the store is broken, but I would still treat it as a high-priority review item before pushing more traffic or making platform-specific decisions.",
+    };
+  }
+
+  if (normalized.includes("medium") || normalized.includes("needs review")) {
+    return {
+      label: "Medium",
+      phrase: "is worth reviewing",
+      sentence:
+        "This is worth reviewing because it can still affect confidence in the customer journey, even if it is not the most urgent item.",
+    };
+  }
+
+  return {
+    label: "Low",
+    phrase: "is lower-priority polish",
+    sentence:
+      "I would treat this as lower-priority polish unless it shows up again during a manual storefront walkthrough.",
+  };
+}
+
+function topicCategoryKeys(topic: string) {
+  const keys: Record<string, string[]> = {
+    ux: ["ux", "uxui", "uxuiissues", "ux/ui"],
+    conversion: ["conversion", "conversionissues"],
+    trust: ["trust", "trustsignals"],
+    tracking: ["tracking", "trackingissues"],
+    operations: ["operations", "operationsissues"],
+    technical: ["technical", "technicalissues"],
+    platform: ["platform", "platformvisibility", "technicalissues"],
+  };
+
+  return keys[topic] ?? [topic];
+}
+
+function categoryPriorityForTopic(
+  scanContext: Record<string, unknown>,
+  topic: string,
+) {
+  const category = asArray(scanContext.categoryScores)
+    .map(asRecord)
+    .find((item) => {
+      const haystack = [
+        asString(item.key),
+        asString(item.label),
+        asString(item.status),
+        asString(item.statusDetail),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .replace(/[^a-z0-9/]+/g, "");
+
+      return topicCategoryKeys(topic).some((key) =>
+        haystack.includes(key.replace(/[^a-z0-9/]+/g, "")),
+      );
+    });
+
+  return (
+    asString(category?.priority) ||
+    asString(category?.status) ||
+    asString(category?.statusDetail)
+  );
+}
+
+function findingPriorityTone(
+  finding: Record<string, unknown> | undefined,
+  scanContext: Record<string, unknown>,
+  topic: string,
+) {
+  return priorityTone(
+    asString(finding?.severity) ||
+      asString(finding?.priority) ||
+      categoryPriorityForTopic(scanContext, topic),
   );
 }
 
@@ -210,17 +602,22 @@ function buildFindingsAnswer(
 
   const topFinding = findings[0];
   const titles = findings.slice(0, 3).map(findingTitle).join(", ");
+  const priority = findingPriorityTone(topFinding, scanContext, topic);
 
   return {
     matched: true,
     topic,
-    directAnswer: `The scan found ${findings.length} ${label} finding${
+    directAnswer: `What stands out to me in ${label} is ${findingTitle(
+      topFinding,
+    )}. The scan found ${findings.length} relevant finding${
       findings.length === 1 ? "" : "s"
-    }. The strongest is ${findingTitle(topFinding)}.`,
-    evidence: `${findingEvidence(topFinding)} Related ${label} findings: ${titles}.`,
+    } in this area, and this ${priority.phrase}.`,
+    evidence: `${findingEvidence(topFinding)} Related ${label} findings to keep nearby: ${titles}.`,
     businessMeaning:
-      asString(topFinding.explanation) ||
-      "This area can influence how clearly shoppers understand the journey and move toward purchase.",
+      `${priority.sentence} ${
+        asString(topFinding.explanation) ||
+        "This area can influence how clearly shoppers understand the journey and move toward purchase."
+      }`,
     suggestedFollowUp:
       topic === "ux"
         ? "Do you want me to compare the UX findings with conversion?"
@@ -255,6 +652,82 @@ function getActionItems(scanContext: Record<string, unknown>) {
   return asArray(scanContext.whatToReviewFirst).map(asRecord);
 }
 
+function technicalSignalsSummary(scanContext: Record<string, unknown>) {
+  const rawDiagnostics = getNestedRecord(scanContext, "rawDiagnostics");
+  const platform =
+    asString(asRecord(rawDiagnostics.platformDetection).name) ||
+    asString(asRecord(scanContext.platform).name);
+  const confidenceLabel =
+    asString(asRecord(rawDiagnostics.platformDetection).confidenceLabel) ||
+    asString(asRecord(scanContext.platform).confidenceLabel);
+  const confidence =
+    asRecord(rawDiagnostics.platformDetection).confidence ??
+    asRecord(scanContext.platform).confidence;
+  const failedCount = asArray(rawDiagnostics.failedRequests).length;
+  const consoleCount = asArray(rawDiagnostics.consoleErrors).length;
+  const warningCount = asArray(rawDiagnostics.warnings).length;
+  const signals: string[] = [];
+
+  if (
+    typeof confidence === "number" &&
+    (confidence < 70 || /low|needs review/i.test(confidenceLabel))
+  ) {
+    signals.push(
+      `the storefront platform is not being identified with full confidence`,
+    );
+  } else if (platform && platform !== "Unknown") {
+    signals.push(`${platform} is the likely storefront platform`);
+  }
+
+  if (failedCount > 0) {
+    signals.push(
+      `the scan found ${failedCount === 1 ? "one failed frontend request" : "a few failed frontend requests"}`,
+    );
+  }
+
+  if (consoleCount > 0) {
+    signals.push(
+      `${consoleCount === 1 ? "one console error was" : "some console errors were"} visible during the page load`,
+    );
+  } else if (warningCount > 0) {
+    signals.push("there were frontend warnings worth checking in context");
+  }
+
+  if (signals.length === 0) {
+    return "the public technical signals look relatively quiet in this lightweight scan";
+  }
+
+  return signals.join(", ");
+}
+
+function technicalExactAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const summary = technicalSignalsSummary(scanContext);
+  const technicalFindings = getCategoryFindings(scanContext, "technical");
+  const finding = getFirstFindingByKeywords(technicalFindings, [
+    "technical",
+    "platform",
+    "failed",
+    "request",
+    "console",
+    "metadata",
+  ]);
+  const priority = findingPriorityTone(finding, scanContext, "technical");
+  const title = finding ? findingTitle(finding) : "technical reliability";
+
+  return {
+    matched: true,
+    topic: "technical",
+    directAnswer: `The main technical concern is ${title}. What stands out technically is that ${summary}.`,
+    evidence: finding
+      ? findingEvidence(finding)
+      : "The scan only uses public storefront signals, so I would verify these in a browser and platform-aware walkthrough.",
+    businessMeaning:
+      `${priority.sentence} This is worth prioritizing because technical uncertainty can affect how confidently the team interprets checkout, tracking, and storefront-structure recommendations.`,
+    suggestedFollowUp:
+      "Do you want me to compare the technical signals with tracking visibility?",
+  };
+}
+
 function ctaExactAnswer(
   message: string,
   scanContext: Record<string, unknown>,
@@ -282,16 +755,21 @@ function ctaExactAnswer(
   const actionText = ctaFinding
     ? asString(ctaFinding.recommendedFirstAction)
     : asString(getActionItems(scanContext)[0]?.action);
+  const priority = findingPriorityTone(
+    ctaFinding,
+    scanContext,
+    ctaFinding ? "conversion" : "ux",
+  );
 
   return {
     matched: true,
     topic: "mobile_cta",
-    directAnswer: `The scan says the mobile CTA is ${boolPhrase(
+    directAnswer: `What stands out to me is that the mobile CTA is ${boolPhrase(
       mobileVisible,
-    )}, but it may not be the strongest action path.`,
+    )}, but the action path may still need a clearer hierarchy.`,
     evidence,
     businessMeaning:
-      "Shoppers can see an action, but the report is asking whether the CTA hierarchy clearly guides the next purchase step.",
+      `${priority.sentence} Shoppers can see an action, but the bigger concern is whether the primary next step is obvious enough on a small screen.`,
     suggestedFollowUp: actionText
       ? `Do you want me to walk through the first action: ${sanitizeEvidenceText(actionText, { maxLength: 120 })}?`
       : "Do you want me to compare the CTA issue with the conversion findings?",
@@ -305,6 +783,134 @@ function getExactAnswer(
   const scanContext = asRecord(rawScanContext);
   const normalized = normalizeText(message);
   const exact = getNestedRecord(scanContext, "exactCommerceVisibility");
+
+  const glossaryAnswer = buildGlossaryExactAnswer(message, scanContext);
+  if (glossaryAnswer.matched) {
+    return glossaryAnswer;
+  }
+
+  if (
+    hasAny(normalized, [
+      "why does this matter",
+      "why does this",
+      "why this matter",
+      "why is this important",
+      "why is this relevant",
+      "why should i care",
+      "explain the impact",
+      "business impact",
+      "what is the impact",
+    ])
+  ) {
+    const primaryConcern = getPrimaryConcern(scanContext);
+    const actionItems = getActionItems(scanContext);
+    const primaryAction = asString(actionItems[0]?.action);
+    const concernLabel = asString(primaryConcern.label);
+
+    let directAnswer = "";
+    let evidence = "";
+    let businessMeaning = "";
+
+    if (concernLabel) {
+      directAnswer =
+        `${concernLabel} affects how much confidence you can have in your next action. When this area is unclear, it's harder to know if you're optimizing for the right thing.`;
+      evidence =
+        `The scan shows: ${asString(primaryConcern.statusDetail || "unclear signal")}. If I were reviewing this manually, I'd look at the scan findings in context and compare them with what you see in your analytics.`;
+      businessMeaning =
+        `The next thing I'd check is whether your tracking setup aligns with what the scan found. Mismatches there often hide real conversion issues.`;
+    } else {
+      directAnswer =
+        "This matters because public-page signals shape how confidently you can act on recommendations. When visibility, tracking, or checkout readiness are unclear, teams often misattribute issues and fix the wrong things first.";
+      evidence =
+        `The scan focuses on visible commerce signals, tracking visibility, and checkout readiness. If I were reviewing this manually, I'd validate the platform detection and cross-check the tracking findings with your analytics dashboard.`;
+      businessMeaning =
+        `If signals are off, you might blame conversion issues on traffic when the real problem is tracking or checkout clarity.`;
+    }
+
+    const suggestedFollowUp = primaryAction
+      ? `Want me to compare this impact with the first action: ${sanitizeEvidenceText(primaryAction, { maxLength: 100 })}?`
+      : "Want me to compare this with tracking visibility?";
+
+    return {
+      matched: true,
+      topic: "why_it_matters",
+      directAnswer,
+      evidence,
+      businessMeaning,
+      suggestedFollowUp,
+    };
+  }
+
+  // Technical-errors specific handler: translate raw diagnostics into operator language.
+  if (
+    hasAny(normalized, [
+      "technical error",
+      "technical errors",
+      "what are the technical errors",
+      "technical issues",
+      "technical problems",
+    ])
+  ) {
+    const raw = getNestedRecord(scanContext, "rawDiagnostics");
+    const platform = asRecord(raw.platformDetection);
+    const platformName = asString(platform.name) || "an unknown platform";
+    const platformConfidenceLabel = asString(platform.confidenceLabel) || "unknown confidence";
+    const platformConfidence = platform.confidence;
+    const consoleErrors = asArray(raw.consoleErrors).length;
+    const failedRequests = asArray(raw.failedRequests).length;
+
+    const direct = `What stands out technically is ${platformName !== "Unknown" && platformName !== "an unknown platform" ? `the scan's platform detection suggesting ${platformName} (${platformConfidenceLabel.toLowerCase()}${typeof platformConfidence === "number" ? `, ${platformConfidence}%` : ""})` : "low confidence in platform detection"}${failedRequests > 0 ? `, and ${failedRequests} failed frontend request${failedRequests === 1 ? "" : "s"}` : ``}${consoleErrors > 0 ? `${failedRequests > 0 ? ", and" : ", and"} ${consoleErrors} console error${consoleErrors === 1 ? "" : "s"}` : ""}.`;
+
+    const evidenceLines: string[] = [];
+    if (platformName && platformName !== "Unknown") {
+      evidenceLines.push(
+        `The scan detected ${platformName} with ${platformConfidenceLabel.toLowerCase()}${typeof platformConfidence === "number" ? ` (${platformConfidence}%)` : ""}.`,
+      );
+    } else {
+      evidenceLines.push("Platform visibility is limited in the public-page scan.");
+    }
+
+    if (failedRequests > 0) {
+      evidenceLines.push(`The scan reported ${failedRequests} failed frontend request${failedRequests === 1 ? "" : "s"}.`);
+    }
+
+    if (consoleErrors > 0) {
+      evidenceLines.push(`The scan reported ${consoleErrors} console error${consoleErrors === 1 ? "" : "s"}.`);
+    }
+
+    const evidence = evidenceLines.join(" ");
+
+    const business =
+      "Failed requests and console errors can affect script execution, tracking, and storefront consistency. If I were reviewing this manually, I'd look at the platform signals and compare them with what you see in your dev tools.";
+
+    const suggested =
+      "Want me to compare this with the tracking visibility findings?";
+
+    return {
+      matched: true,
+      topic: "technical_errors",
+      directAnswer: direct,
+      evidence,
+      businessMeaning: business,
+      suggestedFollowUp: suggested,
+    };
+  }
+
+  if (
+    hasAny(normalized, [
+      "technical errors",
+      "technical issues",
+      "technical finding",
+      "technical findings",
+      "failed frontend",
+      "failed requests",
+      "console errors",
+      "frontend requests",
+      "page errors",
+    ])
+  ) {
+    return technicalExactAnswer(scanContext);
+  }
 
   if (
     hasAny(normalized, [
@@ -587,6 +1193,11 @@ function getExactAnswer(
   if (hasAny(normalized, ["what to fix first", "fix first", "opun fix first", "review first"])) {
     const primary = getPrimaryConcern(scanContext);
     const action = getActionItems(scanContext)[0];
+    const priority = priorityTone(
+      asString(primary.severity) ||
+        asString(primary.priority) ||
+        categoryPriorityForTopic(scanContext, "priority"),
+    );
     const title =
       asString(primary.title) ||
       asString(primary.riskLabel) ||
@@ -597,15 +1208,17 @@ function getExactAnswer(
     return {
       matched: true,
       topic: "fix_first",
-      directAnswer: `I would review ${title} first.`,
+      directAnswer: `I would review ${title} first, and this ${priority.phrase}.`,
       evidence:
         asString(primary.evidenceSummary) ||
         asString(action.evidenceClue) ||
         "The scan ranked this as the clearest next review area.",
       businessMeaning:
-        asString(primary.explanation) ||
-        asString(action.why) ||
-        "Starting here keeps the review focused on the highest-friction part of the customer journey.",
+        `${priority.sentence} ${
+          asString(primary.explanation) ||
+          asString(action.why) ||
+          "Starting here keeps the review focused on the highest-friction part of the customer journey."
+        }`,
       suggestedFollowUp:
         "Do you want me to explain why this should come before the other findings?",
     };
@@ -614,6 +1227,7 @@ function getExactAnswer(
   if (hasAny(normalized, ["primary operational concern", "primary concern", "biggest concern", "main concern"])) {
     const primary = getPrimaryConcern(scanContext);
     const title = asString(primary.title) || asString(primary.riskLabel);
+    const priority = priorityTone(asString(primary.severity) || asString(primary.priority));
 
     if (!title) {
       return {
@@ -629,13 +1243,13 @@ function getExactAnswer(
     return {
       matched: true,
       topic: "primary_operational_concern",
-      directAnswer: `The primary operational concern is ${title}.`,
+      directAnswer: `What stands out is ${title}. ${priority.sentence}`,
       evidence:
         asString(primary.evidenceSummary) ||
         "The scan included this as the primary operational concern.",
       businessMeaning:
-        asString(primary.explanation) ||
-        "This is the finding the scan suggests reviewing before broader optimization work.",
+        `${asString(primary.explanation) ||
+          "This is the finding the scan suggests reviewing before broader optimization work."}`,
       suggestedFollowUp:
         "Do you want me to show what Opun would review first from that concern?",
     };
@@ -736,10 +1350,31 @@ export async function POST(request: NextRequest) {
     const exactAnswer = getExactAnswer(message, scanContext);
 
     if (exactAnswer.matched) {
+      // Provide an extra phrasing variant for certain glossary topics so the UI
+      // can surface alternate question examples to the user.
+      const baseReplies = [exactAnswer.suggestedFollowUp].filter(Boolean);
+      let extraReplies: string[] = [];
+
+      if (exactAnswer.topic === "attribution") {
+        extraReplies = [
+          "How does attribution affect marketing decisions?",
+          "Can you show attribution evidence from this scan?",
+        ];
+      }
+
+      if (exactAnswer.topic === "operationalVisibility") {
+        extraReplies = [
+          "How does operational visibility affect customer trust?",
+          "Can you show operational evidence from this scan?",
+        ];
+      }
+
+      const suggestedReplies = [...baseReplies, ...extraReplies].filter(Boolean);
+
       return NextResponse.json(
         {
           reply: formatExactAnswer(exactAnswer),
-          suggestedReplies: [exactAnswer.suggestedFollowUp].filter(Boolean),
+          suggestedReplies,
         },
         { status: 200 },
       );
