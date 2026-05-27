@@ -217,10 +217,13 @@ type PostScanAssistantApiResponse = {
 type ConversationState = {
   currentTopic: ConversationTopic | null;
   lastIntent: AssistantIntent | null;
+  lastQuestion: string | null;
+  lastAnswerSummary: string | null;
   lastFindingDiscussed: RetrievedFinding | null;
   lastCategoryDiscussed: string | null;
   conversationStep: number;
   pendingFollowUp: PendingFollowUp | null;
+  conversationDepthByTopic: Partial<Record<ConversationTopic, number>>;
 };
 
 type AssistantTurn = {
@@ -957,11 +960,75 @@ function messageToContent(message: ChatMessage) {
   return message.paragraphs.join("\n\n");
 }
 
+function summarizeAssistantMessage(message: ChatMessage) {
+  return sanitizeEvidenceText(messageToContent(message), { maxLength: 320 })
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function splitAssistantReply(reply: string) {
   return reply
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
+}
+
+function replySimilarity(left: string, right: string | null) {
+  if (!left || !right) {
+    return 0;
+  }
+
+  const leftTerms = new Set(
+    normalizeText(left)
+      .split(/\s+/)
+      .filter((term) => term.length > 4),
+  );
+  const rightTerms = normalizeText(right)
+    .split(/\s+/)
+    .filter((term) => term.length > 4);
+
+  if (leftTerms.size === 0 || rightTerms.length === 0) {
+    return 0;
+  }
+
+  const overlap = rightTerms.filter((term) => leftTerms.has(term)).length;
+
+  return overlap / Math.max(leftTerms.size, rightTerms.length);
+}
+
+function attachConversationProgression(
+  turn: AssistantTurn,
+  previousState: ConversationState,
+  question: string,
+  depthOverride?: number,
+): AssistantTurn {
+  const topic = turn.nextState.currentTopic;
+  const conversationDepthByTopic = {
+    ...previousState.conversationDepthByTopic,
+    ...turn.nextState.conversationDepthByTopic,
+  };
+  const previousDepth = topic ? conversationDepthByTopic[topic] ?? 0 : 0;
+  const nextDepth =
+    topic && depthOverride
+      ? depthOverride
+      : topic
+        ? Math.max(previousDepth, 1)
+        : previousDepth;
+
+  if (topic) {
+    conversationDepthByTopic[topic] = Math.min(5, nextDepth);
+  }
+
+  return {
+    ...turn,
+    nextState: {
+      ...turn.nextState,
+      lastQuestion: question,
+      lastAnswerSummary: summarizeAssistantMessage(turn.message),
+      conversationDepthByTopic,
+    },
+  };
 }
 
 function buildLocalAssistantTurn(
@@ -970,20 +1037,29 @@ function buildLocalAssistantTurn(
   scanContext: ScanContext,
   conversationState: ConversationState,
 ) {
-  const directTurn = answerDirectQuestion(question, scanContext, conversationState);
+  const expansionTurn = shouldExpandCurrentTopic(question, conversationState)
+    ? expandCurrentTopicResponse(question, audit, scanContext, conversationState)
+    : null;
+  const directTurn = !expansionTurn
+    ? answerDirectQuestion(question, scanContext, conversationState)
+    : null;
   const continuationTurn =
-    !directTurn && isAffirmativeFollowUp(question)
+    !expansionTurn && !directTurn && isAffirmativeFollowUp(question)
       ? buildFollowUpContinuation(audit, scanContext, conversationState)
       : null;
-  const intent = !directTurn && !continuationTurn ? detectIntent(question) : "unknown";
-
-  return (
+  const intent =
+    !expansionTurn && !directTurn && !continuationTurn
+      ? detectIntent(question)
+      : "unknown";
+  const turn =
+    expansionTurn ??
     directTurn ??
     continuationTurn ??
     (intent !== "unknown"
       ? buildAssistantResponse(intent, audit, conversationState)
-      : buildFallbackResponse(conversationState))
-  );
+      : buildFallbackResponse(conversationState));
+
+  return attachConversationProgression(turn, conversationState, question);
 }
 
 function normalizeText(value: string) {
@@ -1614,6 +1690,323 @@ function isAffirmativeFollowUp(input: string) {
   );
 }
 
+function isExpansionIntent(input: string) {
+  const normalized = normalizeText(input).trim();
+
+  return (
+    /^(yes|yes please|yeah|yep|sure|please|ok|okay|continue|go on|tell me more|explain|explain more|go deeper|show me|do that|sounds good)$/.test(
+      normalized,
+    ) ||
+    textIncludesAny(normalized, [
+      "explain more",
+      "tell me more",
+      "go deeper",
+      "how so",
+      "why",
+      "what happens if",
+      "if not fixed",
+      "give me an example",
+      "example",
+      "continue",
+    ])
+  );
+}
+
+function topicFromText(value: string): ConversationTopic | null {
+  const normalized = normalizeText(value);
+  const topicOrder: ConversationTopic[] = [
+    "tracking",
+    "conversion",
+    "trust",
+    "operations",
+    "technical",
+    "platform",
+    "ux",
+    "benchmark",
+    "booking",
+    "priority",
+  ];
+
+  return (
+    topicOrder.find((topic) => textIncludesAny(normalized, getTopicKeywords(topic))) ??
+    null
+  );
+}
+
+function topicFromFinding(finding: RetrievedFinding | null) {
+  if (!finding) {
+    return null;
+  }
+
+  if (finding.topic !== "priority" && finding.topic !== "booking") {
+    return finding.topic;
+  }
+
+  return topicFromText(
+    [
+      finding.title,
+      finding.categoryLabel,
+      finding.evidenceSummary,
+      finding.explanation,
+      finding.recommendedFirstAction,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+}
+
+function resolveExpansionTopic(
+  input: string,
+  state: ConversationState,
+): ConversationTopic | null {
+  return (
+    topicFromText(input) ??
+    topicFromFinding(state.lastFindingDiscussed) ??
+    state.currentTopic
+  );
+}
+
+function shouldExpandCurrentTopic(input: string, state: ConversationState) {
+  if (!isExpansionIntent(input)) {
+    return false;
+  }
+
+  return Boolean(
+    state.currentTopic ||
+      state.lastFindingDiscussed ||
+      state.pendingFollowUp ||
+      state.lastAnswerSummary,
+  );
+}
+
+function expansionDepthForQuestion(
+  input: string,
+  state: ConversationState,
+  topic: ConversationTopic,
+) {
+  const normalized = normalizeText(input);
+  const currentDepth = state.conversationDepthByTopic[topic] ?? 1;
+  let depth = Math.min(5, currentDepth + 1);
+
+  if (textIncludesAny(normalized, ["what happens if", "if not fixed", "if we do not"])) {
+    depth = Math.max(depth, 3);
+  }
+
+  if (textIncludesAny(normalized, ["example", "give me an example"])) {
+    depth = Math.max(depth, 4);
+  }
+
+  if (textIncludesAny(normalized, ["what should", "fix first", "next step", "action sequence"])) {
+    depth = Math.max(depth, 5);
+  }
+
+  return depth;
+}
+
+function ecommerceExampleForTopic(topic: ConversationTopic) {
+  const examples: Record<ConversationTopic, string> = {
+    ux:
+      "A practical example would be a mobile shopper landing from an ad, seeing several links and messages at once, and not immediately understanding where the product path begins.",
+    conversion:
+      "A practical example would be a shopper who likes the product but pauses because the primary action, cart path, or checkout next step is not obvious enough.",
+    trust:
+      "A practical example would be a new visitor reaching the purchase point but hesitating because reviews, returns, shipping, or payment reassurance are not close enough to the decision.",
+    tracking:
+      "A practical example would be scaling paid traffic and seeing more sessions, but not being able to trust whether product views, cart activity, checkout starts, or lead forms are being measured cleanly.",
+    operations:
+      "A practical example would be customers buying successfully, then creating extra support workload because order, returns, shipping, or contact expectations were not clear upfront.",
+    technical:
+      "A practical example would be a failed frontend request affecting a script that supports tracking, storefront consistency, or part of the buying path without making the whole store visibly break.",
+    benchmark:
+      "A practical example would be comparing the store against stronger ecommerce patterns and using that gap to decide whether discovery, trust, or measurement needs attention first.",
+    platform:
+      "A practical example would be making Shopify, Magento, or WooCommerce-specific recommendations before the platform signal is confirmed, which can send the team toward the wrong implementation path.",
+    priority:
+      "A practical example would be fixing visual polish first while the bigger issue is measurement, discovery, or checkout clarity, making it hard to know whether the work actually improved the buying path.",
+    booking:
+      "A practical example would be using the scan to focus a human audit on the few areas most likely to change decisions, instead of reviewing the whole storefront as a generic checklist.",
+  };
+
+  return examples[topic];
+}
+
+function businessContextForTopic(
+  topic: ConversationTopic,
+  finding: RetrievedFinding,
+) {
+  const contexts: Record<ConversationTopic, string> = {
+    ux:
+      "The real risk is product discovery confusion. If shoppers cannot quickly understand the page hierarchy, they may not reach the product or action path you want them to take.",
+    conversion:
+      "The real risk is purchase momentum. A visitor can be interested and still drop off if the next action, cart path, or checkout step takes too much interpretation.",
+    trust:
+      "The real risk is hesitation. Trust cues do not need to be loud, but shoppers should see enough reassurance before they are asked to commit.",
+    tracking:
+      "The real risk is decision confidence. If the measurement layer is unclear, the team may not know which traffic, campaigns, or customer actions are actually producing results.",
+    operations:
+      "The real risk is post-purchase drag. Unclear support, order, shipping, or returns signals can turn normal customer questions into avoidable service workload.",
+    technical:
+      "The real risk is implementation certainty. I would not treat this as proof something is broken, but technical uncertainty can make platform, checkout, and tracking recommendations less reliable.",
+    benchmark:
+      "The real risk is prioritizing against the wrong comparison set. Benchmark context is useful when it helps decide what to inspect first, not when it becomes a generic scorecard.",
+    platform:
+      "The real risk is recommendation accuracy. If the platform signal is uncertain, platform-specific fixes should wait until the storefront technology is confirmed.",
+    priority:
+      "The real risk is fixing the visible symptom before the underlying operating constraint. The first review item should help the team make better decisions about the rest of the report.",
+    booking:
+      "The real risk is spreading attention too thin. A focused audit should validate the scan's strongest signal first, then decide which secondary issues deserve time.",
+  };
+
+  return `${contexts[topic]} In this scan, that connects to ${finding.title}.`;
+}
+
+function operationalConsequenceForTopic(topic: ConversationTopic) {
+  const consequences: Record<ConversationTopic, string> = {
+    ux:
+      "If it is not addressed, more visitors can drift around the page without building enough product intent to continue.",
+    conversion:
+      "If it is not addressed, the store may keep attracting qualified visitors but lose them at the moment they need a clear next step.",
+    trust:
+      "If it is not addressed, paid traffic and first-time visitors may need more reassurance than the page is currently giving them.",
+    tracking:
+      "If it is not addressed, conversion fixes become harder to judge because the team may not know whether changes improved behavior or only changed what is visible in reports.",
+    operations:
+      "If it is not addressed, support questions, returns confusion, or order-status uncertainty can absorb time after the purchase.",
+    technical:
+      "If it is not addressed, the team may make recommendations on top of uncertain platform or frontend signals, which can create rework.",
+    benchmark:
+      "If it is not addressed, the benchmark read can stay abstract instead of becoming a practical fix order.",
+    platform:
+      "If it is not addressed, platform-specific recommendations may be less accurate than they look.",
+    priority:
+      "If it is not addressed first, later fixes can become harder to evaluate because the main constraint is still unresolved.",
+    booking:
+      "If it is not addressed in a focused review, the scan may stay as a list of observations instead of becoming a practical plan.",
+  };
+
+  return consequences[topic];
+}
+
+function actionSequenceForTopic(
+  topic: ConversationTopic,
+  finding: RetrievedFinding,
+  audit: AssistantAudit,
+) {
+  const firstAction =
+    finding.recommendedFirstAction ??
+    audit.recommendedNextSteps[0]?.action ??
+    "validate the finding in a manual storefront walkthrough";
+  const sequences: Record<ConversationTopic, string> = {
+    ux:
+      "The next thing I would check is whether the first mobile screen makes the product path, message hierarchy, and primary CTA obvious.",
+    conversion:
+      "The next thing I would check is the route from landing page to product, cart, checkout, and any lead form or purchase action.",
+    trust:
+      "The next thing I would check is whether reviews, returns, shipping, warranty, payment, and support cues appear close to purchase decisions.",
+    tracking:
+      "The next thing I would check is whether GA4 or GTM events connect to product views, cart activity, checkout actions, lead forms, and purchases.",
+    operations:
+      "The next thing I would check is whether support, shipping, returns, and order communication are clear before and after checkout.",
+    technical:
+      "The next thing I would check is the failed requests, platform signal, frontend scripts, and whether those signals affect tracking or checkout confidence.",
+    benchmark:
+      "The next thing I would check is which benchmark gap maps to an actual storefront action rather than a cosmetic improvement.",
+    platform:
+      "The next thing I would check is whether the detected platform matches the storefront source, checkout behavior, theme structure, and public technology signals.",
+    priority:
+      "The next thing I would check is whether the top finding blocks decision confidence, purchase momentum, or customer trust more than the secondary findings.",
+    booking:
+      "The next thing I would do is use the scan to structure a human review around the main constraint, then validate secondary issues in order.",
+  };
+
+  return `${sequences[topic]} First action: ${firstAction}`;
+}
+
+function expandCurrentTopicResponse(
+  input: string,
+  audit: AssistantAudit,
+  _context: ScanContext,
+  state: ConversationState,
+): AssistantTurn | null {
+  const topic = resolveExpansionTopic(input, state);
+
+  if (!topic) {
+    return null;
+  }
+
+  const finding = state.lastFindingDiscussed ?? getFindingByTopic(audit, topic);
+  const depth = expansionDepthForQuestion(input, state, topic);
+  const priority = priorityTone(finding.severity);
+  const paragraphs =
+    depth <= 2
+      ? [
+          "Here’s how I’d think about it.",
+          businessContextForTopic(topic, finding),
+          `${priority.sentence} The first useful move is to understand the business meaning before jumping into fixes.`,
+          continueQuestion(topic),
+        ]
+      : depth === 3
+        ? [
+            "The next layer is the operational consequence.",
+            operationalConsequenceForTopic(topic),
+            `That is why I would keep ${finding.title} near the top of the review instead of treating it as a minor note.`,
+            "Do you want a practical example?",
+          ]
+        : depth === 4
+          ? [
+              ecommerceExampleForTopic(topic),
+              `For this scan, the example connects back to ${finding.title}: ${finding.explanation}`,
+              "The useful question is whether this issue shows up in the full storefront journey, not only in the public-page sample.",
+              "Do you want the recommended action sequence?",
+            ]
+          : [
+              "The action sequence I’d use is simple.",
+              actionSequenceForTopic(topic, finding, audit),
+              "After that, I would compare the result with the related findings so the team does not fix one symptom while leaving the bigger journey issue untouched.",
+              topic === "booking"
+                ? "Do you want to book a deeper audit?"
+                : "Do you want to see where Opun would help with that sequence?",
+            ];
+  const candidate = buildMessage(
+    `assistant-expand-${topic}-${Date.now()}`,
+    paragraphs,
+    { topic, finding, cta: topic === "booking" || depth >= 5 },
+  );
+  const lastSummary = state.lastAnswerSummary;
+  const candidateSummary = summarizeAssistantMessage(candidate);
+  const finalMessage =
+    replySimilarity(candidateSummary, lastSummary) > 0.55
+      ? buildMessage(
+          `assistant-expand-alt-${topic}-${Date.now()}`,
+          [
+            ecommerceExampleForTopic(topic),
+            actionSequenceForTopic(topic, finding, audit),
+            "That gives the follow-up a different angle: not just what the scan found, but how I would validate it in the actual ecommerce workflow.",
+            continueQuestion(topic),
+          ],
+          { topic, finding, cta: depth >= 5 },
+        )
+      : candidate;
+
+  return {
+    message: finalMessage,
+    nextState: {
+      ...createNextState(
+        topic,
+        "ask_clarification",
+        finding,
+        finding.categoryLabel ?? state.lastCategoryDiscussed ?? topicLabel(topic),
+        state.conversationStep,
+        pendingFollowUpForTopic(topic),
+      ),
+      conversationDepthByTopic: {
+        ...state.conversationDepthByTopic,
+        [topic]: depth,
+      },
+    },
+  };
+}
+
 function buildScanAnswer({
   id,
   topic,
@@ -1875,12 +2268,14 @@ function answerDirectQuestion(
     return null;
   }
 
+  finding = finding ?? context.categoryFindings[topic]?.[0] ?? state.lastFindingDiscussed;
+
   return {
     message,
     nextState: createNextState(
       topic,
       "ask_clarification",
-      finding ?? state.lastFindingDiscussed,
+      finding,
       finding?.categoryLabel ?? state.lastCategoryDiscussed ?? topicLabel(topic),
       state.conversationStep,
       pendingFollowUpForTopic(topic),
@@ -2130,13 +2525,13 @@ function buildClarificationResponse(
       message: buildMessage(
         `assistant-clarify-${Date.now()}`,
         [
-          `Continuing on ${topicLabel(topic)?.toLowerCase()}: ${finding.title} ${priority.phrase}.`,
-          `${priority.sentence} It matters because ${finding.explanation}`,
+          `Here’s how I’d think about ${finding.title}. It ${priority.phrase}.`,
+          `${priority.sentence} The business reason is that ${finding.explanation}`,
         finding.evidenceSummary
-            ? `The useful scan clue behind that is: ${finding.evidenceSummary}`
+            ? `The useful scan clue is: ${finding.evidenceSummary}`
             : "The scan did not expose every internal detail, so I would treat this as a public-page signal to verify in a deeper review.",
         finding.recommendedFirstAction
-            ? `If I were reviewing this manually, I would check this next: ${finding.recommendedFirstAction}`
+            ? `The next thing I’d check is: ${finding.recommendedFirstAction}`
             : "The next sensible action is to inspect this part of the customer journey manually.",
           continueQuestion(topic),
         ],
@@ -2353,10 +2748,13 @@ function createNextState(
   return {
     currentTopic: topic,
     lastIntent: intent,
+    lastQuestion: null,
+    lastAnswerSummary: null,
     lastFindingDiscussed: finding,
     lastCategoryDiscussed: category ?? null,
     conversationStep: previousStep + 1,
     pendingFollowUp,
+    conversationDepthByTopic: topic ? { [topic]: 1 } : {},
   };
 }
 
@@ -2478,10 +2876,13 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
   const [conversationState, setConversationState] = useState<ConversationState>({
     currentTopic: "priority",
     lastIntent: null,
+    lastQuestion: null,
+    lastAnswerSummary: summarizeAssistantMessage(initialMessage),
     lastFindingDiscussed: getHighestImpactFinding(audit),
     lastCategoryDiscussed: getHighestImpactFinding(audit).categoryLabel ?? null,
     conversationStep: 0,
     pendingFollowUp: pendingFollowUpForTopic("priority"),
+    conversationDepthByTopic: { priority: 1 },
   });
 
   useEffect(() => {
@@ -2494,10 +2895,13 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
     setConversationState({
       currentTopic: "priority",
       lastIntent: null,
+      lastQuestion: null,
+      lastAnswerSummary: summarizeAssistantMessage(buildInitialMessage(audit)),
       lastFindingDiscussed: highestImpactFinding,
       lastCategoryDiscussed: highestImpactFinding.categoryLabel ?? null,
       conversationStep: 0,
       pendingFollowUp: pendingFollowUpForTopic("priority"),
+      conversationDepthByTopic: { priority: 1 },
     });
   }, [audit.generatedAt, audit.website]);
 
@@ -2506,7 +2910,11 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       return;
     }
 
-    const turn = buildAssistantResponse(intent, audit, conversationState);
+    const turn = attachConversationProgression(
+      buildAssistantResponse(intent, audit, conversationState),
+      conversationState,
+      label,
+    );
 
     setMessages((current) => [
       ...current,
@@ -2532,9 +2940,26 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
         content: messageToContent(message),
       }),
     );
+    const localExpansionTurn = shouldExpandCurrentTopic(question, conversationState)
+      ? expandCurrentTopicResponse(question, audit, scanContext, conversationState)
+      : null;
+
+    setFreeTextQuestion("");
+
+    if (localExpansionTurn) {
+      const progressedTurn = attachConversationProgression(
+        localExpansionTurn,
+        conversationState,
+        question,
+      );
+
+      setMessages((current) => [...current, userMessage, progressedTurn.message]);
+      setConversationState(progressedTurn.nextState);
+      setAiSuggestedReplies([]);
+      return;
+    }
 
     setMessages((current) => [...current, userMessage]);
-    setFreeTextQuestion("");
     setIsAssistantLoading(true);
 
     try {
@@ -2563,24 +2988,29 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
         ? getFindingByTopic(audit, nextTopic)
         : conversationState.lastFindingDiscussed;
 
-      setMessages((current) => [
-        ...current,
+      const assistantMessage: ChatMessage = {
+        id: `assistant-ai-${Date.now()}`,
+        role: "assistant",
+        paragraphs: splitAssistantReply(aiReply),
+        topic: nextTopic ?? undefined,
+      };
+      const progressedTurn = attachConversationProgression(
         {
-          id: `assistant-ai-${Date.now()}`,
-          role: "assistant",
-          paragraphs: splitAssistantReply(aiReply),
-          topic: nextTopic ?? undefined,
+          message: assistantMessage,
+          nextState: createNextState(
+            nextTopic,
+            intent,
+            nextFinding,
+            nextFinding?.categoryLabel ?? conversationState.lastCategoryDiscussed,
+            conversationState.conversationStep,
+          ),
         },
-      ]);
-      setConversationState(
-        createNextState(
-          nextTopic,
-          intent,
-          nextFinding,
-          nextFinding?.categoryLabel ?? conversationState.lastCategoryDiscussed,
-          conversationState.conversationStep,
-        ),
+        conversationState,
+        question,
       );
+
+      setMessages((current) => [...current, progressedTurn.message]);
+      setConversationState(progressedTurn.nextState);
       setAiSuggestedReplies(data.suggestedReplies?.slice(0, 4) ?? []);
     } catch {
       const turn = buildLocalAssistantTurn(
