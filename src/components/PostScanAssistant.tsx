@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  MouseEvent,
+  PointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Activity,
   ArrowRight,
@@ -48,6 +56,22 @@ type AssistantConcern = {
   supportingFindings?: string[];
 };
 
+type StorefrontReviewSiteType =
+  | "ecommerce-storefront"
+  | "enterprise-retail"
+  | "catalog-commerce"
+  | "lead-generation"
+  | "education/content-commerce"
+  | "non-ecommerce-or-unclear"
+  | "custom-enterprise";
+
+type StorefrontReviewContext = {
+  siteType: StorefrontReviewSiteType;
+  confidence: string;
+  reason: string;
+  supportingSignals: string[];
+};
+
 type AssistantCategory = {
   key: string;
   label: string;
@@ -74,6 +98,9 @@ type AssistantAudit = {
   overallStatus: string;
   auditNarrative?: string;
   currentNarrativeArchetype?: string;
+  siteType?: StorefrontReviewSiteType;
+  siteTypeReason?: string;
+  storefrontReviewContext?: StorefrontReviewContext;
   executiveSummary: {
     summary: string;
     businessInterpretation: string;
@@ -94,6 +121,18 @@ type AssistantAudit = {
       tone: "positive" | "negative" | "mixed";
     }[];
   };
+  storefrontIdentityProfile?: {
+    domain: string;
+    businessScale: string;
+    architectureStyle: string;
+    commerceMaturity: string;
+    operationalPattern: string;
+    platformConfidence: string;
+    identitySignals: string[];
+    identitySummary: string;
+    identityOpening: string;
+    identityFraming: string;
+  };
   diagnostics: {
     finalUrl?: string;
     title?: string | null;
@@ -102,6 +141,7 @@ type AssistantAudit = {
       name: string;
       confidence: number;
       confidenceLabel: string;
+      explanation?: string;
     };
     technologyDetections: {
       label: string;
@@ -155,6 +195,7 @@ type AssistantIntent =
   | "ask_trust"
   | "ask_operations"
   | "ask_technical"
+  | "ask_metadata"
   | "ask_benchmark"
   | "ask_platform"
   | "ask_seriousness"
@@ -170,6 +211,7 @@ type ConversationTopic =
   | "tracking"
   | "operations"
   | "technical"
+  | "metadata"
   | "benchmark"
   | "platform"
   | "priority"
@@ -219,12 +261,24 @@ type ConversationState = {
   lastIntent: AssistantIntent | null;
   lastQuestion: string | null;
   lastAnswerSummary: string | null;
+  lastExplainedTopic: ConversationTopic | null;
+  lastExpansionDepth: number;
+  lastBusinessAngle: BusinessAngle | null;
   lastFindingDiscussed: RetrievedFinding | null;
   lastCategoryDiscussed: string | null;
   conversationStep: number;
   pendingFollowUp: PendingFollowUp | null;
   conversationDepthByTopic: Partial<Record<ConversationTopic, number>>;
 };
+
+type BusinessAngle =
+  | "operational_risk"
+  | "customer_behavior"
+  | "analytics_reliability"
+  | "conversion_impact"
+  | "scaling_risk"
+  | "support_burden"
+  | "optimization_confidence";
 
 type AssistantTurn = {
   message: ChatMessage;
@@ -250,6 +304,9 @@ type ScanContext = {
   score: number;
   status: string;
   currentNarrativeArchetype?: string;
+  siteType?: StorefrontReviewSiteType;
+  siteTypeReason?: string;
+  storefrontReviewContext?: StorefrontReviewContext;
   platform: AssistantAudit["diagnostics"]["platformDetection"];
   trackingTools: AssistantAudit["diagnostics"]["technologyDetections"];
   benchmarkTags: string[];
@@ -271,6 +328,8 @@ type ScanContext = {
   metadata: {
     title: string | null;
     metaDescription: string | null;
+    structuredData?: string[] | null;
+    openGraph?: Record<string, string> | null;
   };
   consoleDiagnostics: {
     consoleErrors: string[];
@@ -388,7 +447,6 @@ const intentKeywords: Record<AssistantIntent, string[]> = {
     "operationscontinuity",
     "operational",
     "handoff",
-    "backend",
     "automation",
     "fulfillment",
     "follow-up",
@@ -400,15 +458,24 @@ const intentKeywords: Record<AssistantIntent, string[]> = {
     "technical",
     "technicalissues",
     "platformvisibility",
-    "metadataclarity",
     "performance",
-    "metadata",
     "console",
     "errors",
     "failed requests",
-    "seo",
     "template",
     "speed",
+  ],
+  ask_metadata: [
+    "metadata",
+    "meta data",
+    "meta title",
+    "page title",
+    "title tag",
+    "meta description",
+    "seo title",
+    "seo description",
+    "metadata summary",
+    "metadataclarity",
   ],
   ask_benchmark: [
     "benchmark",
@@ -478,7 +545,7 @@ function getPrimaryConcernLabel(audit: AssistantAudit) {
 
 function getTrackingSummary(audit: AssistantAudit) {
   const visibleTools = audit.diagnostics.technologyDetections.filter(
-    (tool) => tool.detected,
+    (tool) => tool.detected && isTrackingTool(tool),
   );
 
   if (visibleTools.length === 0) {
@@ -490,8 +557,18 @@ function getTrackingSummary(audit: AssistantAudit) {
   }: ${visibleTools.map((tool) => tool.label).join(", ")}.`;
 }
 
+function isTrackingTool(tool: { label: string; detected: boolean }) {
+  return !/shopify|bigcommerce|woocommerce|magento|platform|indicator/i.test(
+    tool.label,
+  );
+}
+
 function getPlatformSummary(audit: AssistantAudit) {
   const platform = audit.diagnostics.platformDetection;
+
+  if (platform.name === "Enterprise / Custom Commerce Stack") {
+    return "From the public scan, I would not confidently call this Magento, Shopify, BigCommerce, or WooCommerce. The safer interpretation is an enterprise/custom commerce stack that should be manually confirmed.";
+  }
 
   return `${platform.name} visibility is ${platform.confidenceLabel.toLowerCase()} at ${platform.confidence}%.`;
 }
@@ -777,6 +854,33 @@ function buildVisibilitySignal({
   };
 }
 
+function metadataFinding(metadata: ScanContext["metadata"]): RetrievedFinding {
+  const title = metadata.title
+    ? "Metadata Visible"
+    : "Metadata Needs Review";
+  const evidenceSummary = [
+    metadata.title
+      ? `Page title: ${metadata.title}`
+      : "Page title was not found.",
+    metadata.metaDescription
+      ? `Meta description: ${metadata.metaDescription}`
+      : "Meta description was not found.",
+  ].join(" ");
+
+  return {
+    title,
+    topic: "metadata",
+    categoryLabel: "Metadata",
+    severity: metadata.title && metadata.metaDescription ? "Low" : "Medium",
+    confidence: "High",
+    evidenceSummary: sanitizeEvidenceText(evidenceSummary, { maxLength: 260 }),
+    explanation:
+      "Metadata affects how clearly the page presents itself in search results, browser tabs, and shared links.",
+    recommendedFirstAction:
+      "Confirm the page title and meta description are specific, readable, and aligned with the page's intended customer action.",
+  };
+}
+
 function normalizeScanContext(audit: AssistantAudit): ScanContext {
   const commerce = audit.diagnostics.commerceFlowSignals;
   const storefront = audit.diagnostics.storefrontSignals;
@@ -811,9 +915,12 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
     score: audit.overallScore,
     status: audit.overallStatus,
     currentNarrativeArchetype: audit.currentNarrativeArchetype,
+    siteType: audit.siteType ?? audit.storefrontReviewContext?.siteType,
+    siteTypeReason: audit.siteTypeReason ?? audit.storefrontReviewContext?.reason,
+    storefrontReviewContext: audit.storefrontReviewContext,
     platform: audit.diagnostics.platformDetection,
     trackingTools: audit.diagnostics.technologyDetections.filter(
-      (tool) => tool.detected,
+      (tool) => tool.detected && isTrackingTool(tool),
     ),
     benchmarkTags: getBenchmarkTags(audit),
     auditNarrative: audit.auditNarrative,
@@ -826,6 +933,10 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
       tracking: getFindingsByCategory(audit, "tracking"),
       operations: getFindingsByCategory(audit, "operations"),
       technical: getFindingsByCategory(audit, "technical"),
+      metadata: [metadataFinding({
+        title: audit.diagnostics.title ?? null,
+        metaDescription: audit.diagnostics.metaDescription ?? null,
+      })],
       benchmark: getFindingsByCategory(audit, "benchmark"),
       platform: getFindingsByCategory(audit, "platform"),
       priority: [getHighestImpactFinding(audit)],
@@ -894,6 +1005,8 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
     metadata: {
       title: audit.diagnostics.title ?? null,
       metaDescription: audit.diagnostics.metaDescription ?? null,
+      structuredData: null,
+      openGraph: null,
     },
     consoleDiagnostics: {
       consoleErrors: audit.diagnostics.consoleErrors ?? [],
@@ -910,6 +1023,9 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
     score: context.score,
     status: context.status,
     currentNarrativeArchetype: context.currentNarrativeArchetype,
+    siteType: context.siteType,
+    siteTypeReason: context.siteTypeReason,
+    storefrontReviewContext: context.storefrontReviewContext,
     auditNarrative:
       context.auditNarrative ?? audit.executiveSummary.businessInterpretation,
     primaryOperationalConcern: context.primaryOperationalConcern,
@@ -925,9 +1041,11 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
       scoreExplanation: category.scoreExplanation,
     })),
     categoryFindings: context.categoryFindings,
+    metadata: context.metadata,
     platformVisibility: context.platformVisibility,
     trackingVisibility: getTrackingSummary(audit),
     benchmarkContext: context.benchmarkContext,
+    storefrontIdentityProfile: audit.storefrontIdentityProfile,
     commerceSignals: context.commerceSignals,
     exactCommerceVisibility: {
       mobileCtaVisibleAboveFold:
@@ -1026,6 +1144,9 @@ function attachConversationProgression(
       ...turn.nextState,
       lastQuestion: question,
       lastAnswerSummary: summarizeAssistantMessage(turn.message),
+      lastExplainedTopic: topic ?? previousState.lastExplainedTopic,
+      lastExpansionDepth: turn.nextState.lastExpansionDepth || previousState.lastExpansionDepth,
+      lastBusinessAngle: turn.nextState.lastBusinessAngle ?? previousState.lastBusinessAngle,
       conversationDepthByTopic,
     },
   };
@@ -1037,23 +1158,38 @@ function buildLocalAssistantTurn(
   scanContext: ScanContext,
   conversationState: ConversationState,
 ) {
-  const expansionTurn = shouldExpandCurrentTopic(question, conversationState)
+  const intent = detectIntent(question);
+  const detectedTopic = topicFromIntent(intent);
+  const acknowledgementTurn = detectAcknowledgementIntent(question)
+    ? buildAcknowledgementResponse(question, conversationState)
+    : null;
+  if (acknowledgementTurn) {
+    return attachConversationProgression(
+      acknowledgementTurn,
+      conversationState,
+      question,
+    );
+  }
+
+  const directTurn = answerDirectQuestion(question, scanContext, conversationState);
+  const switchedTopicTurn =
+    !directTurn &&
+    intent !== "unknown" &&
+    detectedTopic &&
+    detectedTopic !== conversationState.currentTopic
+      ? buildAssistantResponse(intent, audit, conversationState)
+      : null;
+  const expansionTurn = !directTurn && !switchedTopicTurn && shouldExpandCurrentTopic(question, conversationState)
     ? expandCurrentTopicResponse(question, audit, scanContext, conversationState)
     : null;
-  const directTurn = !expansionTurn
-    ? answerDirectQuestion(question, scanContext, conversationState)
-    : null;
   const continuationTurn =
-    !expansionTurn && !directTurn && isAffirmativeFollowUp(question)
+    !directTurn && !switchedTopicTurn && !expansionTurn && isAffirmativeFollowUp(question)
       ? buildFollowUpContinuation(audit, scanContext, conversationState)
       : null;
-  const intent =
-    !expansionTurn && !directTurn && !continuationTurn
-      ? detectIntent(question)
-      : "unknown";
   const turn =
-    expansionTurn ??
     directTurn ??
+    switchedTopicTurn ??
+    expansionTurn ??
     continuationTurn ??
     (intent !== "unknown"
       ? buildAssistantResponse(intent, audit, conversationState)
@@ -1083,6 +1219,7 @@ function getTopicKeywords(topic: ConversationTopic) {
     tracking: intentKeywords.ask_tracking,
     operations: intentKeywords.ask_operations,
     technical: intentKeywords.ask_technical,
+    metadata: intentKeywords.ask_metadata,
     benchmark: intentKeywords.ask_benchmark,
     platform: intentKeywords.ask_platform,
     priority: intentKeywords.ask_priority,
@@ -1100,6 +1237,7 @@ function topicLabel(topic: ConversationTopic | null) {
     tracking: "Tracking visibility",
     operations: "Operations",
     technical: "Technical",
+    metadata: "Metadata",
     benchmark: "Benchmark context",
     platform: "Platform",
     priority: "Fix order",
@@ -1118,6 +1256,7 @@ function topicFromIntent(intent: AssistantIntent): ConversationTopic | null {
     ask_trust: "trust",
     ask_operations: "operations",
     ask_technical: "technical",
+    ask_metadata: "metadata",
     ask_benchmark: "benchmark",
     ask_platform: "platform",
     ask_seriousness: "priority",
@@ -1408,6 +1547,13 @@ function getFindingsByCategory(
 }
 
 function getFindingByTopic(audit: AssistantAudit, topic: ConversationTopic) {
+  if (topic === "metadata") {
+    return metadataFinding({
+      title: audit.diagnostics.title ?? null,
+      metaDescription: audit.diagnostics.metaDescription ?? null,
+    });
+  }
+
   return getFindingsByCategory(audit, topic)[0] ?? getHighestImpactFinding(audit);
 }
 
@@ -1459,6 +1605,7 @@ function getRelatedFindings(
     tracking: ["conversion", "technical"],
     operations: ["conversion", "technical"],
     technical: ["tracking", "operations"],
+    metadata: ["technical", "platform"],
     benchmark: ["priority", "conversion"],
     platform: ["technical", "operations"],
     priority: ["conversion", "ux", "tracking"],
@@ -1673,7 +1820,7 @@ function pendingFollowUpForTopic(topic: ConversationTopic | null): PendingFollow
   if (topic === "conversion") return "show_opun_fix_order";
   if (topic === "tracking") return "explain_tracking";
   if (topic === "trust") return "explain_trust";
-  if (topic === "platform" || topic === "technical") return "explain_platform";
+  if (topic === "platform" || topic === "technical" || topic === "metadata") return "explain_platform";
   if (topic === "priority" || topic === "operations" || topic === "benchmark") {
     return "explain_why_it_matters";
   }
@@ -1694,15 +1841,17 @@ function isExpansionIntent(input: string) {
   const normalized = normalizeText(input).trim();
 
   return (
-    /^(yes|yes please|yeah|yep|sure|please|ok|okay|continue|go on|tell me more|explain|explain more|go deeper|show me|do that|sounds good)$/.test(
+    /^(yes|yes please|yeah|yep|sure|please|continue|go on|tell me more|explain|explain more|go deeper|show me|do that|sounds good)$/.test(
       normalized,
     ) ||
     textIncludesAny(normalized, [
       "explain more",
+      "yes please explain",
       "tell me more",
       "go deeper",
       "how so",
       "why",
+      "explain",
       "what happens if",
       "if not fixed",
       "give me an example",
@@ -1789,15 +1938,15 @@ function expansionDepthForQuestion(
   let depth = Math.min(5, currentDepth + 1);
 
   if (textIncludesAny(normalized, ["what happens if", "if not fixed", "if we do not"])) {
-    depth = Math.max(depth, 3);
+    return 3;
   }
 
   if (textIncludesAny(normalized, ["example", "give me an example"])) {
-    depth = Math.max(depth, 4);
+    return currentDepth >= 4 ? 5 : 4;
   }
 
   if (textIncludesAny(normalized, ["what should", "fix first", "next step", "action sequence"])) {
-    depth = Math.max(depth, 5);
+    return 5;
   }
 
   return depth;
@@ -1817,6 +1966,8 @@ function ecommerceExampleForTopic(topic: ConversationTopic) {
       "A practical example would be customers buying successfully, then creating extra support workload because order, returns, shipping, or contact expectations were not clear upfront.",
     technical:
       "A practical example would be a failed frontend request affecting a script that supports tracking, storefront consistency, or part of the buying path without making the whole store visibly break.",
+    metadata:
+      "A practical example would be a search result or shared link showing a vague title or missing description, so shoppers do not immediately understand the page before they click.",
     benchmark:
       "A practical example would be comparing the store against stronger ecommerce patterns and using that gap to decide whether discovery, trust, or measurement needs attention first.",
     platform:
@@ -1828,6 +1979,84 @@ function ecommerceExampleForTopic(topic: ConversationTopic) {
   };
 
   return examples[topic];
+}
+
+function businessAngleForDepth(
+  topic: ConversationTopic,
+  depth: number,
+  lastAngle: BusinessAngle | null,
+): BusinessAngle {
+  const angleByTopic: Record<ConversationTopic, BusinessAngle[]> = {
+    ux: ["customer_behavior", "conversion_impact", "optimization_confidence"],
+    conversion: ["conversion_impact", "customer_behavior", "scaling_risk"],
+    trust: ["customer_behavior", "conversion_impact", "scaling_risk"],
+    tracking: ["analytics_reliability", "optimization_confidence", "scaling_risk"],
+    operations: ["support_burden", "operational_risk", "customer_behavior"],
+    technical: ["operational_risk", "analytics_reliability", "optimization_confidence"],
+    metadata: ["customer_behavior", "optimization_confidence", "conversion_impact"],
+    benchmark: ["optimization_confidence", "conversion_impact", "operational_risk"],
+    platform: ["operational_risk", "optimization_confidence", "analytics_reliability"],
+    priority: ["optimization_confidence", "operational_risk", "conversion_impact"],
+    booking: ["operational_risk", "optimization_confidence", "support_burden"],
+  };
+  const angles = angleByTopic[topic];
+  const preferred = angles[(Math.max(depth, 1) - 1) % angles.length];
+
+  if (preferred !== lastAngle) {
+    return preferred;
+  }
+
+  return angles.find((angle) => angle !== lastAngle) ?? preferred;
+}
+
+function businessAnglePhrase(angle: BusinessAngle, topic: ConversationTopic) {
+  const phrases: Record<BusinessAngle, string> = {
+    operational_risk:
+      "The reason this matters operationally is that it can change what the team should validate before making fixes.",
+    customer_behavior:
+      "The real concern behind this finding is shopper behavior: people can lose momentum even when the page technically loads.",
+    analytics_reliability:
+      "The underlying business risk is analytics reliability: the team needs to trust what customer actions are being measured.",
+    conversion_impact:
+      "This matters for conversion because the issue sits close to whether interest turns into a clear next step.",
+    scaling_risk:
+      "This becomes important when traffic scaling begins because unclear signals make paid traffic harder to judge.",
+    support_burden:
+      "This matters for support because unclear expectations can turn normal customer questions into avoidable workload.",
+    optimization_confidence:
+      "The practical risk is optimization confidence: fixes are easier to prioritize when the team knows what the scan is really pointing to.",
+  };
+
+  if (topic === "tracking" && angle === "analytics_reliability") {
+    return "You’re reviewing this early because measurement reliability affects how confidently the business can interpret conversion behavior.";
+  }
+
+  return phrases[angle];
+}
+
+function findingAnchor(
+  topic: ConversationTopic,
+  finding: RetrievedFinding,
+  angle: BusinessAngle,
+) {
+  const topicName = topicLabel(topic)?.toLowerCase() ?? "this area";
+  const title = finding.title;
+
+  if (topic === "tracking") {
+    return `You’re still looking at ${title}: the tracking question is whether the business can trust what it is seeing before it optimizes. ${businessAnglePhrase(
+      angle,
+      topic,
+    )}`;
+  }
+
+  if (topic === "priority") {
+    return `The active priority is ${title}. ${businessAnglePhrase(angle, topic)}`;
+  }
+
+  return `We’re talking about ${title} in ${topicName}. ${businessAnglePhrase(
+    angle,
+    topic,
+  )}`;
 }
 
 function businessContextForTopic(
@@ -1847,6 +2076,8 @@ function businessContextForTopic(
       "The real risk is post-purchase drag. Unclear support, order, shipping, or returns signals can turn normal customer questions into avoidable service workload.",
     technical:
       "The real risk is implementation certainty. I would not treat this as proof something is broken, but technical uncertainty can make platform, checkout, and tracking recommendations less reliable.",
+    metadata:
+      "The real risk is first-impression clarity. Page titles and descriptions help visitors, search engines, and shared links understand what the page is meant to do.",
     benchmark:
       "The real risk is prioritizing against the wrong comparison set. Benchmark context is useful when it helps decide what to inspect first, not when it becomes a generic scorecard.",
     platform:
@@ -1874,6 +2105,8 @@ function operationalConsequenceForTopic(topic: ConversationTopic) {
       "If it is not addressed, support questions, returns confusion, or order-status uncertainty can absorb time after the purchase.",
     technical:
       "If it is not addressed, the team may make recommendations on top of uncertain platform or frontend signals, which can create rework.",
+    metadata:
+      "If it is not addressed, the page can look less clear in search results or shared previews, even if the storefront itself is functioning.",
     benchmark:
       "If it is not addressed, the benchmark read can stay abstract instead of becoming a practical fix order.",
     platform:
@@ -1909,6 +2142,8 @@ function actionSequenceForTopic(
       "The next thing I would check is whether support, shipping, returns, and order communication are clear before and after checkout.",
     technical:
       "The next thing I would check is the failed requests, platform signal, frontend scripts, and whether those signals affect tracking or checkout confidence.",
+    metadata:
+      "The next thing I would check is whether the title and meta description clearly describe the page, brand, and expected customer action.",
     benchmark:
       "The next thing I would check is which benchmark gap maps to an actual storefront action rather than a cosmetic improvement.",
     platform:
@@ -1920,6 +2155,62 @@ function actionSequenceForTopic(
   };
 
   return `${sequences[topic]} First action: ${firstAction}`;
+}
+
+function buildAnchoredExpansionParagraphs({
+  _baseParagraphs,
+  depth,
+  topic,
+  finding,
+  audit,
+  priority,
+  anchor,
+}: {
+  _baseParagraphs: string[];
+  depth: number;
+  topic: ConversationTopic;
+  finding: RetrievedFinding;
+  audit: AssistantAudit;
+  priority: ReturnType<typeof priorityTone>;
+  anchor: string;
+}) {
+  if (depth <= 2) {
+    return [
+      anchor,
+      businessContextForTopic(topic, finding),
+      `${priority.sentence} The first useful move is to understand the business meaning before jumping into fixes.`,
+      continueQuestion(topic),
+    ];
+  }
+
+  if (depth === 3) {
+    return [
+      anchor,
+      `The operational consequence is this: ${operationalConsequenceForTopic(topic)}`,
+      `That is why I would keep ${finding.title} near the top of the review instead of treating it as a minor note.`,
+      "Do you want a practical example?",
+    ];
+  }
+
+  if (depth === 4) {
+    return [
+      anchor,
+      ecommerceExampleForTopic(topic),
+      `For this scan, the example connects back to ${finding.title}: ${finding.explanation}`,
+      "The useful question is whether this issue shows up in the full storefront journey, not only in the public-page sample.",
+      "Do you want the recommended audit approach?",
+    ];
+  }
+
+  return [
+    anchor,
+    "The recommended audit approach is to validate the active issue first, then check the related journey signals around it.",
+    actionSequenceForTopic(topic, finding, audit),
+    "After that, I would compare the result with the related findings so the team does not fix one symptom while leaving the bigger journey issue untouched.",
+    topic === "booking"
+      ? "Do you want to book a deeper audit?"
+      : "Do you want to see where Opun would help with that approach?",
+  ];
 }
 
 function expandCurrentTopicResponse(
@@ -1937,6 +2228,8 @@ function expandCurrentTopicResponse(
   const finding = state.lastFindingDiscussed ?? getFindingByTopic(audit, topic);
   const depth = expansionDepthForQuestion(input, state, topic);
   const priority = priorityTone(finding.severity);
+  const businessAngle = businessAngleForDepth(topic, depth, state.lastBusinessAngle);
+  const anchor = findingAnchor(topic, finding, businessAngle);
   const paragraphs =
     depth <= 2
       ? [
@@ -1969,16 +2262,25 @@ function expandCurrentTopicResponse(
             ];
   const candidate = buildMessage(
     `assistant-expand-${topic}-${Date.now()}`,
-    paragraphs,
+    buildAnchoredExpansionParagraphs({
+      _baseParagraphs: paragraphs,
+      depth,
+      topic,
+      finding,
+      audit,
+      priority,
+      anchor,
+    }),
     { topic, finding, cta: topic === "booking" || depth >= 5 },
   );
   const lastSummary = state.lastAnswerSummary;
   const candidateSummary = summarizeAssistantMessage(candidate);
   const finalMessage =
-    replySimilarity(candidateSummary, lastSummary) > 0.55
+    depth !== 3 && replySimilarity(candidateSummary, lastSummary) > 0.55
       ? buildMessage(
-          `assistant-expand-alt-${topic}-${Date.now()}`,
+        `assistant-expand-alt-${topic}-${Date.now()}`,
           [
+            anchor,
             ecommerceExampleForTopic(topic),
             actionSequenceForTopic(topic, finding, audit),
             "That gives the follow-up a different angle: not just what the scan found, but how I would validate it in the actual ecommerce workflow.",
@@ -2003,6 +2305,9 @@ function expandCurrentTopicResponse(
         ...state.conversationDepthByTopic,
         [topic]: depth,
       },
+      lastExplainedTopic: topic,
+      lastExpansionDepth: depth,
+      lastBusinessAngle: businessAngle,
     },
   };
 }
@@ -2112,6 +2417,70 @@ function buildFindingListAnswer(
   );
 }
 
+function buildMetadataAnswer(
+  input: string,
+  context: ScanContext,
+): ChatMessage {
+  const normalized = normalizeText(input);
+  const title = context.metadata.title;
+  const metaDescription = context.metadata.metaDescription;
+  const finding = context.categoryFindings.metadata[0] ?? metadataFinding(context.metadata);
+  const asksTitle = textIncludesAny(normalized, [
+    "page title",
+    "meta title",
+    "title tag",
+    "seo title",
+  ]);
+  const asksDescription = textIncludesAny(normalized, [
+    "meta description",
+    "seo description",
+    "description",
+  ]);
+
+  if (asksTitle && !asksDescription) {
+    return buildScanAnswer({
+      id: `assistant-direct-metadata-title-${Date.now()}`,
+      topic: "metadata",
+      directAnswer: title
+        ? `The page title is "${title}".`
+        : "The scan did not find a page title in the loaded page metadata.",
+      evidence: finding.evidenceSummary ?? "The scan checked the loaded page metadata.",
+      businessMeaning:
+        "The title tag shapes browser-tab clarity, search-result relevance, and the first cue people see before opening the page.",
+      nextQuestion: "Do you want me to check the meta description too?",
+    });
+  }
+
+  if (asksDescription) {
+    return buildScanAnswer({
+      id: `assistant-direct-metadata-description-${Date.now()}`,
+      topic: "metadata",
+      directAnswer: metaDescription
+        ? `The meta description is "${metaDescription}".`
+        : "The scan did not find a meta description in the loaded page metadata.",
+      evidence: finding.evidenceSummary ?? "The scan checked the loaded page metadata.",
+      businessMeaning:
+        "The meta description helps set expectations in search results and shared previews; if it is missing or vague, the page can feel less clear before someone even lands on it.",
+      nextQuestion: "Do you want me to connect this to the technical findings?",
+    });
+  }
+
+  return buildScanAnswer({
+    id: `assistant-direct-metadata-${Date.now()}`,
+    topic: "metadata",
+    directAnswer: title || metaDescription
+      ? "The scan found public metadata for the loaded page."
+      : "The scan did not find clear title or meta description metadata for the loaded page.",
+    evidence: sanitizeEvidenceText(
+      `${finding.evidenceSummary ?? "The scan checked the loaded page metadata."} Structured data and Open Graph fields are not exposed in the current scan context.`,
+      { maxLength: 300 },
+    ),
+    businessMeaning:
+      "Metadata matters because it controls the page's first impression in search results, browser tabs, and shared links. I would make sure it clearly describes the page and the expected customer action.",
+    nextQuestion: "Do you want me to compare metadata with the technical findings?",
+  });
+}
+
 function answerDirectQuestion(
   input: string,
   context: ScanContext,
@@ -2123,7 +2492,50 @@ function answerDirectQuestion(
   let topic: ConversationTopic | null = null;
   let finding: RetrievedFinding | null = null;
 
-  if (
+  if (detectIntent(input) === "ask_metadata") {
+    topic = "metadata";
+    message = buildMetadataAnswer(input, context);
+    finding = context.categoryFindings.metadata[0] ?? metadataFinding(context.metadata);
+  } else if (
+    normalized.includes("is this ecommerce") ||
+    normalized.includes("what kind of site") ||
+    normalized.includes("site type") ||
+    normalized.includes("why does the scan sound ecommerce") ||
+    (normalized.includes("why") && normalized.includes("cart") && normalized.includes("not visible"))
+  ) {
+    topic = "platform";
+    const siteType = context.siteType ?? "non-ecommerce-or-unclear";
+    const reason =
+      context.siteTypeReason ??
+      context.storefrontReviewContext?.reason ??
+      "The scan classified the page from the public cart, checkout, catalog, CTA, form, platform, and metadata signals.";
+    const supportingSignals =
+      context.storefrontReviewContext?.supportingSignals?.slice(0, 2).join(" ") ??
+      "";
+    const isStandardStorefront = siteType === "ecommerce-storefront";
+    const isNonEcommerce = siteType === "non-ecommerce-or-unclear";
+    const isEnterprise =
+      siteType === "enterprise-retail" || siteType === "custom-enterprise";
+
+    message = buildScanAnswer({
+      id: `assistant-direct-site-type-${Date.now()}`,
+      topic,
+      directAnswer: isStandardStorefront
+        ? "Yes. From the public scan, this page exposes enough ecommerce signals to review it as a storefront."
+        : isNonEcommerce
+          ? "I would not treat this URL as a confirmed ecommerce storefront from the public scan alone."
+          : isEnterprise
+            ? "This looks more like an enterprise or custom commerce environment than a standard storefront template."
+            : `I would classify this as ${siteType.replace(/-/g, " ")} from the public scan.`,
+      evidence: sanitizeEvidenceText(`${reason} ${supportingSignals}`),
+      businessMeaning: isNonEcommerce
+        ? "The first review question is whether this is the right commerce entry point, or whether buying happens elsewhere, behind login, through a lead path, or outside this public page."
+        : isEnterprise
+          ? "Cart, checkout, and platform details may be intentionally abstracted, so the scan should stay conservative until a manual review confirms the actual journey."
+          : "The site type changes how I would read the findings: a catalog, lead-gen, or education journey should not be judged exactly like a retail checkout flow.",
+      nextQuestion: "Do you want me to explain what this means for the scan priorities?",
+    });
+  } else if (
     asksVisible &&
     (normalized.includes("product/category") ||
       normalized.includes("product category") ||
@@ -2172,16 +2584,28 @@ function answerDirectQuestion(
   } else if (
     normalized.includes("what platform") ||
     normalized.includes("which platform") ||
-    normalized.includes("platform is this")
+    normalized.includes("platform is this") ||
+    normalized.includes("is this magento") ||
+    normalized.includes("why did it say magento") ||
+    normalized.includes("what is walmart built on") ||
+    normalized.includes("custom enterprise stack")
   ) {
     topic = "platform";
+    const isEnterpriseStack =
+      context.platform.name === "Enterprise / Custom Commerce Stack";
     message = buildScanAnswer({
       id: `assistant-direct-platform-${Date.now()}`,
       topic,
-      directAnswer: `The scan identifies ${context.platform.name} as the likely platform.`,
-      evidence: `${context.platform.name} was detected with ${context.platform.confidenceLabel.toLowerCase()} at ${context.platform.confidence}%.`,
-      businessMeaning:
-        "Platform detection is useful context for the review, but it should still be confirmed before making platform-specific recommendations.",
+      directAnswer: isEnterpriseStack
+        ? "From the public scan, I would not confidently call this Magento, Shopify, BigCommerce, or WooCommerce. The safer interpretation is a custom or heavily abstracted enterprise commerce stack."
+        : `The scan identifies ${context.platform.name} as the likely platform.`,
+      evidence: isEnterpriseStack
+        ? context.platform.explanation ??
+          "The public page exposes mixed or limited standard-platform evidence, which is common on custom or hybrid enterprise storefronts."
+        : `${context.platform.name} was detected with ${context.platform.confidenceLabel.toLowerCase()} at ${context.platform.confidence}%.`,
+      businessMeaning: isEnterpriseStack
+        ? "Platform-specific assumptions should be manually confirmed before recommending Magento, Shopify, BigCommerce, or WooCommerce-specific fixes."
+        : "Platform detection is useful context for the review, but it should still be confirmed before making platform-specific recommendations.",
       nextQuestion: "Do you want me to connect the platform signal to the technical findings?",
     });
   } else if (asksVisible && (normalized.includes("cta") || /\bbutton\b/.test(normalized))) {
@@ -2396,6 +2820,7 @@ function continueQuestion(topic: ConversationTopic) {
     tracking: "Do you want me to explain how this affects conversion measurement?",
     operations: "Do you want me to separate quick wins from deeper operational fixes?",
     technical: "Do you want me to compare this with the tracking visibility findings?",
+    metadata: "Do you want me to compare this with the technical findings?",
     benchmark: "Do you want me to turn that benchmark context into a fix order?",
     platform: "Do you want me to connect the platform signal to the technical findings?",
     priority: "Do you want me to explain why that should come first?",
@@ -2641,6 +3066,34 @@ function buildPlatformResponse(audit: AssistantAudit): AssistantTurn {
   };
 }
 
+function buildMetadataResponse(audit: AssistantAudit): AssistantTurn {
+  const metadata = {
+    title: audit.diagnostics.title ?? null,
+    metaDescription: audit.diagnostics.metaDescription ?? null,
+  };
+  const finding = metadataFinding(metadata);
+
+  return {
+    message: buildScanAnswer({
+      id: `assistant-metadata-${Date.now()}`,
+      topic: "metadata",
+      directAnswer: metadata.title || metadata.metaDescription
+        ? "The scan found public metadata for the loaded page."
+        : "The scan did not find clear title or meta description metadata for the loaded page.",
+      evidence: finding.evidenceSummary ?? "The scan checked the loaded page metadata.",
+      businessMeaning:
+        "Metadata matters because it shapes search snippets, browser tabs, and shared-link previews before someone reaches the page.",
+      nextQuestion: "Do you want me to connect metadata with the technical findings?",
+    }),
+    nextState: createNextState(
+      "metadata",
+      "ask_metadata",
+      finding,
+      "Metadata",
+    ),
+  };
+}
+
 function buildTrackingResponse(audit: AssistantAudit): AssistantTurn {
   const finding = getFindingByTopic(audit, "tracking");
   const trackingSummary = getTrackingSummary(audit);
@@ -2707,11 +3160,81 @@ function buildFallbackResponse(
   };
 }
 
+function detectAcknowledgementIntent(value: string) {
+  const normalized = normalizeText(value).replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  const acknowledgementPhrases = [
+    "thanks",
+    "thank you",
+    "appreciate it",
+    "got it",
+    "understood",
+    "makes sense",
+    "okay",
+    "ok",
+    "cool",
+    "perfect",
+    "awesome",
+    "great",
+    "nice",
+    "helpful",
+    "that helps",
+    "that was helpful",
+  ];
+
+  return acknowledgementPhrases.some(
+    (phrase) =>
+      normalized === phrase ||
+      normalized === `that is ${phrase}` ||
+      normalized === `that was ${phrase}` ||
+      normalized === `${phrase} thanks`,
+  );
+}
+
+function buildAcknowledgementResponse(
+  input: string,
+  state: ConversationState,
+): AssistantTurn {
+  const normalized = normalizeText(input);
+  const reply = textIncludesAny(normalized, ["thanks", "thank you", "appreciate it"])
+    ? "You're welcome."
+    : textIncludesAny(normalized, ["got it", "understood", "makes sense", "okay", "ok"])
+      ? "Makes sense."
+      : "Glad that helped.";
+  const softFollowUp =
+    state.currentTopic && state.currentTopic !== "priority"
+      ? "If you'd like, we can compare the top findings next."
+      : "If you'd like, we can look at fix priority next.";
+
+  return {
+    message: buildMessage(`assistant-acknowledgement-${Date.now()}`, [
+      `${reply} ${softFollowUp}`,
+    ]),
+    nextState: createNextState(
+      state.currentTopic,
+      "unknown",
+      state.lastFindingDiscussed,
+      state.lastCategoryDiscussed,
+      state.conversationStep,
+      state.pendingFollowUp,
+    ),
+  };
+}
+
 function detectIntent(value: string): AssistantIntent {
   const normalized = value.toLowerCase().trim();
+  const normalizedSearch = normalizeText(value).replace(/\s+/g, " ").trim();
 
   if (!normalized) {
     return "unknown";
+  }
+
+  if (textIncludesAny(normalizedSearch, intentKeywords.ask_metadata)) {
+    return "ask_metadata";
   }
 
   if (
@@ -2750,6 +3273,9 @@ function createNextState(
     lastIntent: intent,
     lastQuestion: null,
     lastAnswerSummary: null,
+    lastExplainedTopic: topic,
+    lastExpansionDepth: previousStep,
+    lastBusinessAngle: null,
     lastFindingDiscussed: finding,
     lastCategoryDiscussed: category ?? null,
     conversationStep: previousStep + 1,
@@ -2819,6 +3345,14 @@ function buildAssistantResponse(
     };
   }
 
+  if (intent === "ask_metadata") {
+    const turn = buildMetadataResponse(audit);
+    return {
+      ...turn,
+      nextState: { ...turn.nextState, conversationStep: state.conversationStep + 1 },
+    };
+  }
+
   if (intent === "ask_benchmark") {
     const turn = buildBenchmarkResponse(audit);
     return {
@@ -2869,6 +3403,10 @@ function buildAssistantResponse(
 export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
   const initialMessage = useMemo(() => buildInitialMessage(audit), [audit]);
   const scanContext = useMemo(() => normalizeScanContext(audit), [audit]);
+  const messageListRef = useRef<HTMLDivElement | null>(null);
+  const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const shouldAutoScrollRef = useRef(false);
+  const userIsNearBottomRef = useRef(true);
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
   const [freeTextQuestion, setFreeTextQuestion] = useState("");
   const [isAssistantLoading, setIsAssistantLoading] = useState(false);
@@ -2878,6 +3416,9 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
     lastIntent: null,
     lastQuestion: null,
     lastAnswerSummary: summarizeAssistantMessage(initialMessage),
+    lastExplainedTopic: "priority",
+    lastExpansionDepth: 1,
+    lastBusinessAngle: null,
     lastFindingDiscussed: getHighestImpactFinding(audit),
     lastCategoryDiscussed: getHighestImpactFinding(audit).categoryLabel ?? null,
     conversationStep: 0,
@@ -2885,9 +3426,58 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
     conversationDepthByTopic: { priority: 1 },
   });
 
+  function updateAutoScrollPreference() {
+    const messageList = messageListRef.current;
+
+    if (!messageList) {
+      userIsNearBottomRef.current = true;
+      return;
+    }
+
+    const distanceFromBottom =
+      messageList.scrollHeight - messageList.scrollTop - messageList.clientHeight;
+    const isNearBottom = distanceFromBottom < 150;
+    userIsNearBottomRef.current = isNearBottom;
+  }
+
+  function queueMessageAutoScroll({ force = false } = {}) {
+    shouldAutoScrollRef.current = force || userIsNearBottomRef.current;
+  }
+
+  function scrollLatestMessageIntoView() {
+    if (!shouldAutoScrollRef.current) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const messageList = messageListRef.current;
+
+      if (!messageList) {
+        return;
+      }
+
+      messageEndRef.current?.scrollIntoView({
+        block: "end",
+        behavior: "auto",
+      });
+      messageList.scrollTop = messageList.scrollHeight;
+
+      window.requestAnimationFrame(() => {
+        messageList.scrollTop = messageList.scrollHeight;
+        shouldAutoScrollRef.current = false;
+      });
+    });
+  }
+
+  useEffect(() => {
+    scrollLatestMessageIntoView();
+  }, [messages.length]);
+
   useEffect(() => {
     const highestImpactFinding = getHighestImpactFinding(audit);
 
+    shouldAutoScrollRef.current = false;
+    userIsNearBottomRef.current = true;
     setMessages([buildInitialMessage(audit)]);
     setFreeTextQuestion("");
     setIsAssistantLoading(false);
@@ -2897,6 +3487,9 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       lastIntent: null,
       lastQuestion: null,
       lastAnswerSummary: summarizeAssistantMessage(buildInitialMessage(audit)),
+      lastExplainedTopic: "priority",
+      lastExpansionDepth: 1,
+      lastBusinessAngle: null,
       lastFindingDiscussed: highestImpactFinding,
       lastCategoryDiscussed: highestImpactFinding.categoryLabel ?? null,
       conversationStep: 0,
@@ -2916,6 +3509,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       label,
     );
 
+    queueMessageAutoScroll({ force: true });
     setMessages((current) => [
       ...current,
       {
@@ -2934,6 +3528,64 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       role: "user",
       paragraphs: [question],
     };
+    const acknowledgementTurn = detectAcknowledgementIntent(question)
+      ? buildAcknowledgementResponse(question, conversationState)
+      : null;
+
+    if (acknowledgementTurn) {
+      const progressedTurn = attachConversationProgression(
+        acknowledgementTurn,
+        conversationState,
+        question,
+      );
+
+      setFreeTextQuestion("");
+      queueMessageAutoScroll({ force: true });
+      setMessages((current) => [...current, userMessage, progressedTurn.message]);
+      setConversationState(progressedTurn.nextState);
+      setAiSuggestedReplies([]);
+      return;
+    }
+
+    const directTurn = answerDirectQuestion(question, scanContext, conversationState);
+
+    if (directTurn) {
+      const progressedTurn = attachConversationProgression(
+        directTurn,
+        conversationState,
+        question,
+      );
+
+      setFreeTextQuestion("");
+      queueMessageAutoScroll({ force: true });
+      setMessages((current) => [...current, userMessage, progressedTurn.message]);
+      setConversationState(progressedTurn.nextState);
+      setAiSuggestedReplies([]);
+      return;
+    }
+
+    const intent = detectIntent(question);
+    const detectedTopic = topicFromIntent(intent);
+    const shouldSwitchTopic =
+      intent !== "unknown" &&
+      detectedTopic &&
+      detectedTopic !== conversationState.currentTopic;
+
+    if (shouldSwitchTopic || intent === "ask_priority") {
+      const progressedTurn = attachConversationProgression(
+        buildAssistantResponse(intent, audit, conversationState),
+        conversationState,
+        question,
+      );
+
+      setFreeTextQuestion("");
+      queueMessageAutoScroll({ force: true });
+      setMessages((current) => [...current, userMessage, progressedTurn.message]);
+      setConversationState(progressedTurn.nextState);
+      setAiSuggestedReplies([]);
+      return;
+    }
+
     const conversationHistory = [...messages, userMessage].slice(-10).map(
       (message) => ({
         role: message.role,
@@ -2953,12 +3605,14 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
         question,
       );
 
+      queueMessageAutoScroll({ force: true });
       setMessages((current) => [...current, userMessage, progressedTurn.message]);
       setConversationState(progressedTurn.nextState);
       setAiSuggestedReplies([]);
       return;
     }
 
+    queueMessageAutoScroll({ force: true });
     setMessages((current) => [...current, userMessage]);
     setIsAssistantLoading(true);
 
@@ -3009,6 +3663,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
         question,
       );
 
+      queueMessageAutoScroll({ force: true });
       setMessages((current) => [...current, progressedTurn.message]);
       setConversationState(progressedTurn.nextState);
       setAiSuggestedReplies(data.suggestedReplies?.slice(0, 4) ?? []);
@@ -3020,6 +3675,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
         conversationState,
       );
 
+      queueMessageAutoScroll({ force: true });
       setMessages((current) => [...current, turn.message]);
       setConversationState(turn.nextState);
       setAiSuggestedReplies([]);
@@ -3046,6 +3702,17 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
     }
 
     void submitFreeTextQuestion(question);
+  }
+
+  function handleQuestionInputPointerDown(
+    event: MouseEvent<HTMLInputElement> | PointerEvent<HTMLInputElement>,
+  ) {
+    if (document.activeElement === event.currentTarget) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.focus({ preventScroll: true });
   }
 
   const currentTopicLabel = topicLabel(conversationState.currentTopic);
@@ -3137,8 +3804,10 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
           )}
 
           <div
+            ref={messageListRef}
             data-testid="assistant-message-list"
-            className="max-h-[min(52vh,34rem)] overflow-y-auto overscroll-contain pr-1 sm:pr-2 md:max-h-[min(58vh,38rem)]"
+            onScroll={updateAutoScrollPreference}
+            className="max-h-[min(52vh,34rem)] scroll-pb-6 overflow-y-auto overscroll-contain pr-1 pb-2 sm:pr-2 md:max-h-[min(58vh,38rem)]"
           >
             <div className="space-y-4" aria-live="polite">
             {messages.map((message, index) => {
@@ -3239,6 +3908,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                 </div>
               </div>
             )}
+            <div ref={messageEndRef} aria-hidden="true" className="h-1" />
             </div>
           </div>
 
@@ -3289,6 +3959,8 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
               type="text"
               value={freeTextQuestion}
               onChange={(event) => setFreeTextQuestion(event.target.value)}
+              onPointerDown={handleQuestionInputPointerDown}
+              onMouseDown={handleQuestionInputPointerDown}
               placeholder="Ask what to fix first, why it matters, or how serious it is"
               disabled={isAssistantLoading}
               className="min-h-[3.25rem] min-w-0 flex-1 rounded-xl border border-brand-cyan/30 bg-white/[0.06] px-4 py-3 text-sm text-primary outline-none transition-colors placeholder:text-muted focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"

@@ -80,6 +80,51 @@ type PrimaryOperationalConcern = {
   supportingFindings: string[];
 };
 
+type StorefrontIdentityProfile = {
+  domain: string;
+  businessScale:
+    | "enterprise"
+    | "growth"
+    | "brand"
+    | "education"
+    | "lead-capture"
+    | "unknown";
+  architectureStyle:
+    | "standard-platform"
+    | "enterprise-custom"
+    | "custom"
+    | "unknown";
+  commerceMaturity: "advanced" | "moderate" | "early" | "unknown";
+  operationalPattern:
+    | "enterprise-retail"
+    | "catalog-commerce"
+    | "brand-commerce"
+    | "education-commerce"
+    | "lead-capture"
+    | "unknown";
+  platformConfidence: "high" | "moderate" | "low" | "unknown";
+  identitySignals: string[];
+  identitySummary: string;
+  identityOpening: string;
+  identityFraming: string;
+};
+
+type StorefrontReviewSiteType =
+  | "ecommerce-storefront"
+  | "enterprise-retail"
+  | "catalog-commerce"
+  | "lead-generation"
+  | "education/content-commerce"
+  | "non-ecommerce-or-unclear"
+  | "custom-enterprise";
+
+type StorefrontReviewContext = {
+  siteType: StorefrontReviewSiteType;
+  confidence: HeuristicConfidence;
+  reason: string;
+  supportingSignals: string[];
+};
+
 type BenchmarkNote = {
   message: string;
   evidence: string;
@@ -95,6 +140,214 @@ type BenchmarkContext = {
   recurringNegativePatterns: string[];
   signalScore: number;
 };
+
+const knownEnterpriseRetailDomains = [
+  "amazon.com",
+  "walmart.com",
+  "target.com",
+  "apple.com",
+  "bestbuy.com",
+  "nike.com",
+  "costco.com",
+  "homedepot.com",
+  "lowes.com",
+];
+
+const knownEducationContentDomains = [
+  "pearson.com",
+  "education.adp.com",
+];
+
+function safeHost(value: string | null | undefined) {
+  if (!value) return "";
+
+  try {
+    return new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return value.replace(/^https?:\/\//, "").split("/")[0]?.replace(/^www\./, "").toLowerCase() ?? "";
+  }
+}
+
+function domainMatches(domain: string, candidates: string[]) {
+  return candidates.some((candidate) => domain === candidate || domain.endsWith(`.${candidate}`));
+}
+
+function textHasAny(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(term));
+}
+
+function classifyStorefrontReviewContext({
+  website,
+  diagnostics,
+}: {
+  website: string;
+  diagnostics: LiveDiagnosticsResult;
+}): StorefrontReviewContext {
+  const commerce = diagnostics.commerceFlowSignals;
+  const storefront = diagnostics.storefrontSignals;
+  const domain = safeHost(diagnostics.finalUrl || website);
+  const platform = diagnostics.platformDetection;
+  const pageCorpus = [
+    diagnostics.title,
+    diagnostics.metaDescription,
+    diagnostics.finalUrl,
+    diagnostics.commerceFlowSignals.ctaLabels.join(" "),
+    diagnostics.conversionSignals.ctaLabels.join(" "),
+    diagnostics.storefrontSignals.mobileCtaLabels.join(" "),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const supportingSignals: string[] = [];
+
+  const isKnownEnterprise = domainMatches(domain, knownEnterpriseRetailDomains);
+  const isKnownEducationContent = domainMatches(domain, knownEducationContentDomains);
+  const platformIsEnterprise = platform.name === "Enterprise / Custom Commerce Stack";
+  const cartOrCheckoutVisible = commerce.cartVisible || commerce.checkoutVisible;
+  const catalogSignalsVisible =
+    commerce.productCatalogVisible ||
+    storefront.productNavigationVisible ||
+    storefront.collectionLinksVisible ||
+    storefront.searchVisible;
+  const productCatalogPathVisible =
+    commerce.productCatalogVisible ||
+    storefront.productNavigationVisible ||
+    storefront.collectionLinksVisible;
+  const leadPathVisible = commerce.formVisible || storefront.leadCaptureVisible;
+  const ctaVisible = commerce.ctaVisible || commerce.ctaCount > 0;
+  const hasStandardPlatformConfidence =
+    platform.name !== "Unknown" &&
+    platform.name !== "Needs Manual Review" &&
+    platform.name !== "Enterprise / Custom Commerce Stack" &&
+    platform.confidence >= 70;
+  const hasCommerceLanguage = textHasAny(pageCorpus, [
+    "shop",
+    "cart",
+    "checkout",
+    "product",
+    "category",
+    "collection",
+    "buy",
+    "order",
+    "shipping",
+    "returns",
+    "store",
+  ]);
+  const hasEducationLanguage = textHasAny(pageCorpus, [
+    "education",
+    "learning",
+    "course",
+    "training",
+    "academy",
+    "certification",
+    "student",
+    "school",
+    "university",
+    "class",
+  ]);
+  const hasLeadGenLanguage = textHasAny(pageCorpus, [
+    "contact",
+    "book",
+    "schedule",
+    "request",
+    "demo",
+    "consultation",
+    "quote",
+    "talk to",
+    "get started",
+    "apply",
+  ]);
+
+  if (isKnownEnterprise) {
+    supportingSignals.push("Known major enterprise retail domain.");
+  }
+
+  if (platformIsEnterprise) {
+    supportingSignals.push("Public platform evidence points to a custom or heavily abstracted commerce stack.");
+  } else if (!hasStandardPlatformConfidence) {
+    supportingSignals.push("Standard platform confidence is not strong enough for platform-specific assumptions.");
+  }
+
+  if (cartOrCheckoutVisible) {
+    supportingSignals.push("Cart or checkout signals are visible in the public sample.");
+  }
+
+  if (catalogSignalsVisible) {
+    supportingSignals.push("Product, category, collection, or search signals are visible.");
+  }
+
+  if (leadPathVisible || ctaVisible) {
+    supportingSignals.push("CTA or form signals are visible.");
+  }
+
+  if (hasEducationLanguage) {
+    supportingSignals.push("Page language points to an education, learning, course, or content journey.");
+  }
+
+  if (isKnownEducationContent || (hasEducationLanguage && !productCatalogPathVisible)) {
+    return {
+      siteType: "education/content-commerce",
+      confidence: isKnownEducationContent ? "High" : "Moderate",
+      reason:
+        "The public evidence points more strongly to an education, course, account, or content journey than to a standard retail checkout flow.",
+      supportingSignals: supportingSignals.slice(0, 5),
+    };
+  }
+
+  if (platformIsEnterprise || isKnownEnterprise) {
+    return {
+      siteType: platformIsEnterprise ? "custom-enterprise" : "enterprise-retail",
+      confidence: catalogSignalsVisible || hasCommerceLanguage ? "High" : "Moderate",
+      reason:
+        "The public page appears to be part of a large or custom commerce environment where platform and purchase-path details may be intentionally abstracted.",
+      supportingSignals: supportingSignals.slice(0, 5),
+    };
+  }
+
+  if (
+    cartOrCheckoutVisible &&
+    hasCommerceLanguage &&
+    (productCatalogPathVisible || hasStandardPlatformConfidence)
+  ) {
+    return {
+      siteType: "ecommerce-storefront",
+      confidence: catalogSignalsVisible && cartOrCheckoutVisible ? "High" : "Moderate",
+      reason:
+        "The public page exposes enough catalog and purchase-path evidence to treat it as a storefront review.",
+      supportingSignals: supportingSignals.slice(0, 5),
+    };
+  }
+
+  if (productCatalogPathVisible && hasCommerceLanguage && !cartOrCheckoutVisible) {
+    return {
+      siteType: "catalog-commerce",
+      confidence: "Moderate",
+      reason:
+        "The public page exposes product discovery signals, but the cart or checkout path is not clearly visible in this sample.",
+      supportingSignals: supportingSignals.slice(0, 5),
+    };
+  }
+
+  if ((leadPathVisible || ctaVisible || hasLeadGenLanguage) && !cartOrCheckoutVisible && !catalogSignalsVisible) {
+    return {
+      siteType: "lead-generation",
+      confidence: leadPathVisible || hasLeadGenLanguage ? "High" : "Moderate",
+      reason:
+        "The visible journey appears to route users toward a CTA, form, or handoff rather than a standard product checkout.",
+      supportingSignals: supportingSignals.slice(0, 5),
+    };
+  }
+
+  return {
+    siteType: "non-ecommerce-or-unclear",
+    confidence: "Needs Review",
+    reason:
+      "The submitted page does not expose enough public catalog, cart, checkout, or lead-path evidence to classify it as a standard ecommerce storefront.",
+    supportingSignals: supportingSignals.length
+      ? supportingSignals.slice(0, 5)
+      : ["No complete public ecommerce journey was visible in the lightweight scan."],
+  };
+}
 
 const auditCategoryTemplates = [
   {
@@ -335,6 +588,7 @@ function visibleMarketingTools(diagnostics: LiveDiagnosticsResult) {
 function platformNeedsManualReview(diagnostics: LiveDiagnosticsResult) {
   return (
     diagnostics.platformDetection.name === "Unknown" ||
+    diagnostics.platformDetection.name === "Enterprise / Custom Commerce Stack" ||
     diagnostics.platformDetection.name === "Needs Manual Review" ||
     diagnostics.platformDetection.confidenceLabel === "Low confidence" ||
     diagnostics.platformDetection.confidenceLabel === "Needs Review"
@@ -1349,9 +1603,15 @@ function interpretTechnicalFinding({
   const platform = diagnostics.platformDetection.name;
   const foundPlatform = platform && platform !== "Unknown" ? platform : "an unknown platform";
   const issueCount = diagnostics.failedRequests.length + diagnostics.consoleErrors.length;
+  const platformMeaning =
+    platform === "Enterprise / Custom Commerce Stack"
+      ? "That means standard-platform assumptions should wait until the custom or hybrid architecture is manually confirmed."
+      : foundPlatform === "an unknown platform"
+        ? "That makes it harder to plan specific fixes."
+        : "That means we should verify whether the detected platform assumptions are accurate.";
 
   return {
-    businessMeaning: `The public scan suggests platform reliability and script execution are the key operational risks. ${foundPlatform === "an unknown platform" ? "That makes it harder to plan specific fixes." : `That means we should verify whether the detected platform assumptions are accurate.`}`,
+    businessMeaning: `The public scan suggests platform reliability and script execution are the key operational risks. ${platformMeaning}`,
     operationalConcern: `If the storefront is not stable, fixes in tracking, checkout, or product discovery may not behave consistently.`,
     customerImpact: issueCount > 0
       ? `Shoppers may experience inconsistent behavior or interrupted checkout if these frontend issues remain. `
@@ -1486,27 +1746,126 @@ function interpretCTAFinding({
   };
 }
 
+function buildSiteTypeExecutiveSummary({
+  reviewContext,
+  diagnostics,
+  findings,
+}: {
+  reviewContext: StorefrontReviewContext;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+}) {
+  const topFindings = findings.slice(0, 3);
+  const opportunities = topFindings.map((finding) =>
+    buildExecutiveOpportunityText({
+      title: finding.title,
+      evidence: finding.evidenceSummary,
+      action: finding.recommendedFirstAction,
+    }),
+  );
+
+  if (reviewContext.siteType === "non-ecommerce-or-unclear") {
+    return {
+      summary:
+        "The submitted page does not expose a complete ecommerce journey from public evidence, so the review should first confirm whether this is the correct commerce entry point.",
+      highestImpactOpportunities: opportunities,
+      businessInterpretation:
+        "Treat this as a routing and context check before judging checkout, cart, or product conversion performance. The next review should confirm whether the buying path lives on another URL, behind account access, or outside the public page sample.",
+    };
+  }
+
+  if (reviewContext.siteType === "enterprise-retail" || reviewContext.siteType === "custom-enterprise") {
+    return {
+      summary:
+        "This looks like an enterprise or custom commerce environment where the public page intentionally exposes limited platform and transaction detail.",
+      highestImpactOpportunities: opportunities,
+      businessInterpretation:
+        "The first priority is manual confirmation of platform, catalog, cart, checkout, and measurement architecture before making platform-specific recommendations.",
+    };
+  }
+
+  if (reviewContext.siteType === "catalog-commerce") {
+    return {
+      summary:
+        "The scan reads as a catalog-led commerce review: product discovery is visible, but the full browse-to-buy path is not fully exposed in the public sample.",
+      highestImpactOpportunities: opportunities,
+      businessInterpretation:
+        "Prioritize category clarity, search visibility, product links, and the handoff from browsing into purchase or enquiry before treating checkout friction as the main issue.",
+    };
+  }
+
+  if (reviewContext.siteType === "lead-generation") {
+    return {
+      summary:
+        "The submitted page behaves more like a lead-generation path than a standard retail storefront.",
+      highestImpactOpportunities: opportunities,
+      businessInterpretation:
+        "The review should focus on CTA clarity, form visibility, trust cues, and the operational handoff after a visitor shows intent.",
+    };
+  }
+
+  if (reviewContext.siteType === "education/content-commerce") {
+    return {
+      summary:
+        "The page appears to sit in an education, course, account, or content journey rather than a straightforward retail checkout path.",
+      highestImpactOpportunities: opportunities,
+      businessInterpretation:
+        "The next review should clarify whether users are expected to browse courses, sign in, request access, or move into a separate commerce flow.",
+    };
+  }
+
+  return null;
+}
+
 function buildExecutiveSummary({
   categories,
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
+  reviewContext,
 }: {
   categories: ReturnType<typeof applyLiveDiagnosticScoring>;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore: number;
+  identityProfile: StorefrontIdentityProfile;
+  reviewContext: StorefrontReviewContext;
 }) {
   const profile = resolveNarrativeArchetype({ categories, diagnostics, findings });
   const weightedFindings = narrativeSortedFindings(findings, profile.archetype);
+  const siteTypeSummary = buildSiteTypeExecutiveSummary({
+    reviewContext,
+    diagnostics,
+    findings: weightedFindings,
+  });
+
+  if (siteTypeSummary) {
+    return {
+      ...siteTypeSummary,
+      summary: sanitizeEvidenceText(
+        `${identityProfile.identitySummary} ${siteTypeSummary.summary}`,
+      ),
+      businessInterpretation: sanitizeEvidenceText(siteTypeSummary.businessInterpretation),
+    };
+  }
+
   const summaryBuilder = summaryBuilders[profile.archetype] ?? buildBalancedReviewSummary;
-  return summaryBuilder({
+  const result = summaryBuilder({
     profile,
     categories,
     diagnostics,
     findings: weightedFindings,
     overallScore,
+    identityProfile,
   });
+
+  return {
+    ...result,
+    summary: sanitizeEvidenceText(
+      `${identityProfile.identitySummary} ${result.summary}`,
+    ),
+  };
 }
 
 function buildTechnicalRiskSummary({
@@ -1514,11 +1873,13 @@ function buildTechnicalRiskSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }): {
   summary: string;
   highestImpactOpportunities: string[];
@@ -1549,11 +1910,13 @@ function buildTrustDeficitSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const interpretation = interpretTrustFinding({ diagnostics, findings });
   const topFinding = findings.find((finding) => finding.category === "trustSignals");
@@ -1580,11 +1943,13 @@ function buildDiscoveryBreakdownSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const interpretation = interpretDiscoveryFinding({ diagnostics, findings });
   const discoveryFinding = findings.find((finding) => finding.category === "productDiscovery") ?? findings[0];
@@ -1611,11 +1976,13 @@ function buildCheckoutContinuityRiskSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const interpretation = interpretOperationalFinding({ diagnostics, findings });
   const checkoutFinding = findings.find((finding) => finding.title.includes("Cart / Checkout")) ?? findings[0];
@@ -1642,11 +2009,13 @@ function buildMobileClarityRiskSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const interpretation = interpretCTAFinding({ diagnostics, findings });
   const mobileFinding = findings.find((finding) => finding.title.includes("Mobile CTA")) ?? findings[0];
@@ -1673,11 +2042,13 @@ function buildMeasurementConfidenceGapSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const interpretation = interpretTrackingFinding({ diagnostics, findings });
   const trackingFinding = findings.find((finding) => finding.primaryCategory === "trackingIssues") ?? findings[0];
@@ -1704,11 +2075,13 @@ function buildOperationalClaritySummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const interpretation = interpretOperationalFinding({ diagnostics, findings });
   const operationalFinding = findings.find((finding) => finding.primaryCategory === "operationsIssues") ?? findings[0];
@@ -1735,11 +2108,13 @@ function buildConversionFrictionSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore?: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const interpretation = interpretCTAFinding({ diagnostics, findings });
   const conversionFinding = findings.find((finding) => finding.primaryCategory === "conversionIssues") ?? findings[0];
@@ -1767,12 +2142,14 @@ function buildBalancedReviewSummary({
   diagnostics,
   findings,
   overallScore,
+  identityProfile,
 }: {
   profile: NarrativeArchetypeProfile;
   categories: ReturnType<typeof applyLiveDiagnosticScoring>;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore: number;
+  identityProfile: StorefrontIdentityProfile;
 }) {
   const trackingToolCount = diagnostics.technologyDetections.filter((tool) => tool.detected).length;
   const cartVisible = diagnostics.commerceFlowSignals.cartVisible;
@@ -1810,6 +2187,7 @@ const summaryBuilders: Record<
     diagnostics: LiveDiagnosticsResult;
     findings: HeuristicFinding[];
     overallScore: number;
+    identityProfile: StorefrontIdentityProfile;
   }) => {
     summary: string;
     highestImpactOpportunities: string[];
@@ -1929,6 +2307,7 @@ function buildPrimaryOperationalConcern(
   findings: HeuristicFinding[],
   connectedInsight: ConnectedInsight | null,
   profile: NarrativeArchetypeProfile,
+  identityProfile: StorefrontIdentityProfile,
 ): PrimaryOperationalConcern | null {
   const weightedFindings = narrativeSortedFindings(findings, profile.archetype);
   const connectedFindings = connectedInsight
@@ -1962,6 +2341,11 @@ function buildPrimaryOperationalConcern(
       ? connectedInsight.insight
       : `The dominant ${profile.archetype.replace(/-/g, " ")} pattern should lead the review before secondary issues are treated as the main story.`;
 
+  const firstAction = buildIdentityAwareFirstAction(
+    leadFinding.recommendedFirstAction,
+    identityProfile,
+  );
+
   return {
     title: concernTitle,
     riskLabel: concernTitle,
@@ -1975,11 +2359,221 @@ function buildPrimaryOperationalConcern(
         .join(" "),
     ),
     recommendedFirstAction: sanitizeEvidenceText(
-      `${leadFinding.recommendedFirstAction} Then confirm the related ${relatedTitles.length > 1 ? "signals" : "signal"} in the same journey walkthrough.`,
+      `${firstAction} Then confirm the related ${relatedTitles.length > 1 ? "signals" : "signal"} in the same journey walkthrough.`,
       { maxLength: 240 },
     ),
     supportingFindings: relatedTitles,
   };
+}
+
+function conciseFindingSentence(finding: HeuristicFinding | undefined) {
+  if (!finding) {
+    return "The next useful step is to manually walk the visible journey before assigning platform-specific fixes.";
+  }
+
+  return `${finding.title} should be reviewed first because ${finding.businessImpact.toLowerCase()}`;
+}
+
+function secondaryFindingSentence(findings: HeuristicFinding[]) {
+  if (findings.length === 0) {
+    return "";
+  }
+
+  return `Other visible signals to validate are ${findings
+    .map((finding) => finding.title.toLowerCase())
+    .join(", ")}.`;
+}
+
+function platformNarrativeContext(diagnostics: LiveDiagnosticsResult) {
+  if (platformNeedsManualReview(diagnostics)) {
+    return "Platform-specific recommendations should wait until a manual review confirms the commerce architecture.";
+  }
+
+  return `${diagnostics.platformDetection.name} evidence is visible enough to support a platform-aware review, while still needing human confirmation before implementation work.`;
+}
+
+function trackingNarrativeContext(diagnostics: LiveDiagnosticsResult) {
+  const marketingTools = visibleMarketingTools(diagnostics);
+
+  if (marketingTools.length === 0) {
+    return "Measurement visibility should also be checked, because public tracking evidence is limited in the loaded page.";
+  }
+
+  return `The scan saw ${marketingTools.length} supported marketing signal${marketingTools.length === 1 ? "" : "s"}, so measurement should be validated against the actual conversion or lead events.`;
+}
+
+function buildEcommerceStorefrontNarrative({
+  diagnostics,
+  priorityFindings,
+  identityProfile,
+  profile,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  priorityFindings: HeuristicFinding[];
+  identityProfile: StorefrontIdentityProfile;
+  profile: NarrativeArchetypeProfile;
+}) {
+  const leadFinding = priorityFindings[0];
+
+  return [
+    identityProfile.identityOpening ||
+      "This page exposes enough ecommerce signals to review it as a storefront journey.",
+    "The story should stay close to the customer path: discovery, primary action, cart or checkout readiness, trust, and measurement.",
+    conciseFindingSentence(leadFinding),
+    secondaryFindingSentence(priorityFindings.slice(1, 3)),
+    profile.operationalFraming,
+    trackingNarrativeContext(diagnostics),
+  ].filter(Boolean).join(" ");
+}
+
+function buildEnterpriseRetailNarrative({
+  diagnostics,
+  priorityFindings,
+  reviewContext,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  priorityFindings: HeuristicFinding[];
+  reviewContext: StorefrontReviewContext;
+}) {
+  return [
+    "This looks less like a standard plug-and-play storefront scan and more like a public view into an enterprise commerce environment.",
+    "The main story is visibility: platform, catalog, cart, checkout, and measurement details may be hidden behind custom services, account flows, regional routing, or abstracted frontend architecture.",
+    conciseFindingSentence(priorityFindings[0]),
+    secondaryFindingSentence(priorityFindings.slice(1, 3)),
+    reviewContext.reason,
+    platformNarrativeContext(diagnostics),
+  ].filter(Boolean).join(" ");
+}
+
+function buildCatalogCommerceNarrative({
+  diagnostics,
+  priorityFindings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  priorityFindings: HeuristicFinding[];
+}) {
+  return [
+    "This scan is best read as a catalog-commerce review, not a full checkout-flow review.",
+    "The useful question is whether shoppers can understand the category structure, search or browse products, and find the next commercial step without extra effort.",
+    conciseFindingSentence(priorityFindings[0]),
+    secondaryFindingSentence(priorityFindings.slice(1, 3)),
+    "Cart and checkout conclusions should stay conservative until the buying path is confirmed from the correct product or transaction URL.",
+    trackingNarrativeContext(diagnostics),
+  ].filter(Boolean).join(" ");
+}
+
+function buildLeadGenerationNarrative({
+  diagnostics,
+  priorityFindings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  priorityFindings: HeuristicFinding[];
+}) {
+  return [
+    "This page behaves more like a lead-generation or enquiry path than a retail checkout path.",
+    "The review should focus on whether the CTA is clear, whether trust signals support the decision, and whether the handoff after form or contact intent is operationally clean.",
+    conciseFindingSentence(priorityFindings[0]),
+    secondaryFindingSentence(priorityFindings.slice(1, 3)),
+    "Cart or checkout absence should not be treated as a failure unless this URL is meant to sell directly.",
+    trackingNarrativeContext(diagnostics),
+  ].filter(Boolean).join(" ");
+}
+
+function buildEducationContentNarrative({
+  diagnostics,
+  priorityFindings,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  priorityFindings: HeuristicFinding[];
+}) {
+  return [
+    "This page appears to sit inside an education, course, account, or content journey rather than a straightforward retail checkout flow.",
+    "The story should focus on learning-path clarity, account or course access, catalogue discovery, and whether ecommerce checkout is actually the right expectation for this URL.",
+    conciseFindingSentence(priorityFindings[0]),
+    secondaryFindingSentence(priorityFindings.slice(1, 3)),
+    "A manual review should confirm whether users are meant to browse content, log in, request access, or move into a separate payment flow.",
+    trackingNarrativeContext(diagnostics),
+  ].filter(Boolean).join(" ");
+}
+
+function buildNonEcommerceNarrative({
+  reviewContext,
+}: {
+  reviewContext: StorefrontReviewContext;
+}) {
+  return [
+    "This page does not expose enough public ecommerce flow to treat it like a standard storefront.",
+    "The review should focus on whether this URL is the right commerce entry point, whether the buying path lives elsewhere, or whether the site is primarily informational, lead-generation, or account-driven.",
+    reviewContext.reason,
+    reviewContext.supportingSignals.length > 0
+      ? `Visible context: ${reviewContext.supportingSignals.join(" ")}`
+      : "",
+  ].filter(Boolean).join(" ");
+}
+
+function buildSiteTypeAuditNarrative({
+  diagnostics,
+  priorityFindings,
+  connectedInsight,
+  identityProfile,
+  profile,
+  reviewContext,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  priorityFindings: HeuristicFinding[];
+  connectedInsight: ConnectedInsight | null;
+  identityProfile: StorefrontIdentityProfile;
+  profile: NarrativeArchetypeProfile;
+  reviewContext: StorefrontReviewContext;
+}) {
+  const narrative =
+    reviewContext.siteType === "non-ecommerce-or-unclear"
+      ? buildNonEcommerceNarrative({ reviewContext })
+      : reviewContext.siteType === "enterprise-retail" || reviewContext.siteType === "custom-enterprise"
+        ? buildEnterpriseRetailNarrative({ diagnostics, priorityFindings, reviewContext })
+        : reviewContext.siteType === "catalog-commerce"
+          ? buildCatalogCommerceNarrative({ diagnostics, priorityFindings })
+          : reviewContext.siteType === "lead-generation"
+            ? buildLeadGenerationNarrative({ diagnostics, priorityFindings })
+            : reviewContext.siteType === "education/content-commerce"
+              ? buildEducationContentNarrative({ diagnostics, priorityFindings })
+              : buildEcommerceStorefrontNarrative({
+                  diagnostics,
+                  priorityFindings,
+                  identityProfile,
+                  profile,
+                });
+
+  return connectedInsight?.insight && reviewContext.siteType === "ecommerce-storefront"
+    ? `${narrative} ${connectedInsight.insight}`
+    : narrative;
+}
+
+function assertNarrativeSpecificity({
+  narrative,
+  reviewContext,
+}: {
+  narrative: string;
+  reviewContext: StorefrontReviewContext;
+}) {
+  const genericTemplatePattern =
+    /lead issue for this|secondary issues to keep in view|this scan reads like/i;
+  const ecommerceFlowPattern = /checkout|cart|purchase path|storefront journey/i;
+
+  if (genericTemplatePattern.test(narrative)) {
+    return reviewContext.siteType === "non-ecommerce-or-unclear"
+      ? buildNonEcommerceNarrative({ reviewContext })
+      : narrative.replace(genericTemplatePattern, "").trim();
+  }
+
+  if (
+    reviewContext.siteType === "non-ecommerce-or-unclear" &&
+    ecommerceFlowPattern.test(narrative)
+  ) {
+    return buildNonEcommerceNarrative({ reviewContext });
+  }
+
+  return narrative;
 }
 
 function buildAuditNarrative({
@@ -1988,41 +2582,32 @@ function buildAuditNarrative({
   findings,
   overallScore,
   connectedInsight,
+  identityProfile,
+  reviewContext,
 }: {
   categories: ReturnType<typeof applyLiveDiagnosticScoring>;
   diagnostics: LiveDiagnosticsResult;
   findings: HeuristicFinding[];
   overallScore: number;
   connectedInsight: ConnectedInsight | null;
+  identityProfile: StorefrontIdentityProfile;
+  reviewContext: StorefrontReviewContext;
 }) {
   const profile = resolveNarrativeArchetype({ categories, diagnostics, findings });
   const priorityFindings = narrativeSortedFindings(findings, profile.archetype).slice(0, 4);
-  const leadFinding = priorityFindings[0];
-  const secondaryFindings = priorityFindings.slice(1, 4);
-  const marketingTools = visibleMarketingTools(diagnostics);
-  const platformContext = platformNeedsManualReview(diagnostics)
-    ? "Platform evidence needs manual confirmation before platform-specific fixes are planned."
-    : `${diagnostics.platformDetection.name} evidence is visible enough to support a platform-aware discussion.`;
-  const trackingContext =
-    marketingTools.length === 0
-      ? "Marketing attribution visibility appears limited in the loaded storefront."
-      : `${marketingTools.length} supported marketing signal${marketingTools.length === 1 ? "" : "s"} ${marketingTools.length === 1 ? "was" : "were"} visible.`;
+  const narrative = buildSiteTypeAuditNarrative({
+    diagnostics,
+    priorityFindings,
+    connectedInsight,
+    identityProfile,
+    profile,
+    reviewContext,
+  });
 
-  const opening = profile.toneHints.opening;
-  const vocabularyPhrase = profile.vocabulary.slice(0, 3).join(", ");
-  const connectionSentence =
-    leadFinding
-      ? `${leadFinding.title} is the lead issue for this ${profile.archetype.replace(/-/g, " ")} story, with ${vocabularyPhrase} as the main lens.`
-      : "The next useful step is to map the visible signals against the customer journey in a manual walkthrough.";
-  const secondaryFocus = secondaryFindings.length > 0
-    ? `Secondary issues to keep in view are ${secondaryFindings
-        .map((finding) => finding.title.toLowerCase())
-        .join(", ")}.`
-    : connectedInsight?.insight
-      ? connectedInsight.insight
-      : "No secondary issue should overpower the dominant story until a manual review confirms it.";
-
-  return `${opening} ${connectionSentence} ${secondaryFocus} ${profile.operationalFraming} ${platformContext} ${trackingContext}`;
+  return sanitizeEvidenceText(
+    assertNarrativeSpecificity({ narrative, reviewContext }),
+    { maxLength: 850 },
+  );
 }
 
 function findCategory(
@@ -2340,6 +2925,269 @@ function buildBenchmarkContext(
   };
 }
 
+function getHostFromUrl(website: string) {
+  try {
+    return new URL(website).hostname.replace(/^www\./, "");
+  } catch {
+    return website;
+  }
+}
+
+function buildIdentitySummary({
+  businessScale,
+  commerceMaturity,
+}: {
+  businessScale: StorefrontIdentityProfile["businessScale"];
+  commerceMaturity: StorefrontIdentityProfile["commerceMaturity"];
+}) {
+  const scalePhrase =
+    businessScale === "enterprise"
+      ? "an enterprise retail storefront"
+      : businessScale === "education"
+        ? "an education commerce storefront"
+        : businessScale === "lead-capture"
+          ? "a lead-capture or service-focused storefront"
+          : businessScale === "growth"
+            ? "a growth-stage commerce storefront"
+            : "a brand-focused commerce storefront";
+
+  const maturityPhrase =
+    commerceMaturity === "advanced"
+      ? "It shows a more mature purchase and measurement footprint."
+      : commerceMaturity === "moderate"
+        ? "It appears to have a moderate visible commerce path."
+        : "It is still in an early or lightly signaled commerce phase.";
+
+  return `The storefront reads like ${scalePhrase}; ${maturityPhrase}`;
+}
+
+function buildIdentityOpening({
+  businessScale,
+  operationalPattern,
+}: {
+  businessScale: StorefrontIdentityProfile["businessScale"];
+  operationalPattern: StorefrontIdentityProfile["operationalPattern"];
+}) {
+  if (operationalPattern === "enterprise-retail") {
+    return "This scan reads like an enterprise retail experience, so the customer journey should be reviewed with platform confidence, trust continuity, and checkout clarity in mind.";
+  }
+
+  if (operationalPattern === "catalog-commerce") {
+    return "This storefront feels like catalog-driven commerce, so product discovery, search, and category flow should be examined alongside purchase cues.";
+  }
+
+  if (operationalPattern === "brand-commerce") {
+    return "This is likely a brand-focused commerce experience, so marketing signal clarity and a clean path to purchase should be balanced.";
+  }
+
+  if (operationalPattern === "education-commerce") {
+    return "This appears to be an education or course commerce experience, so lead capture, discovery, and support signals should be reviewed carefully.";
+  }
+
+  if (operationalPattern === "lead-capture") {
+    return "This looks like a lead-capture or service commerce storefront, so form paths, support cues, and purchase intent signals should be confirmed.";
+  }
+
+  return "This storefront should be reviewed in the context of its visible commerce and trust signals.";
+}
+
+function buildIdentityFraming({
+  operationalPattern,
+}: {
+  operationalPattern: StorefrontIdentityProfile["operationalPattern"];
+}) {
+  if (operationalPattern === "enterprise-retail") {
+    return "Treat the findings as part of a coordinated retail experience where platform, cart, and trust signals are all connected.";
+  }
+
+  if (operationalPattern === "catalog-commerce") {
+    return "Treat the findings as part of a catalog discovery path where navigation clarity influences purchase momentum.";
+  }
+
+  if (operationalPattern === "brand-commerce") {
+    return "Treat the findings as part of a brand commerce path where promotional and transactional evidence both matter.";
+  }
+
+  if (operationalPattern === "education-commerce") {
+    return "Treat the findings as part of an education or training commerce flow where discovery and lead capture can be subtle.";
+  }
+
+  if (operationalPattern === "lead-capture") {
+    return "Treat the findings as part of a lead-capture or service path where contact and support signals are central.";
+  }
+
+  return "Treat the findings as connected signals that should be validated in a manual storefront walkthrough.";
+}
+
+function buildStorefrontIdentityProfile({
+  website,
+  diagnostics,
+}: {
+  website: string;
+  diagnostics: LiveDiagnosticsResult;
+}): StorefrontIdentityProfile {
+  const host = getHostFromUrl(website);
+  const marketingTools = visibleMarketingTools(diagnostics);
+  const signals = diagnostics.storefrontSignals;
+  const commerce = diagnostics.commerceFlowSignals;
+  const platform = diagnostics.platformDetection;
+
+  const hostIsEnterprise = /(?:amazon|walmart|target|costco|bestbuy|homedepot|lowes|sears|macys|nike|adidas|apple|microsoft|google|intel|dell|hp|ikea|verizon|att|samsung|sony)/i.test(host);
+  const educationHost = /(?:\.edu|academy|course|learning|training|university|college)/i.test(host);
+  const platformIsCustomEnterprise =
+    platform.name === "Enterprise / Custom Commerce Stack" ||
+    platform.name === "Unknown" ||
+    platform.confidence < 60;
+  const commercePathVisible =
+    commerce.cartVisible ||
+    commerce.checkoutVisible ||
+    signals.productNavigationVisible ||
+    signals.collectionLinksVisible ||
+    signals.searchVisible;
+  const trackingDepth = marketingTools.length;
+  const hasLeadCapture = signals.leadCaptureVisible;
+
+  const businessScale =
+    hostIsEnterprise
+      ? "enterprise"
+      : educationHost
+        ? "education"
+        : hasLeadCapture
+          ? "lead-capture"
+          : commercePathVisible
+            ? "growth"
+            : "brand";
+
+  const architectureStyle =
+    platformIsCustomEnterprise && hostIsEnterprise
+      ? "enterprise-custom"
+      : platformIsCustomEnterprise
+        ? "custom"
+        : "standard-platform";
+
+  const commerceMaturity =
+    commerce.cartVisible && commerce.checkoutVisible && trackingDepth >= 2
+      ? "advanced"
+      : commerce.cartVisible || commerce.checkoutVisible || commercePathVisible
+        ? "moderate"
+        : "early";
+
+  const operationalPattern =
+    hostIsEnterprise
+      ? "enterprise-retail"
+      : educationHost
+        ? "education-commerce"
+        : hasLeadCapture
+          ? "lead-capture"
+          : signals.productNavigationVisible || signals.collectionLinksVisible || signals.searchVisible
+            ? "catalog-commerce"
+            : "brand-commerce";
+
+  const platformConfidence =
+    platform.confidenceLabel === "High confidence"
+      ? "high"
+      : platform.confidenceLabel === "Moderate confidence"
+        ? "moderate"
+        : platform.confidenceLabel === "Low confidence"
+          ? "low"
+          : "unknown";
+
+  const identitySignals = [
+    host ? `host: ${host}` : "host: unknown",
+    `platform: ${platform.name}`,
+    `platform confidence: ${platform.confidenceLabel}`,
+    `commerce path visible: ${commercePathVisible ? "yes" : "no"}`,
+    `marketing tools detected: ${trackingDepth}`,
+    `lead capture visible: ${hasLeadCapture ? "yes" : "no"}`,
+  ];
+
+  return {
+    domain: host,
+    businessScale,
+    architectureStyle,
+    commerceMaturity,
+    operationalPattern,
+    platformConfidence,
+    identitySignals,
+    identitySummary: buildIdentitySummary({ businessScale, commerceMaturity }),
+    identityOpening: buildIdentityOpening({ businessScale, operationalPattern }),
+    identityFraming: buildIdentityFraming({ operationalPattern }),
+  };
+}
+
+function buildIdentityAwareFirstAction(
+  defaultAction: string,
+  identityProfile: StorefrontIdentityProfile,
+) {
+  const trimmedAction = defaultAction.trim();
+  if (!trimmedAction) {
+    return trimmedAction;
+  }
+
+  const baseAction =
+    trimmedAction.charAt(0).toLowerCase() + trimmedAction.slice(1);
+  const prefix =
+    identityProfile.operationalPattern === "enterprise-retail"
+      ? "For this enterprise-style storefront, first validate the purchase path and trust continuity, then"
+      : identityProfile.operationalPattern === "catalog-commerce"
+        ? "For a catalog-led storefront, first confirm product discovery and category flow, then"
+        : identityProfile.operationalPattern === "brand-commerce"
+          ? "For this brand-focused storefront, first verify the customer journey from marketing to purchase, then"
+          : identityProfile.operationalPattern === "education-commerce"
+            ? "For this education commerce experience, first validate discovery and lead path clarity, then"
+            : identityProfile.operationalPattern === "lead-capture"
+              ? "For this lead-capture storefront, first confirm the form and support path, then"
+              : "First,";
+
+  return sanitizeEvidenceText(`${prefix} ${baseAction}`, { maxLength: 240 });
+}
+
+function avoidRepeatedNarrativeText(
+  current: string,
+  compareTexts: Array<string | undefined | null>,
+) {
+  const currentSentence = current.split(/([.!?])\s+/)[0]?.trim();
+
+  if (!currentSentence) {
+    return current;
+  }
+
+  const normalizedCurrent = currentSentence.toLowerCase();
+  const reuseDetected = compareTexts.some((text) => {
+    if (!text) return false;
+    const otherSentence = text.split(/([.!?])\s+/)[0]?.trim();
+    return otherSentence?.toLowerCase() === normalizedCurrent;
+  });
+
+  if (!reuseDetected) {
+    return current;
+  }
+
+  if (current.startsWith("This review")) {
+    return current.replace("This review", "Overall, this scan indicates");
+  }
+
+  return `Overall, ${current.charAt(0).toLowerCase()}${current.slice(1)}`;
+}
+
+function avoidRepeatedActionText(
+  currentAction: string,
+  compareTexts: Array<string | undefined | null>,
+) {
+  const trimmed = currentAction.trim();
+  if (!trimmed) return trimmed;
+
+  const reuseDetected = compareTexts.some(
+    (text) => text != null && text.trim() === trimmed,
+  );
+
+  if (!reuseDetected) {
+    return trimmed;
+  }
+
+  return `${trimmed} Confirm this in a manual storefront walkthrough to keep the review distinct.`;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
@@ -2405,11 +3253,21 @@ export async function POST(request: Request) {
       diagnostics,
       findings: heuristicFindings,
     });
+    const identityProfile = buildStorefrontIdentityProfile({
+      website: values.website,
+      diagnostics,
+    });
+    const storefrontReviewContext = classifyStorefrontReviewContext({
+      website: values.website,
+      diagnostics,
+    });
     const executiveSummary = buildExecutiveSummary({
       categories,
       diagnostics,
       findings: heuristicFindings,
       overallScore,
+      identityProfile,
+      reviewContext: storefrontReviewContext,
     });
     const connectedInsight = buildConnectedInsight(heuristicFindings);
     const auditNarrative = buildAuditNarrative({
@@ -2418,12 +3276,28 @@ export async function POST(request: Request) {
       findings: heuristicFindings,
       overallScore,
       connectedInsight,
+      identityProfile,
+      reviewContext: storefrontReviewContext,
     });
     const primaryOperationalConcern = buildPrimaryOperationalConcern(
       heuristicFindings,
       connectedInsight,
       narrativeProfile,
+      identityProfile,
     );
+
+    if (primaryOperationalConcern) {
+      primaryOperationalConcern.recommendedFirstAction = avoidRepeatedActionText(
+        primaryOperationalConcern.recommendedFirstAction,
+        [executiveSummary.summary, auditNarrative],
+      );
+    }
+
+    executiveSummary.summary = avoidRepeatedNarrativeText(
+      executiveSummary.summary,
+      [auditNarrative, primaryOperationalConcern?.explanation],
+    );
+
     const topPriorityRisks = buildTopPriorityRisks(
       heuristicFindings,
       categories,
@@ -2457,6 +3331,10 @@ export async function POST(request: Request) {
           executiveSummary,
           auditNarrative,
           currentNarrativeArchetype: narrativeProfile.archetype,
+          storefrontIdentityProfile: identityProfile,
+          storefrontReviewContext,
+          siteType: storefrontReviewContext.siteType,
+          siteTypeReason: storefrontReviewContext.reason,
           connectedInsight,
           primaryOperationalConcern,
           topPriorityRisks,

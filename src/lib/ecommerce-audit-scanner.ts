@@ -28,6 +28,7 @@ export type PlatformName =
   | "BigCommerce"
   | "WooCommerce"
   | "Magento / Adobe Commerce"
+  | "Enterprise / Custom Commerce Stack"
   | "Needs Manual Review"
   | "Unknown";
 
@@ -44,6 +45,14 @@ export type PlatformDetection = {
   confidenceLabel: PlatformConfidenceLabel;
   details: string[];
   explanation?: string;
+};
+
+type EnterpriseLikelihood = "low" | "medium" | "high";
+
+type EnterpriseCommerceSignals = {
+  enterpriseLikelihood: EnterpriseLikelihood;
+  explanation: string;
+  supportingSignals: string[];
 };
 
 export type CommerceFlowSignals = {
@@ -474,12 +483,12 @@ const platformIndicatorRules: readonly PlatformIndicatorRule[] = [
       /customer-data/i,
       /\/static\/version/i,
       /Magento_Ui/i,
-      /minicart/i,
     ],
     weak: [
       /checkout\/cart/i,
       /\bcheckout\b/i,
       /\bcart\b/i,
+      /\bminicart\b/i,
     ],
   },
 ] as const;
@@ -488,17 +497,30 @@ export function detectTechnologyDetections(signalText: string): TechnologyDetect
   const checks = [...trackingToolRules, ...platformIndicatorRules] as const;
 
   return checks.map((check) => {
-    const patterns =
-      "patterns" in check ? check.patterns : [...check.strong, ...check.weak];
-    const signals = patterns
-      .filter((pattern) => pattern.test(signalText))
-      .map((pattern) => pattern.source)
-      .slice(0, 3);
+    const strongSignals =
+      "strong" in check
+        ? check.strong
+            .filter((pattern) => pattern.test(signalText))
+            .map((pattern) => pattern.source)
+        : [];
+    const weakSignals =
+      "weak" in check
+        ? check.weak
+            .filter((pattern) => pattern.test(signalText))
+            .map((pattern) => pattern.source)
+        : [];
+    const signals =
+      "patterns" in check
+        ? check.patterns
+            .filter((pattern) => pattern.test(signalText))
+            .map((pattern) => pattern.source)
+            .slice(0, 3)
+        : [...strongSignals, ...weakSignals].slice(0, 3);
 
     return {
       key: check.key,
       label: check.label,
-      detected: signals.length > 0,
+      detected: "patterns" in check ? signals.length > 0 : strongSignals.length > 0,
       description: check.description,
       signals,
     };
@@ -549,9 +571,10 @@ function describePlatformPattern(pattern: RegExp) {
   if (/woocommerce|wc_cart_fragments|wc-ajax|wp-json\\\/wc/i.test(source)) {
     return "WooCommerce plugin or cart fragment signal";
   }
-  if (/Magento_|Magento_Ui|mage|requirejs-config|customer-data|static|version|minicart/i.test(source)) {
+  if (/Magento_|Magento_Ui|mage|requirejs-config|customer-data|static\\\/version/i.test(source)) {
     return "Magento / Adobe Commerce frontend module or static asset signal";
   }
+  if (/minicart/i.test(source)) return "generic minicart wording";
   if (/products|collections|category|catalog|shop/i.test(source)) {
     return "generic product or collection URL pattern";
   }
@@ -580,7 +603,134 @@ function platformEvidenceDetails({
   ];
 }
 
-export function detectEcommercePlatform(signalText: string): PlatformDetection {
+const knownEnterpriseCommerceDomains = [
+  "walmart.com",
+  "amazon.com",
+  "target.com",
+  "apple.com",
+  "bestbuy.com",
+  "nike.com",
+  "costco.com",
+  "homedepot.com",
+  "lowes.com",
+];
+
+function hostnameFromUrl(value?: string) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new URL(value).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isKnownEnterpriseDomain(value?: string) {
+  const hostname = hostnameFromUrl(value);
+
+  return knownEnterpriseCommerceDomains.some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+  );
+}
+
+type PlatformScore = {
+  name: PlatformName;
+  score: number;
+  strongCount: number;
+  weakCount: number;
+  strongMatches: RegExp[];
+  weakMatches: RegExp[];
+  details: string[];
+};
+
+export function detectEnterpriseCommerceSignals({
+  finalUrl,
+  signalText,
+  commerceFlowSignals,
+  platformScores,
+}: {
+  finalUrl?: string;
+  signalText: string;
+  commerceFlowSignals?: CommerceFlowSignals;
+  platformScores: PlatformScore[];
+}): EnterpriseCommerceSignals {
+  const supportingSignals: string[] = [];
+  const sortedScores = [...platformScores].sort((a, b) => b.score - a.score);
+  const top = sortedScores[0];
+  const runnerUp = sortedScores[1];
+
+  if (isKnownEnterpriseDomain(finalUrl)) {
+    supportingSignals.push(
+      "Known large enterprise retailer domain where standard-platform labels should be manually confirmed.",
+    );
+  }
+
+  if (!top || top.score < 65 || top.strongCount < 2) {
+    supportingSignals.push(
+      "No standard storefront platform has multiple strong public-page indicators.",
+    );
+  }
+
+  if (top && runnerUp && runnerUp.score >= 20 && top.score - runnerUp.score < 30) {
+    supportingSignals.push(
+      "Public platform evidence is mixed across more than one standard platform pattern.",
+    );
+  }
+
+  if (top && top.strongCount > 0 && top.weakCount >= top.strongCount * 2) {
+    supportingSignals.push(
+      "Generic cart, checkout, or storefront wording contributes heavily to the platform signal.",
+    );
+  }
+
+  if (
+    commerceFlowSignals &&
+    (!commerceFlowSignals.cartVisible ||
+      !commerceFlowSignals.checkoutVisible ||
+      !commerceFlowSignals.productCatalogVisible)
+  ) {
+    supportingSignals.push(
+      "Public cart, checkout, or catalog behavior is not fully exposed on the loaded page.",
+    );
+  }
+
+  if (
+    /akamai|edgekey|edgesuite|fastly|cloudfront|walmartimages|targetimg|scene7|nikecloud|apple\.com\/wss|bestbuy|homedepotstatic|lowes\.com/i.test(
+      signalText,
+    )
+  ) {
+    supportingSignals.push(
+      "Frontend assets suggest custom CDN, runtime, or enterprise infrastructure abstraction.",
+    );
+  }
+
+  const score =
+    (isKnownEnterpriseDomain(finalUrl) ? 3 : 0) +
+    (supportingSignals.length >= 4 ? 3 : supportingSignals.length >= 2 ? 2 : 0);
+  const enterpriseLikelihood: EnterpriseLikelihood =
+    score >= 5 ? "high" : score >= 3 ? "medium" : "low";
+
+  return {
+    enterpriseLikelihood,
+    supportingSignals,
+    explanation:
+      enterpriseLikelihood === "high"
+        ? "The public page exposes mixed or limited standard-platform evidence and several enterprise storefront signals."
+        : enterpriseLikelihood === "medium"
+          ? "Some public signals suggest a custom, hybrid, or abstracted storefront, but a manual review should confirm the architecture."
+          : "The public evidence does not strongly suggest enterprise-custom architecture.",
+  };
+}
+
+export function detectEcommercePlatform(
+  signalText: string,
+  context: {
+    finalUrl?: string;
+    commerceFlowSignals?: CommerceFlowSignals;
+  } = {},
+): PlatformDetection {
   const platformScores = platformIndicatorRules.map((rule) => {
     const strongMatches = rule.strong.filter((pattern) => pattern.test(signalText));
     const weakMatches = rule.weak.filter((pattern) => pattern.test(signalText));
@@ -612,8 +762,26 @@ export function detectEcommercePlatform(signalText: string): PlatformDetection {
   const sorted = [...platformScores].sort((a, b) => b.score - a.score);
   const top = sorted[0];
   const runnerUp = sorted[1] ?? { score: 0 };
+  const enterpriseSignals = detectEnterpriseCommerceSignals({
+    finalUrl: context.finalUrl,
+    signalText,
+    commerceFlowSignals: context.commerceFlowSignals,
+    platformScores,
+  });
+  const isEnterpriseGuardedDomain = isKnownEnterpriseDomain(context.finalUrl);
 
   if (!top || top.score < 20) {
+    if (enterpriseSignals.enterpriseLikelihood !== "low") {
+      return {
+        name: "Enterprise / Custom Commerce Stack",
+        confidence: 35,
+        confidenceLabel: "Needs Review",
+        details: enterpriseSignals.supportingSignals,
+        explanation:
+          "The public page does not expose enough reliable standard-platform evidence. This may indicate a custom, hybrid, or heavily abstracted enterprise storefront, so platform-specific recommendations should be manually confirmed.",
+      };
+    }
+
     return {
       name: "Unknown",
       confidence: 0,
@@ -633,6 +801,47 @@ export function detectEcommercePlatform(signalText: string): PlatformDetection {
     top.score - runnerUp.score < 30;
   const weakSignalsOutweighStrongSignals =
     top.strongCount > 0 && top.weakCount >= top.strongCount * 3;
+  const hasOverwhelmingStandardEvidence =
+    top.strongCount >= 2 &&
+    top.score >= 75 &&
+    (!("score" in runnerUp) || top.score - runnerUp.score >= 35);
+
+  if (
+    enterpriseSignals.enterpriseLikelihood === "high" &&
+    !hasOverwhelmingStandardEvidence
+  ) {
+    return {
+      name: "Enterprise / Custom Commerce Stack",
+      confidence: Math.min(65, Math.max(35, Math.round(top.score))),
+      confidenceLabel: "Needs Review",
+      details: [
+        ...enterpriseSignals.supportingSignals,
+        `Strongest standard-platform candidate was ${top.name}, but the evidence was not strong enough to override the enterprise/custom guardrail.`,
+        ...top.details,
+      ],
+      explanation:
+        "The storefront exposes mixed or limited public platform signals. Large enterprise retailers often use custom or hybrid commerce systems, so platform-specific recommendations should be manually confirmed.",
+    };
+  }
+
+  if (
+    isEnterpriseGuardedDomain &&
+    !hasOverwhelmingStandardEvidence &&
+    top.score < 90
+  ) {
+    return {
+      name: "Enterprise / Custom Commerce Stack",
+      confidence: Math.min(60, Math.max(35, Math.round(top.score))),
+      confidenceLabel: "Needs Review",
+      details: [
+        ...enterpriseSignals.supportingSignals,
+        `Known-enterprise guardrail applied because ${top.name} evidence was not overwhelming.`,
+        ...top.details,
+      ],
+      explanation:
+        "The public page does not expose enough reliable standard-platform evidence. This may indicate a custom, hybrid, or heavily abstracted enterprise storefront.",
+    };
+  }
 
   if (
     (runnerUp.score >= 20 && top.score - runnerUp.score < 12) ||
@@ -996,15 +1205,20 @@ async function detectPageSignals(page: Page) {
       )
     );
 
+    const commerceFlowSignals = detectCommerceFlowSignals(
+      signalText,
+      pageData.ctaLabels,
+      pageData.formCount,
+      pageData.inputCount,
+    );
+
     return {
       technologyDetections: detectTechnologyDetections(signalText),
-      platformDetection: detectEcommercePlatform(signalText),
-      commerceFlowSignals: detectCommerceFlowSignals(
-        signalText,
-        pageData.ctaLabels,
-        pageData.formCount,
-        pageData.inputCount,
-      ),
+      platformDetection: detectEcommercePlatform(signalText, {
+        finalUrl: page.url(),
+        commerceFlowSignals,
+      }),
+      commerceFlowSignals,
       conversionSignals: {
         formCount: pageData.formCount,
         inputCount: pageData.inputCount,

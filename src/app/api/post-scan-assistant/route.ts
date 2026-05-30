@@ -55,6 +55,7 @@ You should:
 - sound like an experienced ecommerce operator reviewing the scan live
 - use short natural paragraphs, not diagnostic field dumps
 - use scanContext.currentNarrativeArchetype as the dominant framing when it is present, especially for technical-risk, trust-deficit, discovery-breakdown, conversion-friction, and operational-clarity
+- use scanContext.siteType and scanContext.siteTypeReason to avoid applying standard retail checkout assumptions to enterprise, catalog, lead-generation, education/content, or unclear pages
 - use phrases like "What stands out to me is", "If I were reviewing this manually", and "The bigger concern is" when they fit naturally
 - preserve priority and severity; high-priority and critical findings should still sound important without sounding alarmist
 - connect findings to conversion, trust, tracking, operations, or the customer journey
@@ -523,34 +524,96 @@ function currentArchetype(scanContext: Record<string, unknown>) {
   return asString(scanContext.currentNarrativeArchetype);
 }
 
-function archetypeFrame(scanContext: Record<string, unknown>) {
-  const archetype = currentArchetype(scanContext);
-
-  if (archetype === "technical-risk") {
-    return "That matches the report's technical-risk framing, so platform confidence, storefront stability, script execution, and measurement confidence should stay central.";
+function storefrontIdentityProfileFrame(scanContext: Record<string, unknown>) {
+  const profile = asRecord(scanContext.storefrontIdentityProfile);
+  if (!profile || Object.keys(profile).length === 0) {
+    return "";
   }
 
-  if (archetype === "trust-deficit") {
-    return "That matches the report's trust-deficit framing, so reassurance, purchase confidence, and buying comfort should stay central.";
+  const pattern = asString(profile.operationalPattern);
+
+  if (pattern === "enterprise-retail") {
+    return "This appears to be an enterprise retail-style storefront, so platform reliability, trust continuity, and checkout clarity should be considered together.";
   }
 
-  if (archetype === "discovery-breakdown") {
-    return "That matches the report's discovery-breakdown framing, so product intent, navigation clarity, search visibility, and category flow should stay central.";
+  if (pattern === "catalog-commerce") {
+    return "This looks like a catalog-driven commerce storefront, so product discovery, category flow, and purchase path clarity should be prioritized.";
   }
 
-  if (archetype === "conversion-friction" || archetype === "mobile-clarity-risk" || archetype === "checkout-continuity-risk") {
-    return "That matches the report's conversion-friction framing, so action path, CTA hierarchy, checkout readiness, and purchase momentum should stay central.";
+  if (pattern === "brand-commerce") {
+    return "This looks like a brand-focused commerce storefront, so marketing signal quality and shopper path clarity should be balanced.";
   }
 
-  if (archetype === "operational-clarity") {
-    return "That matches the report's operational-clarity framing, so order communication, support handoff, returns clarity, and fulfillment expectations should stay central.";
+  if (pattern === "education-commerce") {
+    return "This reads like an education or training commerce storefront, so lead capture and discovery should be reviewed with extra care.";
   }
 
-  if (archetype === "measurement-confidence-gap") {
-    return "That matches the report's measurement-confidence framing, so tracking visibility, attribution evidence, and signal trust should stay central.";
+  if (pattern === "lead-capture") {
+    return "This feels like a lead-capture or service commerce storefront, so form flows and support handoff should be reviewed alongside purchase intent.";
   }
 
   return "";
+}
+
+function archetypeFrame(scanContext: Record<string, unknown>) {
+  const archetype = currentArchetype(scanContext);
+  const profileFrame = storefrontIdentityProfileFrame(scanContext);
+
+  if (archetype === "technical-risk") {
+    return [
+      "That matches the report's technical-risk framing, so platform confidence, storefront stability, script execution, and measurement confidence should stay central.",
+      profileFrame,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (archetype === "trust-deficit") {
+    return [
+      "That matches the report's trust-deficit framing, so reassurance, purchase confidence, and buying comfort should stay central.",
+      profileFrame,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (archetype === "discovery-breakdown") {
+    return [
+      "That matches the report's discovery-breakdown framing, so product intent, navigation clarity, search visibility, and category flow should stay central.",
+      profileFrame,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (archetype === "conversion-friction" || archetype === "mobile-clarity-risk" || archetype === "checkout-continuity-risk") {
+    return [
+      "That matches the report's conversion-friction framing, so action path, CTA hierarchy, checkout readiness, and purchase momentum should stay central.",
+      profileFrame,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (archetype === "operational-clarity") {
+    return [
+      "That matches the report's operational-clarity framing, so order communication, support handoff, returns clarity, and fulfillment expectations should stay central.",
+      profileFrame,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (archetype === "measurement-confidence-gap") {
+    return [
+      "That matches the report's measurement-confidence framing, so tracking visibility, attribution evidence, and signal trust should stay central.",
+      profileFrame,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return profileFrame;
 }
 function formatExactAnswer(answer: ExactAnswer) {
   return buildConsultantResponse(answer);
@@ -987,6 +1050,51 @@ function getExactAnswer(
 
   if (
     hasAny(normalized, [
+      "is this ecommerce",
+      "what kind of site",
+      "site type",
+      "why does the scan sound ecommerce",
+      "why is cart not visible",
+      "why cart is not visible",
+    ])
+  ) {
+    const reviewContext = asRecord(scanContext.storefrontReviewContext);
+    const siteType = asString(scanContext.siteType || reviewContext.siteType) || "non-ecommerce-or-unclear";
+    const reason =
+      asString(scanContext.siteTypeReason || reviewContext.reason) ||
+      "The scan classified the page from public catalog, cart, checkout, CTA, form, platform, and metadata signals.";
+    const supportingSignals = asArray(reviewContext.supportingSignals)
+      .map((signal) => asString(signal))
+      .filter(Boolean)
+      .slice(0, 2)
+      .join(" ");
+    const isStandardStorefront = siteType === "ecommerce-storefront";
+    const isNonEcommerce = siteType === "non-ecommerce-or-unclear";
+    const isEnterprise = siteType === "enterprise-retail" || siteType === "custom-enterprise";
+
+    return {
+      matched: true,
+      topic: "site_type",
+      directAnswer: isStandardStorefront
+        ? "Yes. From the public scan, this page exposes enough ecommerce signals to review it as a storefront."
+        : isNonEcommerce
+          ? "I would not treat this URL as a confirmed ecommerce storefront from the public scan alone."
+          : isEnterprise
+            ? "This looks more like an enterprise or custom commerce environment than a standard storefront template."
+            : `I would classify this as ${siteType.replace(/-/g, " ")} from the public scan.`,
+      evidence: sanitizeEvidenceText(`${reason} ${supportingSignals}`),
+      businessMeaning: isNonEcommerce
+        ? "The first review question is whether this is the right commerce entry point, or whether buying happens elsewhere, behind login, through a lead path, or outside this public page."
+        : isEnterprise
+          ? "Cart, checkout, and platform details may be intentionally abstracted, so the scan should stay conservative until a manual review confirms the actual journey."
+          : "The site type changes how the findings should be interpreted; a catalog, lead-gen, or education journey should not be judged exactly like a retail checkout flow.",
+      suggestedFollowUp:
+        "Do you want me to explain what this means for the scan priorities?",
+    };
+  }
+
+  if (
+    hasAny(normalized, [
       "why does this matter",
       "why does this",
       "why this matter",
@@ -1224,32 +1332,57 @@ function getExactAnswer(
 
   if (hasAny(normalized, ["platform confidence", "confidence in platform"])) {
     const platform = asRecord(scanContext.platform);
+    const name = asString(platform.name);
+    const isEnterpriseStack = name === "Enterprise / Custom Commerce Stack";
 
     return {
       matched: true,
       topic: "platform_confidence",
-      directAnswer: `Platform confidence is ${asString(platform.confidenceLabel) || "not labeled"}${
-        typeof platform.confidence === "number" ? ` at ${platform.confidence}%` : ""
-      }.`,
+      directAnswer: isEnterpriseStack
+        ? "Platform confidence should be treated as needing manual review because the public scan points to an enterprise/custom stack rather than a standard platform label."
+        : `Platform confidence is ${asString(platform.confidenceLabel) || "not labeled"}${
+          typeof platform.confidence === "number" ? ` at ${platform.confidence}%` : ""
+        }.`,
       evidence: asString(scanContext.platformVisibility) || "The scan included platform visibility context.",
-      businessMeaning:
-        "Platform confidence helps frame recommendations, but platform-specific work should still be confirmed in a human review.",
+      businessMeaning: isEnterpriseStack
+        ? "The public evidence is not strong enough to safely make Magento, Shopify, BigCommerce, or WooCommerce-specific assumptions."
+        : "Platform confidence helps frame recommendations, but platform-specific work should still be confirmed in a human review.",
       suggestedFollowUp:
         "Do you want me to connect the platform signal to the technical findings?",
     };
   }
 
-  if (hasAny(normalized, ["what platform", "which platform", "platform is this", "platform"])) {
+  if (
+    hasAny(normalized, [
+      "what platform",
+      "which platform",
+      "platform is this",
+      "platform",
+      "is this magento",
+      "why did it say magento",
+      "what is walmart built on",
+      "custom enterprise stack",
+      "enterprise commerce stack",
+    ])
+  ) {
     const platform = asRecord(scanContext.platform);
     const name = asString(platform.name) || "not confirmed";
+    const isEnterpriseStack = name === "Enterprise / Custom Commerce Stack";
 
     return {
       matched: true,
       topic: "platform",
-      directAnswer: `The scan identifies ${name} as the likely platform.`,
-      evidence: asString(scanContext.platformVisibility) || "The scan included platform visibility context.",
-      businessMeaning:
-        "Platform detection is useful context, but it should not be treated as a private-system inspection.",
+      directAnswer: isEnterpriseStack
+        ? "From the public scan, I would not confidently call this Magento, Shopify, BigCommerce, or WooCommerce. The safer interpretation is a custom or heavily abstracted enterprise commerce stack."
+        : `The scan identifies ${name} as the likely platform.`,
+      evidence: isEnterpriseStack
+        ? asString(platform.explanation) ||
+          asString(scanContext.platformVisibility) ||
+          "The public page exposes mixed or limited standard-platform evidence."
+        : asString(scanContext.platformVisibility) || "The scan included platform visibility context.",
+      businessMeaning: isEnterpriseStack
+        ? "Platform-specific assumptions should be manually confirmed before recommending Magento, Shopify, BigCommerce, or WooCommerce-specific fixes."
+        : "Platform detection is useful context, but it should not be treated as a private-system inspection.",
       suggestedFollowUp:
         "Do you want me to connect platform visibility with the technical findings?",
     };

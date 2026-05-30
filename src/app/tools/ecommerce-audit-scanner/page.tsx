@@ -57,6 +57,9 @@ type AuditResult = {
   executiveSummary: ExecutiveSummary;
   auditNarrative?: string;
   currentNarrativeArchetype?: string;
+  siteType?: StorefrontReviewSiteType;
+  siteTypeReason?: string;
+  storefrontReviewContext?: StorefrontReviewContext;
   connectedInsight?: ConnectedInsight | null;
   primaryOperationalConcern?: PrimaryOperationalConcern | null;
   topPriorityRisks: TopPriorityRisk[];
@@ -66,6 +69,22 @@ type AuditResult = {
   recommendedNextSteps: RecommendedNextStep[];
   benchmarkTags?: string[];
   benchmarkContext?: BenchmarkContext;
+};
+
+type StorefrontReviewSiteType =
+  | "ecommerce-storefront"
+  | "enterprise-retail"
+  | "catalog-commerce"
+  | "lead-generation"
+  | "education/content-commerce"
+  | "non-ecommerce-or-unclear"
+  | "custom-enterprise";
+
+type StorefrontReviewContext = {
+  siteType: StorefrontReviewSiteType;
+  confidence: "Low" | "Moderate" | "High" | "Needs Review";
+  reason: string;
+  supportingSignals: string[];
 };
 
 type HeuristicFinding = {
@@ -324,6 +343,10 @@ function confidenceLevel(confidence: number) {
 function platformDisplayName(audit: AuditResult) {
   const platform = audit.diagnostics.platformDetection;
 
+  if (platform.name === "Enterprise / Custom Commerce Stack") {
+    return "Enterprise / Custom Commerce Stack";
+  }
+
   if (platform.name === "Unknown") {
     return "Platform not confidently identified";
   }
@@ -335,6 +358,7 @@ function showManualReviewChecklist(audit: AuditResult) {
   const platform = audit.diagnostics.platformDetection;
   return (
     platform.name === "Unknown" ||
+    platform.name === "Enterprise / Custom Commerce Stack" ||
     platform.confidenceLabel === "Low confidence" ||
     platform.confidenceLabel === "Needs Review"
   );
@@ -348,6 +372,10 @@ function platformMarketingInterpretation(audit: AuditResult) {
   const platform = audit.diagnostics.platformDetection;
   const marketingTools = getVisibleMarketingTools(audit.diagnostics);
   const commerce = audit.diagnostics.commerceFlowSignals;
+
+  if (platform.name === "Enterprise / Custom Commerce Stack") {
+    return "The public page does not expose enough reliable standard-platform evidence. This may indicate a custom, hybrid, or heavily abstracted enterprise storefront. Platform-specific recommendations should wait until manual confirmation.";
+  }
 
   if (platform.name === "Unknown" && marketingTools.length === 0) {
     return "The public storefront page did not expose clear platform or common marketing tags in this scan. This may indicate a custom, headless, or heavily customized storefront. Platform visibility is limited and should be manually confirmed before making platform-specific recommendations.";
@@ -1041,12 +1069,19 @@ export default function EcommerceAuditScannerPage() {
                           {platformDisplayName(audit)}
                         </p>
                         <p className="mt-2 text-sm font-semibold text-muted">
-                          {confidenceLevel(
-                            audit.diagnostics.platformDetection.confidence,
-                          )}
+                          {audit.diagnostics.platformDetection.confidenceLabel ??
+                            confidenceLevel(
+                              audit.diagnostics.platformDetection.confidence,
+                            )}
                           {" - "}
                           {audit.diagnostics.platformDetection.confidence}%
                         </p>
+                        {audit.diagnostics.platformDetection.name ===
+                          "Enterprise / Custom Commerce Stack" && (
+                          <p className="mt-2 text-sm font-semibold text-amber-100">
+                            Platform should be manually confirmed
+                          </p>
+                        )}
                         {audit.diagnostics.platformDetection.explanation && (
                           <p className="mt-3 text-sm leading-relaxed text-muted">
                             {audit.diagnostics.platformDetection.explanation}
@@ -1525,9 +1560,10 @@ export default function EcommerceAuditScannerPage() {
                           {platformDisplayName(audit)}
                         </p>
                         <p className="mt-2 text-sm font-semibold text-muted">
-                          {confidenceLevel(
-                            audit.diagnostics.platformDetection.confidence,
-                          )}
+                          {audit.diagnostics.platformDetection.confidenceLabel ??
+                            confidenceLevel(
+                              audit.diagnostics.platformDetection.confidence,
+                            )}
                           {" - "}
                           {audit.diagnostics.platformDetection.confidence}%
                         </p>
