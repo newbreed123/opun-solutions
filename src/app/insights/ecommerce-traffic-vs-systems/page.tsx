@@ -98,7 +98,7 @@ export default function EcommerceTrafficVsSystemsInsight() {
             </p>
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button href="/services/ecommerce-audit">
-                Book Free Ecommerce Audit
+                Talk With Opzix
               </Button>
               <Button
                 href="/services/ai-chatbots-automation"
@@ -114,7 +114,7 @@ export default function EcommerceTrafficVsSystemsInsight() {
       <CTASection
         headline="Find the System Issues Behind Slow Growth"
         subheadline="Book an ecommerce audit and get a practical view of what to fix first."
-        buttonLabel="Book Free Ecommerce Audit"
+        buttonLabel="Talk With Opzix"
         buttonHref="/contact"
       />
     </>

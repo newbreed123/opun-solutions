@@ -15,7 +15,7 @@ export default function Footer() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-blue to-brand-cyan shadow-glow flex items-center justify-center">
                 <span className="text-white font-bold">O</span>
               </div>
-              <span className="text-xl font-bold text-primary">Opun</span>
+              <span className="text-xl font-bold text-primary">Opzix</span>
             </div>
             <p className="body-sm text-secondary">
               Helping service businesses and ecommerce brands grow through
@@ -100,10 +100,10 @@ export default function Footer() {
               <li className="flex items-center gap-2">
                 <Mail size={16} className="text-brand-cyan flex-shrink-0" />
                 <a
-                  href="mailto:hello@opun.com"
+                  href="mailto:hello@opzix.com"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  hello@opun.com
+                  hello@opzix.com
                 </a>
               </li>
               <li className="flex items-center gap-2">
@@ -125,7 +125,7 @@ export default function Footer() {
         {/* Bottom Footer */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="body-sm text-muted">
-            © {currentYear} Opun Solutions. All rights reserved.
+            © {currentYear} Opzix Solutions. All rights reserved.
           </p>
 
           {/* Social Links */}

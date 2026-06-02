@@ -4,6 +4,8 @@ import { FormEvent, useState } from "react";
 import Button from "@/components/Button";
 import PostScanAssistant from "@/components/PostScanAssistant";
 import Section from "@/components/Section";
+import { buildAuditContactHref } from "@/lib/audit-attribution";
+import { trackEvent } from "@/lib/analytics";
 import { sanitizeEvidenceText, summarizeCtaLabels } from "@/lib/evidence-cleanup";
 import {
   BarChart3,
@@ -451,6 +453,20 @@ function primaryOperationalConcern(audit: AuditResult): OperationalConcernView {
   return audit.primaryOperationalConcern ?? audit.topPriorityRisks[0] ?? null;
 }
 
+function primaryOperationalConcernTitle(audit: AuditResult) {
+  const concern = primaryOperationalConcern(audit);
+  return concern?.title || concern?.riskLabel || "Primary audit concern";
+}
+
+function auditAttribution(audit: AuditResult) {
+  return {
+    scannedUrl: audit.website,
+    score: audit.overallScore,
+    status: audit.overallStatus,
+    primaryConcern: primaryOperationalConcernTitle(audit),
+  };
+}
+
 function primaryOperationalSupportingFindings(concern: OperationalConcernView) {
   if (concern && "supportingFindings" in concern) {
     return concern.supportingFindings;
@@ -489,6 +505,10 @@ export default function EcommerceAuditScannerPage() {
     const normalizedWebsite = normalizeWebsiteInput(website);
 
     if (!isValidHttpUrl(normalizedWebsite)) {
+      trackEvent("audit_scan_failed", {
+        scannedUrl: normalizedWebsite,
+        sourceArea: "hero",
+      });
       setError("Enter a valid website URL, such as https://example.com.");
       setAudit(null);
       return;
@@ -496,6 +516,10 @@ export default function EcommerceAuditScannerPage() {
 
     setIsLoading(true);
     setError("");
+    trackEvent("audit_scan_started", {
+      scannedUrl: normalizedWebsite,
+      sourceArea: "hero",
+    });
 
     try {
       const response = await fetch("/api/ecommerce-audit-scanner", {
@@ -509,6 +533,10 @@ export default function EcommerceAuditScannerPage() {
       const data = (await response.json()) as ScannerResponse;
 
       if (!response.ok || !data.success) {
+        trackEvent("audit_scan_failed", {
+          scannedUrl: normalizedWebsite,
+          sourceArea: "hero",
+        });
         setError(
           data.success
             ? "We could not generate the audit preview. Please try again."
@@ -521,7 +549,15 @@ export default function EcommerceAuditScannerPage() {
       setAudit(data.audit);
       setWebsite(normalizedWebsite);
       setShowRawLogs(false);
+      trackEvent("audit_scan_completed", {
+        ...auditAttribution(data.audit),
+        sourceArea: "hero",
+      });
     } catch {
+      trackEvent("audit_scan_failed", {
+        scannedUrl: normalizedWebsite,
+        sourceArea: "hero",
+      });
       setError("Something went wrong while generating the preview report.");
       setAudit(null);
     } finally {
@@ -2009,17 +2045,23 @@ export default function EcommerceAuditScannerPage() {
                   </h3>
                   <p className="mt-4 leading-relaxed text-secondary">
                     This tool is the MVP report structure. For a real review,
-                    Opun can manually inspect your storefront, checkout,
+                    Opzix can manually inspect your storefront, checkout,
                     tracking, operations, backend workflows, and highest-impact
                     fixes.
                   </p>
                   <div className="mt-7">
                     <Button
-                      href="/contact?source=ecommerce-audit"
+                      href={buildAuditContactHref(auditAttribution(audit))}
+                      onClick={() =>
+                        trackEvent("audit_cta_clicked", {
+                          ...auditAttribution(audit),
+                          sourceArea: "report",
+                        })
+                      }
                       variant="primary"
                       size="lg"
                     >
-                      Book Free Ecommerce Audit
+                      Talk With Opzix About This Audit
                     </Button>
                   </div>
                 </div>
@@ -2053,11 +2095,17 @@ export default function EcommerceAuditScannerPage() {
                 </p>
                 <div className="mt-8 flex justify-center">
                   <Button
-                    href="/contact?source=ecommerce-audit"
+                    href={buildAuditContactHref(auditAttribution(audit))}
+                    onClick={() =>
+                      trackEvent("audit_cta_clicked", {
+                        ...auditAttribution(audit),
+                        sourceArea: "report",
+                      })
+                    }
                     variant="primary"
                     size="lg"
                   >
-                    Book Free Ecommerce Audit
+                    Talk With Opzix About This Audit
                   </Button>
                 </div>
               </div>

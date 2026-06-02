@@ -99,7 +99,7 @@ export default function WhatBreaksAfterCheckoutInsight() {
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button href="/services/ecommerce-audit">
-                Book Free Ecommerce Audit
+                Talk With Opzix
               </Button>
               <Button
                 href="/services/ai-chatbots-automation"
@@ -115,7 +115,7 @@ export default function WhatBreaksAfterCheckoutInsight() {
       <CTASection
         headline="Want to Fix What Happens After Checkout?"
         subheadline="Book an ecommerce audit and we will review the operational flow behind your store."
-        buttonLabel="Book Free Ecommerce Audit"
+        buttonLabel="Talk With Opzix"
         buttonHref="/contact"
       />
     </>

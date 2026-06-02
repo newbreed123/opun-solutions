@@ -174,7 +174,7 @@ export default function EcommerceAudit() {
                 size="lg"
                 className="mx-0 w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:w-auto"
               >
-                Book Your Free Ecommerce Audit
+                Talk With Opzix
               </Button>
 
               <p className="body-sm text-muted">
@@ -248,7 +248,7 @@ export default function EcommerceAudit() {
               layers that matter most.
             </p>
             <Button href="/contact?source=ecommerce-audit" variant="primary" size="lg">
-              Book Your Free Ecommerce Audit
+              Talk With Opzix
             </Button>
           </div>
 
@@ -256,7 +256,7 @@ export default function EcommerceAudit() {
         </div>
       </Section>
 
-      {/* Why Opun */}
+      {/* Why Opzix */}
       <Section
         bgColor="primary"
         padded
@@ -349,7 +349,7 @@ export default function EcommerceAudit() {
 
           <div className="mt-10 text-center">
             <Button href="/contact?source=ecommerce-audit" variant="primary" size="lg">
-              Book Your Free Ecommerce Audit
+              Talk With Opzix
             </Button>
             <p className="body-sm mx-auto mt-4 text-muted">
               Limited audit spots each week. The goal is useful analysis, not a
@@ -426,7 +426,7 @@ export default function EcommerceAudit() {
       <CTASection
         headline="Ready to See Exactly What's Holding Your Store Back?"
         subheadline="We'll show you what's broken and what to fix first."
-        buttonLabel="Book Your Free Ecommerce Audit"
+        buttonLabel="Talk With Opzix"
         buttonHref="/contact?source=ecommerce-audit"
       />
     </>

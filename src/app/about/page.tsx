@@ -7,7 +7,7 @@ export default function About() {
     <>
       {/* Hero */}
       <HeroSection
-        headline="About Opun Solutions"
+        headline="About Opzix Solutions"
         subheadline="We help local service businesses grow by building websites, AI systems, and automations that actually work."
       />
 
@@ -17,7 +17,7 @@ export default function About() {
           <h2 className="heading-2 mb-8">Our Story</h2>
           <div className="space-y-6 text-secondary body-lg">
             <p>
-              Opun Solutions was founded on a simple observation: most service
+              Opzix Solutions was founded on a simple observation: most service
               businesses are leaving money on the table. Their websites don't
               convert, they're drowning in manual work, and they're missing the
               tools that would let them scale.

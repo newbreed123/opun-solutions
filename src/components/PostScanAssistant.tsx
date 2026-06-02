@@ -22,6 +22,8 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react";
+import { buildAuditContactHref } from "@/lib/audit-attribution";
+import { trackEvent } from "@/lib/analytics";
 import { sanitizeEvidenceText, summarizeCtaLabels } from "@/lib/evidence-cleanup";
 
 type Severity = "Low" | "Medium" | "High" | "Critical" | string;
@@ -199,7 +201,7 @@ type AssistantIntent =
   | "ask_benchmark"
   | "ask_platform"
   | "ask_seriousness"
-  | "ask_opun_help"
+  | "ask_opzix_help"
   | "ask_booking"
   | "ask_clarification"
   | "unknown";
@@ -220,7 +222,7 @@ type ConversationTopic =
 type PendingFollowUp =
   | "compare_with_conversion"
   | "explain_why_it_matters"
-  | "show_opun_fix_order"
+  | "show_opzix_fix_order"
   | "explain_tracking"
   | "explain_trust"
   | "explain_platform"
@@ -342,21 +344,21 @@ type ScanContext = {
 type QuickReplyIntent =
   | "ask_priority"
   | "ask_clarification"
-  | "ask_opun_help"
+  | "ask_opzix_help"
   | "ask_seriousness";
 
 const quickReplies: { label: string; intent: QuickReplyIntent }[] = [
   { label: "What should I fix first?", intent: "ask_priority" },
   { label: "Why does this matter?", intent: "ask_clarification" },
-  { label: "Can Opun help with this?", intent: "ask_opun_help" },
+  { label: "Can Opzix help with this?", intent: "ask_opzix_help" },
   { label: "How serious is this?", intent: "ask_seriousness" },
 ];
 
 const compactFollowUpReplies = [
   "Compare with conversion",
   "Explain business impact",
-  "What would Opun fix first?",
-  "Book free audit",
+  "What would Opzix fix first?",
+  "Review This Audit With Opzix",
 ];
 
 const answerSectionPattern =
@@ -365,7 +367,7 @@ const answerSectionPattern =
 const quickReplyIcons: Record<QuickReplyIntent, typeof Wrench> = {
   ask_priority: Wrench,
   ask_clarification: CircleHelp,
-  ask_opun_help: Handshake,
+  ask_opzix_help: Handshake,
   ask_seriousness: ShieldAlert,
 };
 
@@ -496,9 +498,9 @@ const intentKeywords: Record<AssistantIntent, string[]> = {
     "concern",
     "priority level",
   ],
-  ask_opun_help: [
+  ask_opzix_help: [
     "help",
-    "opun",
+    "opzix",
     "service",
     "support",
     "work with",
@@ -537,6 +539,17 @@ const intentKeywords: Record<AssistantIntent, string[]> = {
 
 function getPrimaryConcern(audit: AssistantAudit) {
   return audit.primaryOperationalConcern ?? audit.topPriorityRisks[0] ?? null;
+}
+
+function assistantAuditAttribution(audit: AssistantAudit) {
+  const concern = getPrimaryConcern(audit);
+
+  return {
+    scannedUrl: audit.website,
+    score: audit.overallScore,
+    status: audit.overallStatus,
+    primaryConcern: concern?.title || concern?.riskLabel || "Primary audit concern",
+  };
 }
 
 function getPrimaryConcernLabel(audit: AssistantAudit) {
@@ -1260,7 +1273,7 @@ function topicFromIntent(intent: AssistantIntent): ConversationTopic | null {
     ask_benchmark: "benchmark",
     ask_platform: "platform",
     ask_seriousness: "priority",
-    ask_opun_help: "booking",
+    ask_opzix_help: "booking",
     ask_booking: "booking",
   };
 
@@ -1817,7 +1830,7 @@ function renderAssistantMessageContent({
 
 function pendingFollowUpForTopic(topic: ConversationTopic | null): PendingFollowUp | null {
   if (topic === "ux") return "compare_with_conversion";
-  if (topic === "conversion") return "show_opun_fix_order";
+  if (topic === "conversion") return "show_opzix_fix_order";
   if (topic === "tracking") return "explain_tracking";
   if (topic === "trust") return "explain_trust";
   if (topic === "platform" || topic === "technical" || topic === "metadata") return "explain_platform";
@@ -2209,7 +2222,7 @@ function buildAnchoredExpansionParagraphs({
     "After that, I would compare the result with the related findings so the team does not fix one symptom while leaving the bigger journey issue untouched.",
     topic === "booking"
       ? "Do you want to book a deeper audit?"
-      : "Do you want to see where Opun would help with that approach?",
+      : "Do you want to see where Opzix would help with that approach?",
   ];
 }
 
@@ -2258,7 +2271,7 @@ function expandCurrentTopicResponse(
               "After that, I would compare the result with the related findings so the team does not fix one symptom while leaving the bigger journey issue untouched.",
               topic === "booking"
                 ? "Do you want to book a deeper audit?"
-                : "Do you want to see where Opun would help with that sequence?",
+                : "Do you want to see where Opzix would help with that sequence?",
             ];
   const candidate = buildMessage(
     `assistant-expand-${topic}-${Date.now()}`,
@@ -2578,7 +2591,7 @@ function answerDirectQuestion(
     message = answerVisibilityQuestion(
       context.commerceSignals.checkout,
       "conversion",
-      "Would you like me to show what Opun would fix first?",
+      "Would you like me to show what Opzix would fix first?",
     );
     topic = "conversion";
   } else if (
@@ -2729,7 +2742,7 @@ function buildFollowUpContinuation(
           conversion.evidenceSummary ??
           "The scan ties conversion quality to CTA clarity, cart or checkout visibility, and trust near purchase decisions.",
         businessMeaning: `${previous.title} affects how easily shoppers understand the page; ${conversion.title} affects whether that understanding turns into a clear buying step.`,
-        nextQuestion: "Do you want me to show what Opun would fix first?",
+        nextQuestion: "Do you want me to show what Opzix would fix first?",
         finding: conversion,
       }),
       nextState: createNextState(
@@ -2738,12 +2751,12 @@ function buildFollowUpContinuation(
         conversion,
         conversion.categoryLabel,
         state.conversationStep,
-        "show_opun_fix_order",
+        "show_opzix_fix_order",
       ),
     };
   }
 
-  if (state.pendingFollowUp === "show_opun_fix_order") {
+  if (state.pendingFollowUp === "show_opzix_fix_order") {
     const turn = buildPriorityResponse(audit);
     return {
       ...turn,
@@ -2815,7 +2828,7 @@ function buildFollowUpContinuation(
 function continueQuestion(topic: ConversationTopic) {
   const questions: Record<ConversationTopic, string> = {
     ux: "Do you want me to compare this with the conversion findings?",
-    conversion: "Do you want me to show what Opun would fix first?",
+    conversion: "Do you want me to show what Opzix would fix first?",
     trust: "Do you want me to connect this to the purchase path?",
     tracking: "Do you want me to explain how this affects conversion measurement?",
     operations: "Do you want me to separate quick wins from deeper operational fixes?",
@@ -3009,14 +3022,14 @@ function buildSeriousnessResponse(audit: AssistantAudit): AssistantTurn {
   };
 }
 
-function buildOpunHelpResponse(audit: AssistantAudit): AssistantTurn {
+function buildOpzixHelpResponse(audit: AssistantAudit): AssistantTurn {
   const finding = getHighestImpactFinding(audit);
 
   return {
     message: buildMessage(
       `assistant-help-${Date.now()}`,
       [
-        "Yes. Opun can use this scan as the starting point for a practical ecommerce review, especially across UX, conversion flow, tracking visibility, operational handoffs, and trust cues.",
+        "Yes. Opzix can use this scan as the starting point for a practical ecommerce review, especially across UX, conversion flow, tracking visibility, operational handoffs, and trust cues.",
         `For this scan, I would validate ${finding.title} first, then check whether the related findings show up across the full storefront and checkout path.`,
         "The goal would be to separate quick wins from deeper fixes, not turn the report into a long generic checklist.",
         continueQuestion("booking"),
@@ -3025,7 +3038,7 @@ function buildOpunHelpResponse(audit: AssistantAudit): AssistantTurn {
     ),
     nextState: createNextState(
       "booking",
-      "ask_opun_help",
+      "ask_opzix_help",
       finding,
       finding.categoryLabel,
     ),
@@ -3040,7 +3053,7 @@ function buildBookingResponse(audit: AssistantAudit): AssistantTurn {
       `assistant-book-${Date.now()}`,
       [
         `A Free Ecommerce Audit is a sensible next step if you want a human review of ${finding.title} and the other scan findings.`,
-        "Opun can use the scan as a starting point, then review the storefront flow, tracking visibility, trust signals, and operational handoffs in more detail.",
+        "Opzix can use the scan as a starting point, then review the storefront flow, tracking visibility, trust signals, and operational handoffs in more detail.",
         "Do you want to book a deeper audit?",
       ],
       { topic: "booking", finding, cta: true },
@@ -3377,8 +3390,8 @@ function buildAssistantResponse(
     };
   }
 
-  if (intent === "ask_opun_help") {
-    const turn = buildOpunHelpResponse(audit);
+  if (intent === "ask_opzix_help") {
+    const turn = buildOpzixHelpResponse(audit);
     return {
       ...turn,
       nextState: { ...turn.nextState, conversationStep: state.conversationStep + 1 },
@@ -3403,6 +3416,8 @@ function buildAssistantResponse(
 export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
   const initialMessage = useMemo(() => buildInitialMessage(audit), [audit]);
   const scanContext = useMemo(() => normalizeScanContext(audit), [audit]);
+  const attribution = useMemo(() => assistantAuditAttribution(audit), [audit]);
+  const contactHref = useMemo(() => buildAuditContactHref(attribution), [attribution]);
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(false);
@@ -3474,6 +3489,13 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
   }, [messages.length]);
 
   useEffect(() => {
+    trackEvent("audit_assistant_opened", {
+      ...attribution,
+      sourceArea: "assistant",
+    });
+  }, [attribution]);
+
+  useEffect(() => {
     const highestImpactFinding = getHighestImpactFinding(audit);
 
     shouldAutoScrollRef.current = false;
@@ -3503,6 +3525,11 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       return;
     }
 
+    trackEvent("audit_assistant_message_sent", {
+      ...attribution,
+      sourceArea: "assistant",
+    });
+
     const turn = attachConversationProgression(
       buildAssistantResponse(intent, audit, conversationState),
       conversationState,
@@ -3523,6 +3550,11 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
   }
 
   async function submitFreeTextQuestion(question: string) {
+    trackEvent("audit_assistant_message_sent", {
+      ...attribution,
+      sourceArea: "assistant",
+    });
+
     const userMessage: ChatMessage = {
       id: `user-free-text-${Date.now()}`,
       role: "user",
@@ -3755,7 +3787,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-              Opun Assistant
+              Opzix Assistant
             </p>
             <h3
               id="post-scan-assistant-title"
@@ -3776,7 +3808,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-50" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
                 </span>
-                Opun is reviewing your scan
+                Opzix is reviewing your scan
               </span>
             </div>
           </div>
@@ -3856,7 +3888,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                         <Sparkles className="h-3.5 w-3.5" />
                         {isInitialAssistantMessage
                           ? "Primary Scan Observation"
-                          : "Opun Assistant"}
+                          : "Opzix Assistant"}
                       </div>
                     )}
                     {renderAssistantMessageContent({
@@ -3879,10 +3911,16 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                     {message.cta && (
                       <div className="mt-5">
                         <Link
-                          href="/contact?source=ecommerce-audit-assistant"
+                          href={contactHref}
+                          onClick={() =>
+                            trackEvent("audit_cta_clicked", {
+                              ...attribution,
+                              sourceArea: "assistant",
+                            })
+                          }
                           className="inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl border border-brand-cyan/50 bg-gradient-to-r from-brand-blue to-brand-cyan px-4 py-3 text-sm font-bold text-white shadow-[0_16px_40px_rgba(6,182,212,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(6,182,212,0.36)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-dark-deep sm:w-auto"
                         >
-                          Book Free Ecommerce Audit
+                          Review This Audit With Opzix
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                       </div>
@@ -3896,7 +3934,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                 <div className="max-w-full rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-sm leading-6 text-secondary shadow-[0_12px_30px_rgba(2,8,23,0.16)]">
                   <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Opun Assistant
+                    Opzix Assistant
                   </div>
                   <p className="flex items-center gap-2">
                     <span className="relative flex h-2.5 w-2.5">
@@ -3918,13 +3956,19 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
             </p>
             <div className="flex flex-wrap gap-2">
               {compactSuggestedReplies.map((reply) => {
-                const isBooking = /book/i.test(reply);
+                const isBooking = /review this audit/i.test(reply);
 
                 if (isBooking) {
                   return (
                     <Link
                       key={reply}
-                      href="/contact?source=ecommerce-audit-assistant"
+                      href={contactHref}
+                      onClick={() =>
+                        trackEvent("audit_cta_clicked", {
+                          ...attribution,
+                          sourceArea: "assistant",
+                        })
+                      }
                       className="inline-flex min-h-10 max-w-full items-center rounded-full border border-brand-cyan/55 bg-brand-cyan/18 px-3.5 py-2 text-xs font-bold text-primary shadow-[0_10px_28px_rgba(6,182,212,0.12)] transition-all hover:-translate-y-0.5 hover:bg-brand-cyan/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/50"
                     >
                       {reply}
@@ -4020,7 +4064,13 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
             })}
 
             <Link
-              href="/contact?source=ecommerce-audit-assistant"
+              href={contactHref}
+              onClick={() =>
+                trackEvent("audit_cta_clicked", {
+                  ...attribution,
+                  sourceArea: "assistant",
+                })
+              }
               className="group relative flex min-h-[4.25rem] w-full items-center justify-between gap-3 overflow-hidden rounded-xl border border-brand-cyan/60 bg-gradient-to-r from-brand-blue to-brand-cyan px-4 py-3 text-left text-sm font-bold text-white shadow-[0_18px_48px_rgba(6,182,212,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_58px_rgba(6,182,212,0.38)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-dark-deep"
             >
               <span className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/15 blur-2xl transition-transform group-hover:translate-x-full" />
@@ -4029,7 +4079,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                   Recommended next step
                 </span>
                 <span className="mt-1 block text-base leading-5">
-                  Book a free audit
+                  Review This Audit With Opzix
                 </span>
               </span>
               <CalendarCheck className="h-5 w-5 flex-none text-white transition-transform group-hover:scale-105" />

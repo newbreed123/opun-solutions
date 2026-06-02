@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import React from "react";
+import { trackEvent } from "@/lib/analytics";
 
 interface ButtonProps {
   href?: string;
@@ -38,17 +41,31 @@ export default function Button({
   };
 
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
+  const label = typeof children === "string" ? children.trim() : "";
+  const handleClick = () => {
+    if (label === "Talk With Opzix") {
+      trackEvent("audit_cta_clicked", { sourceArea: "hero" });
+    }
+
+    onClick?.();
+  };
 
   if (href) {
     return (
-      <Link href={href} target={target} rel={rel} className={classes}>
+      <Link
+        href={href}
+        target={target}
+        rel={rel}
+        className={classes}
+        onClick={handleClick}
+      >
         {children}
       </Link>
     );
   }
 
   return (
-    <button onClick={onClick} disabled={disabled} className={classes}>
+    <button onClick={handleClick} disabled={disabled} className={classes}>
       {children}
     </button>
   );

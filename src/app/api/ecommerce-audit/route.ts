@@ -22,6 +22,10 @@ const auditFields: FieldDefinition[] = [
   { key: "biggestIssue", label: "biggest issue", required: true },
   { key: "runningAds", label: "ad status", required: true },
   { key: "sourcePage", label: "source page", aliases: ["source"] },
+  { key: "scannedUrl", label: "scanned URL" },
+  { key: "auditScore", label: "audit score", aliases: ["score"] },
+  { key: "auditStatus", label: "audit status", aliases: ["status"] },
+  { key: "primaryConcern", label: "primary concern" },
 ];
 
 export async function POST(request: NextRequest) {

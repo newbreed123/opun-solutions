@@ -143,7 +143,7 @@ const comparison = [
     ],
   },
   {
-    title: "Opun",
+    title: "Opzix",
     points: [
       "Builds conversion systems",
       "Connects lead flow to operations",
@@ -308,10 +308,10 @@ export default function LeadGenerationSystemsPage() {
       <Section bgColor="deep">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            Why Opun
+            Why Opzix
           </p>
           <h2 className="mt-4 text-3xl font-bold text-primary md:text-5xl">
-            Why Opun Is Different
+            Why Opzix Is Different
           </h2>
         </div>
 

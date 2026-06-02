@@ -19,7 +19,7 @@ export default function EcommerceSystemSuccess() {
             into a reliable growth engine.
           </p>
           <Button href="/services/ecommerce-audit" size="lg" variant="primary">
-            Book Free Ecommerce Audit
+            Talk With Opzix
           </Button>
         </div>
       </Section>
@@ -181,7 +181,7 @@ export default function EcommerceSystemSuccess() {
               Client Testimonial
             </p>
             <p className="body-lg text-secondary leading-8 mb-4">
-              “Opun helped us stop guessing and start fixing the actual system.
+              “Opzix helped us stop guessing and start fixing the actual system.
               We went from chasing lost orders and angry customers to having a
               checkout process that works, clear shipping handoffs, and
               measurable revenue growth.”
@@ -212,7 +212,7 @@ export default function EcommerceSystemSuccess() {
               size="lg"
               variant="primary"
             >
-              Book Free Ecommerce Audit
+              Talk With Opzix
             </Button>
           </div>
         </div>

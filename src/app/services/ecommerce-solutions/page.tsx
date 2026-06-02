@@ -181,7 +181,7 @@ export default function EcommerceSolutions() {
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button href="/contact?source=services" variant="primary" size="lg">
-                Book Free Ecommerce Audit
+                Talk With Opzix
               </Button>
               <Button href="#solutions" variant="secondary" size="lg">
                 View What We Build
@@ -438,7 +438,7 @@ export default function EcommerceSolutions() {
       <CTASection
         headline="See how this works in real businesses?"
         subheadline="Let’s review your storefront, checkout flow, operations, and tracking — then map the highest-impact improvements."
-        buttonLabel="Book Free Ecommerce Audit"
+        buttonLabel="Talk With Opzix"
         buttonHref="/contact?source=services"
       />
     </>

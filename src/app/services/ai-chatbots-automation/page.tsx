@@ -160,7 +160,7 @@ const packages = [
   },
 ];
 
-const whyOpun = [
+const whyOpzix = [
   "Built around real business workflows",
   "Designed for lead capture and conversion",
   "Practical automation, not gimmicks",
@@ -447,13 +447,13 @@ export default function AIChatbotsAutomationPage() {
           </div>
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              Why Opun
+              Why Opzix
             </p>
             <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
               Why Our AI Systems Are Different
             </h2>
             <div className="mt-8 grid gap-4">
-              {whyOpun.map((item) => (
+              {whyOpzix.map((item) => (
                 <div key={item} className="flex gap-3 text-lg text-dark-muted">
                   <Check className="mt-1 h-5 w-5 flex-none text-brand-cyan" />
                   <span>{item}</span>

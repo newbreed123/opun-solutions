@@ -99,7 +99,7 @@ export default function WhyAIChatbotsFailInsight() {
                 Explore AI Chatbots
               </Button>
               <Button href="/services/ecommerce-audit" variant="secondary">
-                Book Free Ecommerce Audit
+                Talk With Opzix
               </Button>
             </div>
           </div>

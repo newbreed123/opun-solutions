@@ -3,15 +3,24 @@
 import { useEffect, useState } from "react";
 import Section from "@/components/Section";
 import Button from "@/components/Button";
+import { trackEvent } from "@/lib/analytics";
 import { Check, X, ShoppingCart, Zap } from "lucide-react";
 
 const validLeadSources = new Set([
+  "opzix-audit",
   "ecommerce-audit",
   "contact-general",
   "ai-chatbot",
   "services",
   "homepage",
 ]);
+
+type ContactAttribution = {
+  scannedUrl: string;
+  auditScore: string;
+  auditStatus: string;
+  primaryConcern: string;
+};
 
 export default function Contact() {
   const [serviceType, setServiceType] = useState<"audit" | "services" | null>(
@@ -41,12 +50,43 @@ export default function Contact() {
   const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [sourcePage, setSourcePage] = useState("contact-general");
+  const [contactAttribution, setContactAttribution] = useState<ContactAttribution>({
+    scannedUrl: "",
+    auditScore: "",
+    auditStatus: "",
+    primaryConcern: "",
+  });
 
   useEffect(() => {
-    const source = new URLSearchParams(window.location.search).get("source");
+    const params = new URLSearchParams(window.location.search);
+    const source = params.get("source");
+    const scannedUrl = params.get("scannedUrl") ?? "";
+    const attribution = {
+      scannedUrl,
+      auditScore: params.get("score") ?? "",
+      auditStatus: params.get("status") ?? "",
+      primaryConcern: params.get("primaryConcern") ?? "",
+    };
 
     if (source && validLeadSources.has(source)) {
       setSourcePage(source);
+    }
+
+    setContactAttribution(attribution);
+
+    if (scannedUrl) {
+      setServiceType("audit");
+      setAuditFormState((current) => ({
+        ...current,
+        website: current.website || scannedUrl,
+      }));
+      trackEvent("audit_contact_intent", {
+        scannedUrl,
+        score: attribution.auditScore,
+        status: attribution.auditStatus,
+        primaryConcern: attribution.primaryConcern,
+        sourceArea: "report",
+      });
     }
   }, []);
 
@@ -82,8 +122,13 @@ export default function Contact() {
         },
         body: JSON.stringify({
           ...auditFormState,
+          source: sourcePage,
           sourcePage:
             sourcePage === "contact-general" ? "ecommerce-audit" : sourcePage,
+          scannedUrl: contactAttribution.scannedUrl,
+          auditScore: contactAttribution.auditScore,
+          auditStatus: contactAttribution.auditStatus,
+          primaryConcern: contactAttribution.primaryConcern,
         }),
       });
 
@@ -134,7 +179,12 @@ export default function Contact() {
         body: JSON.stringify({
           ...servicesFormState,
           service: servicesFormState.serviceNeeded,
+          source: sourcePage,
           sourcePage,
+          scannedUrl: contactAttribution.scannedUrl,
+          auditScore: contactAttribution.auditScore,
+          auditStatus: contactAttribution.auditStatus,
+          primaryConcern: contactAttribution.primaryConcern,
         }),
       });
 
@@ -190,6 +240,19 @@ export default function Contact() {
           </div>
         </div>
       </section>
+
+      {contactAttribution.scannedUrl && (
+        <section className="bg-dark-bg pb-8">
+          <div className="container-wide">
+            <div className="max-w-3xl overflow-hidden rounded-2xl border border-brand-cyan/25 bg-brand-cyan/10 px-4 py-3 text-sm leading-6 text-secondary">
+              You're requesting a review for:
+              <span className="mt-1 block max-w-full break-all font-semibold text-primary">
+                {contactAttribution.scannedUrl}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Service Selection */}
       {!serviceType && (
@@ -357,6 +420,27 @@ export default function Contact() {
                     </div>
                   ) : (
                     <form onSubmit={handleAuditSubmit} className="space-y-6">
+                      <input type="hidden" name="source" value={sourcePage} />
+                      <input
+                        type="hidden"
+                        name="scannedUrl"
+                        value={contactAttribution.scannedUrl}
+                      />
+                      <input
+                        type="hidden"
+                        name="auditScore"
+                        value={contactAttribution.auditScore}
+                      />
+                      <input
+                        type="hidden"
+                        name="auditStatus"
+                        value={contactAttribution.auditStatus}
+                      />
+                      <input
+                        type="hidden"
+                        name="primaryConcern"
+                        value={contactAttribution.primaryConcern}
+                      />
                       {formError && (
                         <div className="p-4 bg-red-500/10 border border-red-500 text-red-200 rounded-lg">
                           {formError}
@@ -678,6 +762,27 @@ export default function Contact() {
               </div>
             ) : (
               <form onSubmit={handleServicesSubmit} className="space-y-6">
+                <input type="hidden" name="source" value={sourcePage} />
+                <input
+                  type="hidden"
+                  name="scannedUrl"
+                  value={contactAttribution.scannedUrl}
+                />
+                <input
+                  type="hidden"
+                  name="auditScore"
+                  value={contactAttribution.auditScore}
+                />
+                <input
+                  type="hidden"
+                  name="auditStatus"
+                  value={contactAttribution.auditStatus}
+                />
+                <input
+                  type="hidden"
+                  name="primaryConcern"
+                  value={contactAttribution.primaryConcern}
+                />
                 {formError && (
                   <div className="p-4 bg-red-500/10 border border-red-500 text-red-200 rounded-lg">
                     {formError}

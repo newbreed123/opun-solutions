@@ -1,4 +1,5 @@
 export const leadSourcePages = [
+  "opzix-audit",
   "ecommerce-audit",
   "contact-general",
   "ai-chatbot",
@@ -19,6 +20,10 @@ export type NormalizedLead = {
   email: string;
   message: string;
   sourcePage: LeadSourcePage;
+  scannedUrl: string;
+  auditScore: string;
+  auditStatus: string;
+  primaryConcern: string;
   createdAt: string;
 };
 
@@ -43,6 +48,10 @@ export function normalizeLead(
       values.sourcePage || values.source || "",
       options.defaultSourcePage,
     ),
+    scannedUrl: values.scannedUrl ?? "",
+    auditScore: values.auditScore || values.score || "",
+    auditStatus: values.auditStatus || values.status || "",
+    primaryConcern: values.primaryConcern ?? "",
     createdAt: new Date().toISOString(),
   };
 }

@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import OpunAIAssistant from "@/components/OpunAIAssistant";
+import OpzixAIAssistant from "@/components/OpzixAIAssistant";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title:
-    "Opun Solutions - Websites, AI & Business Systems for Service Businesses",
+    "Opzix Solutions - Websites, AI & Business Systems for Service Businesses",
   description:
     "We build high-converting websites, smart AI assistants, and automation systems that help service businesses grow. Website design, ecommerce, chatbots, Google Ads, client portals & integrations.",
   icons: {
@@ -34,7 +34,7 @@ export default function RootLayout({
         <Header />
         <main>{children}</main>
         <Footer />
-        <OpunAIAssistant />
+        <OpzixAIAssistant />
       </body>
     </html>
   );

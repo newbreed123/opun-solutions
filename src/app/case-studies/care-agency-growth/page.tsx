@@ -76,7 +76,7 @@ export default function CareAgencyGrowthCaseStudy() {
               <span className="block">and Intake System</span>
             </h1>
             <p className="body-lg mb-8 max-w-[32ch] text-secondary md:max-w-2xl">
-              <span className="block">How Opun helped improve</span>
+              <span className="block">How Opzix helped improve</span>
               <span className="block">a care agency's inquiry flow,</span>
               <span className="block">intake experience, and path to inquiry.</span>
             </p>

@@ -302,9 +302,9 @@ export default function Industries() {
         <div className="max-w-6xl mx-auto">
           <div className="mb-10 text-center">
             <p className="text-brand-blue uppercase tracking-[0.32em] text-sm font-semibold mb-3">
-              Why Opun
+              Why Opzix
             </p>
-            <h2 className="heading-2">Why Businesses Choose Opun</h2>
+            <h2 className="heading-2">Why Businesses Choose Opzix</h2>
           </div>
 
           <div className="grid gap-4 md:gap-6 md:grid-cols-2 xl:grid-cols-4">

@@ -49,7 +49,7 @@ const typicalAgency = [
   "Offers limited operational thinking",
 ];
 
-const opunDifference = [
+const opzixDifference = [
   "Builds around real operations",
   "Creates conversion-focused systems",
   "Connects website, AI, automation, and backend workflows",
@@ -99,7 +99,7 @@ export default function Home() {
                 <span className="block">Operational Control</span>
               </h1>
               <p className="body-lg mb-8 text-secondary">
-                Opun builds more than websites. We create conversion-focused
+                Opzix builds more than websites. We create conversion-focused
                 ecommerce systems, AI assistants, automation workflows,
                 dashboards, integrations, and customer journeys that help your
                 team sell better and operate with more control.
@@ -153,7 +153,7 @@ export default function Home() {
         <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-              Why Opun Is Different
+              Why Opzix Is Different
             </p>
             <h2 className="heading-2 mt-4">
               Built for Businesses That Need More Than a Pretty Website
@@ -176,9 +176,9 @@ export default function Home() {
               </div>
             </div>
             <div className="card-elevated p-6 lg:-mt-5">
-              <h3 className="heading-4 mb-5 text-brand-cyan">Opun</h3>
+              <h3 className="heading-4 mb-5 text-brand-cyan">Opzix</h3>
               <div className="space-y-3">
-                {opunDifference.map((item) => (
+                {opzixDifference.map((item) => (
                   <div key={item} className="flex gap-3 rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 px-4 py-3 text-sm text-primary">
                     <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
                     <span>{item}</span>

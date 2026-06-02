@@ -249,7 +249,7 @@ button {
   min-width: 0;
 }
 
-.opun-ai-shell {
+.opzix-ai-shell {
   position: fixed;
   right: 1rem;
   bottom: 1rem;
@@ -260,7 +260,7 @@ button {
   gap: 0.75rem;
 }
 
-.opun-ai-panel {
+.opzix-ai-panel {
   width: min(24rem, calc(100vw - 2rem));
   max-height: min(38rem, calc(100vh - 7rem));
   overflow-y: auto;
@@ -276,7 +276,7 @@ button {
   backdrop-filter: blur(18px);
 }
 
-.opun-ai-button {
+.opzix-ai-button {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -296,17 +296,17 @@ button {
   transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
 
-.opun-ai-button::before {
+.opzix-ai-button::before {
   content: "";
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 9999px;
   background: #06b6d4;
   box-shadow: 0 0 18px rgba(6, 182, 212, 0.9);
-  animation: opunPulse 2.4s ease-in-out infinite;
+  animation: opzixPulse 2.4s ease-in-out infinite;
 }
 
-.opun-ai-button:hover {
+.opzix-ai-button:hover {
   border-color: rgba(59, 130, 246, 0.58);
   box-shadow:
     0 20px 56px rgba(3, 7, 18, 0.38),
@@ -315,7 +315,7 @@ button {
   transform: translateY(-2px);
 }
 
-@keyframes opunPulse {
+@keyframes opzixPulse {
   0%,
   100% {
     opacity: 0.55;
@@ -393,18 +393,18 @@ button {
     overflow-wrap: break-word;
   }
 
-  .opun-ai-button {
+  .opzix-ai-button {
     padding: 0.65rem 0.85rem;
     font-size: 0.8125rem;
     max-width: calc(100vw - 1.5rem);
   }
 
-  .opun-ai-shell {
+  .opzix-ai-shell {
     right: 0.75rem;
     bottom: 0.75rem;
   }
 
-  .opun-ai-panel {
+  .opzix-ai-panel {
     width: calc(100vw - 1.5rem);
     max-height: calc(100vh - 6.5rem);
     border-radius: 1.25rem;

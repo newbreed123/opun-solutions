@@ -6,7 +6,7 @@ import { Check, MessageSquare, X } from "lucide-react";
 
 const prompts = [
   {
-    question: "How can Opun help my business?",
+    question: "How can Opzix help my business?",
     response:
       "We look at your website, customer journey, and operations, then map the systems that would help you capture leads, sell online, and reduce manual work.",
   },
@@ -32,18 +32,18 @@ const prompts = [
   },
 ];
 
-export default function OpunAIAssistant() {
+export default function OpzixAIAssistant() {
   const [open, setOpen] = useState(false);
   const [activePrompt, setActivePrompt] = useState(prompts[0]);
 
   return (
-    <div className="opun-ai-shell">
+    <div className="opzix-ai-shell">
       {open && (
-        <div className="opun-ai-panel" role="dialog" aria-label="Ask Opun AI">
+        <div className="opzix-ai-panel" role="dialog" aria-label="Ask Opzix AI">
           <div className="flex items-start justify-between gap-4 border-b border-dark-border pb-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.26em] text-brand-cyan">
-                Opun AI Preview
+                Opzix AI Preview
               </p>
               <h2 className="mt-2 text-lg font-bold text-primary">
                 Ask about systems, ecommerce, or automation
@@ -53,7 +53,7 @@ export default function OpunAIAssistant() {
               type="button"
               onClick={() => setOpen(false)}
               className="rounded-full border border-dark-border bg-white/5 p-2 text-muted transition-colors hover:border-brand-cyan hover:text-primary"
-              aria-label="Close Ask Opun AI"
+              aria-label="Close Ask Opzix AI"
             >
               <X className="h-4 w-4" />
             </button>
@@ -97,13 +97,13 @@ export default function OpunAIAssistant() {
 
       <button
         type="button"
-        className="opun-ai-button"
+        className="opzix-ai-button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
-        aria-label="Open Ask Opun AI"
+        aria-label="Open Ask Opzix AI"
       >
         <MessageSquare className="h-4 w-4" />
-        Ask Opun AI
+        Ask Opzix AI
       </button>
     </div>
   );

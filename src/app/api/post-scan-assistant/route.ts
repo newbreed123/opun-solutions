@@ -44,7 +44,7 @@ type ExactAnswer = {
 };
 
 const assistantInstructions = `
-You are Opun Assistant, a calm ecommerce systems consultant reviewing a lightweight public scan.
+You are Opzix Assistant, a calm ecommerce systems consultant reviewing a lightweight public scan.
 
 Use only the provided scan context and the conversation history. If the scan context does not contain enough evidence, say that clearly and suggest a human audit or storefront walkthrough.
 
@@ -796,7 +796,7 @@ function buildFindingsAnswer(
     suggestedFollowUp:
       topic === "ux"
         ? "Do you want me to compare the UX findings with conversion?"
-        : "Do you want me to show what Opun would fix first?",
+        : "Do you want me to show what Opzix would fix first?",
   };
 }
 
@@ -1326,7 +1326,7 @@ function getExactAnswer(
       businessMeaning:
         "A clear checkout path reduces uncertainty once shoppers are ready to buy.",
       suggestedFollowUp:
-        "Do you want me to show what Opun would fix first?",
+        "Do you want me to show what Opzix would fix first?",
     };
   }
 
@@ -1522,7 +1522,7 @@ function getExactAnswer(
     );
   }
 
-  if (hasAny(normalized, ["what to fix first", "fix first", "opun fix first", "review first"])) {
+  if (hasAny(normalized, ["what to fix first", "fix first", "opzix fix first", "review first"])) {
     const primary = getPrimaryConcern(scanContext);
     const action = getActionItems(scanContext)[0];
     const priority = priorityTone(
@@ -1583,7 +1583,7 @@ function getExactAnswer(
         `${archetypeFrame(scanContext)} ${asString(primary.explanation) ||
           "This is the finding the scan suggests reviewing before broader optimization work."}`,
       suggestedFollowUp:
-        "Do you want me to show what Opun would review first from that concern?",
+        "Do you want me to show what Opzix would review first from that concern?",
     };
   }
 
