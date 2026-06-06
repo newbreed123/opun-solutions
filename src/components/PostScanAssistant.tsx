@@ -74,6 +74,34 @@ type StorefrontReviewContext = {
   supportingSignals: string[];
 };
 
+type AssistantNarrativeProfile = {
+  siteType?: string;
+  archetype?: string;
+  ecommerceProbability?: {
+    label?: string;
+    probability?: number;
+  };
+  platformConfidence?: {
+    label?: string;
+    score?: number;
+    platformName?: string;
+  };
+  narrativeMode?: string;
+  concernPriority?: string;
+  languageRules?: string[];
+  businessContext?: string;
+  recommendedActionStyle?: string;
+  narrativeProfileSummary?: string;
+  recommendedFirstAction?: string;
+};
+
+type EcommerceProbability = {
+  probability: number;
+  label: "High" | "Moderate" | "Low" | "Unclear" | string;
+  evidence: string[];
+  negativeSignals: string[];
+};
+
 type AssistantCategory = {
   key: string;
   label: string;
@@ -94,12 +122,14 @@ type AssistantCategory = {
 };
 
 type AssistantAudit = {
+  scanId?: string;
   website: string;
   generatedAt: string;
   overallScore: number;
   overallStatus: string;
   auditNarrative?: string;
   currentNarrativeArchetype?: string;
+  narrativeProfile?: AssistantNarrativeProfile;
   siteType?: StorefrontReviewSiteType;
   siteTypeReason?: string;
   storefrontReviewContext?: StorefrontReviewContext;
@@ -141,9 +171,14 @@ type AssistantAudit = {
     metaDescription?: string | null;
     platformDetection: {
       name: string;
+      platformName?: string;
       confidence: number;
+      confidenceScore?: number;
       confidenceLabel: string;
+      ecommerceProbability?: EcommerceProbability;
+      evidence?: string[];
       explanation?: string;
+      recommendation?: string;
     };
     technologyDetections: {
       label: string;
@@ -306,6 +341,7 @@ type ScanContext = {
   score: number;
   status: string;
   currentNarrativeArchetype?: string;
+  narrativeProfile?: AssistantNarrativeProfile;
   siteType?: StorefrontReviewSiteType;
   siteTypeReason?: string;
   storefrontReviewContext?: StorefrontReviewContext;
@@ -545,6 +581,7 @@ function assistantAuditAttribution(audit: AssistantAudit) {
   const concern = getPrimaryConcern(audit);
 
   return {
+    scanId: audit.scanId,
     scannedUrl: audit.website,
     score: audit.overallScore,
     status: audit.overallStatus,
@@ -576,14 +613,115 @@ function isTrackingTool(tool: { label: string; detected: boolean }) {
   );
 }
 
-function getPlatformSummary(audit: AssistantAudit) {
-  const platform = audit.diagnostics.platformDetection;
+function getPlatformName(
+  platform: AssistantAudit["diagnostics"]["platformDetection"],
+) {
+  return platform.platformName || platform.name || "not confirmed";
+}
 
-  if (platform.name === "Enterprise / Custom Commerce Stack") {
-    return "From the public scan, I would not confidently call this Magento, Shopify, BigCommerce, or WooCommerce. The safer interpretation is an enterprise/custom commerce stack that should be manually confirmed.";
+function getEcommerceProbability(
+  platform: AssistantAudit["diagnostics"]["platformDetection"],
+) {
+  return platform.ecommerceProbability;
+}
+
+function isGroceryNarrativeProfile(profile?: AssistantNarrativeProfile) {
+  return profile?.narrativeMode === "Grocery / Supermarket Retail";
+}
+
+function groceryRetailAnswer() {
+  return "This looks more like grocery / supermarket retail than a normal DTC brand. For this kind of site, I would prioritize search, departments, pickup/delivery clarity, weekly ad, and cart path before treating platform uncertainty as the main client-facing issue.";
+}
+
+function isLowEcommerceProbability(
+  platform: AssistantAudit["diagnostics"]["platformDetection"],
+) {
+  return (
+    getPlatformName(platform) === "Not an ecommerce storefront" ||
+    getEcommerceProbability(platform)?.label === "Low"
+  );
+}
+
+function isUnclearEcommerceProbability(
+  platform: AssistantAudit["diagnostics"]["platformDetection"],
+) {
+  return (
+    getPlatformName(platform) === "Ecommerce probability unclear" ||
+    getEcommerceProbability(platform)?.label === "Unclear"
+  );
+}
+
+function platformEvidenceSummary(
+  platform: AssistantAudit["diagnostics"]["platformDetection"],
+  fallback = "The scan included public-page platform visibility context.",
+) {
+  const evidence = platform.evidence?.filter(Boolean).slice(0, 3).join(" ");
+
+  return sanitizeEvidenceText(
+    evidence || platform.explanation || platform.recommendation || fallback,
+    { maxLength: 340 },
+  );
+}
+
+function buildPlatformDirectAnswer(
+  platform: AssistantAudit["diagnostics"]["platformDetection"],
+  normalizedQuestion = "",
+) {
+  const name = getPlatformName(platform);
+  const ecommerceProbability = getEcommerceProbability(platform);
+  const asksMagento =
+    normalizedQuestion.includes("why did it say magento") ||
+    normalizedQuestion.includes("is this magento");
+
+  if (asksMagento) {
+    return "It should not call this Magento unless there are strong Magento-specific signals. If the current result did, the safer interpretation is platform not confidently identified or ecommerce probability low.";
   }
 
-  return `${platform.name} visibility is ${platform.confidenceLabel.toLowerCase()} at ${platform.confidence}%.`;
+  if (isLowEcommerceProbability(platform)) {
+    return "I would not classify this as an ecommerce storefront from the public scan. The page did not expose enough product, cart, checkout, or purchase-flow signals.";
+  }
+
+  if (isUnclearEcommerceProbability(platform)) {
+    return "The page may support commerce elsewhere, but this URL does not expose enough public commerce signals to identify a platform confidently.";
+  }
+
+  if (name === "Platform not confidently identified") {
+    return "I would not confidently identify a standard ecommerce platform from this public scan.";
+  }
+
+  if (name === "Enterprise / Custom Commerce Stack") {
+    return "From the public scan, I would not confidently call this Magento, Shopify, BigCommerce, or WooCommerce. The safer interpretation is a custom or heavily abstracted enterprise commerce stack.";
+  }
+
+  return `The scan identifies ${name} as the likely platform.`;
+}
+
+function getPlatformSummary(audit: AssistantAudit) {
+  const platform = audit.diagnostics.platformDetection;
+  const name = getPlatformName(platform);
+  const ecommerceProbability = getEcommerceProbability(platform);
+
+  if (isLowEcommerceProbability(platform)) {
+    return "Ecommerce probability is low. The public scan does not expose enough product, cart, checkout, or purchase-flow evidence to classify this as a standard ecommerce storefront.";
+  }
+
+  if (isUnclearEcommerceProbability(platform)) {
+    return "Ecommerce probability is unclear. The page may support commerce elsewhere, but this URL does not expose enough public commerce signals for a confident platform call.";
+  }
+
+  if (name === "Enterprise / Custom Commerce Stack") {
+    return "Enterprise / Custom Commerce Stack is the safer interpretation. Standard platform evidence is intentionally limited or not exposed, so I would manually confirm the commerce stack.";
+  }
+
+  if (name === "Platform not confidently identified") {
+    return "Platform not confidently identified. The scan found commerce-adjacent signals, but not enough strong Shopify, BigCommerce, WooCommerce, or Magento evidence.";
+  }
+
+  const probabilityText = ecommerceProbability
+    ? ` Ecommerce probability is ${ecommerceProbability.label.toLowerCase()} at ${ecommerceProbability.probability}%.`
+    : "";
+
+  return `${name} visibility is ${platform.confidenceLabel.toLowerCase()} at ${platform.confidence}%.${probabilityText}`;
 }
 
 function getBenchmarkTags(audit: AssistantAudit) {
@@ -638,11 +776,15 @@ function technicalSignalsSummary(audit: AssistantAudit) {
   const signals: string[] = [];
 
   if (
+    isLowEcommerceProbability(platform) ||
+    isUnclearEcommerceProbability(platform) ||
     platform.confidence < 70 ||
     /low|needs review/i.test(platform.confidenceLabel)
   ) {
     signals.push(
-      `the storefront platform was only identified with ${platform.confidenceLabel.toLowerCase()} confidence`,
+      isLowEcommerceProbability(platform)
+        ? "the submitted URL did not expose enough public ecommerce evidence for standard storefront classification"
+        : `the platform was only identified with ${platform.confidenceLabel.toLowerCase()} confidence`,
     );
   } else if (platform.name && platform.name !== "Unknown") {
     signals.push(
@@ -928,6 +1070,7 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
     score: audit.overallScore,
     status: audit.overallStatus,
     currentNarrativeArchetype: audit.currentNarrativeArchetype,
+    narrativeProfile: audit.narrativeProfile,
     siteType: audit.siteType ?? audit.storefrontReviewContext?.siteType,
     siteTypeReason: audit.siteTypeReason ?? audit.storefrontReviewContext?.reason,
     storefrontReviewContext: audit.storefrontReviewContext,
@@ -1036,6 +1179,7 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
     score: context.score,
     status: context.status,
     currentNarrativeArchetype: context.currentNarrativeArchetype,
+    narrativeProfile: context.narrativeProfile,
     siteType: context.siteType,
     siteTypeReason: context.siteTypeReason,
     storefrontReviewContext: context.storefrontReviewContext,
@@ -2513,10 +2657,20 @@ function answerDirectQuestion(
     normalized.includes("is this ecommerce") ||
     normalized.includes("what kind of site") ||
     normalized.includes("site type") ||
+    normalized.includes("what kind of business") ||
+    normalized.includes("is this dtc") ||
+    normalized.includes("is sprouts dtc") ||
+    normalized.includes("why is this dtc") ||
+    normalized.includes("why did it say dtc") ||
+    normalized.includes("why platform is first") ||
+    normalized.includes("why is platform first") ||
+    normalized.includes("why does this not sound like a normal ecommerce audit") ||
+    normalized.includes("why does it not sound like a normal ecommerce audit") ||
     normalized.includes("why does the scan sound ecommerce") ||
     (normalized.includes("why") && normalized.includes("cart") && normalized.includes("not visible"))
   ) {
     topic = "platform";
+    const profile = context.narrativeProfile;
     const siteType = context.siteType ?? "non-ecommerce-or-unclear";
     const reason =
       context.siteTypeReason ??
@@ -2529,19 +2683,38 @@ function answerDirectQuestion(
     const isNonEcommerce = siteType === "non-ecommerce-or-unclear";
     const isEnterprise =
       siteType === "enterprise-retail" || siteType === "custom-enterprise";
+    const ecommerceProbability = context.platform.ecommerceProbability;
+    const lowProbability = isLowEcommerceProbability(context.platform);
+    const unclearProbability = isUnclearEcommerceProbability(context.platform);
 
     message = buildScanAnswer({
       id: `assistant-direct-site-type-${Date.now()}`,
       topic,
-      directAnswer: isStandardStorefront
+      directAnswer: isGroceryNarrativeProfile(profile)
+        ? groceryRetailAnswer()
+        : profile?.narrativeMode
+        ? `I would frame this as ${profile.narrativeMode.toLowerCase()}. ${profile.narrativeProfileSummary ?? profile.businessContext ?? ""}`.trim()
+        : lowProbability
+        ? "I would not classify this as an ecommerce storefront from the public scan. The page did not expose enough product, cart, checkout, or purchase-flow signals."
+        : unclearProbability
+          ? "The ecommerce probability is unclear from this URL. The page may support commerce elsewhere, but this scan should not assume a full ecommerce storefront without manual confirmation."
+          : isStandardStorefront
         ? "Yes. From the public scan, this page exposes enough ecommerce signals to review it as a storefront."
         : isNonEcommerce
           ? "I would not treat this URL as a confirmed ecommerce storefront from the public scan alone."
           : isEnterprise
             ? "This looks more like an enterprise or custom commerce environment than a standard storefront template."
             : `I would classify this as ${siteType.replace(/-/g, " ")} from the public scan.`,
-      evidence: sanitizeEvidenceText(`${reason} ${supportingSignals}`),
-      businessMeaning: isNonEcommerce
+      evidence: ecommerceProbability
+        ? sanitizeEvidenceText(
+            `Ecommerce probability is ${ecommerceProbability.label} at ${ecommerceProbability.probability}%. ${ecommerceProbability.evidence.slice(0, 2).join(" ")} ${ecommerceProbability.negativeSignals.slice(0, 2).join(" ")}`,
+          )
+        : sanitizeEvidenceText(`${reason} ${supportingSignals}`),
+      businessMeaning: isGroceryNarrativeProfile(profile)
+        ? "Grocery retail has a different customer journey than a typical brand-owned DTC storefront: shoppers often start with search, departments, weekly offers, fulfillment choice, store location, loyalty, or cart recovery rather than lifestyle product storytelling."
+        : profile?.businessContext
+        ? `The audit sounds different because the scan is using ${profile.businessContext}. The first review priority is ${profile.concernPriority ?? "the visible journey context"}.`
+        : lowProbability || isNonEcommerce
         ? "The first review question is whether this is the right commerce entry point, or whether buying happens elsewhere, behind login, through a lead path, or outside this public page."
         : isEnterprise
           ? "Cart, checkout, and platform details may be intentionally abstracted, so the scan should stay conservative until a manual review confirms the actual journey."
@@ -2605,20 +2778,25 @@ function answerDirectQuestion(
   ) {
     topic = "platform";
     const isEnterpriseStack =
-      context.platform.name === "Enterprise / Custom Commerce Stack";
+      getPlatformName(context.platform) === "Enterprise / Custom Commerce Stack";
     message = buildScanAnswer({
       id: `assistant-direct-platform-${Date.now()}`,
       topic,
-      directAnswer: isEnterpriseStack
-        ? "From the public scan, I would not confidently call this Magento, Shopify, BigCommerce, or WooCommerce. The safer interpretation is a custom or heavily abstracted enterprise commerce stack."
-        : `The scan identifies ${context.platform.name} as the likely platform.`,
+      directAnswer: buildPlatformDirectAnswer(context.platform, normalized),
       evidence: isEnterpriseStack
-        ? context.platform.explanation ??
-          "The public page exposes mixed or limited standard-platform evidence, which is common on custom or hybrid enterprise storefronts."
-        : `${context.platform.name} was detected with ${context.platform.confidenceLabel.toLowerCase()} at ${context.platform.confidence}%.`,
+        ? platformEvidenceSummary(
+            context.platform,
+            "The public page exposes mixed or limited standard-platform evidence, which is common on custom or hybrid enterprise storefronts.",
+          )
+        : platformEvidenceSummary(
+            context.platform,
+            `${getPlatformName(context.platform)} was detected with ${context.platform.confidenceLabel.toLowerCase()} at ${context.platform.confidence}%.`,
+          ),
       businessMeaning: isEnterpriseStack
         ? "Platform-specific assumptions should be manually confirmed before recommending Magento, Shopify, BigCommerce, or WooCommerce-specific fixes."
-        : "Platform detection is useful context for the review, but it should still be confirmed before making platform-specific recommendations.",
+        : isLowEcommerceProbability(context.platform)
+          ? "The scan should treat this URL as a possible lead-generation or informational entry point until a human confirms where the commerce journey actually starts."
+          : "Platform detection is useful context for the review, but it should still be confirmed before making platform-specific recommendations.",
       nextQuestion: "Do you want me to connect the platform signal to the technical findings?",
     });
   } else if (asksVisible && (normalized.includes("cta") || /\bbutton\b/.test(normalized))) {
@@ -2916,18 +3094,29 @@ function buildPriorityResponse(audit: AssistantAudit): AssistantTurn {
   const finding = getHighestImpactFinding(audit);
   const priority = priorityTone(finding.severity);
   const frame = archetypeFrame(audit.currentNarrativeArchetype);
+  const profile = audit.narrativeProfile;
+  const firstAction =
+    profile?.recommendedActionStyle ||
+    priorities[0]?.action ||
+    finding.recommendedFirstAction;
 
   return {
     message: buildMessage(
       `assistant-priority-${Date.now()}`,
       [
-        `I would start with ${finding.title}, because it is the clearest operational signal in this scan and it ${priority.phrase}.`,
-        `${frame ? `${frame} ` : ""}${priority.sentence}`,
+        isGroceryNarrativeProfile(profile)
+          ? groceryRetailAnswer()
+          : profile?.narrativeMode
+          ? `I would start with the ${profile.narrativeMode.toLowerCase()} journey: ${firstAction}`
+          : `I would start with ${finding.title}, because it is the clearest operational signal in this scan and it ${priority.phrase}.`,
+        profile?.businessContext
+          ? `That matters because this scan is framed around ${profile.businessContext}.`
+          : `${frame ? `${frame} ` : ""}${priority.sentence}`,
         finding.evidenceSummary
           ? `The practical clue is: ${finding.evidenceSummary}`
           : "The scan is pointing to this as the first area to validate before changing campaigns or tooling.",
-        finding.recommendedFirstAction
-          ? `If I were reviewing this manually, I would start by doing this: ${finding.recommendedFirstAction}`
+        firstAction
+          ? `If I were reviewing this manually, I would start by doing this: ${firstAction}`
           : "The first practical action is to review the customer journey around this finding and confirm whether it shows up in the full storefront flow.",
         continueQuestion("priority"),
       ],

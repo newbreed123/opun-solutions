@@ -29,6 +29,9 @@ export type PlatformName =
   | "WooCommerce"
   | "Magento / Adobe Commerce"
   | "Enterprise / Custom Commerce Stack"
+  | "Not an ecommerce storefront"
+  | "Ecommerce probability unclear"
+  | "Platform not confidently identified"
   | "Needs Manual Review"
   | "Unknown";
 
@@ -41,10 +44,22 @@ export type PlatformConfidenceLabel =
 
 export type PlatformDetection = {
   name: PlatformName;
+  platformName: PlatformName;
   confidence: number;
+  confidenceScore: number;
   confidenceLabel: PlatformConfidenceLabel;
+  ecommerceProbability: EcommerceProbability;
   details: string[];
+  evidence: string[];
   explanation?: string;
+  recommendation: string;
+};
+
+export type EcommerceProbability = {
+  probability: number;
+  label: "High" | "Moderate" | "Low" | "Unclear";
+  evidence: string[];
+  negativeSignals: string[];
 };
 
 type EnterpriseLikelihood = "low" | "medium" | "high";
@@ -637,6 +652,7 @@ function isKnownEnterpriseDomain(value?: string) {
 
 type PlatformScore = {
   name: PlatformName;
+  key: PlatformIndicatorRule["key"];
   score: number;
   strongCount: number;
   weakCount: number;
@@ -644,6 +660,180 @@ type PlatformScore = {
   weakMatches: RegExp[];
   details: string[];
 };
+
+const defaultEcommerceProbability: EcommerceProbability = {
+  probability: 0,
+  label: "Unclear",
+  evidence: [],
+  negativeSignals: [
+    "No ecommerce probability scan evidence was available.",
+  ],
+};
+
+function platformDetectionResult({
+  name,
+  confidence,
+  confidenceLabel,
+  details,
+  explanation,
+  recommendation,
+  ecommerceProbability = defaultEcommerceProbability,
+  evidence,
+}: {
+  name: PlatformName;
+  confidence: number;
+  confidenceLabel: PlatformConfidenceLabel;
+  details: string[];
+  explanation?: string;
+  recommendation: string;
+  ecommerceProbability?: EcommerceProbability;
+  evidence?: string[];
+}): PlatformDetection {
+  return {
+    name,
+    platformName: name,
+    confidence,
+    confidenceScore: confidence,
+    confidenceLabel,
+    ecommerceProbability,
+    details,
+    evidence: evidence ?? details,
+    explanation,
+    recommendation,
+  };
+}
+
+export function calculateEcommerceProbability(scanEvidence: {
+  signalText: string;
+  finalUrl?: string;
+  commerceFlowSignals?: CommerceFlowSignals;
+  platformScores?: PlatformScore[];
+}): EcommerceProbability {
+  const text = scanEvidence.signalText.toLowerCase();
+  const commerce = scanEvidence.commerceFlowSignals;
+  const platformScores = scanEvidence.platformScores ?? [];
+  const evidence: string[] = [];
+  const negativeSignals: string[] = [];
+  let score = 0;
+
+  const addEvidence = (condition: boolean, points: number, message: string) => {
+    if (condition) {
+      score += points;
+      evidence.push(message);
+    }
+  };
+
+  const addNegative = (condition: boolean, points: number, message: string) => {
+    if (condition) {
+      score -= points;
+      negativeSignals.push(message);
+    }
+  };
+
+  const hasStrongPlatformEvidence = platformScores.some(
+    (platform) => platform.strongCount >= 2 && platform.score >= 60,
+  );
+  const hasAnyPlatformEvidence = platformScores.some(
+    (platform) => platform.strongCount > 0,
+  );
+  const hasProductPath =
+    /\/products?\b|\/collections?\b|\/category\b|\/catalog\b|\/shop\b/i.test(
+      scanEvidence.signalText,
+    );
+  const hasPricePattern =
+    /(?:[$£€]\s?\d+(?:[.,]\d{2})?)|(?:\d+(?:[.,]\d{2})?\s?(?:usd|gbp|eur))/i.test(
+      scanEvidence.signalText,
+    );
+  const hasProductSchema =
+    /"@type"\s*:\s*"(?:Product|Offer)"|schema\.org\/(?:Product|Offer)/i.test(
+      scanEvidence.signalText,
+    );
+  const hasCommerceLanguage =
+    /\b(shop|buy|checkout|cart|basket|shopping bag|add to cart|add to bag|buy now|order now)\b/i.test(
+      scanEvidence.signalText,
+    );
+  const hasPaymentSignals =
+    /shop pay|paypal|klarna|afterpay|apple pay|google pay|visa|mastercard|secure checkout|payment/i.test(
+      scanEvidence.signalText,
+    );
+  const knownEnterpriseDomain = isKnownEnterpriseDomain(scanEvidence.finalUrl);
+  const hasLeadOnlyLanguage =
+    /\b(contact us|request a quote|schedule a consultation|book a call|learn more|leadership|services|solutions)\b/i.test(
+      scanEvidence.signalText,
+    );
+  const hasRealEstateLanguage =
+    /\b(real estate|property listings?|homes for sale|commercial property|brokerage|tenant|lease)\b/i.test(
+      scanEvidence.signalText,
+    );
+  const hasEducationLanguage =
+    /\b(education|course|learning|student|school|university|training|certification|curriculum)\b/i.test(
+      scanEvidence.signalText,
+    );
+  const hasAccountOnlyLanguage =
+    /\b(sign in|log in|account portal|my account)\b/i.test(scanEvidence.signalText) &&
+    !hasCommerceLanguage;
+
+  addEvidence(commerce?.cartVisible === true, 22, "Cart or shopping bag signals are visible.");
+  addEvidence(commerce?.checkoutVisible === true, 22, "Checkout or buy-now signals are visible.");
+  addEvidence(commerce?.productCatalogVisible === true, 18, "Product or catalog paths are visible.");
+  addEvidence(hasProductPath, 14, "Product, collection, catalog, or shop URLs are visible.");
+  addEvidence(hasPricePattern, 12, "Price-like patterns are visible.");
+  addEvidence(hasProductSchema, 16, "Product or offer schema is visible.");
+  addEvidence(hasCommerceLanguage, 12, "Commerce language such as shop, buy, cart, or checkout is visible.");
+  addEvidence(hasPaymentSignals, 10, "Payment or secure checkout signals are visible.");
+  addEvidence(hasStrongPlatformEvidence, 18, "Multiple strong ecommerce platform signals are visible.");
+  addEvidence(hasAnyPlatformEvidence && !hasStrongPlatformEvidence, 8, "Some ecommerce platform evidence is visible.");
+  addEvidence(knownEnterpriseDomain, 20, "Known large commerce domain.");
+
+  addNegative(commerce?.cartVisible !== true, 12, "No cart or shopping bag signal was visible.");
+  addNegative(commerce?.checkoutVisible !== true, 12, "No checkout signal was visible.");
+  addNegative(!hasProductPath && commerce?.productCatalogVisible !== true, 12, "No product or catalog links were detected.");
+  addNegative(!hasPricePattern && !hasProductSchema, 8, "No price, product schema, or offer schema was detected.");
+  addNegative(commerce?.formVisible === true && !hasCommerceLanguage, 8, "Lead form signals are stronger than purchase-flow signals.");
+  addNegative(hasLeadOnlyLanguage && !hasCommerceLanguage, 12, "Service or lead-generation language dominates the visible page.");
+  addNegative(hasRealEstateLanguage && commerce?.checkoutVisible !== true, 18, "Real estate listing language appears without cart or checkout evidence.");
+  addNegative(hasEducationLanguage && commerce?.checkoutVisible !== true, 10, "Education or content language appears without checkout evidence.");
+  addNegative(hasAccountOnlyLanguage, 8, "Account or login language appears without a public purchase path.");
+
+  if (knownEnterpriseDomain) {
+    score = Math.max(score, 55);
+  }
+
+  if (
+    hasRealEstateLanguage &&
+    commerce?.checkoutVisible !== true &&
+    !hasStrongPlatformEvidence
+  ) {
+    score = Math.min(score, 24);
+  }
+
+  if (
+    commerce?.cartVisible !== true &&
+    commerce?.checkoutVisible !== true &&
+    !hasStrongPlatformEvidence &&
+    !hasProductSchema &&
+    !knownEnterpriseDomain
+  ) {
+    score = Math.min(score, 42);
+  }
+
+  const probability = Math.max(0, Math.min(100, Math.round(score)));
+  const label: EcommerceProbability["label"] =
+    probability >= 70
+      ? "High"
+      : probability >= 45
+        ? "Moderate"
+        : probability >= 25
+          ? "Unclear"
+          : "Low";
+
+  return {
+    probability,
+    label,
+    evidence: evidence.slice(0, 8),
+    negativeSignals: negativeSignals.slice(0, 8),
+  };
+}
 
 export function detectEnterpriseCommerceSignals({
   finalUrl,
@@ -744,8 +934,13 @@ export function detectEcommercePlatform(
       score = Math.min(score, 18);
     }
 
+    if (rule.key === "magento" && strongMatches.length < 2) {
+      score = Math.min(strongMatches.length > 0 ? score : 0, strongMatches.length > 0 ? 28 : 0);
+    }
+
     return {
       name: platformNameFromKey(rule.key),
+      key: rule.key,
       score,
       strongCount: strongMatches.length,
       weakCount: weakMatches.length,
@@ -762,6 +957,12 @@ export function detectEcommercePlatform(
   const sorted = [...platformScores].sort((a, b) => b.score - a.score);
   const top = sorted[0];
   const runnerUp = sorted[1] ?? { score: 0 };
+  const ecommerceProbability = calculateEcommerceProbability({
+    signalText,
+    finalUrl: context.finalUrl,
+    commerceFlowSignals: context.commerceFlowSignals,
+    platformScores,
+  });
   const enterpriseSignals = detectEnterpriseCommerceSignals({
     finalUrl: context.finalUrl,
     signalText,
@@ -770,28 +971,74 @@ export function detectEcommercePlatform(
   });
   const isEnterpriseGuardedDomain = isKnownEnterpriseDomain(context.finalUrl);
 
+  if (ecommerceProbability.label === "Low") {
+    return platformDetectionResult({
+      name: "Not an ecommerce storefront",
+      confidence: Math.max(5, Math.min(35, ecommerceProbability.probability)),
+      confidenceLabel: "Low confidence",
+      ecommerceProbability,
+      details: [
+        "Platform detection skipped because ecommerce probability is low.",
+        ...ecommerceProbability.evidence,
+        ...ecommerceProbability.negativeSignals,
+      ],
+      evidence: ecommerceProbability.evidence,
+      explanation:
+        "The public page does not expose enough cart, checkout, product, or commerce-flow evidence to classify this as an ecommerce storefront.",
+      recommendation:
+        "Confirm whether this URL is the correct commerce entry point or primarily a lead-generation, service, education, real estate, or informational page.",
+    });
+  }
+
+  if (ecommerceProbability.label === "Unclear") {
+    return platformDetectionResult({
+      name: "Ecommerce probability unclear",
+      confidence: Math.max(20, Math.min(44, ecommerceProbability.probability)),
+      confidenceLabel: "Needs Review",
+      ecommerceProbability,
+      details: [
+        "Manual review recommended because ecommerce probability is unclear.",
+        ...ecommerceProbability.evidence,
+        ...ecommerceProbability.negativeSignals,
+      ],
+      evidence: ecommerceProbability.evidence,
+      explanation:
+        "The page may support commerce elsewhere, but this URL does not expose enough public commerce signals.",
+      recommendation:
+        "Manually verify whether product, cart, checkout, or transaction flow exists on another URL before making platform-specific recommendations.",
+    });
+  }
+
   if (!top || top.score < 20) {
     if (enterpriseSignals.enterpriseLikelihood !== "low") {
-      return {
+      return platformDetectionResult({
         name: "Enterprise / Custom Commerce Stack",
         confidence: 35,
         confidenceLabel: "Needs Review",
+        ecommerceProbability,
         details: enterpriseSignals.supportingSignals,
+        evidence: enterpriseSignals.supportingSignals,
         explanation:
           "The public page does not expose enough reliable standard-platform evidence. This may indicate a custom, hybrid, or heavily abstracted enterprise storefront, so platform-specific recommendations should be manually confirmed.",
-      };
+        recommendation:
+          "Confirm architecture manually before making Shopify, BigCommerce, WooCommerce, or Magento-specific recommendations.",
+      });
     }
 
-    return {
-      name: "Unknown",
+    return platformDetectionResult({
+      name: "Platform not confidently identified",
       confidence: 0,
       confidenceLabel: "Unknown",
+      ecommerceProbability,
       details: [
         "No clear storefront platform indicators were detected from page assets or scripts.",
       ],
+      evidence: [],
       explanation:
         "Platform detection did not find enough specific signals to identify the storefront platform confidently.",
-    };
+      recommendation:
+        "Confirm platform details manually from source assets, admin access, or checkout/cart URLs before making platform-specific recommendations.",
+    });
   }
 
   const hasCompetingStrongSignals =
@@ -805,23 +1052,80 @@ export function detectEcommercePlatform(
     top.strongCount >= 2 &&
     top.score >= 75 &&
     (!("score" in runnerUp) || top.score - runnerUp.score >= 35);
+  const hasStrongStandardEvidence =
+    top.strongCount >= 2 &&
+    top.score >= 55 &&
+    top.weakCount <= Math.max(3, top.strongCount * 2);
+  const magentoEvidenceIsStrong =
+    top.name !== "Magento / Adobe Commerce" ||
+    (top.strongCount >= 2 && top.score >= 54);
+
+  if (
+    ecommerceProbability.label === "Moderate" &&
+    (!hasStrongStandardEvidence || !magentoEvidenceIsStrong)
+  ) {
+    if (
+      enterpriseSignals.enterpriseLikelihood !== "low" ||
+      isEnterpriseGuardedDomain
+    ) {
+      return platformDetectionResult({
+        name: "Enterprise / Custom Commerce Stack",
+        confidence: Math.min(78, Math.max(45, Math.round(top.score))),
+        confidenceLabel:
+          enterpriseSignals.enterpriseLikelihood === "high"
+            ? "Moderate confidence"
+            : "Needs Review",
+        ecommerceProbability,
+        details: [
+          ...enterpriseSignals.supportingSignals,
+          `Standard-platform evidence was not strong enough to call ${top.name}.`,
+          ...top.details,
+        ],
+        evidence: enterpriseSignals.supportingSignals,
+        explanation:
+          "The page has moderate commerce probability, but standard platform signatures are weak, mixed, or intentionally abstracted.",
+        recommendation:
+          "Treat this as custom or enterprise commerce until source assets, cart behavior, and checkout architecture are manually confirmed.",
+      });
+    }
+
+    return platformDetectionResult({
+      name: "Platform not confidently identified",
+      confidence: Math.min(55, Math.max(30, Math.round(top.score))),
+      confidenceLabel: "Needs Review",
+      ecommerceProbability,
+      details: [
+        `Moderate ecommerce probability, but ${top.name} evidence was not strong enough for platform identification.`,
+        ...top.details,
+      ],
+      evidence: top.details.filter((detail) => detail.startsWith("Strong signal")),
+      explanation:
+        "The page shows some commerce-adjacent signals, but platform-specific evidence is not strong enough to identify Shopify, BigCommerce, WooCommerce, or Magento safely.",
+      recommendation:
+        "Manually verify platform-specific assets before making implementation recommendations.",
+    });
+  }
 
   if (
     enterpriseSignals.enterpriseLikelihood === "high" &&
     !hasOverwhelmingStandardEvidence
   ) {
-    return {
+    return platformDetectionResult({
       name: "Enterprise / Custom Commerce Stack",
       confidence: Math.min(65, Math.max(35, Math.round(top.score))),
       confidenceLabel: "Needs Review",
+      ecommerceProbability,
       details: [
         ...enterpriseSignals.supportingSignals,
         `Strongest standard-platform candidate was ${top.name}, but the evidence was not strong enough to override the enterprise/custom guardrail.`,
         ...top.details,
       ],
+      evidence: enterpriseSignals.supportingSignals,
       explanation:
         "The storefront exposes mixed or limited public platform signals. Large enterprise retailers often use custom or hybrid commerce systems, so platform-specific recommendations should be manually confirmed.",
-    };
+      recommendation:
+        "Confirm the custom or hybrid architecture manually before using platform-specific recommendations.",
+    });
   }
 
   if (
@@ -829,39 +1133,48 @@ export function detectEcommercePlatform(
     !hasOverwhelmingStandardEvidence &&
     top.score < 90
   ) {
-    return {
+    return platformDetectionResult({
       name: "Enterprise / Custom Commerce Stack",
       confidence: Math.min(60, Math.max(35, Math.round(top.score))),
       confidenceLabel: "Needs Review",
+      ecommerceProbability,
       details: [
         ...enterpriseSignals.supportingSignals,
         `Known-enterprise guardrail applied because ${top.name} evidence was not overwhelming.`,
         ...top.details,
       ],
+      evidence: enterpriseSignals.supportingSignals,
       explanation:
         "The public page does not expose enough reliable standard-platform evidence. This may indicate a custom, hybrid, or heavily abstracted enterprise storefront.",
-    };
+      recommendation:
+        "Confirm source assets, cart/checkout behavior, and internal architecture before applying standard platform assumptions.",
+    });
   }
 
   if (
     (runnerUp.score >= 20 && top.score - runnerUp.score < 12) ||
     hasCompetingStrongSignals ||
     weakSignalsOutweighStrongSignals ||
-    (top.name === "Shopify" && top.strongCount === 0)
+    (top.name === "Shopify" && top.strongCount === 0) ||
+    !magentoEvidenceIsStrong
   ) {
     const runnerUpName = "name" in runnerUp ? runnerUp.name : "another platform";
-    return {
-      name: "Needs Manual Review",
+    return platformDetectionResult({
+      name: "Platform not confidently identified",
       confidence: Math.min(95, Math.round(top.score)),
       confidenceLabel: "Needs Review",
+      ecommerceProbability,
       details: [
         `Needs manual review: ${top.name} signals were strongest, but ${runnerUpName} signals or generic commerce patterns also appeared.`,
         `Top candidate signal count: ${top.strongCount} strong and ${top.weakCount} weak ${top.name} indicators.`,
         ...top.details,
       ],
+      evidence: top.details.filter((detail) => detail.startsWith("Strong signal")),
       explanation:
         `Platform signals conflict or rely too heavily on generic commerce patterns. The strongest candidate was ${top.name}, but the evidence is not clean enough for a confident platform label.`,
-    };
+      recommendation:
+        "Do not make platform-specific recommendations until public evidence or internal access confirms the storefront platform.",
+    });
   }
 
   const confidence = Math.min(95, Math.round(top.score));
@@ -872,19 +1185,22 @@ export function detectEcommercePlatform(
     .map((detail) => detail.replace(/^Strong signal: /, "").replace(/\s+\(.+\)$/, ""))
     .join("; ");
 
-  return {
+  return platformDetectionResult({
     name: top.name,
     confidence,
     confidenceLabel,
+    ecommerceProbability,
     details: top.details,
+    evidence: top.details.filter((detail) => detail.startsWith("Strong signal")),
     explanation:
       confidenceLabel === "High confidence"
         ? `Detected ${top.name} with high confidence because platform-specific evidence was visible: ${strongestEvidence || "multiple strong storefront signals"}.`
         : confidenceLabel === "Low confidence"
-        ?
-          `Detected ${top.name}, but the signal strength is low and should be confirmed manually because the scan found only limited platform-specific evidence.`
+        ? `Detected ${top.name}, but the signal strength is low and should be confirmed manually because the scan found only limited platform-specific evidence.`
         : `Detected ${top.name} with ${confidenceLabel.toLowerCase()} from visible public-page indicators; confirm manually before making platform-specific recommendations.`,
-  };
+    recommendation:
+      "Use platform-specific recommendations only after confirming the detected public signals match the actual storefront architecture.",
+  });
 }
 
 export function detectCommerceFlowSignals(
@@ -1307,16 +1623,20 @@ function defaultTechnologyDetections(): TechnologyDetection[] {
 }
 
 function defaultPlatformDetection(): PlatformDetection {
-  return {
+  return platformDetectionResult({
     name: "Unknown",
     confidence: 0,
     confidenceLabel: "Unknown",
+    ecommerceProbability: defaultEcommerceProbability,
     details: [
       "No clear storefront platform indicators were detected from the lightweight scan.",
     ],
+    evidence: [],
     explanation:
       "No platform indicators were available from the lightweight scan, so the storefront platform could not be identified.",
-  };
+    recommendation:
+      "Run the scan against a public page that exposes product, cart, checkout, or platform-specific evidence.",
+  });
 }
 
 function defaultCommerceFlowSignals(): CommerceFlowSignals {

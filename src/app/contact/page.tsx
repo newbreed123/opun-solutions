@@ -16,6 +16,7 @@ const validLeadSources = new Set([
 ]);
 
 type ContactAttribution = {
+  scanId: string;
   scannedUrl: string;
   auditScore: string;
   auditStatus: string;
@@ -51,6 +52,7 @@ export default function Contact() {
   const [loading, setLoading] = useState(false);
   const [sourcePage, setSourcePage] = useState("contact-general");
   const [contactAttribution, setContactAttribution] = useState<ContactAttribution>({
+    scanId: "",
     scannedUrl: "",
     auditScore: "",
     auditStatus: "",
@@ -62,6 +64,7 @@ export default function Contact() {
     const source = params.get("source");
     const scannedUrl = params.get("scannedUrl") ?? "";
     const attribution = {
+      scanId: params.get("scanId") ?? "",
       scannedUrl,
       auditScore: params.get("score") ?? "",
       auditStatus: params.get("status") ?? "",
@@ -125,6 +128,7 @@ export default function Contact() {
           source: sourcePage,
           sourcePage:
             sourcePage === "contact-general" ? "ecommerce-audit" : sourcePage,
+          scanId: contactAttribution.scanId,
           scannedUrl: contactAttribution.scannedUrl,
           auditScore: contactAttribution.auditScore,
           auditStatus: contactAttribution.auditStatus,
@@ -181,6 +185,7 @@ export default function Contact() {
           service: servicesFormState.serviceNeeded,
           source: sourcePage,
           sourcePage,
+          scanId: contactAttribution.scanId,
           scannedUrl: contactAttribution.scannedUrl,
           auditScore: contactAttribution.auditScore,
           auditStatus: contactAttribution.auditStatus,
@@ -421,6 +426,11 @@ export default function Contact() {
                   ) : (
                     <form onSubmit={handleAuditSubmit} className="space-y-6">
                       <input type="hidden" name="source" value={sourcePage} />
+                      <input
+                        type="hidden"
+                        name="scanId"
+                        value={contactAttribution.scanId}
+                      />
                       <input
                         type="hidden"
                         name="scannedUrl"
@@ -763,6 +773,11 @@ export default function Contact() {
             ) : (
               <form onSubmit={handleServicesSubmit} className="space-y-6">
                 <input type="hidden" name="source" value={sourcePage} />
+                <input
+                  type="hidden"
+                  name="scanId"
+                  value={contactAttribution.scanId}
+                />
                 <input
                   type="hidden"
                   name="scannedUrl"

@@ -49,6 +49,7 @@ type AuditCategory = {
 };
 
 type AuditResult = {
+  scanId?: string;
   website: string;
   mode: "mock";
   generatedAt: string;
@@ -174,10 +175,20 @@ type LiveDiagnostics = {
   }[];
   platformDetection: {
     name: string;
+    platformName?: string;
     confidence: number;
+    confidenceScore?: number;
     confidenceLabel: string;
+    ecommerceProbability?: {
+      probability: number;
+      label: "High" | "Moderate" | "Low" | "Unclear" | string;
+      evidence: string[];
+      negativeSignals: string[];
+    };
     details: string[];
+    evidence?: string[];
     explanation?: string;
+    recommendation?: string;
   };
   commerceFlowSignals: {
     cartVisible: boolean;
@@ -345,6 +356,18 @@ function confidenceLevel(confidence: number) {
 function platformDisplayName(audit: AuditResult) {
   const platform = audit.diagnostics.platformDetection;
 
+  if (platform.name === "Not an ecommerce storefront") {
+    return "Platform detection skipped";
+  }
+
+  if (platform.name === "Ecommerce probability unclear") {
+    return "Manual review recommended";
+  }
+
+  if (platform.name === "Platform not confidently identified") {
+    return "Platform not confidently identified";
+  }
+
   if (platform.name === "Enterprise / Custom Commerce Stack") {
     return "Enterprise / Custom Commerce Stack";
   }
@@ -361,6 +384,9 @@ function showManualReviewChecklist(audit: AuditResult) {
   return (
     platform.name === "Unknown" ||
     platform.name === "Enterprise / Custom Commerce Stack" ||
+    platform.name === "Not an ecommerce storefront" ||
+    platform.name === "Ecommerce probability unclear" ||
+    platform.name === "Platform not confidently identified" ||
     platform.confidenceLabel === "Low confidence" ||
     platform.confidenceLabel === "Needs Review"
   );
@@ -374,9 +400,18 @@ function platformMarketingInterpretation(audit: AuditResult) {
   const platform = audit.diagnostics.platformDetection;
   const marketingTools = getVisibleMarketingTools(audit.diagnostics);
   const commerce = audit.diagnostics.commerceFlowSignals;
+  const probability = platform.ecommerceProbability;
+
+  if (probability?.label === "Low") {
+    return "Ecommerce probability low. Platform detection skipped. This page does not expose enough product, cart, checkout, or purchase-flow evidence to classify it as a standard ecommerce storefront.";
+  }
+
+  if (probability?.label === "Unclear") {
+    return "Ecommerce probability unclear. Manual review is recommended because this URL may support commerce elsewhere, but the public page does not expose enough commerce signals.";
+  }
 
   if (platform.name === "Enterprise / Custom Commerce Stack") {
-    return "The public page does not expose enough reliable standard-platform evidence. This may indicate a custom, hybrid, or heavily abstracted enterprise storefront. Platform-specific recommendations should wait until manual confirmation.";
+    return "Enterprise / Custom Commerce Stack. Standard platform evidence is intentionally limited or not exposed, so platform-specific recommendations should wait until manual confirmation.";
   }
 
   if (platform.name === "Unknown" && marketingTools.length === 0) {
@@ -384,7 +419,8 @@ function platformMarketingInterpretation(audit: AuditResult) {
   }
 
   const platformText =
-    platform.name === "Unknown"
+    platform.name === "Unknown" ||
+    platform.name === "Platform not confidently identified"
       ? "Platform not confidently identified"
       : `The storefront appears to expose ${platform.name} signals`;
   const marketingText =
@@ -460,6 +496,7 @@ function primaryOperationalConcernTitle(audit: AuditResult) {
 
 function auditAttribution(audit: AuditResult) {
   return {
+    scanId: audit.scanId,
     scannedUrl: audit.website,
     score: audit.overallScore,
     status: audit.overallStatus,
@@ -498,6 +535,21 @@ export default function EcommerceAuditScannerPage() {
     src: string;
     label: string;
   } | null>(null);
+
+  function handleExportReport() {
+    if (!audit) {
+      return;
+    }
+
+    trackEvent("audit_export_clicked", auditAttribution(audit));
+    setShowVisibilityDetails(true);
+    setShowRawLogs(false);
+    setExpandedScreenshot(null);
+
+    window.setTimeout(() => {
+      window.print();
+    }, 0);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -712,6 +764,31 @@ export default function EcommerceAuditScannerPage() {
             </div>
           ) : (
             <div className="space-y-8">
+              <div className="audit-print-only audit-print-header">
+                <p className="audit-print-kicker">Opzix Audit</p>
+                <h1>Opzix Audit Report</h1>
+                <dl>
+                  <div>
+                    <dt>Website</dt>
+                    <dd>{audit.website}</dd>
+                  </div>
+                  <div>
+                    <dt>Generated</dt>
+                    <dd>{new Date(audit.generatedAt).toLocaleString()}</dd>
+                  </div>
+                  <div>
+                    <dt>Score</dt>
+                    <dd>
+                      {audit.overallScore}/100 - {audit.overallStatus}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Primary Concern</dt>
+                    <dd>{primaryOperationalConcernTitle(audit)}</dd>
+                  </div>
+                </dl>
+              </div>
+
               <div className="card-elevated p-6 md:p-8">
                 <div className="grid gap-6 lg:grid-cols-[0.7fr_1.3fr] lg:items-center">
                   <div className="rounded-[2rem] border border-brand-cyan/30 bg-brand-blue/10 p-6 text-center">
@@ -753,19 +830,15 @@ export default function EcommerceAuditScannerPage() {
                     <div className="mt-5 inline-flex max-w-full rounded-full border border-dark-border bg-white/[0.035] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
                       Generated {new Date(audit.generatedAt).toLocaleString()}
                     </div>
-                    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                    <div className="print-hidden mt-6 flex flex-col gap-3 sm:flex-row">
                       <button
                         type="button"
-                        disabled
-                        className="btn border border-dark-border bg-white/[0.035] text-muted opacity-70"
-                        title="Export coming soon"
+                        onClick={handleExportReport}
+                        className="btn border border-dark-border bg-white/[0.035] text-secondary transition-colors hover:border-brand-cyan hover:text-primary"
                       >
                         <Download className="mr-2 h-4 w-4" />
                         Export Report
                       </button>
-                      <span className="inline-flex items-center justify-center rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-muted">
-                        Export coming soon
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -990,7 +1063,9 @@ export default function EcommerceAuditScannerPage() {
                 </div>
               </div>
 
-              <PostScanAssistant audit={audit} />
+              <div className="print-hidden">
+                <PostScanAssistant audit={audit} />
+              </div>
 
               <div className="card-elevated p-6 md:p-8">
                 <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -1112,10 +1187,38 @@ export default function EcommerceAuditScannerPage() {
                           {" - "}
                           {audit.diagnostics.platformDetection.confidence}%
                         </p>
+                        {audit.diagnostics.platformDetection
+                          .ecommerceProbability && (
+                          <p className="mt-2 text-sm font-semibold text-brand-cyan">
+                            Ecommerce probability{" "}
+                            {
+                              audit.diagnostics.platformDetection
+                                .ecommerceProbability.label
+                            }{" "}
+                            -{" "}
+                            {
+                              audit.diagnostics.platformDetection
+                                .ecommerceProbability.probability
+                            }
+                            %
+                          </p>
+                        )}
                         {audit.diagnostics.platformDetection.name ===
                           "Enterprise / Custom Commerce Stack" && (
                           <p className="mt-2 text-sm font-semibold text-amber-100">
                             Platform should be manually confirmed
+                          </p>
+                        )}
+                        {audit.diagnostics.platformDetection.name ===
+                          "Not an ecommerce storefront" && (
+                          <p className="mt-2 text-sm font-semibold text-amber-100">
+                            Ecommerce probability low
+                          </p>
+                        )}
+                        {audit.diagnostics.platformDetection.name ===
+                          "Ecommerce probability unclear" && (
+                          <p className="mt-2 text-sm font-semibold text-amber-100">
+                            Manual review recommended
                           </p>
                         )}
                         {audit.diagnostics.platformDetection.explanation && (
@@ -1123,6 +1226,22 @@ export default function EcommerceAuditScannerPage() {
                             {audit.diagnostics.platformDetection.explanation}
                           </p>
                         )}
+                        {/* Site classification block */}
+                        <div className="mt-4 rounded-xl border border-white/6 bg-white/[0.02] p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-cyan">Site Type</p>
+                          <p className="mt-1 text-sm font-semibold text-secondary">{audit.siteType}</p>
+                          <p className="mt-1 text-xs text-muted">{audit.siteTypeReason}</p>
+                          {audit.diagnostics && audit.siteType && (
+                            <div className="mt-2 text-xs text-muted">
+                              <p className="font-semibold">Evidence</p>
+                              <ul className="list-disc ml-4">
+                                {(audit.diagnostics.platformDetection?.evidence || []).slice(0,3).map((e, i) => (
+                                  <li key={i}>{String(e)}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
@@ -1216,6 +1335,15 @@ export default function EcommerceAuditScannerPage() {
                               ),
                             )}
                           </ul>
+                          {audit.diagnostics.platformDetection
+                            .recommendation && (
+                            <p className="mt-4 rounded-xl border border-dark-border bg-white/[0.035] p-3 text-muted">
+                              {
+                                audit.diagnostics.platformDetection
+                                  .recommendation
+                              }
+                            </p>
+                          )}
                         </div>
 
                         <div>
@@ -1274,7 +1402,7 @@ export default function EcommerceAuditScannerPage() {
                 );
               })()}
 
-              <div className="card-elevated p-5 sm:p-6 md:p-8">
+              <div className="print-hidden card-elevated p-5 sm:p-6 md:p-8">
                 <div className="mb-8 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
@@ -2109,6 +2237,12 @@ export default function EcommerceAuditScannerPage() {
                   </Button>
                 </div>
               </div>
+
+              <div className="audit-print-only audit-print-footer">
+                <p>Generated by Opzix Audit</p>
+                <p>Talk with Opzix about this audit</p>
+                <p>Contact: /contact</p>
+              </div>
             </div>
           )}
         </div>
@@ -2150,6 +2284,197 @@ export default function EcommerceAuditScannerPage() {
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        .audit-print-only {
+          display: none;
+        }
+
+        @media print {
+          @page {
+            margin: 0.55in;
+          }
+
+          html,
+          body {
+            background: #ffffff !important;
+            color: #111827 !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+
+          body > header,
+          body > nav,
+          body > footer,
+          header,
+          nav,
+          footer,
+          form,
+          input,
+          textarea,
+          select,
+          button,
+          [role="dialog"],
+          .hero-atmosphere,
+          .print-hidden {
+            display: none !important;
+          }
+
+          .scanner-report-scope {
+            max-width: none !important;
+            width: 100% !important;
+            overflow: visible !important;
+          }
+
+          .scanner-report-scope *,
+          .scanner-report-scope *::before,
+          .scanner-report-scope *::after {
+            box-shadow: none !important;
+            text-shadow: none !important;
+          }
+
+          .audit-print-only {
+            display: block !important;
+          }
+
+          .audit-print-header {
+            border-bottom: 2px solid #111827;
+            margin-bottom: 24px;
+            padding-bottom: 18px;
+          }
+
+          .audit-print-kicker {
+            color: #0f766e;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            margin: 0 0 6px;
+            text-transform: uppercase;
+          }
+
+          .audit-print-header h1 {
+            color: #111827;
+            font-size: 28px;
+            line-height: 1.15;
+            margin: 0 0 14px;
+          }
+
+          .audit-print-header dl {
+            display: grid;
+            gap: 8px 18px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin: 0;
+          }
+
+          .audit-print-header div {
+            break-inside: avoid;
+          }
+
+          .audit-print-header dt {
+            color: #4b5563;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+          }
+
+          .audit-print-header dd {
+            color: #111827;
+            font-size: 13px;
+            font-weight: 700;
+            margin: 2px 0 0;
+            overflow-wrap: anywhere;
+          }
+
+          .scanner-report-scope .space-y-8 > * {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+
+          .scanner-report-scope .card,
+          .scanner-report-scope .card-elevated,
+          .scanner-report-scope [class*="rounded-"] {
+            background: #ffffff !important;
+            border-color: #d1d5db !important;
+            color: #111827 !important;
+          }
+
+          .scanner-report-scope [class*="bg-dark"],
+          .scanner-report-scope [class*="bg-brand"],
+          .scanner-report-scope [class*="bg-gradient"],
+          .scanner-report-scope [class*="bg-white/"],
+          .scanner-report-scope [class*="bg-amber"],
+          .scanner-report-scope [class*="bg-emerald"],
+          .scanner-report-scope [class*="bg-red"] {
+            background: #ffffff !important;
+          }
+
+          .scanner-report-scope .text-primary,
+          .scanner-report-scope .text-secondary,
+          .scanner-report-scope .text-muted,
+          .scanner-report-scope .text-brand-cyan,
+          .scanner-report-scope .text-amber-100,
+          .scanner-report-scope .text-emerald-100,
+          .scanner-report-scope [class*="text-"] {
+            color: #111827 !important;
+          }
+
+          .scanner-report-scope p,
+          .scanner-report-scope li,
+          .scanner-report-scope dd {
+            color: #1f2937 !important;
+          }
+
+          .scanner-report-scope h1,
+          .scanner-report-scope h2,
+          .scanner-report-scope h3,
+          .scanner-report-scope h4 {
+            color: #111827 !important;
+            page-break-after: avoid;
+          }
+
+          .scanner-report-scope .grid {
+            gap: 14px !important;
+          }
+
+          .scanner-report-scope [class*="overflow"] {
+            overflow: visible !important;
+          }
+
+          .scanner-report-scope img {
+            display: none !important;
+          }
+
+          .scanner-report-scope a {
+            color: #111827 !important;
+            text-decoration: none !important;
+          }
+
+          .scanner-report-scope .btn,
+          .scanner-report-scope [aria-label],
+          .scanner-report-scope svg {
+            display: none !important;
+          }
+
+          .scanner-report-scope ul,
+          .scanner-report-scope ol {
+            break-inside: avoid;
+          }
+
+          .audit-print-footer {
+            border-top: 2px solid #111827;
+            margin-top: 28px;
+            padding-top: 14px;
+          }
+
+          .audit-print-footer p {
+            color: #111827 !important;
+            font-size: 12px;
+            font-weight: 700;
+            margin: 3px 0;
+          }
+        }
+      `}</style>
     </>
   );
 }

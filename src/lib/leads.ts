@@ -20,6 +20,7 @@ export type NormalizedLead = {
   email: string;
   message: string;
   sourcePage: LeadSourcePage;
+  scanId: string;
   scannedUrl: string;
   auditScore: string;
   auditStatus: string;
@@ -48,6 +49,7 @@ export function normalizeLead(
       values.sourcePage || values.source || "",
       options.defaultSourcePage,
     ),
+    scanId: values.scanId ?? "",
     scannedUrl: values.scannedUrl ?? "",
     auditScore: values.auditScore || values.score || "",
     auditStatus: values.auditStatus || values.status || "",
