@@ -24,6 +24,10 @@ import {
   sanitizeEvidenceText,
   summarizeCtaLabels,
 } from "@/lib/evidence-cleanup";
+import {
+  analyzeVisualUx,
+  type VisualUxDiagnosticsResult,
+} from "@/lib/visual-ux-diagnostics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +45,7 @@ type HeuristicCategory =
   | "marketingVisibility"
   | "operationsContinuity"
   | "platformVisibility"
+  | "visualUx"
   | "metadataClarity";
 
 type AuditCategoryKey =
@@ -891,6 +896,7 @@ function productDiscoveryFirstAction(diagnostics: LiveDiagnosticsResult) {
 
 function buildHeuristicFindings(
   diagnostics: LiveDiagnosticsResult,
+  visualUxDiagnostics?: VisualUxDiagnosticsResult,
 ): HeuristicFinding[] {
   const findings: HeuristicFinding[] = [];
   const signals = diagnostics.storefrontSignals;
@@ -987,6 +993,29 @@ function buildHeuristicFindings(
         "No visible search input or search-labeled navigation item was detected in the public page sample.",
     });
   }
+
+  visualUxDiagnostics?.findings.forEach((finding) => {
+    addFinding({
+      title: finding.title,
+      category: "visualUx",
+      primaryCategory: "uxUiIssues",
+      secondaryCategories:
+        finding.title.includes("Product Discovery") ||
+        finding.title.includes("Mobile Content")
+          ? ["conversionIssues"]
+          : undefined,
+      severity: finding.severity,
+      confidence:
+        finding.confidence === "High"
+          ? "High"
+          : finding.confidence === "Moderate"
+            ? "Moderate"
+            : "Low",
+      businessImpact: finding.businessImpact,
+      recommendedFirstAction: finding.recommendedFirstAction,
+      evidenceSummary: finding.evidenceSummary,
+    });
+  });
 
   if (trustSignalsVisible <= 2) {
     addFinding({
@@ -1126,6 +1155,7 @@ function categoryEvidencePenalty(
   key: string,
   diagnostics: LiveDiagnosticsResult,
   findings: HeuristicFinding[],
+  siteClassification?: SiteClassification,
 ) {
   const signals = diagnostics.storefrontSignals;
   const commerce = diagnostics.commerceFlowSignals;
@@ -1144,8 +1174,18 @@ function categoryEvidencePenalty(
   );
 
   if (key === "uxUiIssues") {
+    const visualFindings = categoryFindings.filter((finding) => finding.category === "visualUx");
+    const visualPenalty = Math.min(
+      8,
+      visualFindings.reduce(
+        (total, finding) => total + (finding.severity === "High" ? 4 : finding.severity === "Medium" ? 2 : 1),
+        0,
+      ),
+    );
+
     return (
       findingPressure +
+      visualPenalty +
       (!signals.mobileCtaVisibleAboveFold ? 5 : 0) +
       (signals.mobileCrowdingRisk ? 4 : 0) +
       (!signals.productNavigationVisible ? 4 : 0) +
@@ -1173,12 +1213,27 @@ function categoryEvidencePenalty(
   }
 
   if (key === "technicalIssues") {
+    const siteType = siteClassification?.siteType.toLowerCase() ?? "";
+    const isEnterpriseOrMarketplace =
+      siteType.includes("enterprise") || siteType.includes("marketplace");
+    const platformReviewPenalty = platformNeedsManualReview(diagnostics)
+      ? isEnterpriseOrMarketplace
+        ? 2
+        : 8
+      : 0;
+    const lowConfidencePenalty =
+      diagnostics.platformDetection.confidence > 0 && diagnostics.platformDetection.confidence < 65
+        ? isEnterpriseOrMarketplace
+          ? 1
+          : 3
+        : 0;
+
     return (
       findingPressure +
       (diagnostics.title ? 0 : 3) +
       (diagnostics.metaDescription ? 0 : 3) +
-      (platformNeedsManualReview(diagnostics) ? 8 : 0) +
-      (diagnostics.platformDetection.confidence > 0 && diagnostics.platformDetection.confidence < 65 ? 3 : 0) +
+      platformReviewPenalty +
+      lowConfidencePenalty +
       (diagnostics.platformDetection.confidenceLabel === "Moderate confidence" ? 1 : 0) +
       Math.min(10, diagnostics.consoleErrors.length * 3) +
       Math.min(7, diagnostics.failedRequests.length * 2)
@@ -1298,13 +1353,19 @@ function buildScoreExplanation({
 function applyLiveDiagnosticScoring(
   diagnostics: LiveDiagnosticsResult,
   findings: HeuristicFinding[],
+  siteClassification?: SiteClassification,
 ) {
   return auditCategoryTemplates.map((category) => {
     const categoryFindings = findingsOwnedByCategory(findings, category.key);
     const influencingFindings = findingsInfluencingCategory(findings, category.key);
     const score = Math.max(
       35,
-      Math.min(96, category.score - categoryEvidencePenalty(category.key, diagnostics, findings)),
+      Math.min(96, category.score - categoryEvidencePenalty(
+        category.key,
+        diagnostics,
+        findings,
+        siteClassification,
+      )),
     );
     const scoreExplanation = buildScoreExplanation({
       key: category.key,
@@ -1338,6 +1399,130 @@ function applyLiveDiagnosticScoring(
       influencingFindings: influencingFindings.map((finding) => finding.title),
     };
   });
+}
+
+function adjustOverallScoreForVisualUx({
+  baseScore,
+  categories,
+  findings,
+  visualUxDiagnostics,
+  diagnostics,
+  siteClassification,
+}: {
+  baseScore: number;
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>;
+  findings: HeuristicFinding[];
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+  diagnostics: LiveDiagnosticsResult;
+  siteClassification: SiteClassification;
+}) {
+  const uxScore =
+    categories.find((category) => category.key === "uxUiIssues")?.score ?? baseScore;
+  const conversionScore =
+    categories.find((category) => category.key === "conversionIssues")?.score ?? baseScore;
+  const operationsScore =
+    categories.find((category) => category.key === "operationsIssues")?.score ?? baseScore;
+  const trackingScore =
+    categories.find((category) => category.key === "trackingIssues")?.score ?? baseScore;
+  const technicalScore =
+    categories.find((category) => category.key === "technicalIssues")?.score ?? baseScore;
+  const siteType = siteClassification.siteType.toLowerCase();
+  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "").toLowerCase();
+  const isEnterpriseOrMarketplace =
+    siteType.includes("enterprise") ||
+    siteType.includes("marketplace") ||
+    visualArchetype.includes("enterprise") ||
+    visualArchetype.includes("marketplace");
+  const isIndustrialB2b =
+    siteType.includes("industrial") ||
+    siteType.includes("b2b") ||
+    visualArchetype.includes("industrial") ||
+    visualArchetype.includes("b2b");
+  const effectiveUxScore = Math.round(
+    isIndustrialB2b
+      ? uxScore * 0.5 + visualUxDiagnostics.score * 0.5
+      : isEnterpriseOrMarketplace
+        ? Math.max(uxScore, visualUxDiagnostics.score * 0.9)
+        : uxScore * 0.7 + visualUxDiagnostics.score * 0.3,
+  );
+  const weightedScore = Math.round(
+    isIndustrialB2b
+      ? effectiveUxScore * 0.36 +
+          conversionScore * 0.22 +
+          operationsScore * 0.16 +
+          technicalScore * 0.16 +
+          trackingScore * 0.1
+      : isEnterpriseOrMarketplace
+        ? effectiveUxScore * 0.32 +
+            conversionScore * 0.25 +
+            operationsScore * 0.2 +
+            trackingScore * 0.13 +
+            technicalScore * 0.1
+        : effectiveUxScore * 0.28 +
+            conversionScore * 0.24 +
+            operationsScore * 0.18 +
+            technicalScore * 0.16 +
+            trackingScore * 0.14,
+  );
+  let adjustedScore = Math.round((baseScore * 0.35) + (weightedScore * 0.65));
+  const hasHighVisualOrDiscoveryFinding = findings.some(
+    (finding) =>
+      finding.severity === "High" &&
+      (finding.category === "visualUx" ||
+        finding.category === "productDiscovery" ||
+        /layout|content-to-product|grid-to-content|discovery|catalog/i.test(finding.title)),
+  );
+  const hasSevereCustomerFacingIssue = findings.some(
+    (finding) =>
+      finding.severity === "Critical" ||
+      (finding.severity === "High" &&
+        (finding.primaryCategory === "uxUiIssues" ||
+          finding.primaryCategory === "conversionIssues" ||
+          finding.primaryCategory === "operationsIssues") &&
+        !/platform|manual review|platform evidence/i.test(finding.title)),
+  );
+  const trustSignalsVisible = trustSignalCount(diagnostics);
+  const hasCatalogSignal =
+    diagnostics.commerceFlowSignals.productCatalogVisible ||
+    diagnostics.storefrontSignals.productNavigationVisible ||
+    diagnostics.storefrontSignals.collectionLinksVisible;
+  const hasCommercePath =
+    diagnostics.commerceFlowSignals.cartVisible ||
+    diagnostics.commerceFlowSignals.checkoutVisible;
+  const hasStrongCustomerMaturity =
+    visualUxDiagnostics.score >= 75 &&
+    diagnostics.storefrontSignals.searchVisible &&
+    hasCatalogSignal &&
+    hasCommercePath &&
+    trustSignalsVisible >= 2 &&
+    !diagnostics.storefrontSignals.mobileCrowdingRisk;
+
+  if (isEnterpriseOrMarketplace && hasStrongCustomerMaturity && !hasSevereCustomerFacingIssue) {
+    adjustedScore = Math.max(adjustedScore, 75);
+  }
+
+  if (
+    visualUxDiagnostics.score < 50 &&
+    uxScore < 55 &&
+    hasHighVisualOrDiscoveryFinding
+  ) {
+    adjustedScore = Math.min(adjustedScore, 60);
+  }
+
+  if (
+    visualUxDiagnostics.score < 55 &&
+    uxScore < 60 &&
+    hasHighVisualOrDiscoveryFinding
+  ) {
+    adjustedScore = Math.min(adjustedScore, 65);
+  }
+
+  if (isIndustrialB2b && visualUxDiagnostics.score < 55 && hasHighVisualOrDiscoveryFinding) {
+    adjustedScore = Math.min(adjustedScore, 65);
+    adjustedScore = Math.max(adjustedScore, visualUxDiagnostics.score < 50 ? 55 : 58);
+  }
+
+  return Math.max(35, Math.min(96, adjustedScore));
 }
 
 type NarrativeArchetype =
@@ -2440,10 +2625,11 @@ function buildExecutiveSummary({
     profile.archetype,
     narrativeProfile,
   );
-  const topFinding = weightedFindings[0];
+  const topVisualFinding = findHighSeverityVisualUxFinding(weightedFindings);
+  const topFinding = topVisualFinding ?? weightedFindings[0];
 
   if (narrativeProfile) {
-    const opportunities = weightedFindings.slice(0, 3).map((finding) =>
+    const initialOpportunities = weightedFindings.slice(0, 3).map((finding) =>
       buildExecutiveOpportunityText({
         title: finding.title,
         evidence: finding.evidenceSummary,
@@ -2453,6 +2639,18 @@ function buildExecutiveSummary({
             : finding.recommendedFirstAction,
       }),
     );
+    const opportunities = topVisualFinding
+      ? [
+          buildExecutiveOpportunityText({
+            title: topVisualFinding.title,
+            evidence: topVisualFinding.evidenceSummary,
+            action: topVisualFinding.recommendedFirstAction,
+          }),
+          ...initialOpportunities.filter(
+            (opportunity) => !opportunity.includes(topVisualFinding.title),
+          ),
+        ].slice(0, 3)
+      : initialOpportunities;
     const probabilityPhrase =
       narrativeProfile.ecommerceProbability.label === "Low"
         ? "Ecommerce probability is low, so this should not be judged like a standard storefront until the correct commerce entry point is confirmed."
@@ -2813,8 +3011,18 @@ function buildBalancedReviewSummary({
 
   const summary = `${profile.toneHints.headline} The scan shows ${trackingToolCount} visible marketing tool${trackingToolCount === 1 ? "" : "s"}, ${cartVisible && checkoutVisible ? "a visible purchase path" : "a purchase path that still needs confirmation"}, and ${productDiscoveryVisible ? "product discovery signals" : "limited discovery signals"}. ${profile.operationalFraming}`;
 
-  const topFindings = findings.slice(0, 3);
-  const businessInterpretation = `${profile.toneHints.interpretation} Review the strongest visible findings and verify them against the customer journey before making deeper recommendations.`;
+  const topVisualFinding = findHighSeverityVisualUxFinding(findings);
+  const topFindings = topVisualFinding
+    ? [
+        topVisualFinding,
+        ...findings.filter((finding) => finding !== topVisualFinding).slice(0, 2),
+      ]
+    : findings.slice(0, 3);
+  const businessInterpretation = `${profile.toneHints.interpretation} ${
+    topVisualFinding
+      ? `A high-priority visual UX concern is ${topVisualFinding.title.toLowerCase()}.`
+      : ""
+  } Review the strongest visible findings and verify them against the customer journey before making deeper recommendations.`;
 
   return {
     summary: sanitizeEvidenceText(summary),
@@ -3393,11 +3601,18 @@ function buildTopPriorityRisks(
   profile: NarrativeArchetypeProfile,
   narrativeProfile?: NarrativeProfile,
 ) {
-  const priorityFindings = narrativeSortedFindingsForProfile(
+  const weightedFindings = narrativeSortedFindingsForProfile(
     findings,
     profile.archetype,
     narrativeProfile,
-  ).slice(0, 3);
+  );
+  const topVisualFinding = findHighSeverityVisualUxFinding(weightedFindings);
+  const priorityFindings = topVisualFinding
+    ? [
+        topVisualFinding,
+        ...weightedFindings.filter((finding) => finding !== topVisualFinding).slice(0, 2),
+      ]
+    : weightedFindings.slice(0, 3);
 
   if (priorityFindings.length > 0) {
     return priorityFindings.map((finding) => ({
@@ -3492,6 +3707,11 @@ function buildRecommendedNextSteps(
       affinity.primaryCategories.includes(category),
     ),
   );
+
+  const topVisualFinding = findHighSeverityVisualUxFinding(sortedFindings);
+  if (topVisualFinding && !selected.includes(topVisualFinding)) {
+    selected.push(topVisualFinding);
+  }
 
   for (const finding of sortedFindings) {
     if (selected.length >= 3) {
@@ -4298,6 +4518,14 @@ function findingsWithText(findings: HeuristicFinding[], terms: string[]) {
   });
 }
 
+function findHighSeverityVisualUxFinding(findings: HeuristicFinding[]) {
+  return findings.find(
+    (finding) =>
+      finding.category === "visualUx" &&
+      (finding.severity === "High" || finding.severity === "Critical"),
+  );
+}
+
 function withUnknown(value: string | null | undefined) {
   return value?.trim() || "unknown";
 }
@@ -4356,12 +4584,54 @@ export async function POST(request: Request) {
       );
     }
 
-    const heuristicFindings = buildHeuristicFindings(diagnostics);
-    const categories = applyLiveDiagnosticScoring(diagnostics, heuristicFindings);
-    const overallScore = Math.round(
+    const siteClassification = classifySiteType({ diagnostics, website: values.website });
+    const visualUxDiagnostics = analyzeVisualUx({
+      desktopScreenshot: diagnostics.desktopScreenshotUrl,
+      mobileScreenshot: diagnostics.mobileScreenshotUrl,
+      desktopDomMetrics: diagnostics.desktopVisualMetrics,
+      mobileDomMetrics: diagnostics.mobileVisualMetrics,
+      visibleText: [
+        diagnostics.desktopVisualMetrics?.visibleTextSample,
+        diagnostics.mobileVisualMetrics?.visibleTextSample,
+      ]
+        .filter(Boolean)
+        .join(" "),
+      visibleLinks: [
+        ...(diagnostics.desktopVisualMetrics?.visibleLinks ?? []),
+        ...(diagnostics.mobileVisualMetrics?.visibleLinks ?? []),
+      ],
+      productSignals: diagnostics.storefrontSignals,
+      commerceSignals: diagnostics.commerceFlowSignals,
+      siteType: siteClassification.siteType,
+      platformName: diagnostics.platformDetection.platformName,
+      scannedUrl: diagnostics.finalUrl || values.website,
+    });
+    console.info("Visual UX metrics debug", {
+      website: values.website,
+      finalUrl: diagnostics.finalUrl,
+      visualMetricsDebug: visualUxDiagnostics.visualMetricsDebug,
+    });
+    const heuristicFindings = buildHeuristicFindings(
+      diagnostics,
+      visualUxDiagnostics,
+    );
+    const categories = applyLiveDiagnosticScoring(
+      diagnostics,
+      heuristicFindings,
+      siteClassification,
+    );
+    const baseOverallScore = Math.round(
       categories.reduce((total, category) => total + category.score, 0) /
         categories.length,
     );
+    const overallScore = adjustOverallScoreForVisualUx({
+      baseScore: baseOverallScore,
+      categories,
+      findings: heuristicFindings,
+      visualUxDiagnostics,
+      diagnostics,
+      siteClassification,
+    });
     const narrativeArchetypeProfile = resolveNarrativeArchetype({
       categories,
       diagnostics,
@@ -4375,7 +4645,6 @@ export async function POST(request: Request) {
       website: values.website,
       diagnostics,
     });
-    const siteClassification = classifySiteType({ diagnostics, website: values.website });
     let narrativeProfile = buildNarrativeProfile({
       diagnostics,
       findings: heuristicFindings,
@@ -4501,6 +4770,7 @@ export async function POST(request: Request) {
       primaryOperationalConcern,
       topPriorityRisks,
       heuristicFindings,
+      visualUxDiagnostics,
       diagnostics,
       categories,
       recommendedNextSteps,
@@ -4536,6 +4806,11 @@ export async function POST(request: Request) {
       trustReadiness: intelligence.trustReadiness,
       checkoutReadiness: intelligence.checkoutReadiness,
       mobileReadiness: intelligence.mobileReadiness,
+      visualUxScore: visualUxDiagnostics.score,
+      visualUxFindings: visualUxDiagnostics.findings,
+      visualUxSummary: visualUxDiagnostics.summary,
+      visualUxMobileConcerns: visualUxDiagnostics.mobileConcerns,
+      visualUxDesktopConcerns: visualUxDiagnostics.desktopConcerns,
       topIssues: topPriorityRisks.slice(0, 3).map((risk) => ({
         title: risk.title,
         riskLabel: risk.riskLabel,

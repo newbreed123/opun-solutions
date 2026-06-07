@@ -160,13 +160,7 @@ function AdminShell({ children }: { children: ReactNode }) {
   );
 }
 
-function LockedState({
-  title,
-  message,
-}: {
-  title: string;
-  message: string;
-}) {
+function LockedState({ title, message }: { title: string; message: string }) {
   return (
     <div className="mx-auto max-w-xl rounded-2xl border border-dark-border bg-dark-card p-8">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
@@ -258,9 +252,7 @@ function ReadinessBadge({ value }: { value: string | null }) {
   const tone =
     label === "strong" || label === "ready" || label === "visible"
       ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100"
-      : label === "limited" ||
-          label === "crowded" ||
-          label === "high-priority"
+      : label === "limited" || label === "crowded" || label === "high-priority"
         ? "border-red-300/30 bg-red-400/10 text-red-100"
         : "border-amber-300/30 bg-amber-400/10 text-amber-100";
 
@@ -278,7 +270,7 @@ function getParam(
   key: string,
 ) {
   const value = params[key];
-  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
 function normalizeContactedFilter(value: string) {

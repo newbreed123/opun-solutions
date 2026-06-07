@@ -21,6 +21,7 @@ type ViewportMetadata = {
   commerceFlowSignals: CommerceFlowSignals;
   conversionSignals: ConversionSignals;
   storefrontSignals: StorefrontReviewSignals;
+  visualDomMetrics: VisualDomMetrics | null;
 };
 
 export type PlatformName =
@@ -91,10 +92,61 @@ export type LiveDiagnosticsResult = {
   commerceFlowSignals: CommerceFlowSignals;
   conversionSignals: ConversionSignals;
   storefrontSignals: StorefrontReviewSignals;
+  desktopVisualMetrics: VisualDomMetrics | null;
+  mobileVisualMetrics: VisualDomMetrics | null;
   consoleErrors: string[];
   failedRequests: string[];
   warnings: string[];
   scanError?: string;
+};
+
+export type BoundingBox = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  right: number;
+  centerX: number;
+  centerY: number;
+  textLength?: number;
+  isHeading?: boolean;
+  isProductCard?: boolean;
+  selector?: string;
+  tag?: string;
+  textSample?: string;
+};
+
+export type VisualDomMetrics = {
+  viewportName: "desktop" | "mobile";
+  viewportWidth: number;
+  viewportHeight: number;
+  visibleTextCharactersAboveFold: number;
+  visibleHeadingCountAboveFold: number;
+  visibleLinkCountAboveFold: number;
+  productCardsAboveFold: number;
+  imagesOrCardsAboveFold: number;
+  firstProductCardY: number | null;
+  firstCtaY: number | null;
+  firstSearchInputY: number | null;
+  largestTextBlockHeight: number;
+  contentColumnWidth: number | null;
+  contentColumnX: number | null;
+  productGridX: number | null;
+  contentCandidateBounds: BoundingBox | null;
+  productGridCandidateBounds: BoundingBox | null;
+  horizontalOverflow: boolean;
+  floatingWidgetOverlapRisk: boolean;
+  chatWidgetOverlapRisk: boolean;
+  elementsWiderThanViewport: number;
+  emptyViewportRatio: number;
+  productCardHeightVariance: number;
+  productCardSpacingVariance: number;
+  bodyTextBeforeFirstProductChars: number;
+  visibleTextSample: string;
+  visibleLinks: string[];
+  headingBounds: BoundingBox[];
+  textBlockBounds: BoundingBox[];
+  productCardBounds: BoundingBox[];
 };
 
 export type TechnologyDetection = {
@@ -229,6 +281,8 @@ export async function runLightweightEcommerceDiagnostics(
         desktop.storefrontSignals,
         mobile.storefrontSignals,
       ),
+      desktopVisualMetrics: desktop.visualDomMetrics,
+      mobileVisualMetrics: mobile.visualDomMetrics,
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
@@ -245,6 +299,8 @@ export async function runLightweightEcommerceDiagnostics(
       commerceFlowSignals: defaultCommerceFlowSignals(),
       conversionSignals: defaultConversionSignals(),
       storefrontSignals: defaultStorefrontReviewSignals(),
+      desktopVisualMetrics: null,
+      mobileVisualMetrics: null,
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
@@ -303,7 +359,10 @@ async function scanViewport({
 
     const metadata: ViewportMetadata =
       viewport.name === "desktop"
-        ? await extractMetadata(page)
+        ? {
+            ...(await extractMetadata(page)),
+            visualDomMetrics: await extractVisualDomMetrics(page, viewport),
+          }
         : {
             title: null,
             metaDescription: null,
@@ -312,6 +371,7 @@ async function scanViewport({
             commerceFlowSignals: defaultCommerceFlowSignals(),
             conversionSignals: defaultConversionSignals(),
             storefrontSignals: await extractStorefrontReviewSignals(page),
+            visualDomMetrics: await extractVisualDomMetrics(page, viewport),
           };
 
     const screenshot = await captureScreenshot(page, scanId, viewport);
@@ -367,6 +427,320 @@ async function extractMetadata(page: Page) {
     metaDescription,
     ...signalDetection,
   };
+}
+
+async function extractVisualDomMetrics(
+  page: Page,
+  viewport: ViewportDefinition,
+): Promise<VisualDomMetrics | null> {
+  try {
+    return await page.evaluate((viewportName) => {
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const selectorFor = (element: Element) => {
+        const htmlElement = element as HTMLElement;
+        const tag = htmlElement.tagName.toLowerCase();
+        if (htmlElement.id) {
+          return `${tag}#${CSS.escape(htmlElement.id)}`;
+        }
+
+        const className =
+          typeof htmlElement.className === "string" ? htmlElement.className : "";
+        const classes = className
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 3)
+          .map((name) => `.${CSS.escape(name)}`)
+          .join("");
+        const parent = htmlElement.parentElement;
+        const siblingIndex = parent
+          ? Array.from(parent.children).filter(
+              (sibling) => sibling.tagName === htmlElement.tagName,
+            ).indexOf(htmlElement) + 1
+          : 1;
+
+        return `${tag}${classes}${siblingIndex > 0 ? `:nth-of-type(${siblingIndex})` : ""}`;
+      };
+      const toBoundingBox = (item: {
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+        right: number;
+        text: string;
+        selector: string;
+        tag: string;
+      }) => ({
+        left: Math.round(item.left),
+        top: Math.round(item.top),
+        width: Math.round(item.width),
+        height: Math.round(item.height),
+        right: Math.round(item.right),
+        centerX: Math.round(item.left + item.width / 2),
+        centerY: Math.round(item.top + item.height / 2),
+        textLength: item.text.length,
+        selector: item.selector,
+        tag: item.tag,
+        textSample: item.text.slice(0, 120),
+      });
+      const ctaPattern =
+        /add to cart|add to bag|buy now|checkout|shop now|view products|view collection|get started|subscribe|sign up|contact|request|quote|book|learn more|shop all|browse/i;
+      const productPattern =
+        /product|collection|category|catalog|sku|price|add to cart|shop now|view item|quick view|\$\s?\d|\b\d+\.\d{2}\b/i;
+      const searchPattern = /search/i;
+      const chatPattern = /chat|help|intercom|drift|zendesk|gorgias|ada|olark|crisp|support/i;
+
+      const visible = Array.from(document.querySelectorAll("body *"))
+        .map((element) => {
+          const htmlElement = element as HTMLElement;
+          const style = window.getComputedStyle(htmlElement);
+          const rect = htmlElement.getBoundingClientRect();
+          const text = (
+            htmlElement.textContent ||
+            htmlElement.getAttribute("aria-label") ||
+            htmlElement.getAttribute("title") ||
+            ""
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+          const className =
+            typeof htmlElement.className === "string" ? htmlElement.className : "";
+          const id = htmlElement.id || "";
+          const role = htmlElement.getAttribute("role") || "";
+          const href =
+            htmlElement instanceof HTMLAnchorElement
+              ? htmlElement.href || htmlElement.getAttribute("href") || ""
+              : "";
+
+          return {
+            tag: htmlElement.tagName.toLowerCase(),
+            text,
+            href,
+            className,
+            id,
+            role,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+            position: style.position,
+            zIndex: Number.parseInt(style.zIndex || "0", 10) || 0,
+            display: style.display,
+            visibility: style.visibility,
+            opacity: Number.parseFloat(style.opacity || "1"),
+            backgroundImage: style.backgroundImage,
+            selector: selectorFor(htmlElement),
+          };
+        })
+        .filter(
+          (item) =>
+            item.display !== "none" &&
+            item.visibility !== "hidden" &&
+            item.opacity > 0.05 &&
+            item.width > 0 &&
+            item.height > 0 &&
+            item.bottom >= 0 &&
+            item.top <= viewportHeight * 1.3,
+        );
+
+      const aboveFold = visible.filter(
+        (item) => item.top >= 0 && item.top < viewportHeight,
+      );
+      const aboveFoldText = aboveFold
+        .map((item) => item.text)
+        .filter(Boolean)
+        .join(" ");
+      const headingsAboveFold = aboveFold.filter((item) =>
+        /^h[1-6]$/.test(item.tag) || item.role === "heading",
+      );
+      const linksAboveFold = aboveFold.filter((item) => item.tag === "a");
+      const visibleLinks = linksAboveFold
+        .map((item) => item.text || item.href)
+        .filter(Boolean)
+        .slice(0, 30);
+      const ctas = aboveFold
+        .filter((item) => ctaPattern.test(`${item.text} ${item.href}`))
+        .sort((a, b) => a.top - b.top);
+      const searchInputs = visible
+        .filter(
+          (item) =>
+            (item.tag === "input" || item.role === "searchbox") &&
+            searchPattern.test(`${item.text} ${item.className} ${item.id} ${item.role}`),
+        )
+        .sort((a, b) => a.top - b.top);
+      const productCandidates = visible
+        .filter((item) => {
+          const haystack = `${item.text} ${item.href} ${item.className} ${item.id} ${item.role}`;
+          const productSized =
+            item.width >= Math.min(160, viewportWidth * 0.35) &&
+            item.height >= 120 &&
+            item.height <= viewportHeight * 0.95;
+          const imageCard =
+            (item.tag === "img" || item.backgroundImage !== "none") &&
+            item.width >= 120 &&
+            item.height >= 100;
+
+          return (
+            productPattern.test(haystack) &&
+            (productSized || imageCard || /product|card|tile|item|grid/i.test(haystack))
+          );
+        })
+        .sort((a, b) => a.top - b.top || a.left - b.left);
+      const productCards = productCandidates.filter(
+        (item, index, items) =>
+          index === 0 ||
+          Math.abs(item.top - items[index - 1].top) > 12 ||
+          Math.abs(item.left - items[index - 1].left) > 12,
+      );
+      const textBlocks = visible
+        .filter(
+          (item) =>
+            item.text.length >= 80 &&
+            item.width >= Math.min(260, viewportWidth * 0.55) &&
+            item.height >= 40,
+        )
+        .sort((a, b) => b.height - a.height);
+      const contentBlocks = visible
+        .filter(
+          (item) =>
+            item.text.length >= 60 &&
+            item.width >= 160 &&
+            item.top >= 0 &&
+            item.top < viewportHeight,
+        )
+        .sort((a, b) => a.top - b.top);
+      const firstProductTop = productCards[0]?.top ?? null;
+      const textBeforeProduct = visible
+        .filter(
+          (item) =>
+            item.text &&
+            item.text.length <= 700 &&
+            (firstProductTop === null || item.top < firstProductTop),
+        )
+        .map((item) => item.text)
+        .join(" ");
+      const fixedOverlays = visible.filter((item) => {
+        const haystack = `${item.text} ${item.className} ${item.id} ${item.role}`;
+        const bottomCorner =
+          item.bottom > viewportHeight * 0.68 &&
+          (item.left < viewportWidth * 0.22 || item.right > viewportWidth * 0.78);
+
+        return (
+          (item.position === "fixed" || item.position === "sticky") &&
+          bottomCorner &&
+          item.width >= 42 &&
+          item.height >= 42 &&
+          (item.zIndex >= 5 || chatPattern.test(haystack))
+        );
+      });
+      const overlapsProduct = fixedOverlays.some((overlay) =>
+        productCards.some(
+          (card) =>
+            overlay.left < card.right &&
+            overlay.right > card.left &&
+            overlay.top < card.bottom &&
+            overlay.bottom > card.top,
+        ),
+      );
+      const productHeights = productCards.slice(0, 8).map((item) => item.height);
+      const productLefts = productCards.slice(0, 8).map((item) => item.left).sort((a, b) => a - b);
+      const averageHeight =
+        productHeights.reduce((total, value) => total + value, 0) /
+        Math.max(1, productHeights.length);
+      const heightVariance =
+        productHeights.length >= 3 && averageHeight > 0
+          ? Math.max(...productHeights.map((value) => Math.abs(value - averageHeight))) /
+            averageHeight
+          : 0;
+      const gaps = productLefts
+        .slice(1)
+        .map((value, index) => value - productLefts[index])
+        .filter((value) => value > 8);
+      const averageGap =
+        gaps.reduce((total, value) => total + value, 0) / Math.max(1, gaps.length);
+      const gapVariance =
+        gaps.length >= 3 && averageGap > 0
+          ? Math.max(...gaps.map((value) => Math.abs(value - averageGap))) / averageGap
+          : 0;
+      const occupiedArea = aboveFold.reduce((total, item) => {
+        const width = Math.max(0, Math.min(item.right, viewportWidth) - Math.max(item.left, 0));
+        const height = Math.max(0, Math.min(item.bottom, viewportHeight) - Math.max(item.top, 0));
+        return total + Math.min(width * height, viewportWidth * viewportHeight * 0.18);
+      }, 0);
+      const viewportArea = Math.max(1, viewportWidth * viewportHeight);
+      const emptyViewportRatio = Math.max(
+        0,
+        Math.min(0.95, 1 - Math.min(occupiedArea / viewportArea, 0.9)),
+      );
+      const widerElements = visible.filter(
+        (item) => item.width > viewportWidth + 12 || item.left < -12 || item.right > viewportWidth + 12,
+      );
+      const contentCandidateBounds = contentBlocks[0]
+        ? toBoundingBox(contentBlocks[0])
+        : null;
+      const productGridCandidateBounds = productCards[0]
+        ? {
+            ...toBoundingBox(productCards[0]),
+            isProductCard: true,
+          }
+        : null;
+
+      return {
+        viewportName,
+        viewportWidth,
+        viewportHeight,
+        visibleTextCharactersAboveFold: Math.min(aboveFoldText.length, 12000),
+        visibleHeadingCountAboveFold: headingsAboveFold.length,
+        visibleLinkCountAboveFold: linksAboveFold.length,
+        productCardsAboveFold: productCards.filter(
+          (item) => item.top >= 0 && item.top < viewportHeight,
+        ).length,
+        imagesOrCardsAboveFold: aboveFold.filter(
+          (item) =>
+            item.tag === "img" ||
+            item.backgroundImage !== "none" ||
+            /card|tile|product|collection|grid/i.test(`${item.className} ${item.id}`),
+        ).length,
+        firstProductCardY: firstProductTop,
+        firstCtaY: ctas[0]?.top ?? null,
+        firstSearchInputY: searchInputs[0]?.top ?? null,
+        largestTextBlockHeight: Math.round(textBlocks[0]?.height ?? 0),
+        contentColumnWidth: typeof contentBlocks[0]?.width === "number" ? Math.round(contentBlocks[0].width) : null,
+        contentColumnX: typeof contentBlocks[0]?.left === "number" ? Math.round(contentBlocks[0].left) : null,
+        productGridX: typeof productCards[0]?.left === "number" ? Math.round(productCards[0].left) : null,
+        contentCandidateBounds,
+        productGridCandidateBounds,
+        horizontalOverflow:
+          document.documentElement.scrollWidth > viewportWidth + 12 ||
+          document.body.scrollWidth > viewportWidth + 12,
+        floatingWidgetOverlapRisk: fixedOverlays.length > 0,
+        chatWidgetOverlapRisk: overlapsProduct,
+        elementsWiderThanViewport: widerElements.length,
+        emptyViewportRatio: Number(emptyViewportRatio.toFixed(2)),
+        productCardHeightVariance: Number(heightVariance.toFixed(2)),
+        productCardSpacingVariance: Number(gapVariance.toFixed(2)),
+        bodyTextBeforeFirstProductChars: Math.min(textBeforeProduct.length, 12000),
+        visibleTextSample: aboveFoldText.slice(0, 1000),
+        visibleLinks,
+        headingBounds: headingsAboveFold.slice(0, 12).map((item) => ({
+          ...toBoundingBox(item),
+          isHeading: true,
+        })),
+        textBlockBounds: textBlocks.slice(0, 12).map((item) => ({
+          ...toBoundingBox(item),
+          isHeading: false,
+        })),
+        productCardBounds: productCards.slice(0, 20).map((item) => ({
+          ...toBoundingBox(item),
+          isProductCard: true,
+        })),
+      };
+    }, viewport.name);
+  } catch {
+    return null;
+  }
 }
 
 const trackingToolRules = [

@@ -29,6 +29,11 @@ export type AuditScanLogInput = {
   trustReadiness: string;
   checkoutReadiness: string;
   mobileReadiness: string;
+  visualUxScore?: number;
+  visualUxFindings?: unknown[];
+  visualUxSummary?: string;
+  visualUxMobileConcerns?: unknown[];
+  visualUxDesktopConcerns?: unknown[];
   topIssues: unknown[];
   benchmarkTags: string[];
   source?: string;
@@ -69,6 +74,11 @@ export type AuditScanRow = {
   trust_readiness: string | null;
   checkout_readiness: string | null;
   mobile_readiness: string | null;
+  visual_ux_score?: number | null;
+  visual_ux_findings?: unknown[];
+  visual_ux_summary?: string | null;
+  visual_ux_mobile_concerns?: unknown[];
+  visual_ux_desktop_concerns?: unknown[];
   top_issues: unknown[];
   benchmark_tags: string[];
   contact_submitted: boolean;
@@ -140,6 +150,11 @@ export async function logAuditScan(input: AuditScanLogInput) {
     trust_readiness: withUnknownFallback(input.trustReadiness),
     checkout_readiness: withUnknownFallback(input.checkoutReadiness),
     mobile_readiness: withUnknownFallback(input.mobileReadiness),
+    visual_ux_score: input.visualUxScore ?? null,
+    visual_ux_findings: input.visualUxFindings ?? [],
+    visual_ux_summary: input.visualUxSummary ?? null,
+    visual_ux_mobile_concerns: input.visualUxMobileConcerns ?? [],
+    visual_ux_desktop_concerns: input.visualUxDesktopConcerns ?? [],
     top_issues: input.topIssues,
     benchmark_tags: input.benchmarkTags,
     source: input.source ?? "opzix-audit",

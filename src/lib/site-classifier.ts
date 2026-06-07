@@ -34,6 +34,17 @@ const knownGroceryRetail = [
   "stopandshop.com",
 ];
 
+const knownIndustrialCatalog = [
+  "maxx-supply.com",
+  "maxxsupply.com",
+  "grainger.com",
+  "uline.com",
+  "mcmaster.com",
+  "fastenal.com",
+  "motion.com",
+  "globalindustrial.com",
+];
+
 const groceryFlowEnterpriseDomains = ["walmart.com"];
 
 const groceryTerms = [
@@ -122,6 +133,7 @@ export function classifySiteType(scanContext: {
   const scannedUrl = diagnostics.finalUrl || scanContext.website;
   const groceryMatches = matchingTerms(text, groceryTerms);
   const isKnownGroceryDomain = domainMatches(scannedUrl, knownGroceryRetail);
+  const isKnownIndustrialDomain = domainMatches(scannedUrl, knownIndustrialCatalog);
   const isGroceryEnterpriseFlow =
     domainMatches(scannedUrl, groceryFlowEnterpriseDomains) &&
     (groceryMatches.length >= 3 || /\/(grocery|groceries|food|pickup-delivery|cp\/food|browse\/food)\b/i.test(scannedUrl || ""));
@@ -141,6 +153,34 @@ export function classifySiteType(scanContext: {
   const b2bTerms = ["wholesale", "bulk", "distributor", "request a quote", "rfq", "procure", "part number", "sku", "commercial sales"];
   if (textIncludes(text, b2bTerms)) {
     evidence.push("B2B / wholesale or quote-request language detected.");
+  }
+
+  const industrialCatalogTerms = [
+    "plumbing",
+    "pvc",
+    "fittings",
+    "pipe",
+    "valves",
+    "industrial supply",
+    "industrial supplies",
+    "distributor",
+    "wholesale",
+    "sku",
+    "part number",
+    "part-number",
+    "technical products",
+    "replacement parts",
+    "contractor",
+    "trade",
+    "specifications",
+    "catalog",
+  ];
+  const industrialMatches = matchingTerms(text, industrialCatalogTerms);
+  if (isKnownIndustrialDomain) {
+    evidence.push("Known industrial distributor or B2B catalog domain detected.");
+  }
+  if (industrialMatches.length > 0) {
+    evidence.push(`Industrial/B2B catalog signals detected: ${industrialMatches.join(", ")}.`);
   }
 
   // education
@@ -194,6 +234,13 @@ export function classifySiteType(scanContext: {
   if (hasStrongGrocerySignals) {
     siteType = "Grocery / Supermarket Retail";
     score = isKnownGroceryDomain || isGroceryEnterpriseFlow ? 84 : 72;
+  } else if (
+    isKnownIndustrialDomain ||
+    industrialMatches.length >= 3 ||
+    (industrialMatches.length >= 2 && (hasCatalog || ecommerceProbability.label === "High" || ecommerceProbability.label === "Moderate"))
+  ) {
+    siteType = "Industrial Distributor / B2B Catalog Commerce";
+    score = isKnownIndustrialDomain ? 84 : 74;
   } else if (ecommerceProbability.label === "Low") {
     // prefer lead-generation or non-ecommerce
     if (hasForms || textIncludes(text, serviceTerms)) {

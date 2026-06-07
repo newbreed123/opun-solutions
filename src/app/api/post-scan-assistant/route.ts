@@ -876,12 +876,191 @@ function getFirstFindingByKeywords(
   );
 }
 
+const visualUxFindingKeywords = [
+  "visual layout",
+  "layout alignment",
+  "content-to-product",
+  "content to product",
+  "desktop whitespace",
+  "grid-to-content",
+  "grid to content",
+  "product discovery pushed below",
+  "mobile content hierarchy",
+  "excessive whitespace",
+  "layout imbalance",
+  "floating widget",
+  "product grid consistency",
+  "horizontal layout overflow",
+  "alignment needs review",
+  "visually disconnected",
+  "desktop layout alignment",
+  "desktop layout",
+  "catalog discovery friction",
+  "part lookup",
+  "product specification",
+  "navigation density",
+  "marketplace complexity",
+  "promotional competition",
+];
+
+const navigationFindingKeywords = [
+  "product discovery",
+  "navigation",
+  "category",
+  "collection",
+  "store search",
+  "search visibility",
+];
+
+function findingHaystack(finding: Record<string, unknown>) {
+  return [
+    findingTitle(finding),
+    asString(finding.category),
+    asString(finding.categoryLabel),
+    asString(finding.primaryCategory),
+    asString(finding.evidenceSummary),
+    asString(finding.explanation),
+    asString(finding.businessImpact),
+    asString(finding.recommendedFirstAction),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function isVisualUxFinding(finding: Record<string, unknown>) {
+  const haystack = findingHaystack(finding);
+
+  return visualUxFindingKeywords.some((keyword) => haystack.includes(keyword));
+}
+
+function getVisualUxFindings(scanContext: Record<string, unknown>) {
+  const visualUxDiagnostics = asRecord(
+    getNestedRecord(scanContext, "visualUxDiagnostics"),
+  );
+  const fromDiagnostics = asArray(visualUxDiagnostics.findings)
+    .map(asRecord)
+    .filter((finding) => Object.keys(finding).length > 0);
+
+  if (fromDiagnostics.length > 0) {
+    return fromDiagnostics;
+  }
+
+  return getCategoryFindings(scanContext, "ux").filter(isVisualUxFinding);
+}
+
+function getNavigationFindings(scanContext: Record<string, unknown>) {
+  return getCategoryFindings(scanContext, "ux").filter((finding) =>
+    navigationFindingKeywords.some((keyword) =>
+      findingHaystack(finding).includes(keyword),
+    ),
+  );
+}
+
+function visualUxMetricPhrase(scanContext: Record<string, unknown>) {
+  const visualUxDiagnostics = asRecord(getNestedRecord(scanContext, "visualUxDiagnostics"));
+  const metrics = asRecord(visualUxDiagnostics.metrics);
+  const archetype = asString(visualUxDiagnostics.uxArchetype);
+  const gapPx = Number(metrics.desktopGapPx);
+  const gapPercent = Number(metrics.desktopGapPercent);
+  const ratio = Number(metrics.contentToProductRatio);
+  const parts = [];
+
+  if (archetype) {
+    parts.push(`This is being interpreted as ${archetype}.`);
+  }
+
+  if (Number.isFinite(gapPx) && Number.isFinite(gapPercent)) {
+    const threshold =
+      gapPx >= 300 || gapPercent >= 20
+        ? "That crosses the high-priority desktop separation threshold."
+        : gapPx >= 160 || gapPercent >= 12
+          ? "That crosses the needs-review desktop separation threshold."
+          : "That stays below the layout-separation threshold.";
+    parts.push(
+      `The measured desktop gap is about ${Math.round(gapPx)}px, or ${gapPercent.toFixed(1)}% of the viewport. ${threshold}`,
+    );
+  }
+
+  if (Number.isFinite(ratio)) {
+    const ratioThreshold =
+      ratio >= 1.3
+        ? "That crosses the high-priority content/product balance threshold."
+        : ratio >= 1.2
+          ? "That crosses the needs-review content/product balance threshold."
+          : "That is within the healthy content/product balance range.";
+    parts.push(`The content/product ratio is ${ratio.toFixed(2)}. ${ratioThreshold}`);
+  }
+
+  return parts.join(" ");
+}
+
+function visualUxDirectAnswer(
+  finding: Record<string, unknown>,
+  scorePhrase = "",
+  metricPhrase = "",
+) {
+  const title = findingTitle(finding);
+  const action = asString(finding.recommendedFirstAction);
+
+  return sanitizeEvidenceText(
+    [
+      `The biggest visual UX issue is ${title}.`,
+      metricPhrase,
+      scorePhrase,
+      action ? `First fix: ${action}` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+    { maxLength: 520 },
+  );
+}
+
+function visualUxBusinessMeaning(finding: Record<string, unknown>) {
+  return (
+    asString(finding.businessImpact) ||
+    asString(finding.explanation) ||
+    "Layout, spacing, hierarchy, and product placement affect what visitors see first and how quickly they understand where to browse or act."
+  );
+}
+
+function getVisualFirstPriorityFinding(scanContext: Record<string, unknown>) {
+  const visual = getVisualUxFindings(scanContext)[0];
+  if (visual) {
+    return { finding: visual, source: "visual" as const };
+  }
+
+  const conversion = getCategoryFindings(scanContext, "conversion")[0];
+  if (conversion) {
+    return { finding: conversion, source: "conversion" as const };
+  }
+
+  const navigation = getNavigationFindings(scanContext)[0];
+  if (navigation) {
+    return { finding: navigation, source: "navigation" as const };
+  }
+
+  const technical = getCategoryFindings(scanContext, "technical")[0];
+  if (technical) {
+    return { finding: technical, source: "technical" as const };
+  }
+
+  return null;
+}
+
 function buildFindingsAnswer(
   scanContext: Record<string, unknown>,
   topic: string,
   label: string,
 ): ExactAnswer | null {
-  const findings = getCategoryFindings(scanContext, topic);
+  const findings =
+    topic === "ux"
+      ? [
+          ...getVisualUxFindings(scanContext),
+          ...getCategoryFindings(scanContext, "conversion"),
+          ...getNavigationFindings(scanContext),
+          ...getCategoryFindings(scanContext, "technical"),
+        ]
+      : getCategoryFindings(scanContext, topic);
 
   if (findings.length === 0) {
     return null;
@@ -909,6 +1088,40 @@ function buildFindingsAnswer(
       topic === "ux"
         ? "Do you want me to compare the UX findings with conversion?"
         : "Do you want me to show what Opzix would fix first?",
+  };
+}
+
+function buildVisualUxAnswer(scanContext: Record<string, unknown>): ExactAnswer | null {
+  const visualUxDiagnostics = asRecord(getNestedRecord(scanContext, "visualUxDiagnostics"));
+  const findings = getVisualUxFindings(scanContext);
+  const topFinding = findings[0];
+  const visualScore = Number(visualUxDiagnostics.score);
+  const scorePhrase = Number.isFinite(visualScore)
+    ? `The visual UX score is ${visualScore}/100.`
+    : "";
+
+  if (!topFinding) {
+    return null;
+  }
+
+  return {
+    matched: true,
+    topic: "visual_ux",
+    directAnswer: visualUxDirectAnswer(
+      topFinding,
+      scorePhrase,
+      visualUxMetricPhrase(scanContext),
+    ),
+    evidence: [
+      findingEvidence(topFinding),
+      asString(visualUxDiagnostics.summary),
+    ]
+      .filter(Boolean)
+      .join(" "),
+    businessMeaning:
+      visualUxBusinessMeaning(topFinding),
+    suggestedFollowUp:
+      "Do you want me to compare this with conversion or product discovery?",
   };
 }
 
@@ -1634,8 +1847,36 @@ function getExactAnswer(
     };
   }
 
-  if (hasAny(normalized, ["ux findings", "ux issues", "ux/ui", "usability", "design issues"])) {
+  if (
+    hasAny(normalized, [
+      "what ux issues",
+      "ux findings",
+      "ux issues",
+      "ux/ui",
+      "usability",
+      "design issues",
+      "wrong with the layout",
+      "layout feel",
+      "page feel off",
+      "mobile layout",
+      "desktop ux",
+      "desktop layout",
+      "ux score low",
+      "why is the ux score low",
+      "why ux score",
+      "fix visually",
+      "visual issue",
+      "visual issues",
+      "visual ux",
+      "alignment",
+      "spacing",
+      "hierarchy",
+      "whitespace",
+      "product grid",
+    ])
+  ) {
     return (
+      buildVisualUxAnswer(scanContext) ??
       buildFindingsAnswer(scanContext, "ux", "UX/UI") ?? {
         matched: false,
         topic: "",
@@ -1687,6 +1928,24 @@ function getExactAnswer(
   }
 
   if (hasAny(normalized, ["what to fix first", "fix first", "opzix fix first", "review first", "what should be reviewed first", "why platform is first", "why is platform first"])) {
+    const visualPriority = getVisualFirstPriorityFinding(scanContext);
+
+    if (visualPriority?.source === "visual") {
+      return {
+        matched: true,
+        topic: "fix_first",
+        directAnswer: visualUxDirectAnswer(
+          visualPriority.finding,
+          "",
+          visualUxMetricPhrase(scanContext),
+        ),
+        evidence: findingEvidence(visualPriority.finding),
+        businessMeaning: visualUxBusinessMeaning(visualPriority.finding),
+        suggestedFollowUp:
+          "Do you want me to compare this visual issue with conversion or navigation?",
+      };
+    }
+
     const primary = getPrimaryConcern(scanContext);
     const action = getActionItems(scanContext)[0];
     const mode = narrativeMode(scanContext);
