@@ -206,6 +206,7 @@ type AssistantAudit = {
       gapPx?: number | null;
       gapPercent?: number | null;
       ratio?: number | null;
+      measurementWarning?: string | null;
     };
   };
   storefrontIdentityProfile?: {

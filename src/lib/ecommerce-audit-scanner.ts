@@ -495,6 +495,12 @@ async function extractVisualDomMetrics(
           const htmlElement = element as HTMLElement;
           const style = window.getComputedStyle(htmlElement);
           const rect = htmlElement.getBoundingClientRect();
+          const directText = Array.from(htmlElement.childNodes)
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent || "")
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim();
           const text = (
             htmlElement.textContent ||
             htmlElement.getAttribute("aria-label") ||
@@ -513,12 +519,19 @@ async function extractVisualDomMetrics(
               : "";
 
           return {
+            element: htmlElement,
             tag: htmlElement.tagName.toLowerCase(),
             text,
+            directText,
             href,
             className,
             id,
             role,
+            childElementCount: htmlElement.children.length,
+            imageDescendantCount: htmlElement.querySelectorAll("img,picture,svg").length,
+            productDescendantCount: htmlElement.querySelectorAll(
+              '[class*="product" i], [class*="card" i], [class*="grid" i], [class*="item" i], [href*="/products/" i], [href*="/collections/" i]',
+            ).length,
             left: rect.left,
             right: rect.right,
             top: rect.top,
@@ -570,7 +583,7 @@ async function extractVisualDomMetrics(
             searchPattern.test(`${item.text} ${item.className} ${item.id} ${item.role}`),
         )
         .sort((a, b) => a.top - b.top);
-      const productCandidates = visible
+      const allProductCandidates = visible
         .filter((item) => {
           const haystack = `${item.text} ${item.href} ${item.className} ${item.id} ${item.role}`;
           const productSized =
@@ -588,6 +601,28 @@ async function extractVisualDomMetrics(
           );
         })
         .sort((a, b) => a.top - b.top || a.left - b.left);
+      const productCandidates = allProductCandidates.filter((item) => {
+        const fullWidthSharedContainer =
+          item.width >= viewportWidth * 0.88 &&
+          item.height >= 180 &&
+          (item.productDescendantCount >= 2 || item.imageDescendantCount >= 2);
+        const structuralContainer =
+          /^(main|section|article|ul|ol|nav|header|footer)$/.test(item.tag) &&
+          item.productDescendantCount >= 2;
+        const nestedProductCandidateCount = allProductCandidates.filter(
+          (candidate) =>
+            candidate !== item &&
+            item.element.contains(candidate.element) &&
+            candidate.width < item.width * 0.92 &&
+            candidate.height < item.height * 0.92,
+        ).length;
+
+        return (
+          !fullWidthSharedContainer &&
+          !structuralContainer &&
+          nestedProductCandidateCount < 3
+        );
+      });
       const productCards = productCandidates.filter(
         (item, index, items) =>
           index === 0 ||
@@ -598,20 +633,50 @@ async function extractVisualDomMetrics(
         .filter(
           (item) =>
             item.text.length >= 80 &&
+            (item.directText.length >= 40 || /^h[1-6]$|^p$|^li$|^blockquote$/.test(item.tag)) &&
+            item.productDescendantCount < 2 &&
             item.width >= Math.min(260, viewportWidth * 0.55) &&
+            item.width <= viewportWidth * 0.82 &&
             item.height >= 40,
         )
         .sort((a, b) => b.height - a.height);
-      const contentBlocks = visible
-        .filter(
-          (item) =>
-            item.text.length >= 60 &&
-            item.width >= 160 &&
-            item.top >= 0 &&
-            item.top < viewportHeight,
-        )
-        .sort((a, b) => a.top - b.top);
       const firstProductTop = productCards[0]?.top ?? null;
+      const contentBlocks = visible
+        .filter((item) => {
+          const actualTextBlock =
+            item.directText.length >= 40 ||
+            /^h[1-6]$|^p$|^li$|^blockquote$/.test(item.tag);
+          const likelySharedProductContainer =
+            item.width >= viewportWidth * 0.88 &&
+            (item.productDescendantCount >= 2 || item.imageDescendantCount >= 2);
+          const navigationOrChrome = /^(nav|header|footer)$/.test(item.tag);
+          const closeEnoughToProductSection =
+            firstProductTop === null ||
+            item.top <= firstProductTop + Math.max(180, viewportHeight * 0.2);
+
+          return (
+            item.text.length >= 60 &&
+            actualTextBlock &&
+            !likelySharedProductContainer &&
+            !navigationOrChrome &&
+            item.width >= 160 &&
+            item.width <= viewportWidth * 0.82 &&
+            item.top >= 0 &&
+            item.top < viewportHeight &&
+            closeEnoughToProductSection
+          );
+        })
+        .sort((a, b) => {
+          if (firstProductTop !== null) {
+            const distanceA = Math.abs(a.top - firstProductTop);
+            const distanceB = Math.abs(b.top - firstProductTop);
+            if (Math.abs(distanceA - distanceB) > 80) {
+              return distanceA - distanceB;
+            }
+          }
+
+          return a.top - b.top || a.left - b.left;
+        });
       const textBeforeProduct = visible
         .filter(
           (item) =>
@@ -680,9 +745,15 @@ async function extractVisualDomMetrics(
       const contentCandidateBounds = contentBlocks[0]
         ? toBoundingBox(contentBlocks[0])
         : null;
-      const productGridCandidateBounds = productCards[0]
+      const productGridCandidate = productCards.find((item) => {
+        const widthRatio = item.width / viewportWidth;
+        const heightRatio = item.height / viewportHeight;
+
+        return widthRatio <= 0.95 && heightRatio <= 0.85;
+      }) ?? productCards[0];
+      const productGridCandidateBounds = productGridCandidate
         ? {
-            ...toBoundingBox(productCards[0]),
+            ...toBoundingBox(productGridCandidate),
             isProductCard: true,
           }
         : null;
@@ -709,7 +780,7 @@ async function extractVisualDomMetrics(
         largestTextBlockHeight: Math.round(textBlocks[0]?.height ?? 0),
         contentColumnWidth: typeof contentBlocks[0]?.width === "number" ? Math.round(contentBlocks[0].width) : null,
         contentColumnX: typeof contentBlocks[0]?.left === "number" ? Math.round(contentBlocks[0].left) : null,
-        productGridX: typeof productCards[0]?.left === "number" ? Math.round(productCards[0].left) : null,
+        productGridX: typeof productGridCandidate?.left === "number" ? Math.round(productGridCandidate.left) : null,
         contentCandidateBounds,
         productGridCandidateBounds,
         horizontalOverflow:

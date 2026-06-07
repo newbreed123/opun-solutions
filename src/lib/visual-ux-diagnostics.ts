@@ -61,6 +61,7 @@ export type VisualMetricsDebug = {
   gapPx: number | null;
   gapPercent: number | null;
   ratio: number | null;
+  measurementWarning: string | null;
 };
 
 export type VisualUxDiagnosticsResult = {
@@ -384,6 +385,7 @@ export function analyzeVisualUx({
         gapPx: null,
         gapPercent: null,
         ratio: null,
+        measurementWarning: null,
       },
     };
   }
@@ -433,6 +435,18 @@ export function analyzeVisualUx({
     gapPx: metrics.desktopGapPx,
     gapPercent: metrics.desktopGapPercent,
     ratio: metrics.contentToProductRatio,
+    measurementWarning:
+      metrics.desktopGapPx === 0 &&
+      metrics.contentToProductRatio === 1 &&
+      bounds.contentCandidateBounds?.selector &&
+      bounds.productGridCandidateBounds?.selector &&
+      bounds.contentCandidateBounds.selector === bounds.productGridCandidateBounds.selector
+        ? "Content and product grid metrics came from the same selector, which indicates a shared parent/container measurement."
+        : metrics.desktopGapPx === 0 &&
+            metrics.contentToProductRatio === 1 &&
+            bounds.contentColumnWidth === bounds.productGridWidth
+          ? "Content and product grid boxes have matching measurements; verify the selected boxes are not shared parent containers."
+          : null,
   };
   const metricSummary = formatMetrics(metrics);
   const gapBucket = desktopGapBucket(metrics.desktopGapPx, metrics.desktopGapPercent);

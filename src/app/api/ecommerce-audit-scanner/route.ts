@@ -4771,6 +4771,7 @@ export async function POST(request: Request) {
       topPriorityRisks,
       heuristicFindings,
       visualUxDiagnostics,
+      visualMetricsDebug: visualUxDiagnostics.visualMetricsDebug,
       diagnostics,
       categories,
       recommendedNextSteps,
