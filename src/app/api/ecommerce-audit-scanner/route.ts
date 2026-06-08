@@ -11,6 +11,8 @@ import {
   ValidationIssue,
 } from "@/lib/form-submissions";
 import {
+  addScannerStageLog,
+  finalizeScannerDiagnostics,
   runLightweightEcommerceDiagnostics,
   type LiveDiagnosticsResult,
 } from "@/lib/ecommerce-audit-scanner";
@@ -28,6 +30,10 @@ import {
   analyzeVisualUx,
   type VisualUxDiagnosticsResult,
 } from "@/lib/visual-ux-diagnostics";
+import {
+  buildScannerDebugRecord,
+  saveScannerDebugRecord,
+} from "@/lib/scanner-debug-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +77,92 @@ type ScoreExplanation = {
   whyAssigned: string;
   evidenceInfluenced: string;
   whatWouldImprove: string;
+};
+
+type PositiveUxSignalLabel = "strong" | "moderate" | "weak" | "unknown";
+
+type PositiveUxSignal = {
+  score: number;
+  label: PositiveUxSignalLabel;
+  evidence: string[];
+  scoreImpact: number;
+};
+
+type PositiveUxSignalKey =
+  | "searchProminence"
+  | "categoryVisibility"
+  | "productDensity"
+  | "trustSignals"
+  | "hierarchyStrength"
+  | "navigationClarity"
+  | "commerceConfidence"
+  | "visualConsistency"
+  | "cartVisibility"
+  | "checkoutVisibility"
+  | "accountVisibility"
+  | "productDiscoveryStrength";
+
+type PositiveUxSignals = Record<PositiveUxSignalKey, PositiveUxSignal>;
+
+type OverallScoreExplanation = {
+  positiveSignals: string[];
+  majorPenalties: string[];
+  whyThisScore: string;
+};
+
+type EcommerceMaturityTier =
+  | "enterprise"
+  | "mature"
+  | "developing"
+  | "early"
+  | "unclear";
+
+type EcommerceMaturityScore = {
+  maturityScore: number;
+  maturityTier: EcommerceMaturityTier;
+  positiveSignals: string[];
+  maturityReducers: string[];
+  explanation: string;
+};
+
+type CoverageSignalSet = {
+  cartVisible: boolean;
+  checkoutVisible: boolean;
+  searchVisible: boolean;
+  categoryProductVisible: boolean;
+  productCardCount: number;
+  ctaVisible: boolean;
+  trustSignalsVisible: boolean;
+  shippingReturnsVisible: boolean;
+  orderReturnsVisible: boolean;
+  accountLoginVisible: boolean;
+  supportContactVisible: boolean;
+  visualUxFindingCount?: number;
+  visualUxScore?: number;
+};
+
+type ScanCoverage = {
+  screenshotMode: "viewport" | "full-page";
+  domCoverage: "visible" | "full-page";
+  scoringCoverage: "above-fold" | "near-fold" | "full-page";
+  aboveFoldSignals: CoverageSignalSet;
+  nearFoldSignals: CoverageSignalSet;
+  fullPageSignals: CoverageSignalSet;
+  visualSignals: CoverageSignalSet;
+  manualConfirmationSignals: {
+    platformNeedsReview: boolean;
+    trackingNeedsReview: boolean;
+    screenshotModeRequiresInterpretation: boolean;
+  };
+  coverageSummary: string;
+  explanation: string;
+};
+
+type OverallScoringResult = {
+  overallScore: number;
+  positiveUxSignals: PositiveUxSignals;
+  ecommerceMaturity: EcommerceMaturityScore;
+  scoreExplanation: OverallScoreExplanation;
 };
 
 type ConnectedInsight = {
@@ -804,6 +896,7 @@ function categoryStatusDetailFallback(
 ) {
   const signals = diagnostics.storefrontSignals;
   const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
   const trustSignalsVisible = trustSignalCount(diagnostics);
 
@@ -901,6 +994,7 @@ function buildHeuristicFindings(
   const findings: HeuristicFinding[] = [];
   const signals = diagnostics.storefrontSignals;
   const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
   const trustSignalsVisible = trustSignalCount(diagnostics);
 
@@ -947,17 +1041,37 @@ function buildHeuristicFindings(
   }
 
   if (!commerce.cartVisible || !commerce.checkoutVisible) {
+    const enterpriseMarketplaceContext =
+      String(visualUxDiagnostics?.uxArchetype ?? "").toLowerCase().includes("enterprise") ||
+      String(visualUxDiagnostics?.uxArchetype ?? "").toLowerCase().includes("marketplace") ||
+      diagnostics.platformDetection.platformName === "Enterprise / Custom Commerce Stack";
+    const enterpriseCommercePathVisible =
+      enterpriseMarketplaceContext &&
+      (commerce.cartVisible ||
+        fullPage.cartVisible ||
+        fullPage.accountLoginVisible ||
+        fullPage.categoryProductVisible);
+
     addFinding({
-      title: "Cart / Checkout Path Needs Review",
+      title: enterpriseCommercePathVisible
+        ? "Checkout Path Ownership Needs Confirmation"
+        : "Cart / Checkout Path Needs Review",
       category: "operationsContinuity",
       primaryCategory: "conversionIssues",
       secondaryCategories: ["operationsIssues"],
-      severity: !commerce.cartVisible && !commerce.checkoutVisible ? "Critical" : "High",
+      severity: enterpriseCommercePathVisible
+        ? "Low"
+        : !commerce.cartVisible && !commerce.checkoutVisible
+          ? "Critical"
+          : "High",
       confidence: "Moderate",
-      businessImpact:
-        "If cart or checkout cues are not easy to find, purchase intent can leak before a customer reaches the buying path.",
-      recommendedFirstAction: cartCheckoutFirstAction(diagnostics),
-      evidenceSummary: `Cart visibility: ${commerce.cartVisible ? "visible" : "not visible"}; checkout visibility: ${commerce.checkoutVisible ? "visible" : "not visible"}.`,
+      businessImpact: enterpriseCommercePathVisible
+        ? "Enterprise marketplaces often route checkout after cart, account, location, or product selection, so homepage checkout absence should not dominate the customer-facing score."
+        : "If cart or checkout cues are not easy to find, purchase intent can leak before a customer reaches the buying path.",
+      recommendedFirstAction: enterpriseCommercePathVisible
+        ? "Confirm cart, account, fulfillment, and checkout ownership from the actual transaction path before treating homepage checkout visibility as a conversion defect."
+        : cartCheckoutFirstAction(diagnostics),
+      evidenceSummary: `Cart visibility: ${commerce.cartVisible || fullPage.cartVisible ? "visible" : "not visible"}; checkout visibility: ${commerce.checkoutVisible || fullPage.checkoutVisible ? "visible" : "not visible"}; enterprise commerce path: ${enterpriseCommercePathVisible ? "visible" : "not confirmed"}.`,
     });
   }
 
@@ -1159,6 +1273,7 @@ function categoryEvidencePenalty(
 ) {
   const signals = diagnostics.storefrontSignals;
   const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
   const trustSignalsVisible = trustSignalCount(diagnostics);
   const categoryFindings = findingsInfluencingCategory(
@@ -1188,9 +1303,9 @@ function categoryEvidencePenalty(
       visualPenalty +
       (!signals.mobileCtaVisibleAboveFold ? 5 : 0) +
       (signals.mobileCrowdingRisk ? 4 : 0) +
-      (!signals.productNavigationVisible ? 4 : 0) +
-      (!signals.collectionLinksVisible ? 3 : 0) +
-      (!signals.searchVisible ? 2 : 0) +
+      (!signals.productNavigationVisible && !fullPage.categoryProductVisible ? 4 : 0) +
+      (!signals.collectionLinksVisible && !fullPage.categoryProductVisible ? 3 : 0) +
+      (!signals.searchVisible && !fullPage.searchVisible ? 2 : 0) +
       Math.min(4, Math.floor(signals.mobileAboveFoldLinkCount / 18)) +
       Math.min(3, signals.genericNavigationCount) +
       (signals.mobileVisibleTextLength > 2400 ? 3 : signals.mobileVisibleTextLength > 1600 ? 2 : 0) +
@@ -1199,11 +1314,16 @@ function categoryEvidencePenalty(
   }
 
   if (key === "conversionIssues") {
+    const effectiveTrustSignalsVisible = Math.max(
+      trustSignalsVisible,
+      fullPage.trustSignalsVisible ? 2 : 0,
+    );
+
     return (
       findingPressure +
-      (6 - trustSignalsVisible) * 2 +
-      (!signals.shippingReturnsVisible ? 4 : 0) +
-      (!signals.contactSupportVisible ? 3 : 0) +
+      (6 - effectiveTrustSignalsVisible) * 2 +
+      (!signals.shippingReturnsVisible && !fullPage.shippingReturnsVisible ? 4 : 0) +
+      (!signals.contactSupportVisible && !fullPage.supportContactVisible ? 3 : 0) +
       (!signals.warrantyGuaranteeVisible ? 2 : 0) +
       (!signals.policyVisible ? 2 : 0) +
       (!signals.paymentTrustVisible ? 3 : 0) +
@@ -1251,16 +1371,26 @@ function categoryEvidencePenalty(
     );
   }
 
+  const supportOnlyOperationsPenalty =
+    (signals.contactSupportVisible || fullPage.supportContactVisible) &&
+    !signals.orderReturnsLanguageVisible &&
+    !fullPage.orderReturnsVisible &&
+    !signals.shippingReturnsVisible &&
+    !fullPage.shippingReturnsVisible
+      ? 5
+      : 0;
+
   return (
     findingPressure +
-    (!commerce.cartVisible ? 9 : 0) +
-    (!commerce.checkoutVisible ? 9 : 0) +
-    (!signals.contactSupportVisible ? 5 : 0) +
-    (!signals.orderReturnsLanguageVisible ? 5 : 0) +
-    (!signals.shippingReturnsVisible ? 3 : 0) +
+    (!commerce.cartVisible && !fullPage.cartVisible ? 9 : 0) +
+    (!commerce.checkoutVisible && !fullPage.checkoutVisible ? 9 : 0) +
+    (!signals.contactSupportVisible && !fullPage.supportContactVisible ? 5 : 0) +
+    (!signals.orderReturnsLanguageVisible && !fullPage.orderReturnsVisible ? 5 : 0) +
+    (!signals.shippingReturnsVisible && !fullPage.shippingReturnsVisible ? 3 : 0) +
+    supportOnlyOperationsPenalty +
     (!signals.leadCaptureVisible ? 2 : 0) +
     (!signals.policyVisible ? 2 : 0) +
-    (!signals.searchVisible && commerce.productCatalogVisible ? 1 : 0)
+    (!signals.searchVisible && !fullPage.searchVisible && commerce.productCatalogVisible ? 1 : 0)
   );
 }
 
@@ -1350,15 +1480,133 @@ function buildScoreExplanation({
   };
 }
 
+function adjustCategoryScoreForEcommerceMaturity({
+  key,
+  score,
+  diagnostics,
+  findings,
+  siteClassification,
+  visualUxDiagnostics,
+  ecommerceMaturity,
+  positiveUxSignals,
+}: {
+  key: AuditCategoryKey;
+  score: number;
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  siteClassification?: SiteClassification;
+  visualUxDiagnostics?: VisualUxDiagnosticsResult;
+  ecommerceMaturity?: EcommerceMaturityScore;
+  positiveUxSignals?: PositiveUxSignals;
+}) {
+  if (!siteClassification || !visualUxDiagnostics || !ecommerceMaturity || !positiveUxSignals) {
+    return score;
+  }
+
+  const signals = diagnostics.storefrontSignals;
+  const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
+  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "");
+  const isEnterprise = isEnterpriseOrMarketplaceContext(
+    siteClassification.siteType,
+    visualArchetype,
+  );
+  const isIndustrial = isIndustrialB2bContext(
+    siteClassification.siteType,
+    visualArchetype,
+  );
+  const hasSevereVisualOrMobileIssue = findings.some(
+    (finding) =>
+      (finding.severity === "High" || finding.severity === "Critical") &&
+      /visual|layout|mobile|hierarchy|content-to-product|grid-to-content/i.test(finding.title),
+  );
+  const hasHighB2bCatalogFriction = findings.some(
+    (finding) =>
+      (finding.severity === "High" || finding.severity === "Critical") &&
+      /layout|content-to-product|grid-to-content|catalog|discovery|part|spec|mobile/i.test(finding.title),
+  );
+  const hasSevereCartCheckoutIssue = findings.some(
+    (finding) =>
+      (finding.severity === "High" || finding.severity === "Critical") &&
+      /cart|checkout/i.test(finding.title),
+  );
+  let adjustedScore = score;
+
+  if (isEnterprise && ecommerceMaturity.maturityScore >= 75) {
+    if (key === "uxUiIssues" && visualUxDiagnostics.score >= 75 && !hasSevereVisualOrMobileIssue) {
+      adjustedScore = Math.max(adjustedScore, visualUxDiagnostics.score >= 84 ? 84 : 80);
+    }
+
+    if (
+      key === "conversionIssues" &&
+      positiveUxSignals.commerceConfidence.score >= 65 &&
+      positiveUxSignals.productDiscoveryStrength.score >= 70 &&
+      !hasSevereCartCheckoutIssue
+    ) {
+      adjustedScore = Math.max(adjustedScore, 86);
+    }
+
+    if (
+      key === "operationsIssues" &&
+      positiveUxSignals.accountVisibility.score >= 60 &&
+      positiveUxSignals.commerceConfidence.score >= 65
+    ) {
+      adjustedScore = Math.max(adjustedScore, 86);
+    }
+
+    if (key === "technicalIssues" && platformNeedsManualReview(diagnostics)) {
+      adjustedScore = Math.max(adjustedScore, 78);
+    }
+  }
+
+  if (isIndustrial && visualUxDiagnostics.score < 55 && hasHighB2bCatalogFriction) {
+    if (key === "uxUiIssues") {
+      adjustedScore = Math.min(adjustedScore, 60);
+    }
+
+    if (key === "conversionIssues") {
+      adjustedScore = Math.min(adjustedScore, 66);
+    }
+  }
+
+  if (
+    key === "operationsIssues" &&
+    (signals.contactSupportVisible || fullPage.supportContactVisible) &&
+    !signals.shippingReturnsVisible &&
+    !fullPage.shippingReturnsVisible &&
+    !signals.orderReturnsLanguageVisible &&
+    !fullPage.orderReturnsVisible &&
+    !signals.policyVisible
+  ) {
+    adjustedScore = Math.min(adjustedScore, isEnterprise ? 76 : 70);
+  }
+
+  if (
+    key === "operationsIssues" &&
+    isIndustrial &&
+    ((!signals.shippingReturnsVisible && !fullPage.shippingReturnsVisible) ||
+      (!signals.orderReturnsLanguageVisible && !fullPage.orderReturnsVisible)) &&
+    !commerce.checkoutVisible &&
+    !fullPage.checkoutVisible
+  ) {
+    adjustedScore = Math.min(adjustedScore, 68);
+  }
+
+  return Math.max(35, Math.min(96, Math.round(adjustedScore)));
+}
+
 function applyLiveDiagnosticScoring(
   diagnostics: LiveDiagnosticsResult,
   findings: HeuristicFinding[],
   siteClassification?: SiteClassification,
+  visualUxDiagnostics?: VisualUxDiagnosticsResult,
+  ecommerceMaturity?: EcommerceMaturityScore,
+  positiveUxSignals?: PositiveUxSignals,
 ) {
   return auditCategoryTemplates.map((category) => {
     const categoryFindings = findingsOwnedByCategory(findings, category.key);
     const influencingFindings = findingsInfluencingCategory(findings, category.key);
-    const score = Math.max(
+    const evidenceScore = Math.max(
       35,
       Math.min(96, category.score - categoryEvidencePenalty(
         category.key,
@@ -1367,6 +1615,16 @@ function applyLiveDiagnosticScoring(
         siteClassification,
       )),
     );
+    const score = adjustCategoryScoreForEcommerceMaturity({
+      key: category.key,
+      score: evidenceScore,
+      diagnostics,
+      findings,
+      siteClassification,
+      visualUxDiagnostics,
+      ecommerceMaturity,
+      positiveUxSignals,
+    });
     const scoreExplanation = buildScoreExplanation({
       key: category.key,
       score,
@@ -1401,13 +1659,582 @@ function applyLiveDiagnosticScoring(
   });
 }
 
-function adjustOverallScoreForVisualUx({
+function positiveSignalLabel(score: number): PositiveUxSignalLabel {
+  if (score >= 75) return "strong";
+  if (score >= 50) return "moderate";
+  if (score > 0) return "weak";
+  return "unknown";
+}
+
+function positiveSignal(score: number, evidence: string[]): PositiveUxSignal {
+  const normalizedScore = Math.max(0, Math.min(100, Math.round(score)));
+  const label = positiveSignalLabel(normalizedScore);
+  const scoreImpact =
+    label === "strong" ? 1.6 : label === "moderate" ? 0.8 : label === "weak" ? 0.2 : 0;
+
+  return {
+    score: normalizedScore,
+    label,
+    evidence: evidence.filter(Boolean).slice(0, 3),
+    scoreImpact,
+  };
+}
+
+function signalSummary(name: string, signal: PositiveUxSignal) {
+  return `${name}: ${signal.label}${signal.evidence.length > 0 ? ` (${signal.evidence[0]})` : ""}`;
+}
+
+function buildScanCoverage(
+  diagnostics: LiveDiagnosticsResult,
+  visualUxDiagnostics: VisualUxDiagnosticsResult,
+): ScanCoverage {
+  const storefront = diagnostics.storefrontSignals;
+  const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
+  const desktopMetrics = diagnostics.desktopVisualMetrics;
+  const mobileMetrics = diagnostics.mobileVisualMetrics;
+  const aboveFoldSignals: CoverageSignalSet = {
+    cartVisible: commerce.cartVisible && storefront.mobileCtaLabels.some((label) => /cart|bag|basket/i.test(label)),
+    checkoutVisible: storefront.mobileCtaLabels.some((label) => /checkout|buy now|order now/i.test(label)),
+    searchVisible:
+      (desktopMetrics?.firstSearchInputY ?? null) !== null ||
+      (mobileMetrics?.firstSearchInputY ?? null) !== null,
+    categoryProductVisible:
+      (desktopMetrics?.productCardsAboveFold ?? 0) > 0 ||
+      (mobileMetrics?.productCardsAboveFold ?? 0) > 0 ||
+      storefront.productNavigationVisible,
+    productCardCount: Math.max(
+      desktopMetrics?.productCardsAboveFold ?? 0,
+      mobileMetrics?.productCardsAboveFold ?? 0,
+    ),
+    ctaVisible: storefront.mobileCtaVisibleAboveFold,
+    trustSignalsVisible: storefront.reviewSignalsVisible || storefront.paymentTrustVisible,
+    shippingReturnsVisible: false,
+    orderReturnsVisible: false,
+    accountLoginVisible: storefront.genericNavigationCount > 0,
+    supportContactVisible: false,
+  };
+  const nearFoldSignals: CoverageSignalSet = {
+    cartVisible: commerce.cartVisible,
+    checkoutVisible: commerce.checkoutVisible,
+    searchVisible: storefront.searchVisible,
+    categoryProductVisible:
+      storefront.productNavigationVisible ||
+      storefront.collectionLinksVisible ||
+      commerce.productCatalogVisible,
+    productCardCount: Math.max(
+      desktopMetrics?.productCardBounds?.length ?? 0,
+      mobileMetrics?.productCardBounds?.length ?? 0,
+    ),
+    ctaVisible: commerce.ctaVisible || storefront.mobileCtaVisibleAboveFold,
+    trustSignalsVisible:
+      storefront.reviewSignalsVisible ||
+      storefront.paymentTrustVisible ||
+      storefront.warrantyGuaranteeVisible,
+    shippingReturnsVisible: storefront.shippingReturnsVisible,
+    orderReturnsVisible: storefront.orderReturnsLanguageVisible,
+    accountLoginVisible: storefront.genericNavigationCount > 0,
+    supportContactVisible: storefront.contactSupportVisible,
+  };
+  const fullPageSignals: CoverageSignalSet = {
+    cartVisible: fullPage.cartVisible || commerce.cartVisible,
+    checkoutVisible: fullPage.checkoutVisible || commerce.checkoutVisible,
+    searchVisible: fullPage.searchVisible || storefront.searchVisible,
+    categoryProductVisible:
+      fullPage.categoryProductVisible ||
+      storefront.productNavigationVisible ||
+      storefront.collectionLinksVisible ||
+      commerce.productCatalogVisible,
+    productCardCount: Math.max(
+      fullPage.productCardCount,
+      desktopMetrics?.productCardBounds?.length ?? 0,
+      mobileMetrics?.productCardBounds?.length ?? 0,
+    ),
+    ctaVisible: fullPage.ctaVisible || commerce.ctaVisible,
+    trustSignalsVisible:
+      fullPage.trustSignalsVisible ||
+      storefront.reviewSignalsVisible ||
+      storefront.paymentTrustVisible ||
+      storefront.warrantyGuaranteeVisible,
+    shippingReturnsVisible: fullPage.shippingReturnsVisible || storefront.shippingReturnsVisible,
+    orderReturnsVisible: fullPage.orderReturnsVisible || storefront.orderReturnsLanguageVisible,
+    accountLoginVisible: fullPage.accountLoginVisible || storefront.genericNavigationCount > 0,
+    supportContactVisible: fullPage.supportContactVisible || storefront.contactSupportVisible,
+  };
+  const visualSignals: CoverageSignalSet = {
+    cartVisible: false,
+    checkoutVisible: false,
+    searchVisible: false,
+    categoryProductVisible: visualUxDiagnostics.findings.some((finding) =>
+      /product|category|catalog|grid|discovery/i.test(finding.title),
+    ),
+    productCardCount: Math.max(
+      desktopMetrics?.productCardBounds?.length ?? 0,
+      mobileMetrics?.productCardBounds?.length ?? 0,
+    ),
+    ctaVisible: visualUxDiagnostics.findings.some((finding) =>
+      /cta|action|hierarchy/i.test(finding.title),
+    ),
+    trustSignalsVisible: false,
+    shippingReturnsVisible: false,
+    orderReturnsVisible: false,
+    accountLoginVisible: false,
+    supportContactVisible: visualUxDiagnostics.findings.some((finding) =>
+      /widget|chat|support/i.test(finding.title),
+    ),
+    visualUxFindingCount: visualUxDiagnostics.findings.length,
+    visualUxScore: visualUxDiagnostics.score,
+  };
+
+  return {
+    screenshotMode: "viewport",
+    domCoverage: "full-page",
+    scoringCoverage: "full-page",
+    aboveFoldSignals,
+    nearFoldSignals,
+    fullPageSignals,
+    visualSignals,
+    manualConfirmationSignals: {
+      platformNeedsReview: platformNeedsManualReview(diagnostics),
+      trackingNeedsReview: visibleMarketingTools(diagnostics).length < 2,
+      screenshotModeRequiresInterpretation: true,
+    },
+    coverageSummary:
+      "This score uses above-the-fold evidence for first impression and full-page DOM evidence for operations, trust, product discovery, and support signals.",
+    explanation:
+      "The scanner reviews the submitted URL only. Above-the-fold and near-fold signals influence first-impression UX, while full-page DOM sampling influences deeper product discovery, trust, shipping/returns, account, support, and operations scoring.",
+  };
+}
+
+function isEnterpriseOrMarketplaceContext(siteType: string, visualArchetype?: string | null) {
+  const combined = `${siteType} ${visualArchetype ?? ""}`.toLowerCase();
+  return combined.includes("enterprise") || combined.includes("marketplace");
+}
+
+function isIndustrialB2bContext(siteType: string, visualArchetype?: string | null) {
+  const combined = `${siteType} ${visualArchetype ?? ""}`.toLowerCase();
+  return combined.includes("industrial") || combined.includes("b2b");
+}
+
+function buildPositiveUxSignals({
+  diagnostics,
+  visualUxDiagnostics,
+  siteClassification,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+  siteClassification: SiteClassification;
+}): PositiveUxSignals {
+  const signals = diagnostics.storefrontSignals;
+  const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
+  const desktopMetrics = diagnostics.desktopVisualMetrics;
+  const mobileMetrics = diagnostics.mobileVisualMetrics;
+  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "");
+  const isEnterprise = isEnterpriseOrMarketplaceContext(siteClassification.siteType, visualArchetype);
+  const isIndustrial = isIndustrialB2bContext(siteClassification.siteType, visualArchetype);
+  const trustCount = trustSignalCount(diagnostics);
+  const textAndLinks = [
+    desktopMetrics?.visibleTextSample,
+    mobileMetrics?.visibleTextSample,
+    ...(desktopMetrics?.visibleLinks ?? []),
+    ...(mobileMetrics?.visibleLinks ?? []),
+    ...commerce.ctaLabels,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const accountVisible = /account|sign in|login|log in|my account|profile/.test(textAndLinks);
+  const quoteOrProcurementVisible = /quote|rfq|account|procurement|purchase order|part number|sku/.test(textAndLinks);
+  const productModules = Math.max(
+    desktopMetrics?.productCardsAboveFold ?? 0,
+    mobileMetrics?.productCardsAboveFold ?? 0,
+    fullPage.productCardCount,
+  );
+  const severeVisualTitles = visualUxDiagnostics.findings
+    .filter((finding) => finding.severity === "High")
+    .map((finding) => finding.title.toLowerCase());
+  const hasSevereLayoutIssue = severeVisualTitles.some((title) =>
+    /layout|content-to-product|grid-to-content|discovery|hierarchy|whitespace/.test(title),
+  );
+  const hasVisualConsistency =
+    visualUxDiagnostics.score >= 75 &&
+    !hasSevereLayoutIssue &&
+    (desktopMetrics?.productCardHeightVariance ?? 0) < 0.7 &&
+    (desktopMetrics?.productCardSpacingVariance ?? 0) < 0.75;
+  const categoryVisible =
+    signals.productNavigationVisible ||
+    signals.collectionLinksVisible ||
+    commerce.productCatalogVisible ||
+    fullPage.categoryProductVisible;
+  const discoveryBase =
+    (signals.searchVisible || fullPage.searchVisible ? 30 : 0) +
+    (signals.productNavigationVisible || fullPage.categoryProductVisible ? 25 : 0) +
+    (signals.collectionLinksVisible || fullPage.productLinks.length > 0 ? 20 : 0) +
+    (productModules > 0 ? 20 : 0) +
+    (isIndustrial && quoteOrProcurementVisible ? 5 : 0);
+
+  return {
+    searchProminence: positiveSignal(
+      signals.searchVisible || fullPage.searchVisible || (desktopMetrics?.firstSearchInputY ?? null) !== null
+        ? isEnterprise || isIndustrial
+          ? 95
+          : 85
+        : 20,
+      signals.searchVisible || fullPage.searchVisible
+        ? ["Search is visible in the submitted URL sample."]
+        : ["Search was not clearly visible above the fold."],
+    ),
+    categoryVisibility: positiveSignal(
+      signals.productNavigationVisible && signals.collectionLinksVisible
+        ? 90
+        : categoryVisible
+          ? 65
+          : 20,
+      [
+        `Product navigation: ${signals.productNavigationVisible ? "visible" : "not visible"}.`,
+        `Collection/product links: ${signals.collectionLinksVisible || fullPage.productLinks.length > 0 ? "visible" : "not visible"}.`,
+      ],
+    ),
+    productDensity: positiveSignal(
+      productModules >= (isEnterprise ? 6 : isIndustrial ? 3 : 2)
+        ? 92
+        : productModules > 0
+          ? 68
+          : 18,
+      [`${productModules} product/card module${productModules === 1 ? "" : "s"} visible in sampled viewports.`],
+    ),
+    trustSignals: positiveSignal(
+      trustCount >= 4 ? 88 : trustCount >= 2 ? 62 : trustCount > 0 ? 38 : 12,
+      [`${trustCount} of 6 trust-signal groups were visible.`],
+    ),
+    hierarchyStrength: positiveSignal(
+      visualUxDiagnostics.score >= 80 && !signals.mobileCrowdingRisk
+        ? 88
+        : visualUxDiagnostics.score >= 65
+          ? 64
+          : visualUxDiagnostics.score >= 45
+            ? 38
+            : 18,
+      [
+        `Visual UX score is ${visualUxDiagnostics.score}/100.`,
+        signals.mobileCrowdingRisk ? "Mobile first-screen density risk was detected." : "No mobile crowding risk was flagged.",
+      ],
+    ),
+    navigationClarity: positiveSignal(
+      isEnterprise && signals.searchVisible && categoryVisible
+        ? 88
+        : signals.searchVisible && categoryVisible
+          ? 78
+          : categoryVisible
+            ? 58
+            : 22,
+      [
+        signals.searchVisible ? "Search is visible." : "Search visibility is weak.",
+        categoryVisible ? "Category or product navigation is visible." : "Category/product navigation is weak.",
+      ],
+    ),
+    commerceConfidence: positiveSignal(
+      (commerce.cartVisible || fullPage.cartVisible) &&
+        (commerce.checkoutVisible || fullPage.checkoutVisible) &&
+        categoryVisible
+        ? 90
+        : (commerce.cartVisible ||
+              commerce.checkoutVisible ||
+              fullPage.cartVisible ||
+              fullPage.checkoutVisible) &&
+            categoryVisible
+          ? 68
+          : categoryVisible
+            ? 48
+            : 18,
+      [
+        `Cart: ${commerce.cartVisible || fullPage.cartVisible ? "visible" : "not visible"}.`,
+        `Checkout: ${commerce.checkoutVisible || fullPage.checkoutVisible ? "visible" : "not visible"}.`,
+        categoryVisible ? "Product/catalog path is visible." : "Product/catalog path is not clear.",
+      ],
+    ),
+    visualConsistency: positiveSignal(
+      hasVisualConsistency ? 88 : visualUxDiagnostics.score >= 65 ? 64 : visualUxDiagnostics.score >= 50 ? 42 : 18,
+      [
+        hasVisualConsistency
+          ? "Visual diagnostics did not find severe layout consistency issues."
+          : visualUxDiagnostics.summary,
+      ],
+    ),
+    cartVisibility: positiveSignal(
+      commerce.cartVisible || fullPage.cartVisible ? 90 : 20,
+      [commerce.cartVisible || fullPage.cartVisible ? "Cart entry point is visible in the submitted URL evidence." : "Cart entry point was not clearly visible."],
+    ),
+    checkoutVisibility: positiveSignal(
+      commerce.checkoutVisible || fullPage.checkoutVisible ? 88 : 20,
+      [commerce.checkoutVisible || fullPage.checkoutVisible ? "Checkout entry point is visible in the submitted URL evidence." : "Checkout entry point was not clearly visible."],
+    ),
+    accountVisibility: positiveSignal(
+      accountVisible || fullPage.accountLoginVisible || (isIndustrial && quoteOrProcurementVisible) ? 82 : 28,
+      [
+        accountVisible
+          ? "Account or sign-in path is visible."
+          : fullPage.accountLoginVisible
+            ? "Account or login language appears in the full-page DOM sample."
+          : isIndustrial && quoteOrProcurementVisible
+            ? "Quote, SKU, or procurement language is visible."
+            : "Account/procurement path was not prominent.",
+      ],
+    ),
+    productDiscoveryStrength: positiveSignal(
+      Math.min(100, discoveryBase),
+      [
+        signals.searchVisible ? "Search supports product discovery." : "Search support is weak.",
+        signals.productNavigationVisible || signals.collectionLinksVisible
+          ? "Product/category paths support discovery."
+          : "Product/category paths are weak.",
+        productModules > 0 ? "Product modules are visible." : "Product modules were not visible above fold.",
+      ],
+    ),
+  };
+}
+
+function calculateEcommerceMaturityScore({
+  diagnostics,
+  findings,
+  visualUxDiagnostics,
+  siteClassification,
+  positiveUxSignals,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  findings: HeuristicFinding[];
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+  siteClassification: SiteClassification;
+  positiveUxSignals?: PositiveUxSignals;
+}): EcommerceMaturityScore {
+  const signals =
+    positiveUxSignals ??
+    buildPositiveUxSignals({
+      diagnostics,
+      visualUxDiagnostics,
+      siteClassification,
+    });
+  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "");
+  const isEnterprise = isEnterpriseOrMarketplaceContext(
+    siteClassification.siteType,
+    visualArchetype,
+  );
+  const isIndustrial = isIndustrialB2bContext(
+    siteClassification.siteType,
+    visualArchetype,
+  );
+  const severeCustomerFacingFindings = findings.filter(
+    (finding) =>
+      (finding.severity === "High" || finding.severity === "Critical") &&
+      (finding.primaryCategory === "uxUiIssues" ||
+        finding.primaryCategory === "conversionIssues" ||
+        finding.primaryCategory === "operationsIssues"),
+  );
+  const b2bCatalogReducers = severeCustomerFacingFindings.filter((finding) =>
+    /layout|content-to-product|grid-to-content|discovery|catalog|part|spec|mobile/i.test(
+      finding.title,
+    ),
+  );
+  const maturityScore = Math.round(
+    signals.searchProminence.score * 0.15 +
+      signals.categoryVisibility.score * 0.12 +
+      signals.productDensity.score * 0.11 +
+      signals.navigationClarity.score * 0.11 +
+      signals.commerceConfidence.score * 0.12 +
+      signals.productDiscoveryStrength.score * 0.13 +
+      signals.hierarchyStrength.score * 0.1 +
+      signals.visualConsistency.score * 0.08 +
+      signals.trustSignals.score * 0.04 +
+      signals.accountVisibility.score * 0.04,
+  );
+  const positiveSignals = buildTopPositiveSignalSummaries(signals);
+  const maturityReducers: string[] = [];
+
+  if (visualUxDiagnostics.score < 60) {
+    maturityReducers.push(`Visual UX maturity is limited (${visualUxDiagnostics.score}/100).`);
+  }
+
+  if (signals.searchProminence.label === "weak" || signals.searchProminence.label === "unknown") {
+    maturityReducers.push("Search prominence is weak for the detected business model.");
+  }
+
+  if (signals.productDiscoveryStrength.label === "weak" || signals.productDiscoveryStrength.label === "unknown") {
+    maturityReducers.push("Product discovery strength is weak in the sampled public page.");
+  }
+
+  if (isIndustrial && b2bCatalogReducers.length > 0) {
+    maturityReducers.push(
+      `${b2bCatalogReducers[0].title} reduces B2B catalog confidence.`,
+    );
+  }
+
+  if (!isEnterprise && signals.commerceConfidence.score < 55) {
+    maturityReducers.push("Cart, checkout, and product path confidence is limited.");
+  }
+
+  const tier: EcommerceMaturityTier =
+    isEnterprise && maturityScore >= 75
+      ? "enterprise"
+      : maturityScore >= 75
+        ? "mature"
+        : maturityScore >= 58
+          ? "developing"
+          : maturityScore >= 35
+            ? "early"
+            : "unclear";
+  const explanation = isEnterprise
+    ? "Enterprise retail maturity is judged mainly by search, category paths, account/cart visibility, product density, and customer-facing journey strength, not by whether the platform is publicly exposed."
+    : isIndustrial
+      ? "B2B catalog maturity is judged mainly by search or part lookup, product/category hierarchy, specification access signals, visual alignment, and mobile catalog usability."
+      : "Ecommerce maturity is judged by customer-facing discovery, hierarchy, trust, cart/checkout clarity, and visible commerce paths.";
+
+  return {
+    maturityScore: Math.max(0, Math.min(100, maturityScore)),
+    maturityTier: tier,
+    positiveSignals,
+    maturityReducers: maturityReducers.slice(0, 4),
+    explanation,
+  };
+}
+
+function buildTopPositiveSignalSummaries(positiveUxSignals: PositiveUxSignals) {
+  const labels: Partial<Record<PositiveUxSignalKey, string>> = {
+    searchProminence: "Search prominence",
+    categoryVisibility: "Category visibility",
+    productDensity: "Product density",
+    trustSignals: "Trust signals",
+    hierarchyStrength: "Hierarchy strength",
+    navigationClarity: "Navigation clarity",
+    commerceConfidence: "Commerce confidence",
+    visualConsistency: "Visual consistency",
+    cartVisibility: "Cart visibility",
+    checkoutVisibility: "Checkout visibility",
+    accountVisibility: "Account/procurement visibility",
+    productDiscoveryStrength: "Product discovery strength",
+  };
+
+  return (Object.entries(positiveUxSignals) as [PositiveUxSignalKey, PositiveUxSignal][])
+    .filter(([, signal]) => signal.label === "strong" || signal.label === "moderate")
+    .sort(([, left], [, right]) => right.score - left.score)
+    .slice(0, 4)
+    .map(([key, signal]) => signalSummary(labels[key] ?? key, signal));
+}
+
+function buildMajorPenaltySummaries({
+  findings,
+  siteClassification,
+  visualUxDiagnostics,
+}: {
+  findings: HeuristicFinding[];
+  siteClassification: SiteClassification;
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+}) {
+  const isEnterprise = isEnterpriseOrMarketplaceContext(
+    siteClassification.siteType,
+    String(visualUxDiagnostics.uxArchetype ?? ""),
+  );
+
+  return findings
+    .filter((finding) => finding.severity === "High" || finding.severity === "Critical")
+    .map((finding) => {
+      const isPlatformOpacity = /platform|manual review|platform evidence/i.test(finding.title);
+      const weight = isPlatformOpacity && isEnterprise ? 1 : finding.severity === "Critical" ? 5 : 3;
+      return {
+        weight,
+        text: `${finding.title}: ${finding.evidenceSummary}`,
+      };
+    })
+    .sort((left, right) => right.weight - left.weight)
+    .slice(0, 4)
+    .map((item) => sanitizeEvidenceText(item.text, { maxLength: 180 }));
+}
+
+function calculateSeverityAdjustedPenalty({
+  findings,
+  siteClassification,
+  visualUxDiagnostics,
+}: {
+  findings: HeuristicFinding[];
+  siteClassification: SiteClassification;
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+}) {
+  const isEnterprise = isEnterpriseOrMarketplaceContext(
+    siteClassification.siteType,
+    String(visualUxDiagnostics.uxArchetype ?? ""),
+  );
+  const isIndustrial = isIndustrialB2bContext(
+    siteClassification.siteType,
+    String(visualUxDiagnostics.uxArchetype ?? ""),
+  );
+  const penalty = findings.reduce((total, finding) => {
+    const isPlatformOpacity = /platform|manual review|platform evidence/i.test(finding.title);
+    if (isPlatformOpacity && isEnterprise) return total + 0.5;
+    if (finding.severity === "Critical") return total + 4;
+    if (finding.severity === "High") {
+      const customerFacing =
+        finding.primaryCategory === "uxUiIssues" ||
+        finding.primaryCategory === "conversionIssues" ||
+        finding.primaryCategory === "operationsIssues";
+      const b2bCatalogIssue =
+        isIndustrial &&
+        /layout|content-to-product|grid-to-content|discovery|catalog|part|spec/i.test(finding.title);
+      return total + (b2bCatalogIssue ? 3.5 : customerFacing ? 2.5 : 1.5);
+    }
+    if (finding.severity === "Medium") return total + 0.6;
+    return total;
+  }, 0);
+
+  return Math.min(isEnterprise ? 8 : 12, penalty);
+}
+
+function buildScoreWhy({
+  score,
+  positiveSignals,
+  majorPenalties,
+  ecommerceMaturity,
+  siteClassification,
+  visualUxDiagnostics,
+}: {
+  score: number;
+  positiveSignals: string[];
+  majorPenalties: string[];
+  ecommerceMaturity: EcommerceMaturityScore;
+  siteClassification: SiteClassification;
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+}) {
+  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "");
+  const isEnterprise = isEnterpriseOrMarketplaceContext(siteClassification.siteType, visualArchetype);
+  const isIndustrial = isIndustrialB2bContext(siteClassification.siteType, visualArchetype);
+
+  if (isEnterprise) {
+    return score >= 75
+      ? `Strong marketplace-scale discovery, navigation, and commerce signals support an ${ecommerceMaturity.maturityTier} maturity read. Score reducers are mainly measurement/platform visibility or density risks, not basic ecommerce maturity.`
+      : `Enterprise retail maturity signals are present (${ecommerceMaturity.maturityScore}/100), but the score stays lower because customer-facing confidence signals or visual hierarchy evidence were not strong enough to offset the reducers.`;
+  }
+
+  if (isIndustrial) {
+    return score <= 65
+      ? `Visible commerce infrastructure is present, but the ${ecommerceMaturity.maturityTier} maturity read is constrained by catalog discovery, mobile hierarchy, specification access, or layout imbalance.`
+      : `B2B catalog signals are reasonably mature (${ecommerceMaturity.maturityScore}/100), with the score shaped by product discovery strength and the remaining catalog usability risks.`;
+  }
+
+  if (positiveSignals.length > majorPenalties.length) {
+    return "Positive ecommerce maturity signals offset some findings, so the score reflects both visible strengths and the remaining review priorities.";
+  }
+
+  return "The score is limited by the strongest customer-facing findings, with positive signals included where the public scan showed mature ecommerce patterns.";
+}
+
+function calculateOverallScoringResult({
   baseScore,
   categories,
   findings,
   visualUxDiagnostics,
   diagnostics,
   siteClassification,
+  positiveUxSignals: providedPositiveUxSignals,
+  ecommerceMaturity: providedEcommerceMaturity,
 }: {
   baseScore: number;
   categories: ReturnType<typeof applyLiveDiagnosticScoring>;
@@ -1415,114 +2242,103 @@ function adjustOverallScoreForVisualUx({
   visualUxDiagnostics: VisualUxDiagnosticsResult;
   diagnostics: LiveDiagnosticsResult;
   siteClassification: SiteClassification;
-}) {
-  const uxScore =
-    categories.find((category) => category.key === "uxUiIssues")?.score ?? baseScore;
-  const conversionScore =
-    categories.find((category) => category.key === "conversionIssues")?.score ?? baseScore;
-  const operationsScore =
-    categories.find((category) => category.key === "operationsIssues")?.score ?? baseScore;
-  const trackingScore =
-    categories.find((category) => category.key === "trackingIssues")?.score ?? baseScore;
-  const technicalScore =
-    categories.find((category) => category.key === "technicalIssues")?.score ?? baseScore;
-  const siteType = siteClassification.siteType.toLowerCase();
-  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "").toLowerCase();
-  const isEnterpriseOrMarketplace =
-    siteType.includes("enterprise") ||
-    siteType.includes("marketplace") ||
-    visualArchetype.includes("enterprise") ||
-    visualArchetype.includes("marketplace");
-  const isIndustrialB2b =
-    siteType.includes("industrial") ||
-    siteType.includes("b2b") ||
-    visualArchetype.includes("industrial") ||
-    visualArchetype.includes("b2b");
-  const effectiveUxScore = Math.round(
-    isIndustrialB2b
-      ? uxScore * 0.5 + visualUxDiagnostics.score * 0.5
-      : isEnterpriseOrMarketplace
-        ? Math.max(uxScore, visualUxDiagnostics.score * 0.9)
-        : uxScore * 0.7 + visualUxDiagnostics.score * 0.3,
+  positiveUxSignals?: PositiveUxSignals;
+  ecommerceMaturity?: EcommerceMaturityScore;
+}): OverallScoringResult {
+  const positiveUxSignals =
+    providedPositiveUxSignals ??
+    buildPositiveUxSignals({
+      diagnostics,
+      visualUxDiagnostics,
+      siteClassification,
+    });
+  const ecommerceMaturity =
+    providedEcommerceMaturity ??
+    calculateEcommerceMaturityScore({
+      diagnostics,
+      findings,
+      visualUxDiagnostics,
+      siteClassification,
+      positiveUxSignals,
+    });
+  const categoryScore = (key: AuditCategoryKey) =>
+    categories.find((category) => category.key === key)?.score ?? baseScore;
+  const weightedCategoryScores = Math.round(
+    categoryScore("uxUiIssues") * 0.35 +
+      categoryScore("conversionIssues") * 0.3 +
+      categoryScore("technicalIssues") * 0.15 +
+      categoryScore("trackingIssues") * 0.1 +
+      categoryScore("operationsIssues") * 0.1,
   );
-  const weightedScore = Math.round(
-    isIndustrialB2b
-      ? effectiveUxScore * 0.36 +
-          conversionScore * 0.22 +
-          operationsScore * 0.16 +
-          technicalScore * 0.16 +
-          trackingScore * 0.1
-      : isEnterpriseOrMarketplace
-        ? effectiveUxScore * 0.32 +
-            conversionScore * 0.25 +
-            operationsScore * 0.2 +
-            trackingScore * 0.13 +
-            technicalScore * 0.1
-        : effectiveUxScore * 0.28 +
-            conversionScore * 0.24 +
-            operationsScore * 0.18 +
-            technicalScore * 0.16 +
-            trackingScore * 0.14,
+  const positiveUxSignalBoost = Math.min(
+    12,
+    Object.values(positiveUxSignals).reduce((total, signal) => total + signal.scoreImpact, 0),
   );
-  let adjustedScore = Math.round((baseScore * 0.35) + (weightedScore * 0.65));
-  const hasHighVisualOrDiscoveryFinding = findings.some(
-    (finding) =>
-      finding.severity === "High" &&
-      (finding.category === "visualUx" ||
-        finding.category === "productDiscovery" ||
-        /layout|content-to-product|grid-to-content|discovery|catalog/i.test(finding.title)),
+  const severityAdjustedPenalties = calculateSeverityAdjustedPenalty({
+    findings,
+    siteClassification,
+    visualUxDiagnostics,
+  });
+  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "");
+  const isEnterprise = isEnterpriseOrMarketplaceContext(siteClassification.siteType, visualArchetype);
+  const isIndustrial = isIndustrialB2bContext(siteClassification.siteType, visualArchetype);
+  const positiveSignals = buildTopPositiveSignalSummaries(positiveUxSignals);
+  const majorPenalties = buildMajorPenaltySummaries({
+    findings,
+    siteClassification,
+    visualUxDiagnostics,
+  });
+  let overallScore = Math.round(
+    weightedCategoryScores + positiveUxSignalBoost - severityAdjustedPenalties,
   );
-  const hasSevereCustomerFacingIssue = findings.some(
+  const hasSevereMobileOrCheckoutIssue = findings.some(
     (finding) =>
       finding.severity === "Critical" ||
-      (finding.severity === "High" &&
-        (finding.primaryCategory === "uxUiIssues" ||
-          finding.primaryCategory === "conversionIssues" ||
-          finding.primaryCategory === "operationsIssues") &&
-        !/platform|manual review|platform evidence/i.test(finding.title)),
+      (finding.severity === "High" && /mobile|checkout|cart/i.test(finding.title)),
   );
-  const trustSignalsVisible = trustSignalCount(diagnostics);
-  const hasCatalogSignal =
-    diagnostics.commerceFlowSignals.productCatalogVisible ||
-    diagnostics.storefrontSignals.productNavigationVisible ||
-    diagnostics.storefrontSignals.collectionLinksVisible;
-  const hasCommercePath =
-    diagnostics.commerceFlowSignals.cartVisible ||
-    diagnostics.commerceFlowSignals.checkoutVisible;
-  const hasStrongCustomerMaturity =
+  const hasStrongEnterpriseMaturity =
+    isEnterprise &&
+    diagnostics.platformDetection.ecommerceProbability.label !== "Low" &&
+    ecommerceMaturity.maturityScore >= 75 &&
+    positiveUxSignals.searchProminence.label === "strong" &&
+    positiveUxSignals.categoryVisibility.label !== "weak" &&
+    positiveUxSignals.productDensity.label === "strong" &&
     visualUxDiagnostics.score >= 75 &&
-    diagnostics.storefrontSignals.searchVisible &&
-    hasCatalogSignal &&
-    hasCommercePath &&
-    trustSignalsVisible >= 2 &&
-    !diagnostics.storefrontSignals.mobileCrowdingRisk;
+    !hasSevereMobileOrCheckoutIssue;
 
-  if (isEnterpriseOrMarketplace && hasStrongCustomerMaturity && !hasSevereCustomerFacingIssue) {
-    adjustedScore = Math.max(adjustedScore, 75);
+  if (hasStrongEnterpriseMaturity) {
+    overallScore = Math.max(overallScore, visualUxDiagnostics.score >= 84 ? 86 : 82);
   }
 
-  if (
-    visualUxDiagnostics.score < 50 &&
-    uxScore < 55 &&
-    hasHighVisualOrDiscoveryFinding
-  ) {
-    adjustedScore = Math.min(adjustedScore, 60);
+  const hasB2bCatalogFriction = findings.some(
+    (finding) =>
+      finding.severity === "High" &&
+      /layout|content-to-product|grid-to-content|discovery|catalog|part|spec|mobile/i.test(finding.title),
+  );
+
+  if (isIndustrial && visualUxDiagnostics.score < 55 && hasB2bCatalogFriction) {
+    overallScore = Math.min(overallScore, 65);
   }
 
-  if (
-    visualUxDiagnostics.score < 55 &&
-    uxScore < 60 &&
-    hasHighVisualOrDiscoveryFinding
-  ) {
-    adjustedScore = Math.min(adjustedScore, 65);
-  }
+  overallScore = Math.max(35, Math.min(96, overallScore));
 
-  if (isIndustrialB2b && visualUxDiagnostics.score < 55 && hasHighVisualOrDiscoveryFinding) {
-    adjustedScore = Math.min(adjustedScore, 65);
-    adjustedScore = Math.max(adjustedScore, visualUxDiagnostics.score < 50 ? 55 : 58);
-  }
-
-  return Math.max(35, Math.min(96, adjustedScore));
+  return {
+    overallScore,
+    positiveUxSignals,
+    ecommerceMaturity,
+    scoreExplanation: {
+      positiveSignals,
+      majorPenalties,
+      whyThisScore: buildScoreWhy({
+        score: overallScore,
+        positiveSignals,
+        majorPenalties,
+        ecommerceMaturity,
+        siteClassification,
+        visualUxDiagnostics,
+      }),
+    },
+  };
 }
 
 type NarrativeArchetype =
@@ -4531,6 +5347,11 @@ function withUnknown(value: string | null | undefined) {
 }
 
 export async function POST(request: Request) {
+  let submittedWebsite = "unknown";
+  let latestDiagnostics: LiveDiagnosticsResult | null = null;
+  let latestScore: number | null = null;
+  let latestStatus: string | null = null;
+
   try {
     const body = await readJsonBody(request);
     const values = toCleanStringRecord(body, scannerFields);
@@ -4571,18 +5392,42 @@ export async function POST(request: Request) {
     }
 
     const submittedAt = new Date().toISOString();
+    submittedWebsite = values.website;
     const diagnostics = await runLightweightEcommerceDiagnostics(values.website);
+    latestDiagnostics = diagnostics;
 
     if (diagnostics.scanError) {
+      await saveScannerDebugRecord(
+        buildScannerDebugRecord({
+          url: values.website,
+          success: false,
+          status: diagnostics.scanError,
+          rootCause: diagnostics.scanDiagnostics?.error ?? null,
+          diagnostics,
+        }),
+      );
+
       return NextResponse.json(
         {
           success: false,
           error: diagnostics.scanError,
-          diagnostics,
+          currentStage: diagnostics.scanDiagnostics?.currentStage,
+          failedUrl:
+            diagnostics.scanDiagnostics?.error?.failedUrl ??
+            diagnostics.finalUrl ??
+            values.website,
+          rootCause: diagnostics.scanDiagnostics?.error,
+          timingMetrics: diagnostics.scanDiagnostics?.timings,
+          scanDiagnostics: diagnostics.scanDiagnostics,
         },
-        { status: 502 },
+        { status: 200 },
       );
     }
+
+    const reportGenerationStart = Date.now();
+    addScannerStageLog(diagnostics.scanDiagnostics, "report_generation", "Generating audit report", {
+      url: diagnostics.finalUrl || values.website,
+    });
 
     const siteClassification = classifySiteType({ diagnostics, website: values.website });
     const visualUxDiagnostics = analyzeVisualUx({
@@ -4615,23 +5460,42 @@ export async function POST(request: Request) {
       diagnostics,
       visualUxDiagnostics,
     );
+    const scanCoverage = buildScanCoverage(diagnostics, visualUxDiagnostics);
+    const positiveUxSignals = buildPositiveUxSignals({
+      diagnostics,
+      visualUxDiagnostics,
+      siteClassification,
+    });
+    const ecommerceMaturity = calculateEcommerceMaturityScore({
+      diagnostics,
+      findings: heuristicFindings,
+      visualUxDiagnostics,
+      siteClassification,
+      positiveUxSignals,
+    });
     const categories = applyLiveDiagnosticScoring(
       diagnostics,
       heuristicFindings,
       siteClassification,
+      visualUxDiagnostics,
+      ecommerceMaturity,
+      positiveUxSignals,
     );
     const baseOverallScore = Math.round(
       categories.reduce((total, category) => total + category.score, 0) /
         categories.length,
     );
-    const overallScore = adjustOverallScoreForVisualUx({
+    const overallScoring = calculateOverallScoringResult({
       baseScore: baseOverallScore,
       categories,
       findings: heuristicFindings,
       visualUxDiagnostics,
       diagnostics,
       siteClassification,
+      positiveUxSignals,
+      ecommerceMaturity,
     });
+    const { overallScore, scoreExplanation } = overallScoring;
     const narrativeArchetypeProfile = resolveNarrativeArchetype({
       categories,
       diagnostics,
@@ -4723,6 +5587,8 @@ export async function POST(request: Request) {
     const benchmarkContext = buildBenchmarkContext(diagnostics, heuristicFindings);
     const scanId = createAuditScanId();
     const overallStatus = adjustedStatus(overallScore);
+    latestScore = overallScore;
+    latestStatus = overallStatus;
     const primaryConcernTitle =
       primaryOperationalConcern?.title ||
       primaryOperationalConcern?.riskLabel ||
@@ -4755,7 +5621,11 @@ export async function POST(request: Request) {
       overallScore,
       overallStatus,
       overallExplanation:
-        "The report combines lightweight live diagnostics with ecommerce heuristics for customer journey, trust, discovery, tracking, and operational visibility.",
+        scoreExplanation.whyThisScore,
+      scoreExplanation,
+      positiveUxSignals,
+      ecommerceMaturity,
+      scanCoverage,
       summary:
         "This internal review uses public-page diagnostics and rule-based ecommerce heuristics. Findings should guide practical review priorities while uncertain signals remain marked for manual confirmation.",
       executiveSummary,
@@ -4821,6 +5691,21 @@ export async function POST(request: Request) {
       benchmarkTags: benchmarkContext.benchmarkTags,
     });
 
+    finalizeScannerDiagnostics(diagnostics.scanDiagnostics, {
+      success: true,
+      finalUrl: diagnostics.finalUrl || values.website,
+      reportGenerationMs: Date.now() - reportGenerationStart,
+    });
+    await saveScannerDebugRecord(
+      buildScannerDebugRecord({
+        url: values.website,
+        success: true,
+        score: overallScore,
+        status: overallStatus,
+        diagnostics,
+      }),
+    );
+
     return NextResponse.json(
       {
         success: true,
@@ -4830,11 +5715,48 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Ecommerce audit scanner error:", error);
+    const rootCause = {
+      category: "Report generation failed",
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      failedUrl: latestDiagnostics?.finalUrl ?? submittedWebsite,
+      elapsedTimeMs: 0,
+      stage: "report_generation" as const,
+    };
+
+    if (latestDiagnostics?.scanDiagnostics) {
+      addScannerStageLog(
+        latestDiagnostics.scanDiagnostics,
+        "report_generation",
+        rootCause.category,
+        {
+          level: "error",
+          url: latestDiagnostics.finalUrl || submittedWebsite,
+        },
+      );
+      latestDiagnostics.scanDiagnostics.error = rootCause;
+      finalizeScannerDiagnostics(latestDiagnostics.scanDiagnostics, {
+        success: false,
+      });
+    }
+
+    await saveScannerDebugRecord(
+      buildScannerDebugRecord({
+        url: submittedWebsite,
+        success: false,
+        score: latestScore,
+        status: latestStatus ?? "Report generation failed",
+        rootCause,
+        diagnostics: latestDiagnostics,
+      }),
+    );
+
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Sorry, we could not generate the audit preview right now. Please try again in a moment.",
+        error: "Report generation failed",
+        rootCause,
       },
       { status: 500 }
     );

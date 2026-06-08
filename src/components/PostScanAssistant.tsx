@@ -124,12 +124,48 @@ type AssistantCategory = {
   influencingFindings?: string[];
 };
 
+type AssistantPositiveUxSignal = {
+  score: number;
+  label: "strong" | "moderate" | "weak" | "unknown";
+  evidence: string[];
+  scoreImpact: number;
+};
+
+type AssistantEcommerceMaturity = {
+  maturityScore: number;
+  maturityTier: "enterprise" | "mature" | "developing" | "early" | "unclear";
+  positiveSignals: string[];
+  maturityReducers: string[];
+  explanation: string;
+};
+
+type AssistantScanCoverage = {
+  screenshotMode: "viewport" | "full-page";
+  domCoverage: "visible" | "full-page";
+  scoringCoverage: "above-fold" | "near-fold" | "full-page";
+  aboveFoldSignals: Record<string, boolean | number | undefined>;
+  nearFoldSignals: Record<string, boolean | number | undefined>;
+  fullPageSignals: Record<string, boolean | number | undefined>;
+  visualSignals: Record<string, boolean | number | undefined>;
+  manualConfirmationSignals?: Record<string, boolean | undefined>;
+  coverageSummary: string;
+  explanation: string;
+};
+
 type AssistantAudit = {
   scanId?: string;
   website: string;
   generatedAt: string;
   overallScore: number;
   overallStatus: string;
+  scoreExplanation?: {
+    positiveSignals: string[];
+    majorPenalties: string[];
+    whyThisScore: string;
+  };
+  positiveUxSignals?: Record<string, AssistantPositiveUxSignal>;
+  ecommerceMaturity?: AssistantEcommerceMaturity;
+  scanCoverage?: AssistantScanCoverage;
   auditNarrative?: string;
   currentNarrativeArchetype?: string;
   narrativeProfile?: AssistantNarrativeProfile;
@@ -396,6 +432,10 @@ type AnswerSection = {
 type ScanContext = {
   score: number;
   status: string;
+  scoreExplanation?: AssistantAudit["scoreExplanation"];
+  positiveUxSignals?: AssistantAudit["positiveUxSignals"];
+  ecommerceMaturity?: AssistantAudit["ecommerceMaturity"];
+  scanCoverage?: AssistantAudit["scanCoverage"];
   currentNarrativeArchetype?: string;
   narrativeProfile?: AssistantNarrativeProfile;
   siteType?: StorefrontReviewSiteType;
@@ -1152,6 +1192,10 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
   return {
     score: audit.overallScore,
     status: audit.overallStatus,
+    scoreExplanation: audit.scoreExplanation,
+    positiveUxSignals: audit.positiveUxSignals,
+    ecommerceMaturity: audit.ecommerceMaturity,
+    scanCoverage: audit.scanCoverage,
     currentNarrativeArchetype: audit.currentNarrativeArchetype,
     narrativeProfile: audit.narrativeProfile,
     siteType: audit.siteType ?? audit.storefrontReviewContext?.siteType,
@@ -1284,6 +1328,10 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
       scoreExplanation: category.scoreExplanation,
     })),
     categoryFindings: context.categoryFindings,
+    scoreExplanation: context.scoreExplanation,
+    positiveUxSignals: context.positiveUxSignals,
+    ecommerceMaturity: context.ecommerceMaturity,
+    scanCoverage: context.scanCoverage,
     metadata: context.metadata,
     platformVisibility: context.platformVisibility,
     trackingVisibility: getTrackingSummary(audit),
@@ -1993,6 +2041,54 @@ function visualUxDirectAnswer(
   return sanitizeEvidenceText(
     `The biggest visual UX issue is ${finding.title}.${metricText}${scorePhrase}${action}`,
     { maxLength: 520 },
+  );
+}
+
+function buildScoreReasoningResponse(context: ScanContext): ChatMessage {
+  const positives = context.scoreExplanation?.positiveSignals ?? [];
+  const penalties = context.scoreExplanation?.majorPenalties ?? [];
+  const maturity = context.ecommerceMaturity;
+  const why =
+    context.scoreExplanation?.whyThisScore ??
+    `The score is ${context.score}/100 because the scan combines category scores, positive ecommerce maturity signals, and severity-adjusted findings.`;
+  const paragraphs = [
+    why,
+    positives.length > 0
+      ? `Top positive signals: ${positives.slice(0, 3).join("; ")}.`
+      : "The scan did not list strong positive ecommerce maturity signals.",
+    maturity
+      ? `Ecommerce maturity: ${maturity.maturityTier}, ${maturity.maturityScore}/100. ${maturity.explanation}`
+      : null,
+    penalties.length > 0
+      ? `Main score reducers: ${penalties.slice(0, 3).join("; ")}.`
+      : "No major score reducers were listed beyond the category-level review.",
+    "Positive signals can lift the score, but they do not erase severe customer-facing UX, conversion, or operations findings.",
+  ].filter((paragraph): paragraph is string => Boolean(paragraph));
+
+  return buildMessage(
+    `assistant-score-reasoning-${Date.now()}`,
+    paragraphs,
+    { topic: "priority" },
+  );
+}
+
+function buildScanCoverageResponse(context: ScanContext): ChatMessage {
+  const coverage = context.scanCoverage;
+  const coverageText =
+    coverage?.coverageSummary ??
+    coverage?.explanation ??
+    "This scan uses above-the-fold evidence for first impression and full-page DOM evidence for deeper commerce signals on the submitted URL.";
+  const paragraphs = [
+    "The scanner reviews the submitted URL, with heavier weighting on above-the-fold evidence for first impression and full-page DOM evidence for deeper commerce signals.",
+    coverageText,
+    coverage?.explanation ?? null,
+    "If something appears lower on the submitted page, it should count for operations, trust, product discovery, support, shipping/returns, account, and fulfillment signals. It may still carry less weight for hero clarity, primary CTA, search prominence, and mobile first impression.",
+  ].filter((paragraph): paragraph is string => Boolean(paragraph));
+
+  return buildMessage(
+    `assistant-scan-coverage-${Date.now()}`,
+    paragraphs,
+    { topic: "priority" },
   );
 }
 
@@ -3183,6 +3279,41 @@ function answerDirectQuestion(
       nextQuestion:
         "Do you want me to explain how this affects conversion measurement?",
     });
+  } else if (
+    normalized.includes("does this scan the full page") ||
+    normalized.includes("scan the full page") ||
+    normalized.includes("full page scan") ||
+    normalized.includes("above fold") ||
+    normalized.includes("near fold") ||
+    normalized.includes("what does the score actually measure") ||
+    normalized.includes("what does the score measure") ||
+    normalized.includes("what does this score measure") ||
+    normalized.includes("what is being measured") ||
+    normalized.includes("is the score only based on the top") ||
+    normalized.includes("only based on the top of the page") ||
+    normalized.includes("why did it miss something lower") ||
+    normalized.includes("miss something lower on the page")
+  ) {
+    topic = "priority";
+    message = buildScanCoverageResponse(context);
+  } else if (
+    normalized.includes("why is the score this high") ||
+    normalized.includes("why is score this high") ||
+    normalized.includes("why is the score high") ||
+    normalized.includes("why is the score this low") ||
+    normalized.includes("why is score this low") ||
+    normalized.includes("why is the score low") ||
+    normalized.includes("why does amazon score") ||
+    normalized.includes("why amazon score") ||
+    normalized.includes("why does maxx score") ||
+    normalized.includes("positive signals") ||
+    normalized.includes("what positive signals") ||
+    normalized.includes("what strengths") ||
+    normalized.includes("why this score") ||
+    normalized.includes("score reasoning")
+  ) {
+    topic = "priority";
+    message = buildScoreReasoningResponse(context);
   } else if (
     normalized.includes("what ux issues") ||
     normalized.includes("ux issues") ||

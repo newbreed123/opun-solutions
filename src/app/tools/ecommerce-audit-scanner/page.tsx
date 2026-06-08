@@ -51,6 +51,56 @@ type AuditCategory = {
   influencingFindings?: string[];
 };
 
+type PositiveUxSignal = {
+  score: number;
+  label: "strong" | "moderate" | "weak" | "unknown";
+  evidence: string[];
+  scoreImpact: number;
+};
+
+type PositiveUxSignals = Record<
+  | "searchProminence"
+  | "categoryVisibility"
+  | "productDensity"
+  | "trustSignals"
+  | "hierarchyStrength"
+  | "navigationClarity"
+  | "commerceConfidence"
+  | "visualConsistency"
+  | "cartVisibility"
+  | "checkoutVisibility"
+  | "accountVisibility"
+  | "productDiscoveryStrength",
+  PositiveUxSignal
+>;
+
+type OverallScoreExplanation = {
+  positiveSignals: string[];
+  majorPenalties: string[];
+  whyThisScore: string;
+};
+
+type EcommerceMaturityScore = {
+  maturityScore: number;
+  maturityTier: "enterprise" | "mature" | "developing" | "early" | "unclear";
+  positiveSignals: string[];
+  maturityReducers: string[];
+  explanation: string;
+};
+
+type ScanCoverage = {
+  screenshotMode: "viewport" | "full-page";
+  domCoverage: "visible" | "full-page";
+  scoringCoverage: "above-fold" | "near-fold" | "full-page";
+  aboveFoldSignals: Record<string, boolean | number | undefined>;
+  nearFoldSignals: Record<string, boolean | number | undefined>;
+  fullPageSignals: Record<string, boolean | number | undefined>;
+  visualSignals: Record<string, boolean | number | undefined>;
+  manualConfirmationSignals?: Record<string, boolean | undefined>;
+  coverageSummary: string;
+  explanation: string;
+};
+
 type AuditResult = {
   scanId?: string;
   website: string;
@@ -59,6 +109,10 @@ type AuditResult = {
   overallScore: number;
   overallStatus: string;
   overallExplanation: string;
+  scoreExplanation?: OverallScoreExplanation;
+  positiveUxSignals?: PositiveUxSignals;
+  ecommerceMaturity?: EcommerceMaturityScore;
+  scanCoverage?: ScanCoverage;
   summary: string;
   executiveSummary: ExecutiveSummary;
   auditNarrative?: string;
@@ -843,6 +897,75 @@ export default function EcommerceAuditScannerPage() {
                     <p className="mt-3 text-sm leading-relaxed text-muted">
                       {audit.overallExplanation}
                     </p>
+                    {audit.scoreExplanation ? (
+                      <div className="mt-5 space-y-4 text-left text-sm leading-6">
+                        <div>
+                          <p className="font-semibold text-primary">
+                            Why this score
+                          </p>
+                          <p className="mt-1 text-muted">
+                            {audit.scoreExplanation.whyThisScore}
+                          </p>
+                        </div>
+                        {audit.ecommerceMaturity ? (
+                          <div>
+                            <p className="font-semibold text-primary">
+                              Ecommerce maturity
+                            </p>
+                            <p className="mt-1 text-muted">
+                              {audit.ecommerceMaturity.maturityTier} maturity,
+                              scored {audit.ecommerceMaturity.maturityScore}/100.
+                              {" "}
+                              {audit.ecommerceMaturity.explanation}
+                            </p>
+                          </div>
+                        ) : null}
+                        {audit.scoreExplanation.positiveSignals.length > 0 ? (
+                          <div>
+                            <p className="font-semibold text-primary">
+                              Positive signals
+                            </p>
+                            <ul className="mt-2 space-y-1 text-muted">
+                              {audit.scoreExplanation.positiveSignals
+                                .slice(0, 3)
+                                .map((signal) => (
+                                  <li key={signal}>+ {signal}</li>
+                                ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {audit.scoreExplanation.majorPenalties.length > 0 ? (
+                          <div>
+                            <p className="font-semibold text-primary">
+                              Score reducers
+                            </p>
+                            <ul className="mt-2 space-y-1 text-muted">
+                              {audit.scoreExplanation.majorPenalties
+                                .slice(0, 3)
+                                .map((penalty) => (
+                                  <li key={penalty}>- {penalty}</li>
+                                ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {audit.scanCoverage ? (
+                          <div>
+                            <p className="font-semibold text-primary">
+                              Scoring coverage
+                            </p>
+                            <p className="mt-1 text-muted">
+                              {audit.scanCoverage.coverageSummary ||
+                                audit.scanCoverage.explanation}
+                            </p>
+                            {audit.scanCoverage.coverageSummary ? (
+                              <p className="mt-1 text-muted">
+                                {audit.scanCoverage.explanation}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div>

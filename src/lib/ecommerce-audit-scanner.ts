@@ -2,11 +2,85 @@ import { randomUUID } from "crypto";
 import { mkdir, readdir, stat, unlink } from "fs/promises";
 import path from "path";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import playwrightPackage from "playwright/package.json";
 
 const screenshotDir = path.join(process.cwd(), "public", "audit-screenshots");
 const screenshotPublicPath = "/api/audit-screenshot";
 const screenshotMaxAgeMs = 1000 * 60 * 60;
 const navigationTimeoutMs = 15000;
+
+export type ScannerStage =
+  | "idle"
+  | "browser_launch"
+  | "browser_context_creation"
+  | "page_creation"
+  | "navigation_start"
+  | "navigation_complete"
+  | "screenshot_capture"
+  | "dom_extraction"
+  | "metrics_calculation"
+  | "report_generation"
+  | "complete"
+  | "failed";
+
+export type ScannerTimingMetrics = {
+  browserLaunchMs?: number;
+  browserContextCreationMs?: number;
+  pageCreationMs?: number;
+  navigationMs?: number;
+  screenshotMs?: number;
+  domExtractionMs?: number;
+  metricsCalculationMs?: number;
+  reportGenerationMs?: number;
+  totalScanMs?: number;
+};
+
+export type ScannerErrorDiagnostic = {
+  category: string;
+  name: string;
+  message: string;
+  stack?: string;
+  failedUrl: string;
+  elapsedTimeMs: number;
+  stage: ScannerStage;
+};
+
+export type ScannerStageLog = {
+  stage: ScannerStage;
+  message: string;
+  elapsedTimeMs: number;
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  viewport?: "desktop" | "mobile";
+  url?: string;
+};
+
+export type ScannerDiagnostics = {
+  scanId: string;
+  requestedUrl: string;
+  finalUrl?: string;
+  currentStage: ScannerStage;
+  startedAt: string;
+  completedAt?: string;
+  success: boolean;
+  timings: ScannerTimingMetrics;
+  stageLogs: ScannerStageLog[];
+  screenshotWarnings: string[];
+  screenshotErrors: ScannerErrorDiagnostic[];
+  screenshotSuccess: boolean;
+  screenshotModeUsed: "fullPage" | "viewport" | "skipped";
+  error?: ScannerErrorDiagnostic;
+};
+
+export type ScannerRuntimeInfo = {
+  nodeEnv: string;
+  nextRuntime: string;
+  platform: NodeJS.Platform;
+  playwrightVersion: string;
+  browserExecutablePath: string;
+};
+
+let lastScannerDiagnostics: ScannerDiagnostics | null = null;
 
 type ViewportScanResult = {
   screenshotUrl: string | null;
@@ -21,6 +95,7 @@ type ViewportMetadata = {
   commerceFlowSignals: CommerceFlowSignals;
   conversionSignals: ConversionSignals;
   storefrontSignals: StorefrontReviewSignals;
+  fullPageDomSignals: FullPageDomSignals;
   visualDomMetrics: VisualDomMetrics | null;
 };
 
@@ -92,12 +167,17 @@ export type LiveDiagnosticsResult = {
   commerceFlowSignals: CommerceFlowSignals;
   conversionSignals: ConversionSignals;
   storefrontSignals: StorefrontReviewSignals;
+  fullPageDomSignals: FullPageDomSignals;
   desktopVisualMetrics: VisualDomMetrics | null;
   mobileVisualMetrics: VisualDomMetrics | null;
   consoleErrors: string[];
   failedRequests: string[];
   warnings: string[];
+  screenshotWarnings: string[];
+  screenshotSuccess: boolean;
+  screenshotModeUsed: "fullPage" | "viewport" | "skipped";
   scanError?: string;
+  scanDiagnostics?: ScannerDiagnostics;
 };
 
 export type BoundingBox = {
@@ -193,6 +273,28 @@ export type StorefrontReviewSignals = {
   orderReturnsLanguageVisible: boolean;
 };
 
+export type FullPageDomSignals = {
+  visibleLinkCount: number;
+  headingCount: number;
+  buttonCount: number;
+  productCardCount: number;
+  formCount: number;
+  footerLinkCount: number;
+  cartVisible: boolean;
+  checkoutVisible: boolean;
+  searchVisible: boolean;
+  categoryProductVisible: boolean;
+  ctaVisible: boolean;
+  trustSignalsVisible: boolean;
+  shippingReturnsVisible: boolean;
+  orderReturnsVisible: boolean;
+  accountLoginVisible: boolean;
+  supportContactVisible: boolean;
+  productLinks: string[];
+  operationTerms: string[];
+  ctaLabels: string[];
+};
+
 type ViewportDefinition = {
   name: "desktop" | "mobile";
   width: number;
@@ -218,6 +320,172 @@ const mobileViewport: ViewportDefinition = {
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 };
 
+function createScannerDiagnostics(scanId: string, requestedUrl: string): ScannerDiagnostics {
+  return {
+    scanId,
+    requestedUrl,
+    currentStage: "idle",
+    startedAt: new Date().toISOString(),
+    success: false,
+    timings: {},
+    stageLogs: [],
+    screenshotWarnings: [],
+    screenshotErrors: [],
+    screenshotSuccess: false,
+    screenshotModeUsed: "skipped",
+  };
+}
+
+function elapsedSince(startedAt: string) {
+  return Date.now() - new Date(startedAt).getTime();
+}
+
+export function getLastScannerDiagnostics() {
+  return lastScannerDiagnostics;
+}
+
+export function getScannerRuntimeInfo(): ScannerRuntimeInfo {
+  let browserExecutablePath = "unknown";
+
+  try {
+    browserExecutablePath = chromium.executablePath();
+  } catch (error) {
+    browserExecutablePath = `unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+
+  return {
+    nodeEnv: process.env.NODE_ENV ?? "unknown",
+    nextRuntime: process.env.NEXT_RUNTIME ?? "nodejs",
+    platform: process.platform,
+    playwrightVersion: playwrightPackage.version,
+    browserExecutablePath,
+  };
+}
+
+export function addScannerStageLog(
+  diagnostics: ScannerDiagnostics | undefined,
+  stage: ScannerStage,
+  message: string,
+  details?: {
+    level?: "info" | "warn" | "error";
+    viewport?: "desktop" | "mobile";
+    url?: string;
+  },
+) {
+  if (!diagnostics) return;
+
+  diagnostics.currentStage = stage;
+  const log: ScannerStageLog = {
+    stage,
+    message,
+    elapsedTimeMs: elapsedSince(diagnostics.startedAt),
+    timestamp: new Date().toISOString(),
+    level: details?.level ?? "info",
+    viewport: details?.viewport,
+    url: details?.url,
+  };
+  diagnostics.stageLogs.push(log);
+
+  const payload = {
+    scanId: diagnostics.scanId,
+    requestedUrl: diagnostics.requestedUrl,
+    ...log,
+  };
+
+  if (log.level === "error") {
+    console.error("[scanner]", payload);
+  } else if (log.level === "warn") {
+    console.warn("[scanner]", payload);
+  } else {
+    console.info("[scanner]", payload);
+  }
+}
+
+function addTiming(
+  diagnostics: ScannerDiagnostics | undefined,
+  key: keyof ScannerTimingMetrics,
+  value: number,
+) {
+  if (!diagnostics) return;
+
+  diagnostics.timings[key] = Math.round((diagnostics.timings[key] ?? 0) + value);
+}
+
+function classifyScannerError(error: unknown, stage: ScannerStage) {
+  const text = `${error instanceof Error ? `${error.name} ${error.message} ${error.stack ?? ""}` : String(error)}`.toLowerCase();
+
+  if (stage === "browser_launch") return "Browser launch failed";
+  if (stage === "screenshot_capture") return "Screenshot capture failed";
+  if (stage === "dom_extraction") return "DOM extraction failed";
+  if (stage === "metrics_calculation") return "Visual metrics calculation failed";
+  if (/timeout|timed out|navigation timeout/.test(text)) return "Navigation timeout";
+  if (/err_name_not_resolved|dns|enotfound|getaddrinfo/.test(text)) return "DNS lookup failed";
+  if (/net::err|connection refused|econnreset|econnrefused|socket hang up/.test(text)) return "Network connection failed";
+  if (/403|blocked|captcha|bot|access denied|forbidden|challenge|cloudflare/.test(text)) return "Page blocked by anti-bot protection";
+  if (/navigation|goto|response status|http \d{3}/.test(text)) return "Navigation failed";
+
+  return `${stage.replace(/_/g, " ")} failed`;
+}
+
+function toScannerErrorDiagnostic(
+  error: unknown,
+  stage: ScannerStage,
+  diagnostics: ScannerDiagnostics,
+  failedUrl: string,
+): ScannerErrorDiagnostic {
+  return {
+    category: classifyScannerError(error, stage),
+    name: error instanceof Error ? error.name : "UnknownError",
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    failedUrl,
+    elapsedTimeMs: elapsedSince(diagnostics.startedAt),
+    stage,
+  };
+}
+
+function recordScannerError(
+  diagnostics: ScannerDiagnostics,
+  error: unknown,
+  stage: ScannerStage,
+  failedUrl: string,
+) {
+  const scannerError = toScannerErrorDiagnostic(error, stage, diagnostics, failedUrl);
+  diagnostics.currentStage = "failed";
+  diagnostics.success = false;
+  diagnostics.error = scannerError;
+  diagnostics.completedAt = new Date().toISOString();
+  diagnostics.timings.totalScanMs = scannerError.elapsedTimeMs;
+  addScannerStageLog(diagnostics, stage, scannerError.category, {
+    level: "error",
+    url: failedUrl,
+  });
+  lastScannerDiagnostics = diagnostics;
+  return scannerError;
+}
+
+export function finalizeScannerDiagnostics(
+  diagnostics: ScannerDiagnostics | undefined,
+  options: {
+    success: boolean;
+    reportGenerationMs?: number;
+    finalUrl?: string;
+  },
+) {
+  if (!diagnostics) return;
+
+  if (typeof options.reportGenerationMs === "number") {
+    addTiming(diagnostics, "reportGenerationMs", options.reportGenerationMs);
+  }
+
+  diagnostics.finalUrl = options.finalUrl ?? diagnostics.finalUrl;
+  diagnostics.success = options.success;
+  diagnostics.currentStage = options.success ? "complete" : diagnostics.currentStage;
+  diagnostics.completedAt = new Date().toISOString();
+  diagnostics.timings.totalScanMs = elapsedSince(diagnostics.startedAt);
+  lastScannerDiagnostics = diagnostics;
+}
+
 export async function runLightweightEcommerceDiagnostics(
   website: string,
 ): Promise<LiveDiagnosticsResult> {
@@ -225,13 +493,15 @@ export async function runLightweightEcommerceDiagnostics(
   await cleanupOldScreenshots();
 
   const scanId = randomUUID();
+  const scanDiagnostics = createScannerDiagnostics(scanId, website);
+  lastScannerDiagnostics = scanDiagnostics;
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   const warnings: string[] = [];
   let browser: Browser | null = null;
 
   try {
-    browser = await launchBrowser();
+    browser = await launchBrowser(scanDiagnostics);
 
     const desktop = await scanViewport({
       browser,
@@ -240,6 +510,7 @@ export async function runLightweightEcommerceDiagnostics(
       scanId,
       consoleErrors,
       failedRequests,
+      scanDiagnostics,
     });
 
     const mobile = await scanViewport({
@@ -249,6 +520,7 @@ export async function runLightweightEcommerceDiagnostics(
       scanId,
       consoleErrors,
       failedRequests,
+      scanDiagnostics,
     });
 
     if (!desktop.title) {
@@ -267,6 +539,11 @@ export async function runLightweightEcommerceDiagnostics(
       warnings.push(mobile.screenshotError);
     }
 
+    finalizeScannerDiagnostics(scanDiagnostics, {
+      success: true,
+      finalUrl: desktop.finalUrl || website,
+    });
+
     return {
       finalUrl: desktop.finalUrl || website,
       title: desktop.title,
@@ -281,13 +558,25 @@ export async function runLightweightEcommerceDiagnostics(
         desktop.storefrontSignals,
         mobile.storefrontSignals,
       ),
+      fullPageDomSignals: desktop.fullPageDomSignals,
       desktopVisualMetrics: desktop.visualDomMetrics,
       mobileVisualMetrics: mobile.visualDomMetrics,
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
+      screenshotWarnings: scanDiagnostics.screenshotWarnings,
+      screenshotSuccess: scanDiagnostics.screenshotSuccess,
+      screenshotModeUsed: scanDiagnostics.screenshotModeUsed,
+      scanDiagnostics,
     };
   } catch (error) {
+    const scannerError = recordScannerError(
+      scanDiagnostics,
+      error,
+      scanDiagnostics.currentStage === "idle" ? "browser_launch" : scanDiagnostics.currentStage,
+      website,
+    );
+
     return {
       finalUrl: website,
       title: null,
@@ -299,12 +588,17 @@ export async function runLightweightEcommerceDiagnostics(
       commerceFlowSignals: defaultCommerceFlowSignals(),
       conversionSignals: defaultConversionSignals(),
       storefrontSignals: defaultStorefrontReviewSignals(),
+      fullPageDomSignals: defaultFullPageDomSignals(),
       desktopVisualMetrics: null,
       mobileVisualMetrics: null,
       consoleErrors: uniqueMessages(consoleErrors).slice(0, 6),
       failedRequests: uniqueMessages(failedRequests).slice(0, 6),
       warnings,
-      scanError: friendlyScanError(error),
+      screenshotWarnings: scanDiagnostics.screenshotWarnings,
+      screenshotSuccess: scanDiagnostics.screenshotSuccess,
+      screenshotModeUsed: scanDiagnostics.screenshotModeUsed,
+      scanError: scannerError.category,
+      scanDiagnostics,
     };
   } finally {
     if (browser) {
@@ -320,6 +614,7 @@ async function scanViewport({
   scanId,
   consoleErrors,
   failedRequests,
+  scanDiagnostics,
 }: {
   browser: Browser;
   website: string;
@@ -327,10 +622,16 @@ async function scanViewport({
   scanId: string;
   consoleErrors: string[];
   failedRequests: string[];
+  scanDiagnostics: ScannerDiagnostics;
 }) {
   let context: BrowserContext | null = null;
 
   try {
+    const contextStart = Date.now();
+    addScannerStageLog(scanDiagnostics, "browser_context_creation", "Creating browser context", {
+      viewport: viewport.name,
+      url: website,
+    });
     context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       deviceScaleFactor: viewport.deviceScaleFactor ?? 1,
@@ -338,14 +639,27 @@ async function scanViewport({
       userAgent: viewport.userAgent,
       ignoreHTTPSErrors: true,
     });
+    addTiming(scanDiagnostics, "browserContextCreationMs", Date.now() - contextStart);
 
+    const pageStart = Date.now();
+    addScannerStageLog(scanDiagnostics, "page_creation", "Creating page", {
+      viewport: viewport.name,
+      url: website,
+    });
     const page = await context.newPage();
+    addTiming(scanDiagnostics, "pageCreationMs", Date.now() - pageStart);
     attachDiagnostics(page, consoleErrors, failedRequests);
 
+    const navigationStart = Date.now();
+    addScannerStageLog(scanDiagnostics, "navigation_start", "Navigating to submitted URL", {
+      viewport: viewport.name,
+      url: website,
+    });
     const response = await page.goto(website, {
       waitUntil: "domcontentloaded",
       timeout: navigationTimeoutMs,
     });
+    addTiming(scanDiagnostics, "navigationMs", Date.now() - navigationStart);
 
     if (!response) {
       throw new Error("The page did not return a response.");
@@ -355,13 +669,23 @@ async function scanViewport({
       throw new Error(`The page returned HTTP ${response.status()}.`);
     }
 
+    addScannerStageLog(scanDiagnostics, "navigation_complete", `Navigation complete with HTTP ${response.status()}`, {
+      viewport: viewport.name,
+      url: page.url(),
+    });
+
     await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => undefined);
 
+    const domStart = Date.now();
+    addScannerStageLog(scanDiagnostics, "dom_extraction", "Extracting DOM and storefront signals", {
+      viewport: viewport.name,
+      url: page.url(),
+    });
     const metadata: ViewportMetadata =
       viewport.name === "desktop"
         ? {
-            ...(await extractMetadata(page)),
-            visualDomMetrics: await extractVisualDomMetrics(page, viewport),
+            ...(await extractMetadata(page, scanDiagnostics)),
+            visualDomMetrics: await extractVisualDomMetrics(page, viewport, scanDiagnostics),
           }
         : {
             title: null,
@@ -371,10 +695,12 @@ async function scanViewport({
             commerceFlowSignals: defaultCommerceFlowSignals(),
             conversionSignals: defaultConversionSignals(),
             storefrontSignals: await extractStorefrontReviewSignals(page),
-            visualDomMetrics: await extractVisualDomMetrics(page, viewport),
+            fullPageDomSignals: defaultFullPageDomSignals(),
+            visualDomMetrics: await extractVisualDomMetrics(page, viewport, scanDiagnostics),
           };
+    addTiming(scanDiagnostics, "domExtractionMs", Date.now() - domStart);
 
-    const screenshot = await captureScreenshot(page, scanId, viewport);
+    const screenshot = await captureScreenshot(page, scanId, viewport, scanDiagnostics);
 
     return {
       finalUrl: page.url(),
@@ -411,7 +737,7 @@ function attachDiagnostics(
   });
 }
 
-async function extractMetadata(page: Page) {
+async function extractMetadata(page: Page, scanDiagnostics?: ScannerDiagnostics) {
   const title = cleanMetadataValue(await page.title().catch(() => ""));
   const metaDescription = cleanMetadataValue(
     await page
@@ -420,7 +746,7 @@ async function extractMetadata(page: Page) {
       .getAttribute("content")
       .catch(() => ""),
   );
-  const signalDetection = await detectPageSignals(page);
+  const signalDetection = await detectPageSignals(page, scanDiagnostics);
 
   return {
     title,
@@ -432,9 +758,16 @@ async function extractMetadata(page: Page) {
 async function extractVisualDomMetrics(
   page: Page,
   viewport: ViewportDefinition,
+  scanDiagnostics?: ScannerDiagnostics,
 ): Promise<VisualDomMetrics | null> {
+  const metricsStart = Date.now();
+  addScannerStageLog(scanDiagnostics, "metrics_calculation", "Calculating visual DOM metrics", {
+    viewport: viewport.name,
+    url: page.url(),
+  });
+
   try {
-    return await page.evaluate((viewportName) => {
+    const metrics = await page.evaluate((viewportName) => {
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
       const selectorFor = (element: Element) => {
@@ -555,7 +888,9 @@ async function extractVisualDomMetrics(
             item.width > 0 &&
             item.height > 0 &&
             item.bottom >= 0 &&
-            item.top <= viewportHeight * 1.3,
+            item.top <= viewportHeight * 1.3 &&
+            item.right >= -24 &&
+            item.left <= viewportWidth + 24,
         );
 
       const aboveFold = visible.filter(
@@ -809,7 +1144,23 @@ async function extractVisualDomMetrics(
         })),
       };
     }, viewport.name);
-  } catch {
+    addTiming(scanDiagnostics, "metricsCalculationMs", Date.now() - metricsStart);
+    return metrics;
+  } catch (error) {
+    addTiming(scanDiagnostics, "metricsCalculationMs", Date.now() - metricsStart);
+    if (scanDiagnostics) {
+      scanDiagnostics.error = toScannerErrorDiagnostic(
+        error,
+        "metrics_calculation",
+        scanDiagnostics,
+        page.url(),
+      );
+      addScannerStageLog(scanDiagnostics, "metrics_calculation", scanDiagnostics.error.category, {
+        level: "error",
+        viewport: viewport.name,
+        url: page.url(),
+      });
+    }
     return null;
   }
 }
@@ -1884,7 +2235,7 @@ function combineStorefrontSignals(
   };
 }
 
-async function detectPageSignals(page: Page) {
+async function detectPageSignals(page: Page, scanDiagnostics?: ScannerDiagnostics) {
   try {
     const pageData = await page.evaluate(() => {
       const scriptText = Array.from(document.scripts)
@@ -1944,6 +2295,73 @@ async function detectPageSignals(page: Page) {
         })
         .filter((label) => label && ctaPattern.test(label))
         .slice(0, 10);
+      const visibleElements = Array.from(document.querySelectorAll("body *"))
+        .map((element) => {
+          const htmlElement = element as HTMLElement;
+          const style = window.getComputedStyle(htmlElement);
+          const rect = htmlElement.getBoundingClientRect();
+          const text = (
+            htmlElement.textContent ||
+            htmlElement.getAttribute("aria-label") ||
+            htmlElement.getAttribute("title") ||
+            ""
+          )
+            .replace(/\s+/g, " ")
+            .trim();
+          const href =
+            htmlElement instanceof HTMLAnchorElement
+              ? htmlElement.href || htmlElement.getAttribute("href") || ""
+              : "";
+          const className =
+            typeof htmlElement.className === "string" ? htmlElement.className : "";
+          const id = htmlElement.id || "";
+
+          return {
+            element: htmlElement,
+            tag: htmlElement.tagName.toLowerCase(),
+            text,
+            href,
+            className,
+            id,
+            visible:
+              style.display !== "none" &&
+              style.visibility !== "hidden" &&
+              Number.parseFloat(style.opacity || "1") > 0.05 &&
+              rect.width > 0 &&
+              rect.height > 0,
+          };
+        })
+        .filter((item) => item.visible);
+      const fullPageText = visibleElements
+        .map((item) => item.text)
+        .filter(Boolean)
+        .join(" ");
+      const fullPageHaystack = `${fullPageText} ${linkSources}`.toLowerCase();
+      const visibleLinks = visibleElements.filter((item) => item.tag === "a");
+      const visibleButtons = visibleElements.filter(
+        (item) => item.tag === "button" || /button/i.test(item.className),
+      );
+      const fullPageCtaLabels = [...visibleLinks, ...visibleButtons]
+        .map((item) => item.text)
+        .filter((label) => label && ctaPattern.test(label))
+        .slice(0, 15);
+      const productPattern =
+        /product|products|collection|collections|category|categories|catalog|shop|sku|part number|price|\$\s?\d|\b\d+\.\d{2}\b/i;
+      const productLinks = visibleLinks
+        .filter((item) => productPattern.test(`${item.text} ${item.href}`))
+        .map((item) => item.text || item.href)
+        .filter(Boolean)
+        .slice(0, 20);
+      const productCards = visibleElements.filter((item) =>
+        productPattern.test(`${item.text} ${item.href} ${item.className} ${item.id}`),
+      );
+      const operationTermMatches = Array.from(
+        new Set(
+          (fullPageHaystack.match(
+            /shipping|delivery|pickup|returns?|refund|exchange|order status|track order|account|login|sign in|support|contact|customer service|help center/gi,
+          ) ?? []).map((term) => term.toLowerCase()),
+        ),
+      ).slice(0, 20);
 
       return {
         scriptText,
@@ -1956,6 +2374,30 @@ async function detectPageSignals(page: Page) {
         inputCount: document.querySelectorAll(
           "input:not([type='hidden']), textarea, select",
         ).length,
+        fullPageDomSignals: {
+          visibleLinkCount: visibleLinks.length,
+          headingCount: visibleElements.filter((item) => /^h[1-6]$/.test(item.tag)).length,
+          buttonCount: visibleButtons.length,
+          productCardCount: productCards.length,
+          formCount: document.querySelectorAll("form").length,
+          footerLinkCount: document.querySelectorAll("footer a[href]").length,
+          cartVisible: /\/cart|\bcart\b|basket\b|bag\b|shopping bag/.test(fullPageHaystack),
+          checkoutVisible: /checkout|place order|complete order|order now|buy now/.test(fullPageHaystack),
+          searchVisible:
+            document.querySelector('input[type="search"], input[placeholder*="Search" i], [aria-label*="search" i]') !==
+              null || /\bsearch\b/.test(fullPageHaystack),
+          categoryProductVisible: productLinks.length > 0 || productCards.length >= 3,
+          ctaVisible: fullPageCtaLabels.length > 0,
+          trustSignalsVisible:
+            /reviews?|testimonials?|star rating|rated|verified buyer|secure|guarantee|warranty/.test(fullPageHaystack),
+          shippingReturnsVisible: /shipping|delivery|pickup|returns?|exchange|refund/.test(fullPageHaystack),
+          orderReturnsVisible: /order status|track order|shipping|delivery|returns?|exchange|refund/.test(fullPageHaystack),
+          accountLoginVisible: /account|login|log in|sign in|my account|order history/.test(fullPageHaystack),
+          supportContactVisible: /contact|support|help center|customer service|live chat|email us|call us/.test(fullPageHaystack),
+          productLinks,
+          operationTerms: operationTermMatches,
+          ctaLabels: fullPageCtaLabels,
+        },
       };
     });
 
@@ -1987,14 +2429,29 @@ async function detectPageSignals(page: Page) {
         ctaLabels: pageData.ctaLabels,
       },
       storefrontSignals: await extractStorefrontReviewSignals(page),
+      fullPageDomSignals: pageData.fullPageDomSignals,
     };
-  } catch {
+  } catch (error) {
+    if (scanDiagnostics) {
+      scanDiagnostics.error = toScannerErrorDiagnostic(
+        error,
+        "dom_extraction",
+        scanDiagnostics,
+        page.url(),
+      );
+      addScannerStageLog(scanDiagnostics, "dom_extraction", scanDiagnostics.error.category, {
+        level: "error",
+        url: page.url(),
+      });
+    }
+
     return {
       technologyDetections: defaultTechnologyDetections(),
       platformDetection: defaultPlatformDetection(),
       commerceFlowSignals: defaultCommerceFlowSignals(),
       conversionSignals: defaultConversionSignals(),
       storefrontSignals: defaultStorefrontReviewSignals(),
+      fullPageDomSignals: defaultFullPageDomSignals(),
     };
   }
 }
@@ -2127,46 +2584,208 @@ function defaultStorefrontReviewSignals(): StorefrontReviewSignals {
   };
 }
 
+function defaultFullPageDomSignals(): FullPageDomSignals {
+  return {
+    visibleLinkCount: 0,
+    headingCount: 0,
+    buttonCount: 0,
+    productCardCount: 0,
+    formCount: 0,
+    footerLinkCount: 0,
+    cartVisible: false,
+    checkoutVisible: false,
+    searchVisible: false,
+    categoryProductVisible: false,
+    ctaVisible: false,
+    trustSignalsVisible: false,
+    shippingReturnsVisible: false,
+    orderReturnsVisible: false,
+    accountLoginVisible: false,
+    supportContactVisible: false,
+    productLinks: [],
+    operationTerms: [],
+    ctaLabels: [],
+  };
+}
+
 async function captureScreenshot(
   page: Page,
   scanId: string,
   viewport: ViewportDefinition,
+  scanDiagnostics?: ScannerDiagnostics,
 ): Promise<ViewportScanResult> {
   const filename = `${scanId}-${viewport.name}.png`;
   const filepath = path.join(screenshotDir, filename);
+  const screenshotStart = Date.now();
+  const attempts: Array<{
+    label: string;
+    mode: ScannerDiagnostics["screenshotModeUsed"];
+    fullPage: boolean;
+  }> = [
+    { label: "normal viewport screenshot", mode: "viewport", fullPage: false },
+    { label: "fallback viewport screenshot", mode: "viewport", fullPage: false },
+  ];
+  const warnings: string[] = [];
 
-  try {
-    await page.screenshot({
-      path: filepath,
-      fullPage: false,
-      animations: "disabled",
-      timeout: 10000,
+  await preparePageForScreenshot(page);
+
+  for (const attempt of attempts) {
+    addScannerStageLog(scanDiagnostics, "screenshot_capture", "Capturing screenshot", {
+      viewport: viewport.name,
+      url: page.url(),
     });
 
-    return {
-      screenshotUrl: `${screenshotPublicPath}/${filename}`,
-    };
-  } catch {
-    return {
-      screenshotUrl: null,
-      screenshotError: `${viewport.name} screenshot could not be captured for this URL.`,
-    };
+    try {
+      await page.screenshot({
+        path: filepath,
+        fullPage: attempt.fullPage,
+        animations: "disabled",
+        timeout: 20000,
+      });
+      addTiming(scanDiagnostics, "screenshotMs", Date.now() - screenshotStart);
+
+      if (scanDiagnostics) {
+        scanDiagnostics.screenshotSuccess = true;
+        scanDiagnostics.screenshotModeUsed = attempt.mode;
+        addScannerStageLog(scanDiagnostics, "screenshot_capture", `Screenshot captured with ${attempt.label}`, {
+          viewport: viewport.name,
+          url: page.url(),
+        });
+      }
+
+      return {
+        screenshotUrl: `${screenshotPublicPath}/${filename}`,
+      };
+    } catch (error) {
+      const screenshotError = scanDiagnostics
+        ? toScannerErrorDiagnostic(
+            error,
+            "screenshot_capture",
+            scanDiagnostics,
+            page.url(),
+          )
+        : null;
+      const warning =
+        error instanceof Error
+          ? `${viewport.name} ${attempt.label} failed: ${error.name}: ${error.message}`
+          : `${viewport.name} ${attempt.label} failed: ${String(error)}`;
+
+      warnings.push(warning);
+
+      if (scanDiagnostics && screenshotError) {
+        scanDiagnostics.screenshotWarnings.push(warning);
+        scanDiagnostics.screenshotErrors.push(screenshotError);
+        addScannerStageLog(scanDiagnostics, "screenshot_capture", warning, {
+          level: "warn",
+          viewport: viewport.name,
+          url: page.url(),
+        });
+      }
+    }
   }
+
+  addTiming(scanDiagnostics, "screenshotMs", Date.now() - screenshotStart);
+
+  if (scanDiagnostics) {
+    if (!scanDiagnostics.screenshotSuccess) {
+      scanDiagnostics.screenshotModeUsed = "skipped";
+    }
+  }
+
+  return {
+    screenshotUrl: null,
+    screenshotError:
+      warnings[warnings.length - 1] ??
+      `${viewport.name} screenshot could not be captured for this URL.`,
+  };
 }
 
-async function launchBrowser() {
+async function preparePageForScreenshot(page: Page) {
+  await page
+    .addStyleTag({
+      content: `
+        *, *::before, *::after {
+          animation-duration: 0s !important;
+          animation-delay: 0s !important;
+          transition-duration: 0s !important;
+          transition-delay: 0s !important;
+          scroll-behavior: auto !important;
+        }
+      `,
+    })
+    .catch((error) => {
+      console.warn("[scanner] screenshot preparation style injection failed", error);
+    });
+
+  await page
+    .evaluate(async () => {
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      if (document.fonts?.ready) {
+        await Promise.race([document.fonts.ready, sleep(1200)]).catch(() => undefined);
+      }
+
+      const pendingImages = Array.from(document.images)
+        .filter((image) => !image.complete)
+        .slice(0, 12);
+
+      if (pendingImages.length > 0) {
+        await Promise.race([
+          Promise.allSettled(
+            pendingImages.map((image) =>
+              typeof image.decode === "function"
+                ? image.decode().catch(() => undefined)
+                : Promise.resolve(),
+            ),
+          ),
+          sleep(1200),
+        ]).catch(() => undefined);
+      }
+    })
+    .catch((error) => {
+      console.warn("[scanner] screenshot preparation asset wait failed", error);
+    });
+}
+
+async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
   const launchOptions = {
     headless: true,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   };
+  const launchStart = Date.now();
 
   try {
-    return await chromium.launch({
+    addScannerStageLog(scanDiagnostics, "browser_launch", "Launching Chrome channel", {
+      url: scanDiagnostics?.requestedUrl,
+    });
+    const browser = await chromium.launch({
       ...launchOptions,
       channel: "chrome",
     });
-  } catch {
-    return chromium.launch(launchOptions);
+    addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
+    return browser;
+  } catch (chromeError) {
+    addScannerStageLog(scanDiagnostics, "browser_launch", "Chrome channel launch failed, falling back to bundled Chromium", {
+      level: "warn",
+      url: scanDiagnostics?.requestedUrl,
+    });
+
+    try {
+      const browser = await chromium.launch(launchOptions);
+      addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
+      return browser;
+    } catch (fallbackError) {
+      addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
+      if (scanDiagnostics) {
+        scanDiagnostics.error = toScannerErrorDiagnostic(
+          fallbackError,
+          "browser_launch",
+          scanDiagnostics,
+          scanDiagnostics.requestedUrl,
+        );
+      }
+      throw fallbackError;
+    }
   }
 }
 

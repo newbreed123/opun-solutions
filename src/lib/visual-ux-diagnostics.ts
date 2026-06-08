@@ -205,19 +205,36 @@ export function resolveVisualUxArchetype(scanContext: {
 }
 
 function metricBounds(metrics: VisualDomMetrics | null | undefined) {
-  const productBounds = metrics?.productCardBounds ?? [];
-  const textBounds = [...(metrics?.textBlockBounds ?? []), ...(metrics?.headingBounds ?? [])];
+  const viewportWidth = metrics?.viewportWidth ?? 0;
+  const viewportHeight = metrics?.viewportHeight ?? 0;
+  const intersectsViewport = (box: { left: number; right: number; top: number; height: number }) =>
+    viewportWidth > 0 &&
+    viewportHeight > 0 &&
+    box.right >= -24 &&
+    box.left <= viewportWidth + 24 &&
+    box.top + box.height >= -24 &&
+    box.top <= viewportHeight * 1.3;
+  const productBounds = (metrics?.productCardBounds ?? []).filter(intersectsViewport);
+  const textBounds = [...(metrics?.textBlockBounds ?? []), ...(metrics?.headingBounds ?? [])].filter(
+    intersectsViewport,
+  );
   const productLefts = productBounds.map((box) => box.left).filter(isNumber);
   const productRights = productBounds.map((box) => box.right).filter(isNumber);
   const textLefts = textBounds.map((box) => box.left).filter(isNumber);
   const textWidths = textBounds.map((box) => box.width).filter(isNumber);
+  const rawProductGridX = metrics?.productGridX;
+  const rawProductGridInViewport =
+    isNumber(rawProductGridX) &&
+    viewportWidth > 0 &&
+    rawProductGridX >= -24 &&
+    rawProductGridX <= viewportWidth + 24;
 
   const productGridX =
-    isNumber(metrics?.productGridX)
-      ? metrics.productGridX
-      : productLefts.length > 0
+    productLefts.length > 0
         ? Math.min(...productLefts)
-        : null;
+        : rawProductGridInViewport
+          ? rawProductGridX
+          : null;
   const productGridRight = productRights.length > 0 ? Math.max(...productRights) : null;
   const productGridWidth =
     isNumber(productGridX) && isNumber(productGridRight)
@@ -242,7 +259,10 @@ function metricBounds(metrics: VisualDomMetrics | null | undefined) {
     contentColumnX,
     contentColumnWidth,
     contentCandidateBounds: metrics?.contentCandidateBounds ?? null,
-    productGridCandidateBounds: metrics?.productGridCandidateBounds ?? null,
+    productGridCandidateBounds:
+      metrics?.productGridCandidateBounds && intersectsViewport(metrics.productGridCandidateBounds)
+        ? metrics.productGridCandidateBounds
+        : productBounds[0] ?? null,
   };
 }
 
@@ -260,7 +280,17 @@ function compactDebugBox(box: VisualDomMetrics["contentCandidateBounds"]) {
 }
 
 function aggregateProductGridBox(metrics: VisualDomMetrics | null | undefined) {
-  const boxes = metrics?.productCardBounds ?? [];
+  const viewportWidth = metrics?.viewportWidth ?? 0;
+  const viewportHeight = metrics?.viewportHeight ?? 0;
+  const boxes = (metrics?.productCardBounds ?? []).filter(
+    (box) =>
+      viewportWidth > 0 &&
+      viewportHeight > 0 &&
+      box.right >= -24 &&
+      box.left <= viewportWidth + 24 &&
+      box.top + box.height >= -24 &&
+      box.top <= viewportHeight * 1.3,
+  );
   if (boxes.length === 0) return null;
 
   const left = Math.min(...boxes.map((box) => box.left));
@@ -455,10 +485,18 @@ export function analyzeVisualUx({
   const desktopHasProducts = Boolean(desktop && (desktop.productCardsAboveFold > 0 || isNumber(desktop.firstProductCardY)));
   const isEnterprise = archetype === "Enterprise Retail / Marketplace";
   const isIndustrial = archetype === "Industrial Distributor / B2B Catalog";
+  const enterpriseImmediateDiscovery =
+    isEnterprise &&
+    hasProductContext &&
+    ((desktop?.productCardsAboveFold ?? 0) >= 4 ||
+      ((desktop?.imagesOrCardsAboveFold ?? 0) >= 8 &&
+        isNumber(desktop?.firstProductCardY) &&
+        (desktop?.firstProductCardY ?? 0) < (desktop?.viewportHeight ?? 1) * 0.65));
   const enterpriseHealthyLayout =
     isEnterprise &&
-    gapBucket === "healthy" &&
-    (metrics.contentToProductRatio === null || metrics.contentToProductRatio <= 1.1) &&
+    (enterpriseImmediateDiscovery ||
+      (gapBucket === "healthy" &&
+        (metrics.contentToProductRatio === null || metrics.contentToProductRatio <= 1.1))) &&
     (desktop?.productCardsAboveFold ?? 0) > 0;
 
   if (desktop) {
@@ -560,7 +598,11 @@ export function analyzeVisualUx({
     (desktop?.bodyTextBeforeFirstProductChars ?? 0) > 1500 ||
     ((mobile?.visibleTextCharactersAboveFold ?? 0) > 1500 && (mobile?.productCardsAboveFold ?? 0) === 0);
 
-  if (hasProductContext && (desktopProductLate || mobileProductLate || textHeavyBeforeProducts)) {
+  if (
+    hasProductContext &&
+    !enterpriseImmediateDiscovery &&
+    (desktopProductLate || mobileProductLate || textHeavyBeforeProducts)
+  ) {
     pushFinding(findings, {
       title: isIndustrial ? "Catalog Discovery Friction Needs Review" : "Product Discovery Pushed Below Content",
       severity: "High",
@@ -770,18 +812,25 @@ export function analyzeVisualUx({
   if (isEnterprise && !findings.some((finding) => finding.severity === "High")) {
     score = Math.max(score, 78);
   }
+  if (enterpriseImmediateDiscovery && !findings.some((finding) => finding.severity === "High")) {
+    score = Math.max(score, 84);
+  }
   if (isEnterprise && findings.length === 0) {
     score = 88;
   }
 
   const desktopConcernList = concernText(findings, "desktop");
   const mobileConcernList = concernText(findings, "mobile");
+  const enterpriseDiscoverySummary =
+    enterpriseImmediateDiscovery
+      ? "Immediate marketplace discovery was detected, so carousel/container gap metrics are treated as secondary to visible search, navigation, and product modules. "
+      : "";
   const summary =
     findings.length > 0
-      ? `Visual UX diagnostics classified this as ${archetype}. ${metricSummary ? `${metricSummary}. ` : ""}Found ${findings.length} layout, hierarchy, density, or product-discovery concern${findings.length === 1 ? "" : "s"}.${
+      ? `Visual UX diagnostics classified this as ${archetype}. ${enterpriseDiscoverySummary}${metricSummary ? `${metricSummary}. ` : ""}Found ${findings.length} layout, hierarchy, density, or product-discovery concern${findings.length === 1 ? "" : "s"}.${
           desktopConcernList.length > 0 ? ` Desktop: ${desktopConcernList.join(", ")}.` : ""
         }${mobileConcernList.length > 0 ? ` Mobile: ${mobileConcernList.join(", ")}.` : ""}`
-      : `Visual UX diagnostics classified this as ${archetype}. ${metricSummary ? `${metricSummary}. ` : ""}The measured layout did not cross the current desktop separation or content/product balance thresholds.`;
+      : `Visual UX diagnostics classified this as ${archetype}. ${enterpriseDiscoverySummary}${metricSummary ? `${metricSummary}. ` : ""}The measured layout did not cross the current desktop separation or content/product balance thresholds.`;
 
   return {
     score,

@@ -1360,6 +1360,62 @@ function ctaExactAnswer(
   };
 }
 
+function positiveSignalAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const explanation = asRecord(scanContext.scoreExplanation);
+  const maturity = asRecord(scanContext.ecommerceMaturity);
+  const positives = asArray(explanation.positiveSignals)
+    .map((signal) => asString(signal))
+    .filter(Boolean);
+  const penalties = asArray(explanation.majorPenalties)
+    .map((penalty) => asString(penalty))
+    .filter(Boolean);
+  const why = asString(explanation.whyThisScore);
+  const score =
+    typeof scanContext.score === "number" ? `${scanContext.score}/100` : "the current score";
+
+  return {
+    matched: true,
+    topic: "score_reasoning",
+    directAnswer: why || `The score is ${score} because the scan combines category scores, positive ecommerce maturity signals, and severity-adjusted findings.`,
+    evidence:
+      positives.length > 0
+        ? `Top positive signals: ${positives.slice(0, 3).join("; ")}.`
+        : typeof maturity.maturityScore === "number"
+          ? `Ecommerce maturity was scored at ${maturity.maturityScore}/100.`
+          : "The scan did not surface strong positive ecommerce maturity signals in the score explanation.",
+    businessMeaning:
+      penalties.length > 0
+        ? `Main score reducers: ${penalties.slice(0, 3).join("; ")}.`
+        : "There were no major score reducers listed beyond the category-level review items.",
+    suggestedFollowUp:
+      "Do you want me to compare the positive signals with the biggest reducers?",
+  };
+}
+
+function scanCoverageAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const coverage = asRecord(scanContext.scanCoverage);
+  const explanation = asString(coverage.explanation);
+  const coverageSummary = asString(coverage.coverageSummary);
+  const screenshotMode = asString(coverage.screenshotMode) || "viewport";
+  const domCoverage = asString(coverage.domCoverage) || "visible";
+  const scoringCoverage = asString(coverage.scoringCoverage) || "near-fold";
+
+  return {
+    matched: true,
+    topic: "score_coverage",
+    directAnswer:
+      "The scanner reviews the submitted URL, with heavier weighting on above-the-fold evidence for first impression and full-page DOM evidence for deeper commerce signals.",
+    evidence:
+      coverageSummary ||
+      explanation ||
+      `Screenshot mode: ${screenshotMode}; DOM coverage: ${domCoverage}; scoring coverage: ${scoringCoverage}.`,
+    businessMeaning:
+      "If something appears lower on the submitted page, it should count for operations, trust, product discovery, support, shipping/returns, account, and fulfillment signals. It may still carry less weight for hero clarity, primary CTA, search prominence, and mobile first impression.",
+    suggestedFollowUp:
+      "Do you want me to separate what the scanner measured from what still needs manual review?",
+  };
+}
+
 function getExactAnswer(
   message: string,
   rawScanContext: unknown,
@@ -1371,6 +1427,47 @@ function getExactAnswer(
   const glossaryAnswer = buildGlossaryExactAnswer(message, scanContext);
   if (glossaryAnswer.matched) {
     return glossaryAnswer;
+  }
+
+  if (
+    hasAny(normalized, [
+      "does this scan the full page",
+      "scan the full page",
+      "full page scan",
+      "above fold",
+      "near fold",
+      "what does the score actually measure",
+      "what does the score measure",
+      "what does this score measure",
+      "what is being measured",
+      "is the score only based on the top",
+      "only based on the top of the page",
+      "why did it miss something lower",
+      "miss something lower on the page",
+    ])
+  ) {
+    return scanCoverageAnswer(scanContext);
+  }
+
+  if (
+    hasAny(normalized, [
+      "why is the score this high",
+      "why is score this high",
+      "why is the score high",
+      "why is the score this low",
+      "why is score this low",
+      "why is the score low",
+      "why does amazon score",
+      "why amazon score",
+      "why does maxx score",
+      "positive signals",
+      "what positive signals",
+      "what strengths",
+      "why this score",
+      "score reasoning",
+    ])
+  ) {
+    return positiveSignalAnswer(scanContext);
   }
 
   if (
