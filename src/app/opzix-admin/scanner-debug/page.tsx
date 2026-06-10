@@ -68,6 +68,50 @@ export default async function ScannerDebugPage({
         </form>
       </div>
 
+      <DebugPanel title="Scan Summary" className="mb-6">
+        {lastScan ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KeyValue label="URL" value={lastScan.url} />
+            <KeyValue label="Success" value={lastScan.success ? "Yes" : "No"} />
+            <KeyValue
+              label="Overall Score"
+              value={formatOptionalNumber(lastScan.score)}
+            />
+            <KeyValue
+              label="Visual UX"
+              value={formatVisualUxScore(lastScan.visualUxScore)}
+            />
+            <KeyValue
+              label="Visual Metrics Available"
+              value={lastScan.visualMetricsAvailable ? "true" : "false"}
+            />
+            <KeyValue
+              label="Visual UX Confidence"
+              value={lastScan.visualUxConfidence}
+            />
+            <KeyValue
+              label="Scoring Confidence"
+              value={lastScan.scoringConfidence}
+            />
+            <KeyValue
+              label="Score Mismatch Warnings"
+              value={
+                lastScan.scoreMismatchWarnings.length
+                  ? lastScan.scoreMismatchWarnings.join("; ")
+                  : "None"
+              }
+            />
+            <KeyValue label="Site Type" value={lastScan.siteType ?? "Unknown"} />
+            <KeyValue label="Page Type" value={lastScan.pageType} />
+            <KeyValue label="Benchmark" value={lastScan.benchmark} />
+            <KeyValue label="Root Cause" value={formatRootCause(lastScan.rootCause)} />
+            <KeyValue label="Scan Time" value={formatScanTime(lastScan.scanTimeMs)} />
+          </div>
+        ) : (
+          <p className="text-secondary">No scanner debug record found yet.</p>
+        )}
+      </DebugPanel>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <DebugPanel title="Environment">
           <KeyValue label="NODE_ENV" value={runtime.nodeEnv} />
@@ -237,6 +281,34 @@ function KeyValue({ label, value }: { label: string; value: string }) {
       <p className="mt-1 break-all text-sm text-secondary">{value}</p>
     </div>
   );
+}
+
+function formatOptionalNumber(value: number | null | undefined) {
+  return typeof value === "number" ? String(value) : "n/a";
+}
+
+function formatVisualUxScore(value: number | null | undefined) {
+  return typeof value === "number" ? String(value) : "Unavailable";
+}
+
+function formatScanTime(value: number | null | undefined) {
+  return typeof value === "number" ? `${(value / 1000).toFixed(1)} seconds` : "n/a";
+}
+
+function formatRootCause(value: unknown) {
+  if (!value) return "None";
+
+  if (typeof value === "object") {
+    const details = value as {
+      category?: unknown;
+      message?: unknown;
+      name?: unknown;
+    };
+
+    return String(details.category ?? details.message ?? details.name ?? "Recorded");
+  }
+
+  return String(value);
 }
 
 function LockedState({ title, message }: { title: string; message: string }) {

@@ -65,7 +65,10 @@ export type VisualMetricsDebug = {
 };
 
 export type VisualUxDiagnosticsResult = {
-  score: number;
+  score: number | null;
+  visualMetricsAvailable: boolean;
+  visualUxConfidence: "High" | "Moderate" | "Low" | "Unavailable";
+  unavailableReason?: string;
   findings: VisualUxFinding[];
   summary: string;
   evidence: string[];
@@ -134,6 +137,15 @@ export function resolveVisualUxArchetype(scanContext: {
   scannedUrl?: string | null;
 }): VisualUxArchetype {
   const siteType = (scanContext.siteType || "").toLowerCase();
+  const productCount = scanContext.desktopDomMetrics?.productCardsAboveFold ?? 0;
+  const linkCount = scanContext.desktopDomMetrics?.visibleLinkCountAboveFold ?? 0;
+  const hasCommercePath = Boolean(
+    scanContext.commerceSignals?.cartVisible ||
+      scanContext.commerceSignals?.checkoutVisible ||
+      scanContext.productSignals?.productNavigationVisible ||
+      scanContext.productSignals?.collectionLinksVisible ||
+      productCount > 0,
+  );
   const haystack = [
     scanContext.scannedUrl,
     scanContext.platformName,
@@ -145,6 +157,15 @@ export function resolveVisualUxArchetype(scanContext: {
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
+
+  if (
+    !hasCommercePath &&
+    /lead generation|service business|consultation|appointment|real estate|quote request|contact|book|schedule|portfolio|services|wedding|event|music|lesson/.test(
+      siteType + haystack,
+    )
+  ) {
+    return "Lead Generation / Service Business";
+  }
 
   if (/grocery|supermarket|sprouts|publix|kroger|wholefoods|safeway|albertsons|wegmans|heb|meijer|harristeeter/.test(siteType + haystack)) {
     return "Grocery / Supermarket Retail";
@@ -173,7 +194,12 @@ export function resolveVisualUxArchetype(scanContext: {
     return "Industrial Distributor / B2B Catalog";
   }
 
-  if (/marketplace|enterprise retail|amazon|walmart|target|bestbuy|costco|seller|third-party/.test(siteType + haystack)) {
+  if (
+    hasCommercePath &&
+    /marketplace|enterprise retail|amazon|walmart|target|bestbuy|costco|third-party/.test(
+      siteType + haystack,
+    )
+  ) {
     return "Enterprise Retail / Marketplace";
   }
 
@@ -189,10 +215,8 @@ export function resolveVisualUxArchetype(scanContext: {
     return "Lead Generation / Service Business";
   }
 
-  const productCount = scanContext.desktopDomMetrics?.productCardsAboveFold ?? 0;
-  const linkCount = scanContext.desktopDomMetrics?.visibleLinkCountAboveFold ?? 0;
   const looksRetailDense = linkCount > 35 || productCount > 12;
-  if (looksRetailDense) return "Enterprise Retail / Marketplace";
+  if (looksRetailDense && hasCommercePath) return "Enterprise Retail / Marketplace";
 
   const looksDtc =
     siteType.includes("dtc") ||
@@ -384,12 +408,25 @@ export function analyzeVisualUx({
   const desktop = desktopDomMetrics ?? null;
   const mobile = mobileDomMetrics ?? null;
 
-  if (!desktop && !mobile) {
+  if (!desktop || !mobile) {
+    const missingViewports = [
+      !desktop ? "desktop" : "",
+      !mobile ? "mobile" : "",
+    ].filter(Boolean);
+
     return {
-      score: 100,
+      score: null,
+      visualMetricsAvailable: false,
+      visualUxConfidence: "Low",
+      unavailableReason:
+        "Visual metrics could not be calculated from the page.",
       findings,
-      summary: "Visual UX diagnostics were skipped because screenshot DOM metrics were not available.",
-      evidence,
+      summary:
+        "Visual UX metrics were unavailable for this scan, so visual layout quality should be treated as unavailable rather than perfect.",
+      evidence: [
+        `Visual metrics unavailable: ${missingViewports.join(" and ")} metrics were not captured.`,
+        "Visual metrics could not be calculated from the page.",
+      ],
       desktopConcerns: [],
       mobileConcerns: [],
       uxArchetype: "Unknown",
@@ -834,6 +871,10 @@ export function analyzeVisualUx({
 
   return {
     score,
+    visualMetricsAvailable: true,
+    visualUxConfidence: findings.some((finding) => finding.confidence === "Low")
+      ? "Moderate"
+      : "High",
     findings,
     summary,
     evidence: evidence.slice(0, 8),

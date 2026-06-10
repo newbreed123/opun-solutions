@@ -1554,7 +1554,7 @@ export function calculateEcommerceProbability(scanEvidence: {
     );
   const knownEnterpriseDomain = isKnownEnterpriseDomain(scanEvidence.finalUrl);
   const hasLeadOnlyLanguage =
-    /\b(contact us|request a quote|schedule a consultation|book a call|learn more|leadership|services|solutions)\b/i.test(
+    /\b(contact us|request a quote|schedule a consultation|book a call|book now|schedule|appointment|portfolio|wedding|event|music|lesson|performance|learn more|leadership|services|solutions)\b/i.test(
       scanEvidence.signalText,
     );
   const hasRealEstateLanguage =
@@ -1569,8 +1569,24 @@ export function calculateEcommerceProbability(scanEvidence: {
     /\b(sign in|log in|account portal|my account)\b/i.test(scanEvidence.signalText) &&
     !hasCommerceLanguage;
 
-  addEvidence(commerce?.cartVisible === true, 22, "Cart or shopping bag signals are visible.");
-  addEvidence(commerce?.checkoutVisible === true, 22, "Checkout or buy-now signals are visible.");
+  const hasConfirmedProductEvidence =
+    commerce?.productCatalogVisible === true ||
+    hasProductPath ||
+    hasPricePattern ||
+    hasProductSchema;
+  const hasConfirmedCommercePath =
+    hasConfirmedProductEvidence || knownEnterpriseDomain || hasStrongPlatformEvidence;
+
+  addEvidence(
+    commerce?.cartVisible === true && hasConfirmedCommercePath,
+    22,
+    "Cart or shopping bag signals are visible.",
+  );
+  addEvidence(
+    commerce?.checkoutVisible === true && hasConfirmedCommercePath,
+    22,
+    "Checkout or buy-now signals are visible.",
+  );
   addEvidence(commerce?.productCatalogVisible === true, 18, "Product or catalog paths are visible.");
   addEvidence(hasProductPath, 14, "Product, collection, catalog, or shop URLs are visible.");
   addEvidence(hasPricePattern, 12, "Price-like patterns are visible.");
@@ -1587,6 +1603,18 @@ export function calculateEcommerceProbability(scanEvidence: {
   addNegative(!hasPricePattern && !hasProductSchema, 8, "No price, product schema, or offer schema was detected.");
   addNegative(commerce?.formVisible === true && !hasCommerceLanguage, 8, "Lead form signals are stronger than purchase-flow signals.");
   addNegative(hasLeadOnlyLanguage && !hasCommerceLanguage, 12, "Service or lead-generation language dominates the visible page.");
+  addNegative(
+    hasLeadOnlyLanguage && !hasConfirmedProductEvidence,
+    24,
+    "Service or lead-generation language appears without product, catalog, price, or offer evidence.",
+  );
+  addNegative(
+    (commerce?.cartVisible === true || commerce?.checkoutVisible === true) &&
+      !hasConfirmedProductEvidence &&
+      !knownEnterpriseDomain,
+    16,
+    "Cart or checkout-like text appeared without product/catalog evidence.",
+  );
   addNegative(hasRealEstateLanguage && commerce?.checkoutVisible !== true, 18, "Real estate listing language appears without cart or checkout evidence.");
   addNegative(hasEducationLanguage && commerce?.checkoutVisible !== true, 10, "Education or content language appears without checkout evidence.");
   addNegative(hasAccountOnlyLanguage, 8, "Account or login language appears without a public purchase path.");
@@ -1611,6 +1639,14 @@ export function calculateEcommerceProbability(scanEvidence: {
     !knownEnterpriseDomain
   ) {
     score = Math.min(score, 42);
+  }
+
+  if (
+    hasLeadOnlyLanguage &&
+    !hasConfirmedProductEvidence &&
+    !knownEnterpriseDomain
+  ) {
+    score = Math.min(score, 24);
   }
 
   const probability = Math.max(0, Math.min(100, Math.round(score)));
@@ -2005,13 +2041,13 @@ export function detectCommerceFlowSignals(
   formCount: number,
   inputCount: number,
 ): CommerceFlowSignals {
-  const cartVisible = /\/cart|\bcart\b|add-to-cart|add to bag|basket\b|bag\b/i.test(
+  const cartVisible = /(?:^|[\\/"'\s_-])(?:cart|basket)(?:[\\/?#"'._\s-]|$)|add-to-cart|add to cart|add to bag|shopping[-_\s]?bag|shopping[-_\s]?cart|data-cart|cart-items|cart drawer/i.test(
     signalText,
   );
-  const checkoutVisible = /checkout|place order|complete order|order now|buy now/i.test(
+  const checkoutVisible = /(?:^|[\\/"'\s_-])checkout(?:[\\/?#"'._\s-]|$)|secure checkout|proceed to checkout|place order|complete order|order now|buy now/i.test(
     signalText,
   );
-  const productCatalogVisible = /\/products|\/collections|product-category|shop\//i.test(
+  const productCatalogVisible = /\/products?(?:[/?#]|$)|\/collections?(?:[/?#]|$)|product-category|\/catalog(?:[/?#]|$)|\/shop(?:[/?#]|$)|schema\.org\/Product|"@type"\s*:\s*"Product"/i.test(
     signalText,
   );
 
@@ -2346,7 +2382,7 @@ async function detectPageSignals(page: Page, scanDiagnostics?: ScannerDiagnostic
         .filter((label) => label && ctaPattern.test(label))
         .slice(0, 15);
       const productPattern =
-        /product|products|collection|collections|category|categories|catalog|shop|sku|part number|price|\$\s?\d|\b\d+\.\d{2}\b/i;
+        /\/products?(?:[/?#]|$)|\/collections?(?:[/?#]|$)|\/catalog(?:[/?#]|$)|\/shop(?:[/?#]|$)|product-category|sku|part number|price|\$\s?\d|\b\d+\.\d{2}\b/i;
       const productLinks = visibleLinks
         .filter((item) => productPattern.test(`${item.text} ${item.href}`))
         .map((item) => item.text || item.href)
@@ -2381,8 +2417,8 @@ async function detectPageSignals(page: Page, scanDiagnostics?: ScannerDiagnostic
           productCardCount: productCards.length,
           formCount: document.querySelectorAll("form").length,
           footerLinkCount: document.querySelectorAll("footer a[href]").length,
-          cartVisible: /\/cart|\bcart\b|basket\b|bag\b|shopping bag/.test(fullPageHaystack),
-          checkoutVisible: /checkout|place order|complete order|order now|buy now/.test(fullPageHaystack),
+          cartVisible: /(?:^|[\\/"'\s_-])(?:cart|basket)(?:[\\/?#"'._\s-]|$)|add-to-cart|add to cart|add to bag|shopping[-_\s]?bag|shopping[-_\s]?cart|data-cart|cart-items|cart drawer/.test(fullPageHaystack),
+          checkoutVisible: /(?:^|[\\/"'\s_-])checkout(?:[\\/?#"'._\s-]|$)|secure checkout|proceed to checkout|place order|complete order|order now|buy now/.test(fullPageHaystack),
           searchVisible:
             document.querySelector('input[type="search"], input[placeholder*="Search" i], [aria-label*="search" i]') !==
               null || /\bsearch\b/.test(fullPageHaystack),

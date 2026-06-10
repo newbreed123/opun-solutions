@@ -116,6 +116,8 @@ export function classifySiteType(scanContext: {
     diagnostics.commerceFlowSignals.ctaLabels.join(" "),
     diagnostics.conversionSignals.ctaLabels.join(" "),
     diagnostics.storefrontSignals.mobileCtaLabels.join(" "),
+    diagnostics.fullPageDomSignals.ctaLabels.join(" "),
+    diagnostics.fullPageDomSignals.productLinks.join(" "),
   ]
     .filter(Boolean)
     .join(" ")
@@ -128,7 +130,15 @@ export function classifySiteType(scanContext: {
 
   const hasCart = diagnostics.commerceFlowSignals.cartVisible;
   const hasCheckout = diagnostics.commerceFlowSignals.checkoutVisible;
-  const hasCatalog = diagnostics.commerceFlowSignals.productCatalogVisible || diagnostics.storefrontSignals.productNavigationVisible || diagnostics.storefrontSignals.collectionLinksVisible;
+  const fullPage = diagnostics.fullPageDomSignals;
+  const hasProductEvidence =
+    diagnostics.commerceFlowSignals.productCatalogVisible ||
+    diagnostics.storefrontSignals.productNavigationVisible ||
+    diagnostics.storefrontSignals.collectionLinksVisible ||
+    fullPage.categoryProductVisible ||
+    fullPage.productCardCount >= 2 ||
+    fullPage.productLinks.length >= 2;
+  const hasCatalog = hasProductEvidence;
   const hasForms = diagnostics.commerceFlowSignals.formVisible || diagnostics.storefrontSignals.leadCaptureVisible;
   const scannedUrl = diagnostics.finalUrl || scanContext.website;
   const groceryMatches = matchingTerms(text, groceryTerms);
@@ -210,13 +220,47 @@ export function classifySiteType(scanContext: {
   }
 
   // lead generation / services
-  const serviceTerms = ["contact", "book", "schedule", "consultation", "appointment", "agency", "real estate", "services", "get a quote", "request a demo"];
+  const serviceTerms = [
+    "contact",
+    "book",
+    "schedule",
+    "consultation",
+    "appointment",
+    "agency",
+    "real estate",
+    "services",
+    "get a quote",
+    "request a demo",
+    "portfolio",
+    "wedding",
+    "event",
+    "music",
+    "lesson",
+    "performance",
+  ];
   if (textIncludes(text, serviceTerms)) {
     evidence.push("Lead-generation or service-oriented language detected.");
   }
 
   // DTC brand heuristics: product/catalog + cart + platform hints (Shopify)
   const platformName = diagnostics.platformDetection?.platformName?.toLowerCase() || "";
+  const standardCommercePlatformVisible =
+    /shopify|bigcommerce|woocommerce|magento|adobe commerce/.test(platformName) &&
+    diagnostics.platformDetection.confidence >= 60;
+  const hasStrongCommerceEvidence =
+    hasProductEvidence &&
+    (hasCart || hasCheckout || standardCommercePlatformVisible);
+  const serviceOnlyEvidence =
+    (hasForms || textIncludes(text, serviceTerms)) &&
+    !hasProductEvidence &&
+    !domainIsKnownEnterprise(scannedUrl) &&
+    !isKnownGroceryDomain &&
+    !isKnownIndustrialDomain;
+
+  if (serviceOnlyEvidence) {
+    evidence.push("Service or lead-capture evidence outweighed product/catalog evidence.");
+  }
+
   if (hasCatalog && (hasCart || hasCheckout) && (platformName.includes("shopify") || textIncludes(text, ["brand", "shop now", "add to cart", "buy now"]))) {
     evidence.push("Brand storefront signals: product/catalog + cart/checkout and brand/Shopify hints detected.");
   }
@@ -241,7 +285,7 @@ export function classifySiteType(scanContext: {
   ) {
     siteType = "Industrial Distributor / B2B Catalog Commerce";
     score = isKnownIndustrialDomain ? 84 : 74;
-  } else if (ecommerceProbability.label === "Low") {
+  } else if (ecommerceProbability.label === "Low" || serviceOnlyEvidence) {
     // prefer lead-generation or non-ecommerce
     if (hasForms || textIncludes(text, serviceTerms)) {
       siteType = "Lead Generation / Service Business";
@@ -252,7 +296,7 @@ export function classifySiteType(scanContext: {
     }
   } else {
     // High or Moderate ecommerce probability
-    if (evidence.some((e) => e.includes("Marketplace")) || textIncludes(text, marketplaceTerms)) {
+    if (hasStrongCommerceEvidence && (evidence.some((e) => e.includes("Marketplace")) || textIncludes(text, marketplaceTerms))) {
       siteType = "Marketplace";
       score = 80;
     } else if (evidence.some((e) => e.includes("B2B")) || textIncludes(text, b2bTerms)) {
@@ -267,17 +311,17 @@ export function classifySiteType(scanContext: {
     } else if (evidence.some((e) => e.includes("Healthcare")) || textIncludes(text, healthcareTerms)) {
       siteType = "Healthcare Commerce";
       score = 76;
-    } else if ((hasCatalog || hasCart || hasCheckout) && (platformName.includes("shopify") || textIncludes(text, ["brand", "lifestyle", "shop now"]))) {
+    } else if (hasStrongCommerceEvidence && (platformName.includes("shopify") || textIncludes(text, ["brand", "lifestyle", "shop now"]))) {
       siteType = "DTC Brand";
       score = 78;
     } else if (domainIsKnownEnterprise(scannedUrl)) {
       // enterprise domains default to Enterprise Retail unless marketplace language
       siteType = textIncludes(text, marketplaceTerms) ? "Marketplace" : "Enterprise Retail";
       score = 82;
-    } else if (hasCatalog && !hasCart) {
+    } else if (hasProductEvidence && !hasCart) {
       siteType = "B2B Commerce"; // conservative fallback for catalog-driven commerce
       score = 60;
-    } else if (hasCatalog && hasCart) {
+    } else if (hasStrongCommerceEvidence) {
       siteType = "DTC Brand";
       score = 68;
     } else {

@@ -109,8 +109,11 @@ type AssistantCategory = {
   key: string;
   label: string;
   score: number;
+  scoreUnavailable?: boolean;
   status: string;
   statusDetail?: string;
+  evidenceState?: "Positive" | "Negative" | "Unknown";
+  scoringConfidence?: "High" | "Moderate" | "Low";
   purpose?: string;
   explanation: string;
   scoreExplanation?: {
@@ -158,10 +161,15 @@ type AssistantAudit = {
   generatedAt: string;
   overallScore: number;
   overallStatus: string;
+  scoringConfidence?: "High" | "Moderate" | "Low";
+  scoringConfidenceNote?: string;
+  scoreMismatchWarnings?: string[];
   scoreExplanation?: {
     positiveSignals: string[];
     majorPenalties: string[];
     whyThisScore: string;
+    scoringConfidence?: "High" | "Moderate" | "Low";
+    confidenceNote?: string;
   };
   positiveUxSignals?: Record<string, AssistantPositiveUxSignal>;
   ecommerceMaturity?: AssistantEcommerceMaturity;
@@ -193,7 +201,10 @@ type AssistantAudit = {
     }[];
   };
   visualUxDiagnostics?: {
-    score: number;
+    score: number | null;
+    visualMetricsAvailable?: boolean;
+    visualUxConfidence?: "High" | "Moderate" | "Low" | "Unavailable";
+    unavailableReason?: string;
     findings: {
       title: string;
       evidenceSummary: string;
@@ -432,6 +443,8 @@ type AnswerSection = {
 type ScanContext = {
   score: number;
   status: string;
+  scoringConfidence?: "High" | "Moderate" | "Low";
+  scoringConfidenceNote?: string;
   scoreExplanation?: AssistantAudit["scoreExplanation"];
   positiveUxSignals?: AssistantAudit["positiveUxSignals"];
   ecommerceMaturity?: AssistantAudit["ecommerceMaturity"];
@@ -447,6 +460,7 @@ type ScanContext = {
   auditNarrative?: string;
   primaryOperationalConcern: AssistantConcern | null;
   actionItems: AssistantRecommendedStep[];
+  categories?: AssistantCategory[];
   categoryFindings: Record<ConversationTopic, RetrievedFinding[]>;
   platformVisibility: string;
   commerceSignals: {
@@ -472,6 +486,7 @@ type ScanContext = {
   };
   benchmarkContext?: AssistantAudit["benchmarkContext"];
   visualUxDiagnostics?: AssistantAudit["visualUxDiagnostics"];
+  scoreMismatchWarnings?: string[];
 };
 
 type QuickReplyIntent =
@@ -1192,6 +1207,8 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
   return {
     score: audit.overallScore,
     status: audit.overallStatus,
+    scoringConfidence: audit.scoringConfidence,
+    scoringConfidenceNote: audit.scoringConfidenceNote,
     scoreExplanation: audit.scoreExplanation,
     positiveUxSignals: audit.positiveUxSignals,
     ecommerceMaturity: audit.ecommerceMaturity,
@@ -1210,6 +1227,7 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
     auditNarrative: audit.auditNarrative,
     primaryOperationalConcern: getPrimaryConcern(audit),
     actionItems: getTopActionItems(audit),
+    categories: audit.categories ?? [],
     categoryFindings: {
       ux: getFindingsByCategory(audit, "ux"),
       conversion: getFindingsByCategory(audit, "conversion"),
@@ -1294,6 +1312,7 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
       openGraph: null,
     },
     visualUxDiagnostics: audit.visualUxDiagnostics,
+    scoreMismatchWarnings: audit.scoreMismatchWarnings ?? [],
     consoleDiagnostics: {
       consoleErrors: audit.diagnostics.consoleErrors ?? [],
       failedRequests: audit.diagnostics.failedRequests ?? [],
@@ -1308,6 +1327,8 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
     url: audit.website,
     score: context.score,
     status: context.status,
+    scoringConfidence: context.scoringConfidence,
+    scoringConfidenceNote: context.scoringConfidenceNote,
     currentNarrativeArchetype: context.currentNarrativeArchetype,
     narrativeProfile: context.narrativeProfile,
     siteType: context.siteType,
@@ -1321,8 +1342,11 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
       key: category.key,
       label: category.label,
       score: category.score,
+      scoreUnavailable: category.scoreUnavailable,
       status: category.status,
       statusDetail: category.statusDetail,
+      evidenceState: category.evidenceState,
+      scoringConfidence: category.scoringConfidence,
       purpose: category.purpose,
       priority: category.priority,
       scoreExplanation: category.scoreExplanation,
@@ -1337,6 +1361,7 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
     trackingVisibility: getTrackingSummary(audit),
     benchmarkContext: context.benchmarkContext,
     visualUxDiagnostics: context.visualUxDiagnostics,
+    scoreMismatchWarnings: context.scoreMismatchWarnings,
     storefrontIdentityProfile: audit.storefrontIdentityProfile,
     commerceSignals: context.commerceSignals,
     exactCommerceVisibility: {
@@ -1988,6 +2013,13 @@ function getVisualFirstPriorityFinding(context: ScanContext) {
 }
 
 function visualUxMetricPhrase(context: ScanContext) {
+  if (
+    context.visualUxDiagnostics?.visualMetricsAvailable === false ||
+    context.visualUxDiagnostics?.score === null
+  ) {
+    return "The visual engine was unavailable for this scan, so visual UX should be treated as unavailable rather than perfect.";
+  }
+
   const metrics = context.visualUxDiagnostics?.metrics;
   const archetype = context.visualUxDiagnostics?.uxArchetype;
   const gapPx = metrics?.desktopGapPx;
@@ -2026,7 +2058,7 @@ function visualUxMetricPhrase(context: ScanContext) {
 
 function visualUxDirectAnswer(
   finding: RetrievedFinding,
-  score?: number,
+  score?: number | null,
   metricPhrase = "",
 ) {
   const scorePhrase =
@@ -2044,7 +2076,82 @@ function visualUxDirectAnswer(
   );
 }
 
+function visualUxUnavailableAnswer(context: ScanContext) {
+  const reason =
+    context.visualUxDiagnostics?.unavailableReason ??
+    "Visual metrics could not be calculated from the page.";
+
+  return `It should not be 100. The visual engine was unavailable for this scan. The score should be treated as unavailable rather than perfect. ${reason}`;
+}
+
+function getUxUiCategory(context: ScanContext) {
+  return (context.categories ?? []).find((category) => {
+    const key = `${category.key} ${category.label}`.toLowerCase();
+    return key.includes("ux") || key.includes("ui");
+  });
+}
+
+function buildScoreSynchronizationResponse(context: ScanContext): ChatMessage {
+  const visualScore = context.visualUxDiagnostics?.score;
+  const visualUnavailable =
+    context.visualUxDiagnostics?.visualMetricsAvailable === false ||
+    visualScore === null;
+  const uxCategory = getUxUiCategory(context);
+
+  if (visualUnavailable) {
+    return buildMessage(
+      `assistant-score-sync-visual-unavailable-${Date.now()}`,
+      [
+        "UX/UI should be evidence unknown or low confidence when visual metrics fail, not a confident numeric score.",
+        "Visual metrics were unavailable for this scan, so UX/UI should not create a strong positive or negative impact on the overall score.",
+        "The corrected report should show UX/UI as Evidence Unknown with the main driver: Visual metrics unavailable, so UX/UI was not fully scored.",
+      ],
+      { topic: "ux" },
+    );
+  }
+
+  if (
+    typeof visualScore === "number" &&
+    visualScore >= 80 &&
+    uxCategory &&
+    !uxCategory.scoreUnavailable &&
+    uxCategory.score < 70
+  ) {
+    return buildMessage(
+      `assistant-score-sync-visual-strong-${Date.now()}`,
+      [
+        `That is a score mismatch: Visual UX is ${visualScore}/100, but UX/UI is ${uxCategory.score}/100.`,
+        "UX/UI should not fall that far below a strong Visual UX score unless there is a clearly severe customer-facing UX reducer.",
+        "This should be corrected by making UX/UI derive from Visual UX plus product discovery, navigation clarity, mobile hierarchy, and confidence.",
+      ],
+      { topic: "ux" },
+    );
+  }
+
+  return buildMessage(
+    `assistant-score-sync-${Date.now()}`,
+    [
+      "Visual UX Review and UX/UI should be synchronized through the same evidence state.",
+      "If visual metrics are available, UX/UI should reflect that score plus product discovery, navigation clarity, mobile hierarchy, and confidence. If visual metrics are unavailable, UX/UI should be Evidence Unknown or a clearly marked low-confidence fallback.",
+    ],
+    { topic: "ux" },
+  );
+}
+
 function buildScoreReasoningResponse(context: ScanContext): ChatMessage {
+  if (context.scoringConfidence === "Low") {
+    return buildMessage(
+      `assistant-score-low-confidence-${Date.now()}`,
+      [
+        "Visual metrics and DOM extraction were unavailable during this scan. The score should be treated as low confidence rather than a confirmed assessment of the site's quality.",
+        context.scoringConfidenceNote ??
+          "Some scanner subsystems could not evaluate this page. Findings should be treated as directional until visual and DOM extraction complete successfully.",
+        "I would rerun the scan or manually verify the page before treating category reducers as confirmed issues.",
+      ],
+      { topic: "priority" },
+    );
+  }
+
   const positives = context.scoreExplanation?.positiveSignals ?? [];
   const penalties = context.scoreExplanation?.majorPenalties ?? [];
   const maturity = context.ecommerceMaturity;
@@ -3083,7 +3190,18 @@ function answerDirectQuestion(
     finding =
       context.categoryFindings.metadata[0] ?? metadataFinding(context.metadata);
   } else if (
+    (normalized.includes("visual ux") && normalized.includes("ux/ui")) ||
+    normalized.includes("score mismatch") ||
+    normalized.includes("ux/ui 59") ||
+    normalized.includes("ux/ui 72") ||
+    normalized.includes("visual metrics failed")
+  ) {
+    topic = "ux";
+    message = buildScoreSynchronizationResponse(context);
+  } else if (
     normalized.includes("is this ecommerce") ||
+    normalized.includes("is this an ecommerce") ||
+    normalized.includes("ecommerce webpage") ||
     normalized.includes("what kind of site") ||
     normalized.includes("site type") ||
     normalized.includes("what kind of business") ||
@@ -3106,7 +3224,12 @@ function answerDirectQuestion(
   ) {
     topic = "platform";
     const profile = context.narrativeProfile;
-    const siteType = context.siteType ?? "non-ecommerce-or-unclear";
+    const reviewSiteType = context.storefrontReviewContext?.siteType;
+    const siteType =
+      reviewSiteType === "lead-generation" ||
+      reviewSiteType === "non-ecommerce-or-unclear"
+        ? reviewSiteType
+        : context.siteType ?? reviewSiteType ?? "non-ecommerce-or-unclear";
     const reason =
       context.siteTypeReason ??
       context.storefrontReviewContext?.reason ??
@@ -3117,6 +3240,7 @@ function answerDirectQuestion(
         .join(" ") ?? "";
     const isStandardStorefront = siteType === "ecommerce-storefront";
     const isNonEcommerce = siteType === "non-ecommerce-or-unclear";
+    const isLeadGeneration = siteType === "lead-generation";
     const isEnterprise =
       siteType === "enterprise-retail" || siteType === "custom-enterprise";
     const ecommerceProbability = context.platform.ecommerceProbability;
@@ -3128,11 +3252,13 @@ function answerDirectQuestion(
       topic,
       directAnswer: isGroceryNarrativeProfile(profile)
         ? groceryRetailAnswer()
+        : isLeadGeneration
+          ? "I would classify this as a service or lead-generation business page, not a retail ecommerce storefront. The scan needs product/catalog and cart/checkout evidence before calling it ecommerce."
+        : lowProbability || isNonEcommerce
+          ? "I would not classify this as an ecommerce storefront from the public scan. The page did not expose enough product, cart, checkout, or purchase-flow signals."
         : profile?.narrativeMode
           ? `I would frame this as ${profile.narrativeMode.toLowerCase()}. ${profile.narrativeProfileSummary ?? profile.businessContext ?? ""}`.trim()
-          : lowProbability
-            ? "I would not classify this as an ecommerce storefront from the public scan. The page did not expose enough product, cart, checkout, or purchase-flow signals."
-            : unclearProbability
+          : unclearProbability
               ? "The ecommerce probability is unclear from this URL. The page may support commerce elsewhere, but this scan should not assume a full ecommerce storefront without manual confirmation."
               : isStandardStorefront
                 ? "Yes. From the public scan, this page exposes enough ecommerce signals to review it as a storefront."
@@ -3141,17 +3267,22 @@ function answerDirectQuestion(
                   : isEnterprise
                     ? "This looks more like an enterprise or custom commerce environment than a standard storefront template."
                     : `I would classify this as ${siteType.replace(/-/g, " ")} from the public scan.`,
-      evidence: ecommerceProbability
-        ? sanitizeEvidenceText(
-            `Ecommerce probability is ${ecommerceProbability.label} at ${ecommerceProbability.probability}%. ${ecommerceProbability.evidence.slice(0, 2).join(" ")} ${ecommerceProbability.negativeSignals.slice(0, 2).join(" ")}`,
-          )
-        : sanitizeEvidenceText(`${reason} ${supportingSignals}`),
+      evidence:
+        isLeadGeneration || isNonEcommerce
+          ? sanitizeEvidenceText(
+              `${reason} ${supportingSignals} Product/catalog and cart/checkout evidence were not strong enough to confirm ecommerce.`,
+            )
+          : ecommerceProbability
+            ? sanitizeEvidenceText(
+                `Ecommerce probability is ${ecommerceProbability.label} at ${ecommerceProbability.probability}%. ${ecommerceProbability.evidence.slice(0, 2).join(" ")} ${ecommerceProbability.negativeSignals.slice(0, 2).join(" ")}`,
+              )
+            : sanitizeEvidenceText(`${reason} ${supportingSignals}`),
       businessMeaning: isGroceryNarrativeProfile(profile)
         ? "Grocery retail has a different customer journey than a typical brand-owned DTC storefront: shoppers often start with search, departments, weekly offers, fulfillment choice, store location, loyalty, or cart recovery rather than lifestyle product storytelling."
+        : lowProbability || isNonEcommerce || isLeadGeneration
+            ? "The first review question is whether this is the right commerce entry point, or whether buying happens elsewhere, behind login, through a lead path, or outside this public page."
         : profile?.businessContext
           ? `The audit sounds different because the scan is using ${profile.businessContext}. The first review priority is ${profile.concernPriority ?? "the visible journey context"}.`
-          : lowProbability || isNonEcommerce
-            ? "The first review question is whether this is the right commerce entry point, or whether buying happens elsewhere, behind login, through a lead path, or outside this public page."
             : isEnterprise
               ? "Cart, checkout, and platform details may be intentionally abstracted, so the scan should stay conservative until a manual review confirms the actual journey."
               : "The site type changes how I would read the findings: a catalog, lead-gen, or education journey should not be judged exactly like a retail checkout flow.",
@@ -3303,6 +3434,9 @@ function answerDirectQuestion(
     normalized.includes("why is the score this low") ||
     normalized.includes("why is score this low") ||
     normalized.includes("why is the score low") ||
+    normalized.includes("why is walmart scoring low") ||
+    normalized.includes("why walmart scoring low") ||
+    normalized.includes("why is walmart score low") ||
     normalized.includes("why does amazon score") ||
     normalized.includes("why amazon score") ||
     normalized.includes("why does maxx score") ||
@@ -3340,11 +3474,26 @@ function answerDirectQuestion(
     normalized.includes("product grid")
   ) {
     topic = "ux";
-    finding =
-      getVisualUxFindings(context)[0] ??
-      getVisualFirstPriorityFinding(context)?.finding ??
-      null;
-    message = finding
+    if (
+      context.visualUxDiagnostics?.visualMetricsAvailable === false ||
+      context.visualUxDiagnostics?.score === null
+    ) {
+      message = buildMessage(
+        `assistant-direct-visual-ux-unavailable-${Date.now()}`,
+        [
+          visualUxUnavailableAnswer(context),
+          "Visual UX should not add a positive or negative scoring signal when the underlying visual metrics are missing.",
+          "Do you want me to explain which navigation, commerce, tracking, operations, and DOM signals drove the score instead?",
+        ],
+        { topic },
+      );
+      finding = null;
+    } else {
+      finding =
+        getVisualUxFindings(context)[0] ??
+        getVisualFirstPriorityFinding(context)?.finding ??
+        null;
+      message = finding
       ? buildScanAnswer({
           id: `assistant-direct-visual-ux-${Date.now()}`,
           topic,
@@ -3366,6 +3515,7 @@ function answerDirectQuestion(
           finding,
         })
       : buildFindingListAnswer(topic, context);
+    }
   } else if (
     normalized.includes("ux issues") ||
     normalized.includes("ux/ui") ||

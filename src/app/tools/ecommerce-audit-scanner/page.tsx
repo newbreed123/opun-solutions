@@ -32,12 +32,35 @@ import {
   X,
 } from "lucide-react";
 
+function formatVisualUxScore(score: number | null | undefined) {
+  return typeof score === "number" ? `${score}/100` : "Unavailable";
+}
+
+function isNonStorefrontAudit(audit: AuditResult) {
+  const siteType = `${audit.siteType ?? ""} ${audit.storefrontReviewContext?.siteType ?? ""}`.toLowerCase();
+
+  return (
+    siteType.includes("non-ecommerce") ||
+    siteType.includes("lead-generation") ||
+    siteType.includes("lead generation")
+  );
+}
+
+function reportTitle(audit: AuditResult) {
+  return isNonStorefrontAudit(audit)
+    ? `Website Audit Preview for ${audit.website}`
+    : `Ecommerce Audit Preview for ${audit.website}`;
+}
+
 type AuditCategory = {
   key: string;
   label: string;
   score: number;
+  scoreUnavailable?: boolean;
   status: string;
   statusDetail?: string;
+  evidenceState?: "Positive" | "Negative" | "Unknown";
+  scoringConfidence?: "High" | "Moderate" | "Low";
   purpose?: string;
   explanation: string;
   scoreExplanation?: {
@@ -78,6 +101,8 @@ type OverallScoreExplanation = {
   positiveSignals: string[];
   majorPenalties: string[];
   whyThisScore: string;
+  scoringConfidence?: "High" | "Moderate" | "Low";
+  confidenceNote?: string;
 };
 
 type EcommerceMaturityScore = {
@@ -109,6 +134,9 @@ type AuditResult = {
   overallScore: number;
   overallStatus: string;
   overallExplanation: string;
+  scoringConfidence?: "High" | "Moderate" | "Low";
+  scoringConfidenceNote?: string;
+  scoreMismatchWarnings?: string[];
   scoreExplanation?: OverallScoreExplanation;
   positiveUxSignals?: PositiveUxSignals;
   ecommerceMaturity?: EcommerceMaturityScore;
@@ -125,7 +153,10 @@ type AuditResult = {
   topPriorityRisks: TopPriorityRisk[];
   heuristicFindings?: HeuristicFinding[];
   visualUxDiagnostics: {
-    score: number;
+    score: number | null;
+    visualMetricsAvailable?: boolean;
+    visualUxConfidence?: "High" | "Moderate" | "Low" | "Unavailable";
+    unavailableReason?: string;
     findings: VisualUxFinding[];
     summary: string;
     desktopConcerns: string[];
@@ -362,7 +393,7 @@ function statusBadgeClasses(status: string) {
     return "border-orange-300/35 bg-orange-400/10 text-orange-100";
   }
 
-  if (status === "Needs Review" || status === "Medium") {
+  if (status === "Needs Review" || status === "Medium" || status === "Evidence Unknown") {
     return "border-amber-300/35 bg-amber-400/10 text-amber-100";
   }
 
@@ -483,6 +514,11 @@ function platformMarketingInterpretation(audit: AuditResult) {
   const marketingTools = getVisibleMarketingTools(audit.diagnostics);
   const commerce = audit.diagnostics.commerceFlowSignals;
   const probability = platform.ecommerceProbability;
+  const nonStorefront = isNonStorefrontAudit(audit);
+
+  if (nonStorefront) {
+    return "This public page appears to support a service or lead-generation journey. Product, catalog, cart, and checkout evidence should be confirmed before treating it as ecommerce.";
+  }
 
   if (probability?.label === "Low") {
     return "Ecommerce probability low. Platform detection skipped. This page does not expose enough product, cart, checkout, or purchase-flow evidence to classify it as a standard ecommerce storefront.";
@@ -897,6 +933,18 @@ export default function EcommerceAuditScannerPage() {
                     <p className="mt-3 text-sm leading-relaxed text-muted">
                       {audit.overallExplanation}
                     </p>
+                    {audit.scoringConfidence ? (
+                      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
+                          Scoring Confidence: {audit.scoringConfidence}
+                        </p>
+                        {audit.scoringConfidenceNote ? (
+                          <p className="mt-2 text-sm leading-6 text-muted">
+                            {audit.scoringConfidenceNote}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {audit.scoreExplanation ? (
                       <div className="mt-5 space-y-4 text-left text-sm leading-6">
                         <div>
@@ -973,7 +1021,7 @@ export default function EcommerceAuditScannerPage() {
                       Report Generated
                     </p>
                     <h2 className="mt-3 break-words text-3xl font-bold text-primary md:text-4xl">
-                      Ecommerce Audit Preview for {audit.website}
+                      {reportTitle(audit)}
                     </h2>
                     <p className="mt-4 leading-relaxed text-secondary">
                       {audit.summary}
@@ -989,22 +1037,33 @@ export default function EcommerceAuditScannerPage() {
                           </div>
                           <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em] text-muted">
                             <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
-                              Score {audit.visualUxDiagnostics.score}/100
+                              Score {formatVisualUxScore(audit.visualUxDiagnostics.score)}
                             </span>
                             <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
-                              {audit.visualUxDiagnostics.desktopConcerns
-                                .length > 0
+                              Confidence {audit.visualUxDiagnostics.visualUxConfidence ?? "High"}
+                            </span>
+                            <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
+                              {audit.visualUxDiagnostics.visualMetricsAvailable === false
+                                ? "Desktop metrics unavailable"
+                                : audit.visualUxDiagnostics.desktopConcerns.length > 0
                                 ? `${audit.visualUxDiagnostics.desktopConcerns.length} desktop concern${audit.visualUxDiagnostics.desktopConcerns.length === 1 ? "" : "s"}`
                                 : "No desktop concerns"}
                             </span>
                             <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
-                              {audit.visualUxDiagnostics.mobileConcerns.length >
-                              0
+                              {audit.visualUxDiagnostics.visualMetricsAvailable === false
+                                ? "Mobile metrics unavailable"
+                                : audit.visualUxDiagnostics.mobileConcerns.length >
+                                  0
                                 ? `${audit.visualUxDiagnostics.mobileConcerns.length} mobile concern${audit.visualUxDiagnostics.mobileConcerns.length === 1 ? "" : "s"}`
                                 : "No mobile concerns"}
                             </span>
                           </div>
                         </div>
+                        {audit.visualUxDiagnostics.visualMetricsAvailable === false ? (
+                          <p className="mt-3 text-sm text-secondary">
+                            Reason: {audit.visualUxDiagnostics.unavailableReason ?? "Visual metrics could not be calculated from the page."}
+                          </p>
+                        ) : null}
                         {audit.visualUxDiagnostics.findings.length > 0 ? (
                           <div className="mt-5 space-y-3">
                             {audit.visualUxDiagnostics.findings
@@ -1313,11 +1372,25 @@ export default function EcommerceAuditScannerPage() {
                         >
                           {category.status}
                         </span>
+                        {category.scoringConfidence ? (
+                          <span className="inline-flex w-fit rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-muted">
+                            {category.scoringConfidence} confidence
+                          </span>
+                        ) : null}
+                        {category.evidenceState === "Unknown" ? (
+                          <span className="inline-flex w-fit rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-amber-100">
+                            Evidence unknown
+                          </span>
+                        ) : null}
                       </div>
                       <p
-                        className={`mt-5 text-4xl font-black ${scoreTone(category.score)}`}
+                        className={`mt-5 text-4xl font-black ${
+                          category.scoreUnavailable
+                            ? "text-muted"
+                            : scoreTone(category.score)
+                        }`}
                       >
-                        {category.score}
+                        {category.scoreUnavailable ? "—" : category.score}
                       </p>
                       <p className="mt-2 text-sm font-bold leading-snug text-primary">
                         {scoreContext(category)}
@@ -1333,7 +1406,11 @@ export default function EcommerceAuditScannerPage() {
                       <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-brand-blue to-brand-cyan"
-                          style={{ width: `${category.score}%` }}
+                          style={{
+                            width: category.scoreUnavailable
+                              ? "0%"
+                              : `${category.score}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -1349,6 +1426,7 @@ export default function EcommerceAuditScannerPage() {
                   visibleMarketingTools.length,
                 );
                 const commerce = audit.diagnostics.commerceFlowSignals;
+                const nonStorefront = isNonStorefrontAudit(audit);
 
                 return (
                   <div className="card-elevated p-6 md:p-8">
@@ -1358,7 +1436,9 @@ export default function EcommerceAuditScannerPage() {
                           Platform & Marketing Visibility
                         </p>
                         <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
-                          What the storefront makes visible
+                          {nonStorefront
+                            ? "What the public page makes visible"
+                            : "What the storefront makes visible"}
                         </h3>
                         <p className="mt-4 text-lg leading-relaxed text-secondary">
                           {platformMarketingInterpretation(audit)}
@@ -1370,9 +1450,9 @@ export default function EcommerceAuditScannerPage() {
                           Executive use
                         </p>
                         <p className="mt-3 leading-relaxed text-secondary">
-                          This section separates what the public storefront
-                          exposes from what still needs manual confirmation, so
-                          platform assumptions do not overtake the audit story.
+                          {nonStorefront
+                            ? "This section separates visible service, contact, and tracking signals from unconfirmed ecommerce assumptions."
+                            : "This section separates what the public storefront exposes from what still needs manual confirmation, so platform assumptions do not overtake the audit story."}
                         </p>
                       </div>
                     </div>
@@ -1381,7 +1461,7 @@ export default function EcommerceAuditScannerPage() {
                       <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
                         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
                           <ServerCog className="h-4 w-4" />
-                          Storefront platform
+                          {nonStorefront ? "Public page platform" : "Storefront platform"}
                         </div>
                         <p className="text-2xl font-semibold text-secondary">
                           {platformDisplayName(audit)}
@@ -1399,15 +1479,15 @@ export default function EcommerceAuditScannerPage() {
                           .ecommerceProbability && (
                           <p className="mt-2 text-sm font-semibold text-brand-cyan">
                             Ecommerce probability{" "}
-                            {
-                              audit.diagnostics.platformDetection
-                                .ecommerceProbability.label
-                            }{" "}
+                            {nonStorefront
+                              ? "Low"
+                              : audit.diagnostics.platformDetection
+                                  .ecommerceProbability.label}{" "}
                             -{" "}
-                            {
-                              audit.diagnostics.platformDetection
-                                .ecommerceProbability.probability
-                            }
+                            {nonStorefront
+                              ? 0
+                              : audit.diagnostics.platformDetection
+                                  .ecommerceProbability.probability}
                             %
                           </p>
                         )}
@@ -1492,18 +1572,28 @@ export default function EcommerceAuditScannerPage() {
                       <div className="rounded-2xl border border-dark-border bg-dark-deep/70 p-5">
                         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-cyan/25 bg-brand-blue/10 px-3 py-2 text-sm font-semibold text-brand-cyan">
                           <Target className="h-4 w-4" />
-                          Commerce path
+                          {nonStorefront ? "Visible path" : "Commerce path"}
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
-                            Cart: {signalLabel(commerce.cartVisible)}
+                            Cart:{" "}
+                            {signalLabel(
+                              nonStorefront ? false : commerce.cartVisible,
+                            )}
                           </p>
                           <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
-                            Checkout: {signalLabel(commerce.checkoutVisible)}
+                            Checkout:{" "}
+                            {signalLabel(
+                              nonStorefront ? false : commerce.checkoutVisible,
+                            )}
                           </p>
                           <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
                             Catalog:{" "}
-                            {signalLabel(commerce.productCatalogVisible)}
+                            {signalLabel(
+                              nonStorefront
+                                ? false
+                                : commerce.productCatalogVisible,
+                            )}
                           </p>
                           <p className="rounded-xl border border-white/10 bg-white/[0.035] p-3 text-secondary">
                             CTA/form:{" "}
@@ -1909,6 +1999,7 @@ export default function EcommerceAuditScannerPage() {
                   visibleMarketingTools.length,
                 );
                 const commerce = audit.diagnostics.commerceFlowSignals;
+                const nonStorefront = isNonStorefrontAudit(audit);
 
                 return (
                   <div className="hidden">
@@ -1918,7 +2009,9 @@ export default function EcommerceAuditScannerPage() {
                           Platform & Marketing Visibility
                         </p>
                         <h3 className="mt-3 text-3xl font-bold text-primary">
-                          What the storefront makes visible
+                          {nonStorefront
+                            ? "What the public page makes visible"
+                            : "What the storefront makes visible"}
                         </h3>
                         <p className="mt-4 text-lg leading-relaxed text-secondary">
                           {platformMarketingInterpretation(audit)}
@@ -1930,10 +2023,9 @@ export default function EcommerceAuditScannerPage() {
                           Business interpretation
                         </p>
                         <p className="mt-3 leading-relaxed text-secondary">
-                          Use this as a quick read on whether the
-                          customer-facing storefront gives operators enough
-                          clues to discuss the platform, marketing measurement,
-                          and conversion path without touching private systems.
+                          {nonStorefront
+                            ? "Use this as a quick read on whether the public page exposes service, contact, tracking, or ecommerce evidence without assuming a cart path."
+                            : "Use this as a quick read on whether the customer-facing storefront gives operators enough clues to discuss the platform, marketing measurement, and conversion path without touching private systems."}
                         </p>
                       </div>
                     </div>
@@ -1958,9 +2050,9 @@ export default function EcommerceAuditScannerPage() {
                         </p>
                         {showManualReviewChecklist(audit) && (
                           <p className="mt-3 text-xs leading-relaxed text-muted">
-                            Some ecommerce platforms hide or heavily customize
-                            storefront signals. This result means the scanner
-                            did not find enough reliable public-page evidence.
+                            {nonStorefront
+                              ? "This result means the scanner did not find enough reliable product, catalog, cart, or checkout evidence to confirm an ecommerce storefront."
+                              : "Some ecommerce platforms hide or heavily customize storefront signals. This result means the scanner did not find enough reliable public-page evidence."}
                           </p>
                         )}
                       </div>
@@ -2014,17 +2106,25 @@ export default function EcommerceAuditScannerPage() {
                       {[
                         {
                           label: "Cart presence",
-                          value: signalLabel(commerce.cartVisible),
+                          value: signalLabel(
+                            nonStorefront ? false : commerce.cartVisible,
+                          ),
                           icon: ShoppingCart,
                         },
                         {
                           label: "Checkout presence",
-                          value: signalLabel(commerce.checkoutVisible),
+                          value: signalLabel(
+                            nonStorefront ? false : commerce.checkoutVisible,
+                          ),
                           icon: ClipboardCheck,
                         },
                         {
                           label: "Product/catalog presence",
-                          value: signalLabel(commerce.productCatalogVisible),
+                          value: signalLabel(
+                            nonStorefront
+                              ? false
+                              : commerce.productCatalogVisible,
+                          ),
                           icon: FileText,
                         },
                         {
@@ -2167,13 +2267,27 @@ export default function EcommerceAuditScannerPage() {
                             Customer journey evidence
                           </p>
                           <div className="mt-3 space-y-2 text-muted">
-                            <p>Cart: {signalLabel(commerce.cartVisible)}</p>
                             <p>
-                              Checkout: {signalLabel(commerce.checkoutVisible)}
+                              Cart:{" "}
+                              {signalLabel(
+                                nonStorefront ? false : commerce.cartVisible,
+                              )}
+                            </p>
+                            <p>
+                              Checkout:{" "}
+                              {signalLabel(
+                                nonStorefront
+                                  ? false
+                                  : commerce.checkoutVisible,
+                              )}
                             </p>
                             <p>
                               Product/catalog:{" "}
-                              {signalLabel(commerce.productCatalogVisible)}
+                              {signalLabel(
+                                nonStorefront
+                                  ? false
+                                  : commerce.productCatalogVisible,
+                              )}
                             </p>
                             <p>Forms: {signalLabel(commerce.formVisible)}</p>
                             <p>
