@@ -1426,6 +1426,17 @@ const knownEnterpriseCommerceDomains = [
   "lowes.com",
 ];
 
+const knownIndustrialCatalogDomains = [
+  "maxx-supply.com",
+  "maxxsupply.com",
+  "grainger.com",
+  "uline.com",
+  "mcmaster.com",
+  "fastenal.com",
+  "motion.com",
+  "globalindustrial.com",
+];
+
 function hostnameFromUrl(value?: string) {
   if (!value) {
     return "";
@@ -1442,6 +1453,14 @@ function isKnownEnterpriseDomain(value?: string) {
   const hostname = hostnameFromUrl(value);
 
   return knownEnterpriseCommerceDomains.some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+  );
+}
+
+function isKnownIndustrialCatalogDomain(value?: string) {
+  const hostname = hostnameFromUrl(value);
+
+  return knownIndustrialCatalogDomains.some(
     (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
   );
 }
@@ -1529,6 +1548,12 @@ export function calculateEcommerceProbability(scanEvidence: {
   const hasStrongPlatformEvidence = platformScores.some(
     (platform) => platform.strongCount >= 2 && platform.score >= 60,
   );
+  const hasStrongStandardPlatformEvidence = platformScores.some(
+    (platform) =>
+      ["Shopify", "BigCommerce", "WooCommerce", "Magento / Adobe Commerce"].includes(platform.name) &&
+      platform.strongCount >= 2 &&
+      platform.score >= 60,
+  );
   const hasAnyPlatformEvidence = platformScores.some(
     (platform) => platform.strongCount > 0,
   );
@@ -1553,6 +1578,7 @@ export function calculateEcommerceProbability(scanEvidence: {
       scanEvidence.signalText,
     );
   const knownEnterpriseDomain = isKnownEnterpriseDomain(scanEvidence.finalUrl);
+  const knownIndustrialCatalogDomain = isKnownIndustrialCatalogDomain(scanEvidence.finalUrl);
   const hasLeadOnlyLanguage =
     /\b(contact us|request a quote|schedule a consultation|book a call|book now|schedule|appointment|portfolio|wedding|event|music|lesson|performance|learn more|leadership|services|solutions)\b/i.test(
       scanEvidence.signalText,
@@ -1594,13 +1620,41 @@ export function calculateEcommerceProbability(scanEvidence: {
   addEvidence(hasCommerceLanguage, 12, "Commerce language such as shop, buy, cart, or checkout is visible.");
   addEvidence(hasPaymentSignals, 10, "Payment or secure checkout signals are visible.");
   addEvidence(hasStrongPlatformEvidence, 18, "Multiple strong ecommerce platform signals are visible.");
+  addEvidence(
+    hasStrongStandardPlatformEvidence,
+    18,
+    "A standard ecommerce platform is strongly identified.",
+  );
   addEvidence(hasAnyPlatformEvidence && !hasStrongPlatformEvidence, 8, "Some ecommerce platform evidence is visible.");
   addEvidence(knownEnterpriseDomain, 20, "Known large commerce domain.");
+  addEvidence(knownIndustrialCatalogDomain, 24, "Known industrial catalog ecommerce domain.");
 
-  addNegative(commerce?.cartVisible !== true, 12, "No cart or shopping bag signal was visible.");
-  addNegative(commerce?.checkoutVisible !== true, 12, "No checkout signal was visible.");
-  addNegative(!hasProductPath && commerce?.productCatalogVisible !== true, 12, "No product or catalog links were detected.");
-  addNegative(!hasPricePattern && !hasProductSchema, 8, "No price, product schema, or offer schema was detected.");
+  addNegative(
+    commerce?.cartVisible !== true && !hasStrongStandardPlatformEvidence,
+    12,
+    "No cart or shopping bag signal was visible.",
+  );
+  addNegative(
+    commerce?.checkoutVisible !== true && !hasStrongStandardPlatformEvidence,
+    12,
+    "No checkout signal was visible.",
+  );
+  addNegative(
+    !hasProductPath &&
+      commerce?.productCatalogVisible !== true &&
+      !hasStrongStandardPlatformEvidence &&
+      !knownIndustrialCatalogDomain,
+    12,
+    "No product or catalog links were detected.",
+  );
+  addNegative(
+    !hasPricePattern &&
+      !hasProductSchema &&
+      !hasStrongStandardPlatformEvidence &&
+      !knownIndustrialCatalogDomain,
+    8,
+    "No price, product schema, or offer schema was detected.",
+  );
   addNegative(commerce?.formVisible === true && !hasCommerceLanguage, 8, "Lead form signals are stronger than purchase-flow signals.");
   addNegative(hasLeadOnlyLanguage && !hasCommerceLanguage, 12, "Service or lead-generation language dominates the visible page.");
   addNegative(
@@ -1623,6 +1677,14 @@ export function calculateEcommerceProbability(scanEvidence: {
     score = Math.max(score, 55);
   }
 
+  if (hasStrongStandardPlatformEvidence) {
+    score = Math.max(score, knownIndustrialCatalogDomain ? 78 : 64);
+  }
+
+  if (knownIndustrialCatalogDomain) {
+    score = Math.max(score, 72);
+  }
+
   if (
     hasRealEstateLanguage &&
     commerce?.checkoutVisible !== true &&
@@ -1635,8 +1697,10 @@ export function calculateEcommerceProbability(scanEvidence: {
     commerce?.cartVisible !== true &&
     commerce?.checkoutVisible !== true &&
     !hasStrongPlatformEvidence &&
+    !hasStrongStandardPlatformEvidence &&
     !hasProductSchema &&
-    !knownEnterpriseDomain
+    !knownEnterpriseDomain &&
+    !knownIndustrialCatalogDomain
   ) {
     score = Math.min(score, 42);
   }
@@ -1644,7 +1708,9 @@ export function calculateEcommerceProbability(scanEvidence: {
   if (
     hasLeadOnlyLanguage &&
     !hasConfirmedProductEvidence &&
-    !knownEnterpriseDomain
+    !knownEnterpriseDomain &&
+    !hasStrongStandardPlatformEvidence &&
+    !knownIndustrialCatalogDomain
   ) {
     score = Math.min(score, 24);
   }

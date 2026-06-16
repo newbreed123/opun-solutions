@@ -2,6 +2,12 @@ import {
   listAuditInsightScans,
   type AuditScanRow,
 } from "@/lib/audit-scan-log";
+import { ScoreStabilityCell } from "@/components/admin/ScoreStabilityCell";
+import {
+  buildScoreStabilityByDomain,
+  domainForScan,
+  type ScoreStabilitySummary,
+} from "@/lib/score-stability";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +31,10 @@ type ConversionGroupMetric = GroupMetric & {
   conversionRate: number;
 };
 
+type ScoreGroupMetric = GroupMetric & {
+  averageScore: number;
+};
+
 type Insights = {
   totalScans: number;
   scansToday: number;
@@ -37,9 +47,19 @@ type Insights = {
   issueMetrics: GroupMetric[];
   archetypeMetrics: GroupMetric[];
   platformMetrics: GroupMetric[];
+  benchmarkGroupMetrics: ScoreGroupMetric[];
+  pageTypeMetrics: GroupMetric[];
+  scoringConfidenceMetrics: GroupMetric[];
+  revenueRiskMetrics: GroupMetric[];
   conversionByConcern: ConversionGroupMetric[];
   conversionByArchetype: ConversionGroupMetric[];
-  recentScans: AuditScanRow[];
+  conversionByBenchmarkGroup: ConversionGroupMetric[];
+  conversionByRevenueRisk: ConversionGroupMetric[];
+  recentScans: RecentScanRow[];
+};
+
+type RecentScanRow = AuditScanRow & {
+  scoreStability: ScoreStabilitySummary | undefined;
 };
 
 export default async function AdminInsightsPage({
@@ -132,6 +152,33 @@ export default async function AdminInsightsPage({
             </AnalyticsPanel>
           </section>
 
+          <section className="grid gap-6 xl:grid-cols-4">
+            <AnalyticsPanel title="Benchmark Groups">
+              <ScoreRows
+                rows={insights.benchmarkGroupMetrics}
+                emptyLabel="No benchmark groups yet."
+              />
+            </AnalyticsPanel>
+            <AnalyticsPanel title="Page Types">
+              <MetricRows
+                rows={insights.pageTypeMetrics}
+                emptyLabel="No submitted page types yet."
+              />
+            </AnalyticsPanel>
+            <AnalyticsPanel title="Scoring Confidence">
+              <MetricRows
+                rows={insights.scoringConfidenceMetrics}
+                emptyLabel="No scoring confidence data yet."
+              />
+            </AnalyticsPanel>
+            <AnalyticsPanel title="Revenue Risk Areas">
+              <MetricRows
+                rows={insights.revenueRiskMetrics}
+                emptyLabel="No revenue risk areas yet."
+              />
+            </AnalyticsPanel>
+          </section>
+
           <section className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
             <AnalyticsPanel title="Lead Conversion">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
@@ -161,6 +208,18 @@ export default async function AdminInsightsPage({
                   emptyLabel="No archetype conversions yet."
                 />
               </AnalyticsPanel>
+              <AnalyticsPanel title="Conversion by Benchmark">
+                <ConversionRows
+                  rows={insights.conversionByBenchmarkGroup}
+                  emptyLabel="No benchmark conversions yet."
+                />
+              </AnalyticsPanel>
+              <AnalyticsPanel title="Conversion by Revenue Risk">
+                <ConversionRows
+                  rows={insights.conversionByRevenueRisk}
+                  emptyLabel="No revenue-risk conversions yet."
+                />
+              </AnalyticsPanel>
             </div>
           </section>
 
@@ -182,6 +241,7 @@ function buildInsights(scans: AuditScanRow[]): Insights {
   startOfWeek.setDate(startOfWeek.getDate() + mondayOffset);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const leadSubmissions = scans.filter((scan) => scan.contact_submitted).length;
+  const scoreStabilityByDomain = buildScoreStabilityByDomain(scans);
 
   return {
     totalScans: scans.length,
@@ -195,12 +255,27 @@ function buildInsights(scans: AuditScanRow[]): Insights {
     issueMetrics: groupByValue(scans, (scan) => scan.primary_concern),
     archetypeMetrics: groupByValue(scans, (scan) => scan.archetype),
     platformMetrics: groupByValue(scans, (scan) => scan.platform),
+    benchmarkGroupMetrics: scoreByValue(scans, (scan) => scan.benchmark_group),
+    pageTypeMetrics: groupByValue(scans, (scan) => scan.submitted_page_type),
+    scoringConfidenceMetrics: groupByValue(scans, (scan) => scan.scoring_confidence),
+    revenueRiskMetrics: groupByMultiValue(scans, (scan) => scan.revenue_risk_areas),
     conversionByConcern: conversionByValue(
       scans,
       (scan) => scan.primary_concern,
     ),
     conversionByArchetype: conversionByValue(scans, (scan) => scan.archetype),
-    recentScans: scans.slice(0, 12),
+    conversionByBenchmarkGroup: conversionByValue(
+      scans,
+      (scan) => scan.benchmark_group,
+    ),
+    conversionByRevenueRisk: conversionByMultiValue(
+      scans,
+      (scan) => scan.revenue_risk_areas,
+    ),
+    recentScans: scans.slice(0, 12).map((scan) => ({
+      ...scan,
+      scoreStability: scoreStabilityByDomain.get(domainForScan(scan)),
+    })),
   };
 }
 
@@ -210,7 +285,7 @@ function countSince(scans: AuditScanRow[], startDate: Date) {
 
 function groupByValue(
   scans: AuditScanRow[],
-  getValue: (scan: AuditScanRow) => string | null,
+  getValue: (scan: AuditScanRow) => string | null | undefined,
 ) {
   const counts = new Map<string, number>();
 
@@ -230,7 +305,7 @@ function groupByValue(
 
 function conversionByValue(
   scans: AuditScanRow[],
-  getValue: (scan: AuditScanRow) => string | null,
+  getValue: (scan: AuditScanRow) => string | null | undefined,
 ) {
   const groups = new Map<string, { total: number; converted: number }>();
 
@@ -240,6 +315,86 @@ function conversionByValue(
     current.total += 1;
     current.converted += scan.contact_submitted ? 1 : 0;
     groups.set(label, current);
+  });
+
+  return Array.from(groups.entries())
+    .map(([label, group]) => ({
+      label,
+      count: group.total,
+      converted: group.converted,
+      percentage: percentage(group.total, scans.length),
+      conversionRate: percentage(group.converted, group.total),
+    }))
+    .sort(
+      (left, right) =>
+        right.conversionRate - left.conversionRate ||
+        right.converted - left.converted ||
+        right.count - left.count,
+    );
+}
+
+function scoreByValue(
+  scans: AuditScanRow[],
+  getValue: (scan: AuditScanRow) => string | null | undefined,
+) {
+  const groups = new Map<string, { count: number; scoreTotal: number }>();
+
+  scans.forEach((scan) => {
+    const label = cleanLabel(getValue(scan));
+    const current = groups.get(label) ?? { count: 0, scoreTotal: 0 };
+    current.count += 1;
+    current.scoreTotal += scan.score;
+    groups.set(label, current);
+  });
+
+  return Array.from(groups.entries())
+    .map(([label, group]) => ({
+      label,
+      count: group.count,
+      percentage: percentage(group.count, scans.length),
+      averageScore: group.count === 0 ? 0 : group.scoreTotal / group.count,
+    }))
+    .sort(
+      (left, right) =>
+        right.count - left.count || right.averageScore - left.averageScore,
+    );
+}
+
+function groupByMultiValue(
+  scans: AuditScanRow[],
+  getValues: (scan: AuditScanRow) => unknown[] | undefined,
+) {
+  const expanded = scans.flatMap((scan) =>
+    normalizeUnknownList(getValues(scan)).map((label) => ({ scan, label })),
+  );
+  const counts = new Map<string, number>();
+
+  expanded.forEach(({ label }) => {
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({
+      label,
+      count,
+      percentage: percentage(count, scans.length),
+    }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+}
+
+function conversionByMultiValue(
+  scans: AuditScanRow[],
+  getValues: (scan: AuditScanRow) => unknown[] | undefined,
+) {
+  const groups = new Map<string, { total: number; converted: number }>();
+
+  scans.forEach((scan) => {
+    normalizeUnknownList(getValues(scan)).forEach((label) => {
+      const current = groups.get(label) ?? { total: 0, converted: 0 };
+      current.total += 1;
+      current.converted += scan.contact_submitted ? 1 : 0;
+      groups.set(label, current);
+    });
   });
 
   return Array.from(groups.entries())
@@ -361,6 +516,36 @@ function MetricRows({
   );
 }
 
+function ScoreRows({
+  rows,
+  emptyLabel,
+}: {
+  rows: ScoreGroupMetric[];
+  emptyLabel: string;
+}) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted">{emptyLabel}</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <div className="flex items-start justify-between gap-4">
+            <p className="min-w-0 break-words text-sm font-semibold text-secondary">
+              {row.label}
+            </p>
+            <p className="flex-none text-sm font-bold text-primary">
+              {row.count} · avg {row.averageScore.toFixed(0)}
+            </p>
+          </div>
+          <ProgressBar value={row.averageScore} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ConversionRows({
   rows,
   emptyLabel,
@@ -429,19 +614,20 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-function RecentScansTable({ scans }: { scans: AuditScanRow[] }) {
+function RecentScansTable({ scans }: { scans: RecentScanRow[] }) {
   if (scans.length === 0) {
     return <p className="text-sm text-muted">No scans yet.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
         <thead className="border-b border-dark-border text-xs uppercase tracking-[0.16em] text-muted">
           <tr>
             <th className="px-3 py-3">Date</th>
             <th className="px-3 py-3">Domain</th>
             <th className="px-3 py-3">Score</th>
+            <th className="px-3 py-3">Score Stability</th>
             <th className="px-3 py-3">Status</th>
             <th className="px-3 py-3">Primary concern</th>
             <th className="px-3 py-3">Platform</th>
@@ -458,6 +644,9 @@ function RecentScansTable({ scans }: { scans: AuditScanRow[] }) {
                 {scan.normalized_domain || cleanLabel(scan.url)}
               </td>
               <td className="px-3 py-4 text-primary">{scan.score}</td>
+              <td className="px-3 py-4">
+                <ScoreStabilityCell summary={scan.scoreStability} />
+              </td>
               <td className="px-3 py-4 text-secondary">{scan.status}</td>
               <td className="max-w-xs px-3 py-4 text-secondary">
                 {cleanLabel(scan.primary_concern)}
@@ -500,6 +689,12 @@ function getParam(
 
 function cleanLabel(value: string | null | undefined) {
   return value?.trim() || "unknown";
+}
+
+function normalizeUnknownList(value: unknown[] | undefined) {
+  return (Array.isArray(value) ? value : [])
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
 }
 
 function percentage(count: number, total: number) {

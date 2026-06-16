@@ -100,9 +100,13 @@ type PositiveUxSignals = Record<
 type OverallScoreExplanation = {
   positiveSignals: string[];
   majorPenalties: string[];
+  scoreReducers?: string[];
   whyThisScore: string;
   scoringConfidence?: "High" | "Moderate" | "Low";
   confidenceNote?: string;
+  benchmarkContext?: BenchmarkContext;
+  scanCoverage?: ScanCoverage;
+  pageType?: PageTypeDetection;
 };
 
 type EcommerceMaturityScore = {
@@ -114,9 +118,16 @@ type EcommerceMaturityScore = {
 };
 
 type ScanCoverage = {
+  submittedUrlOnly?: boolean;
   screenshotMode: "viewport" | "full-page";
   domCoverage: "visible" | "full-page";
   scoringCoverage: "above-fold" | "near-fold" | "full-page";
+  aboveFoldCoverage?: string;
+  nearFoldCoverage?: string;
+  fullPageDomCoverage?: string;
+  screenshotCoverage?: string;
+  scoringCoverageSummary?: string;
+  coverageWarnings?: string[];
   aboveFoldSignals: Record<string, boolean | number | undefined>;
   nearFoldSignals: Record<string, boolean | number | undefined>;
   fullPageSignals: Record<string, boolean | number | undefined>;
@@ -124,6 +135,36 @@ type ScanCoverage = {
   manualConfirmationSignals?: Record<string, boolean | undefined>;
   coverageSummary: string;
   explanation: string;
+};
+
+type PageTypeDetection = {
+  submittedPageType: string;
+  confidence: number;
+  evidence: string[];
+  scoringNote: string;
+};
+
+type CompetitiveComparison = {
+  comparisonSet: string[];
+  expectedPatterns: string[];
+  strengths: string[];
+  weaknesses: string[];
+  explanation: string;
+};
+
+type RevenueImpactEstimate = {
+  findingTitle: string;
+  riskArea: string;
+  likelyImpact: string;
+  severity: string;
+  confidence: string;
+  explanation: string;
+};
+
+type RevenueImpactSummary = {
+  summary: string;
+  estimates: RevenueImpactEstimate[];
+  revenueRiskAreas: string[];
 };
 
 type AuditResult = {
@@ -141,6 +182,9 @@ type AuditResult = {
   positiveUxSignals?: PositiveUxSignals;
   ecommerceMaturity?: EcommerceMaturityScore;
   scanCoverage?: ScanCoverage;
+  submittedPageType?: PageTypeDetection;
+  competitiveComparison?: CompetitiveComparison;
+  revenueImpactSummary?: RevenueImpactSummary;
   summary: string;
   executiveSummary: ExecutiveSummary;
   auditNarrative?: string;
@@ -193,6 +237,7 @@ type HeuristicFinding = {
   severity: "Low" | "Medium" | "High" | "Critical";
   confidence: "Low" | "Moderate" | "High" | "Needs Review";
   businessImpact: string;
+  revenueImpact?: RevenueImpactEstimate;
   recommendedFirstAction: string;
   evidenceSummary: string;
 };
@@ -253,6 +298,13 @@ type BenchmarkNote = {
 };
 
 type BenchmarkContext = {
+  benchmarkGroup?: string;
+  percentileEstimate?: number | null;
+  benchmarkLabel?: string;
+  comparisonBasis?: string[];
+  strengthsVsBenchmark?: string[];
+  weaknessesVsBenchmark?: string[];
+  explanation?: string;
   summary: string;
   notes: BenchmarkNote[];
   benchmarkTags: string[];
@@ -735,6 +787,11 @@ export default function EcommerceAuditScannerPage() {
     }
   }
 
+  const auditContactHref = audit
+    ? buildAuditContactHref(auditAttribution(audit))
+    : "/contact?source=opzix-audit";
+  const auditContactDisplay = `opzixsolutions.com${auditContactHref}`;
+
   return (
     <>
       <Section bgColor="secondary" className="hero-atmosphere" padded>
@@ -883,8 +940,16 @@ export default function EcommerceAuditScannerPage() {
           ) : (
             <div className="space-y-8">
               <div className="audit-print-only audit-print-header">
-                <p className="audit-print-kicker">Opzix Audit</p>
-                <h1>Opzix Audit Report</h1>
+                <div className="audit-print-brand-row">
+                  <div className="audit-print-logo-mark">O</div>
+                  <div>
+                    <p className="audit-print-kicker">Opzix Audit Beta</p>
+                    <h1>Opzix Audit Report</h1>
+                  </div>
+                </div>
+                <p className="audit-print-prepared">
+                  Prepared by Opzix Audit Beta
+                </p>
                 <dl>
                   <div>
                     <dt>Website</dt>
@@ -905,6 +970,23 @@ export default function EcommerceAuditScannerPage() {
                     <dd>{primaryOperationalConcernTitle(audit)}</dd>
                   </div>
                 </dl>
+              </div>
+
+              <div className="audit-print-only audit-print-cta">
+                <div>
+                  <p className="audit-print-cta-label">Recommended next step</p>
+                  <p className="audit-print-cta-title">
+                    Review this audit with Opzix
+                  </p>
+                  <p className="audit-print-cta-copy">
+                    Walk through the score, validate the public-page evidence,
+                    and turn the top findings into a practical fix list.
+                  </p>
+                </div>
+                <div className="audit-print-schedule-box">
+                  <p>Schedule</p>
+                  <strong>{auditContactDisplay}</strong>
+                </div>
               </div>
 
               <div className="card-elevated p-6 md:p-8">
@@ -996,19 +1078,58 @@ export default function EcommerceAuditScannerPage() {
                             </ul>
                           </div>
                         ) : null}
+                        {audit.submittedPageType ? (
+                          <div>
+                            <p className="font-semibold text-primary">
+                              Submitted page type
+                            </p>
+                            <p className="mt-1 text-muted">
+                              {audit.submittedPageType.submittedPageType} ·{" "}
+                              {audit.submittedPageType.confidence}% confidence.
+                              {" "}
+                              {audit.submittedPageType.scoringNote}
+                            </p>
+                          </div>
+                        ) : null}
                         {audit.scanCoverage ? (
                           <div>
                             <p className="font-semibold text-primary">
                               Scoring coverage
                             </p>
                             <p className="mt-1 text-muted">
-                              {audit.scanCoverage.coverageSummary ||
+                              {audit.scanCoverage.scoringCoverageSummary ||
+                                audit.scanCoverage.coverageSummary ||
                                 audit.scanCoverage.explanation}
                             </p>
+                            {[
+                              audit.scanCoverage.aboveFoldCoverage,
+                              audit.scanCoverage.nearFoldCoverage,
+                              audit.scanCoverage.fullPageDomCoverage,
+                              audit.scanCoverage.screenshotCoverage,
+                            ]
+                              .filter(
+                                (coverageDetail): coverageDetail is string =>
+                                  Boolean(coverageDetail),
+                              )
+                              .map((coverageDetail) => (
+                                <p
+                                  key={coverageDetail}
+                                  className="mt-1 text-muted"
+                                >
+                                  {coverageDetail}
+                                </p>
+                              ))}
                             {audit.scanCoverage.coverageSummary ? (
                               <p className="mt-1 text-muted">
                                 {audit.scanCoverage.explanation}
                               </p>
+                            ) : null}
+                            {audit.scanCoverage.coverageWarnings?.length ? (
+                              <ul className="mt-2 space-y-1 text-amber-100">
+                                {audit.scanCoverage.coverageWarnings.map((warning) => (
+                                  <li key={warning}>- {warning}</li>
+                                ))}
+                              </ul>
                             ) : null}
                           </div>
                         ) : null}
@@ -1327,6 +1448,13 @@ export default function EcommerceAuditScannerPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="audit-print-only audit-print-cta audit-print-cta-slim">
+                <p>
+                  <strong>Book the follow-up:</strong> review this audit with
+                  Opzix at {auditContactDisplay}
+                </p>
               </div>
 
               <div className="print-hidden">
@@ -2345,15 +2473,77 @@ export default function EcommerceAuditScannerPage() {
 
                 <div className="card-elevated p-6 md:p-8">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-                    Benchmark Notes
+                    Benchmark Context
                   </p>
                   <h3 className="mt-3 text-3xl font-bold text-primary">
-                    Internal comparison context
+                    Compared with similar pages
                   </h3>
+                  {audit.benchmarkContext?.benchmarkGroup ? (
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {(audit.benchmarkContext.benchmarkLabel === "Insufficient Data"
+                        ? [
+                            ["Group", audit.benchmarkContext.benchmarkGroup],
+                            ["Benchmark", "Available"],
+                            ["Confidence", "Low"],
+                            ["Validation", "Additional validation required"],
+                          ]
+                        : [
+                            ["Group", audit.benchmarkContext.benchmarkGroup],
+                            [
+                              "Percentile",
+                              `${audit.benchmarkContext.percentileEstimate ?? 0}th`,
+                            ],
+                            ["Label", audit.benchmarkContext.benchmarkLabel ?? "Directional"],
+                          ]
+                      ).map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="rounded-2xl border border-dark-border bg-white/[0.035] p-4"
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                            {label}
+                          </p>
+                          <p className="mt-2 text-sm font-bold leading-6 text-primary">
+                            {value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   <p className="mt-4 leading-relaxed text-secondary">
-                    {audit.benchmarkContext?.summary ??
+                    {audit.benchmarkContext?.explanation ??
+                      audit.benchmarkContext?.summary ??
                       "This scanner will become more useful as we compare results across strong and weak ecommerce stores."}
                   </p>
+                  {audit.benchmarkContext?.strengthsVsBenchmark?.length ||
+                  audit.benchmarkContext?.weaknessesVsBenchmark?.length ? (
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-sm font-bold text-primary">
+                          Strengths vs benchmark
+                        </p>
+                        <ul className="mt-2 space-y-2 text-sm leading-6 text-secondary">
+                          {(audit.benchmarkContext.strengthsVsBenchmark ?? [])
+                            .slice(0, 3)
+                            .map((strength) => (
+                              <li key={strength}>+ {strength}</li>
+                            ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-primary">
+                          Weaknesses vs benchmark
+                        </p>
+                        <ul className="mt-2 space-y-2 text-sm leading-6 text-secondary">
+                          {(audit.benchmarkContext.weaknessesVsBenchmark ?? [])
+                            .slice(0, 3)
+                            .map((weakness) => (
+                              <li key={weakness}>- {weakness}</li>
+                            ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : null}
                   {audit.benchmarkContext?.benchmarkTags?.length ? (
                     <div className="mt-5 flex flex-wrap gap-2">
                       {audit.benchmarkContext.benchmarkTags.map((tag) => (
@@ -2386,14 +2576,83 @@ export default function EcommerceAuditScannerPage() {
                       ))}
                     </div>
                   ) : null}
-                  <p className="mt-5 rounded-2xl border border-dark-border bg-white/[0.035] p-4 text-sm leading-relaxed text-muted">
-                    For now, treat benchmarks as directional rather than
-                    definitive. These notes reflect current internal comparison
-                    criteria and observed public-page evidence, not percentile
-                    rankings or market-wide claims.
-                  </p>
+                  {audit.benchmarkContext?.comparisonBasis?.length ? (
+                    <p className="mt-5 rounded-2xl border border-dark-border bg-white/[0.035] p-4 text-sm leading-relaxed text-muted">
+                      Basis:{" "}
+                      {audit.benchmarkContext.comparisonBasis
+                        .slice(0, 4)
+                        .join("; ")}
+                    </p>
+                  ) : null}
                 </div>
               </div>
+
+              {audit.competitiveComparison || audit.revenueImpactSummary ? (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {audit.competitiveComparison ? (
+                    <div className="card-elevated p-6 md:p-8">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                        Competitive Context
+                      </p>
+                      <h3 className="mt-3 text-3xl font-bold text-primary">
+                        What stronger peers usually show
+                      </h3>
+                      <p className="mt-4 leading-relaxed text-secondary">
+                        {audit.competitiveComparison.explanation}
+                      </p>
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {audit.competitiveComparison.comparisonSet.map((peer) => (
+                          <span
+                            key={peer}
+                            className="rounded-full border border-dark-border bg-white/[0.04] px-3 py-1 text-xs font-semibold text-secondary"
+                          >
+                            {peer}
+                          </span>
+                        ))}
+                      </div>
+                      <ul className="mt-5 space-y-2 text-sm leading-6 text-secondary">
+                        {audit.competitiveComparison.expectedPatterns.map((pattern) => (
+                          <li key={pattern}>- {pattern}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {audit.revenueImpactSummary ? (
+                    <div className="card-elevated p-6 md:p-8">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                        Revenue Impact
+                      </p>
+                      <h3 className="mt-3 text-3xl font-bold text-primary">
+                        Business risk behind the findings
+                      </h3>
+                      <p className="mt-4 leading-relaxed text-secondary">
+                        {audit.revenueImpactSummary.summary}
+                      </p>
+                      <div className="mt-5 space-y-3">
+                        {audit.revenueImpactSummary.estimates
+                          .slice(0, 3)
+                          .map((estimate) => (
+                            <div
+                              key={`${estimate.findingTitle}-${estimate.riskArea}`}
+                              className="rounded-2xl border border-dark-border bg-white/[0.035] p-4"
+                            >
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
+                                {estimate.riskArea}
+                              </p>
+                              <p className="mt-2 text-sm font-bold leading-6 text-primary">
+                                {estimate.findingTitle}
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-secondary">
+                                {estimate.likelyImpact}
+                              </p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="border-t border-dark-border pt-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
@@ -2474,10 +2733,24 @@ export default function EcommerceAuditScannerPage() {
                                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
                                       Impact
                                     </p>
-                                    <p className="mt-2 text-sm leading-6 text-secondary">
-                                      {finding.businessImpact}
-                                    </p>
-                                  </div>
+                                     <p className="mt-2 text-sm leading-6 text-secondary">
+                                       {finding.businessImpact}
+                                     </p>
+                                     {audit.revenueImpactSummary?.estimates.find(
+                                       (estimate) =>
+                                         estimate.findingTitle === finding.title,
+                                     ) ? (
+                                       <p className="mt-3 border-t border-white/10 pt-3 text-sm leading-6 text-secondary">
+                                         Revenue context:{" "}
+                                         {
+                                           audit.revenueImpactSummary.estimates.find(
+                                             (estimate) =>
+                                               estimate.findingTitle === finding.title,
+                                           )?.likelyImpact
+                                         }
+                                       </p>
+                                     ) : null}
+                                   </div>
                                   <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-4">
                                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
                                       First action
@@ -2562,7 +2835,7 @@ export default function EcommerceAuditScannerPage() {
                 </p>
                 <div className="mt-8 flex justify-center">
                   <Button
-                    href={buildAuditContactHref(auditAttribution(audit))}
+                    href={auditContactHref}
                     onClick={() =>
                       trackEvent("audit_cta_clicked", {
                         ...auditAttribution(audit),
@@ -2578,9 +2851,9 @@ export default function EcommerceAuditScannerPage() {
               </div>
 
               <div className="audit-print-only audit-print-footer">
-                <p>Generated by Opzix Audit</p>
-                <p>Talk with Opzix about this audit</p>
-                <p>Contact: /contact</p>
+                <p>Prepared by Opzix Audit Beta</p>
+                <p>Review this audit with Opzix: {auditContactDisplay}</p>
+                <p>Generated {new Date(audit.generatedAt).toLocaleString()}</p>
               </div>
             </div>
           )}
@@ -2631,7 +2904,23 @@ export default function EcommerceAuditScannerPage() {
 
         @media print {
           @page {
-            margin: 0.55in;
+            margin: 0.68in 0.55in 0.78in;
+
+            @bottom-left {
+              color: #4b5563;
+              content: "Prepared by Opzix Audit Beta";
+              font-family: Arial, sans-serif;
+              font-size: 9px;
+              font-weight: 700;
+            }
+
+            @bottom-right {
+              color: #4b5563;
+              content: "Page " counter(page) " of " counter(pages);
+              font-family: Arial, sans-serif;
+              font-size: 9px;
+              font-weight: 700;
+            }
           }
 
           html,
@@ -2682,6 +2971,28 @@ export default function EcommerceAuditScannerPage() {
             padding-bottom: 18px;
           }
 
+          .audit-print-brand-row {
+            align-items: center;
+            display: flex;
+            gap: 12px;
+            margin-bottom: 8px;
+          }
+
+          .audit-print-logo-mark {
+            align-items: center;
+            background: #061827 !important;
+            border: 2px solid #0891b2;
+            border-radius: 12px;
+            color: #ffffff !important;
+            display: flex;
+            font-size: 20px;
+            font-weight: 900;
+            height: 42px;
+            justify-content: center;
+            letter-spacing: 0;
+            width: 42px;
+          }
+
           .audit-print-kicker {
             color: #0f766e;
             font-size: 11px;
@@ -2695,7 +3006,14 @@ export default function EcommerceAuditScannerPage() {
             color: #111827;
             font-size: 28px;
             line-height: 1.15;
-            margin: 0 0 14px;
+            margin: 0;
+          }
+
+          .audit-print-prepared {
+            color: #374151 !important;
+            font-size: 12px;
+            font-weight: 800;
+            margin: 0 0 16px;
           }
 
           .audit-print-header dl {
@@ -2722,6 +3040,82 @@ export default function EcommerceAuditScannerPage() {
             font-size: 13px;
             font-weight: 700;
             margin: 2px 0 0;
+            overflow-wrap: anywhere;
+          }
+
+          .audit-print-cta {
+            align-items: center;
+            background: #ecfeff !important;
+            border: 2px solid #0891b2;
+            border-radius: 16px;
+            display: flex !important;
+            gap: 20px;
+            justify-content: space-between;
+            margin: 0 0 24px;
+            padding: 16px 18px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+
+          .audit-print-cta-slim {
+            margin: 20px 0 24px;
+            padding: 12px 16px;
+          }
+
+          .audit-print-cta-slim p {
+            color: #111827 !important;
+            font-size: 12px;
+            font-weight: 700;
+            margin: 0;
+          }
+
+          .audit-print-cta-label {
+            color: #0f766e !important;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.16em;
+            margin: 0 0 4px;
+            text-transform: uppercase;
+          }
+
+          .audit-print-cta-title {
+            color: #111827 !important;
+            font-size: 18px;
+            font-weight: 900;
+            margin: 0 0 4px;
+          }
+
+          .audit-print-cta-copy {
+            color: #374151 !important;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.45;
+            margin: 0;
+            max-width: 5.6in;
+          }
+
+          .audit-print-schedule-box {
+            background: #ffffff !important;
+            border: 1px solid #0891b2;
+            border-radius: 12px;
+            flex: 0 0 2.2in;
+            padding: 10px 12px;
+          }
+
+          .audit-print-schedule-box p {
+            color: #0f766e !important;
+            font-size: 9px;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            margin: 0 0 4px;
+            text-transform: uppercase;
+          }
+
+          .audit-print-schedule-box strong {
+            color: #111827 !important;
+            display: block;
+            font-size: 10px;
+            line-height: 1.35;
             overflow-wrap: anywhere;
           }
 

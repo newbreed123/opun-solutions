@@ -1,4 +1,10 @@
 import { listAuditScans, type AuditScanRow } from "@/lib/audit-scan-log";
+import { ScoreStabilityCell } from "@/components/admin/ScoreStabilityCell";
+import {
+  buildScoreStabilityByDomain,
+  domainForScan,
+  type ScoreStabilitySummary,
+} from "@/lib/score-stability";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +54,7 @@ export default async function AdminScansPage({
     status,
     primaryConcern,
   });
+  const scoreStabilityByDomain = buildScoreStabilityByDomain(scans.data);
 
   return (
     <AdminShell>
@@ -121,12 +128,13 @@ export default async function AdminScansPage({
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-dark-border bg-dark-card">
-          <table className="w-full min-w-[1360px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1540px] border-collapse text-left text-sm">
             <thead className="border-b border-dark-border bg-white/[0.035] text-xs uppercase tracking-[0.16em] text-muted">
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">URL</th>
                 <th className="px-4 py-3">Score</th>
+                <th className="px-4 py-3">Score Stability</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Primary concern</th>
                 <th className="px-4 py-3">Archetype</th>
@@ -142,7 +150,11 @@ export default async function AdminScansPage({
             </thead>
             <tbody>
               {scans.data.map((scan) => (
-                <ScanRow key={scan.id} scan={scan} />
+                <ScanRow
+                  key={scan.id}
+                  scan={scan}
+                  scoreStability={scoreStabilityByDomain.get(domainForScan(scan))}
+                />
               ))}
             </tbody>
           </table>
@@ -185,7 +197,13 @@ function LockedState({ title, message }: { title: string; message: string }) {
   );
 }
 
-function ScanRow({ scan }: { scan: AuditScanRow }) {
+function ScanRow({
+  scan,
+  scoreStability,
+}: {
+  scan: AuditScanRow;
+  scoreStability: ScoreStabilitySummary | undefined;
+}) {
   return (
     <tr className="border-b border-dark-border last:border-b-0">
       <td className="px-4 py-4 align-top text-secondary">
@@ -196,6 +214,9 @@ function ScanRow({ scan }: { scan: AuditScanRow }) {
         <p className="mt-1 text-xs text-muted">{scan.normalized_domain}</p>
       </td>
       <td className="px-4 py-4 align-top text-primary">{scan.score}</td>
+      <td className="px-4 py-4 align-top">
+        <ScoreStabilityCell summary={scoreStability} />
+      </td>
       <td className="px-4 py-4 align-top text-secondary">{scan.status}</td>
       <td className="max-w-xs px-4 py-4 align-top text-secondary">
         {scan.primary_concern}

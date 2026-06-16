@@ -43,6 +43,17 @@ type ExactAnswer = {
   followUpIntent?: string;
 };
 
+type ProjectSize = "Small" | "Medium" | "Large" | "Enterprise";
+
+type ImplementationCostEstimate = {
+  projectSize: ProjectSize;
+  estimatedRange: string;
+  estimatedEffort: string;
+  reasoning: string[];
+  confidence: string;
+  assumptions: string[];
+};
+
 const assistantInstructions = `
 You are Opzix Assistant, a calm ecommerce systems consultant reviewing a lightweight public scan.
 
@@ -1516,10 +1527,18 @@ function positiveSignalAnswer(scanContext: Record<string, unknown>): ExactAnswer
 function scanCoverageAnswer(scanContext: Record<string, unknown>): ExactAnswer {
   const coverage = asRecord(scanContext.scanCoverage);
   const explanation = asString(coverage.explanation);
-  const coverageSummary = asString(coverage.coverageSummary);
+  const coverageSummary =
+    asString(coverage.scoringCoverageSummary) ||
+    asString(coverage.coverageSummary);
   const screenshotMode = asString(coverage.screenshotMode) || "viewport";
   const domCoverage = asString(coverage.domCoverage) || "visible";
   const scoringCoverage = asString(coverage.scoringCoverage) || "near-fold";
+  const pageType = asRecord(scanContext.submittedPageType);
+  const pageTypeLabel = asString(pageType.submittedPageType);
+  const pageTypeNote = asString(pageType.scoringNote);
+  const coverageWarnings = asArray(coverage.coverageWarnings)
+    .map((item) => asString(item))
+    .filter(Boolean);
 
   return {
     matched: true,
@@ -1531,9 +1550,412 @@ function scanCoverageAnswer(scanContext: Record<string, unknown>): ExactAnswer {
       explanation ||
       `Screenshot mode: ${screenshotMode}; DOM coverage: ${domCoverage}; scoring coverage: ${scoringCoverage}.`,
     businessMeaning:
-      "If something appears lower on the submitted page, it should count for operations, trust, product discovery, support, shipping/returns, account, and fulfillment signals. It may still carry less weight for hero clarity, primary CTA, search prominence, and mobile first impression.",
+      [
+        pageTypeLabel ? `Submitted page type: ${pageTypeLabel}. ${pageTypeNote}` : "",
+        "If something appears lower on the submitted page, it should count for operations, trust, product discovery, support, shipping/returns, account, and fulfillment signals. It may still carry less weight for hero clarity, primary CTA, search prominence, and mobile first impression.",
+        coverageWarnings.length ? `Coverage warnings: ${coverageWarnings.join(" ")}` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
     suggestedFollowUp:
       "Do you want me to separate what the scanner measured from what still needs manual review?",
+  };
+}
+
+function competitiveContextAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const benchmark = asRecord(scanContext.benchmarkContext);
+  const competitive = asRecord(scanContext.competitiveComparison);
+  const comparisonSet = asArray(competitive.comparisonSet)
+    .map((item) => asString(item))
+    .filter(Boolean);
+  const expectedPatterns = asArray(competitive.expectedPatterns)
+    .map((item) => asString(item))
+    .filter(Boolean);
+  const weaknesses = asArray(competitive.weaknesses)
+    .map((item) => asString(item))
+    .filter(Boolean);
+  const benchmarkGroup = asString(benchmark.benchmarkGroup);
+
+  return {
+    matched: true,
+    topic: "benchmark",
+    directAnswer: comparisonSet.length
+      ? `I would compare this scan against ${comparisonSet.join(", ")}.`
+      : `I would compare this scan against ${benchmarkGroup || "similar pages in the same conversion context"}.`,
+    evidence:
+      asString(benchmark.explanation) ||
+      asString(competitive.explanation) ||
+      "The comparison is directional and based on visible public-page evidence.",
+    businessMeaning:
+      expectedPatterns.join(" ") ||
+      "A stronger comparable page usually makes the primary path obvious early, supports trust before commitment, and keeps discovery or contact actions easy to reach.",
+    suggestedFollowUp: weaknesses.length
+      ? `The main gaps versus that context are: ${weaknesses.slice(0, 3).join(" ")}`
+      : "Do you want me to connect the benchmark gaps to the first fixes?",
+  };
+}
+
+const costModel: Record<
+  ProjectSize,
+  { range: string; effort: string; examples: string[] }
+> = {
+  Small: {
+    range: "$500-$2,000",
+    effort: "1-2 weeks",
+    examples: [
+      "CTA fixes",
+      "mobile hierarchy",
+      "trust placement",
+      "search visibility",
+    ],
+  },
+  Medium: {
+    range: "$2,000-$10,000",
+    effort: "2-8 weeks",
+    examples: [
+      "UX redesign",
+      "navigation restructuring",
+      "conversion improvements",
+      "category architecture",
+    ],
+  },
+  Large: {
+    range: "$10,000-$50,000",
+    effort: "2-6 months",
+    examples: [
+      "major ecommerce redesign",
+      "checkout overhaul",
+      "platform integrations",
+    ],
+  },
+  Enterprise: {
+    range: "$50,000+",
+    effort: "6+ months",
+    examples: [
+      "marketplace redesign",
+      "enterprise commerce systems",
+      "custom architecture",
+    ],
+  },
+};
+
+function allFindingRecords(scanContext: Record<string, unknown>) {
+  const categories = asRecord(scanContext.categoryFindings);
+  const findings = Object.values(categories).flatMap((value) =>
+    flattenFindings(value),
+  );
+  const primary = getPrimaryConcern(scanContext);
+
+  if (Object.keys(primary).length > 0) {
+    findings.unshift(primary);
+  }
+
+  return findings;
+}
+
+function findingText(finding: Record<string, unknown>) {
+  return [
+    findingTitle(finding),
+    asString(finding.category),
+    asString(finding.categoryLabel),
+    asString(finding.riskArea),
+    asString(finding.evidenceSummary),
+    asString(finding.explanation),
+    asString(finding.recommendedFirstAction),
+  ].join(" ");
+}
+
+function projectSizeRank(size: ProjectSize) {
+  return ["Small", "Medium", "Large", "Enterprise"].indexOf(size);
+}
+
+function largerProjectSize(a: ProjectSize, b: ProjectSize): ProjectSize {
+  return projectSizeRank(a) > projectSizeRank(b) ? a : b;
+}
+
+function projectSizeForText(text: string): ProjectSize | null {
+  const normalized = normalizeText(text);
+
+  if (
+    hasAny(normalized, [
+      "marketplace redesign",
+      "enterprise commerce systems",
+      "enterprise commerce",
+      "custom architecture",
+      "enterprise",
+      "marketplace",
+    ])
+  ) {
+    return "Enterprise";
+  }
+
+  if (
+    hasAny(normalized, [
+      "major ecommerce redesign",
+      "major redesign",
+      "checkout overhaul",
+      "checkout redesign",
+      "platform integration",
+      "platform integrations",
+      "payment integration",
+      "erp",
+      "oms",
+      "migration",
+      "custom stack",
+    ])
+  ) {
+    return "Large";
+  }
+
+  if (
+    hasAny(normalized, [
+      "ux redesign",
+      "navigation restructuring",
+      "navigation structure",
+      "conversion improvements",
+      "category architecture",
+      "category navigation",
+      "product discovery",
+      "site architecture",
+      "conversion friction",
+    ])
+  ) {
+    return "Medium";
+  }
+
+  if (
+    hasAny(normalized, [
+      "cta",
+      "mobile hierarchy",
+      "mobile content hierarchy",
+      "trust placement",
+      "trust signal",
+      "search visibility",
+      "store search visibility",
+      "primary action",
+      "above fold",
+    ])
+  ) {
+    return "Small";
+  }
+
+  return null;
+}
+
+function estimateImplementationCost(
+  scanContext: Record<string, unknown>,
+): ImplementationCostEstimate {
+  const findings = allFindingRecords(scanContext);
+  const actionItems = getActionItems(scanContext);
+  const platform = asRecord(scanContext.platform);
+  const siteType = asString(scanContext.siteType);
+  const projectSignals = [
+    siteType,
+    asString(scanContext.currentNarrativeArchetype),
+    asString(platform.platformName),
+    asString(platform.name),
+    ...findings.map(findingText),
+    ...actionItems.map((item) =>
+      [asString(item.title), asString(item.action), asString(item.description)].join(" "),
+    ),
+  ];
+
+  let projectSize: ProjectSize = "Small";
+
+  for (const signal of projectSignals) {
+    const signalSize = projectSizeForText(signal);
+    if (signalSize) {
+      projectSize = largerProjectSize(projectSize, signalSize);
+    }
+  }
+
+  const highPriorityCount = findings.filter((finding) =>
+    /critical|high/i.test(
+      [
+        asString(finding.severity),
+        asString(finding.priority),
+        asString(finding.status),
+      ].join(" "),
+    ),
+  ).length;
+
+  if (
+    projectSize === "Small" &&
+    (highPriorityCount >= 3 || findings.length >= 5)
+  ) {
+    projectSize = "Medium";
+  }
+
+  const model = costModel[projectSize];
+  const topFinding = findings[0];
+  const topAction = actionItems[0];
+  const firstAction = topAction
+    ? sanitizeEvidenceText(
+        asString(topAction.action) ||
+          asString(topAction.title) ||
+          asString(topAction.description),
+        { maxLength: 160 },
+      ).replace(/[.]+$/, "")
+    : "";
+  const reasoning = [
+    topFinding ? `Primary scan issue: ${findingTitle(topFinding)}.` : "",
+    firstAction ? `First implementation action: ${firstAction}.` : "",
+    `This maps closest to ${model.examples.slice(0, 3).join(", ")} work.`,
+  ].filter(Boolean);
+
+  const assumptions = [
+    "This is a directional public-scan estimate, not a fixed quote.",
+    "Final pricing depends on platform access, theme complexity, number of templates, content readiness, analytics needs, and stakeholder review cycles.",
+    "The estimate assumes the work focuses on the scanned issues rather than a full brand, catalog, or platform rebuild unless the scan signals that scope.",
+  ];
+
+  return {
+    projectSize,
+    estimatedRange: model.range,
+    estimatedEffort: model.effort,
+    reasoning,
+    confidence:
+      findings.length > 0 || actionItems.length > 0
+        ? "Medium - based on visible scan findings only"
+        : "Low - not enough prioritized scan findings to price confidently",
+    assumptions,
+  };
+}
+
+function hasCostIntent(normalized: string) {
+  return hasAny(normalized, [
+    "cost",
+    "price",
+    "budget",
+    "estimate",
+    "how much",
+    "implementation cost",
+    "project cost",
+    "redesign cost",
+    "fix cost",
+    "what would opzix charge",
+    "opzix charge",
+    "expensive",
+  ]);
+}
+
+function hasRoiIntent(normalized: string) {
+  return hasAny(normalized, [
+    "worth fixing",
+    "worth it",
+    "highest roi",
+    "best roi",
+    "return on investment",
+    "roi",
+  ]);
+}
+
+function costEstimateAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const estimate = estimateImplementationCost(scanContext);
+  const confidenceLabel = estimate.confidence.split(" - ")[0].toLowerCase();
+
+  return {
+    matched: true,
+    topic: "cost_estimate",
+    directAnswer: `Based on this scan, I would frame this as a ${estimate.projectSize} implementation: ${estimate.estimatedRange}, with an estimated effort of ${estimate.estimatedEffort}.`,
+    evidence: estimate.reasoning.join(" "),
+    businessMeaning:
+      `I would treat this as a directional estimate with ${confidenceLabel} confidence. Final pricing depends on platform, theme complexity, templates, content, analytics needs, and whether scope grows beyond the scanned issues.`,
+    suggestedFollowUp:
+      "Do you want me to separate the low-cost quick wins from the bigger redesign work?",
+  };
+}
+
+function roiAnswer(
+  message: string,
+  scanContext: Record<string, unknown>,
+): ExactAnswer {
+  const normalized = normalizeText(message);
+  const estimate = estimateImplementationCost(scanContext);
+  const revenue = asRecord(scanContext.revenueImpactSummary);
+  const estimates = asArray(revenue.estimates).map(asRecord);
+  const findings = allFindingRecords(scanContext);
+  const actionItems = getActionItems(scanContext);
+  const roiSource =
+    estimates.find((item) =>
+      /conversion|cta|mobile|search|trust|navigation|discovery/i.test(
+        [
+          asString(item.findingTitle),
+          asString(item.riskArea),
+          asString(item.likelyImpact),
+          asString(item.explanation),
+        ].join(" "),
+      ),
+    ) ?? estimates[0];
+  const topFinding =
+    findings.find((finding) =>
+      /cta|mobile|search|trust|navigation|discovery|conversion/i.test(
+        findingText(finding),
+      ),
+    ) ?? findings[0];
+  const topAction = actionItems[0];
+  const roiFocus =
+    asString(roiSource?.findingTitle) ||
+    (topFinding ? findingTitle(topFinding) : "") ||
+    asString(topAction?.title) ||
+    asString(topAction?.action) ||
+    "the first conversion-path cleanup";
+
+  if (hasAny(normalized, ["highest roi", "best roi", "which fix"])) {
+    return {
+      matched: true,
+      topic: "roi",
+      directAnswer: `Based on this scan, the highest-ROI fix is likely ${roiFocus}.`,
+      evidence:
+        asString(roiSource?.explanation) ||
+        (topFinding ? findingEvidence(topFinding) : "") ||
+        "The scan prioritizes visible conversion, discovery, trust, and mobile-path issues.",
+      businessMeaning:
+        `Effort: ${estimate.estimatedEffort} in the ${estimate.projectSize.toLowerCase()} scope. Likely impact: better shopper clarity. Risk: directional scan only; validate with analytics, checkout data, and platform access.`,
+      suggestedFollowUp:
+        "Do you want me to rank the first three fixes by effort versus impact?",
+    };
+  }
+
+  return {
+    matched: true,
+    topic: "roi",
+    directAnswer: `Based on this scan, it is worth fixing if the goal is to improve the shopper path without jumping straight into a full rebuild.`,
+    evidence:
+      estimate.reasoning.join(" ") ||
+      "The scan points to visible customer-journey issues rather than private backend evidence.",
+    businessMeaning:
+      `Effort: ${estimate.estimatedEffort}. Likely impact: cleaner discovery, trust, or conversion flow. Risk: confirm against analytics, platform constraints, and a manual walkthrough before over-investing.`,
+    suggestedFollowUp:
+      "Do you want me to identify the cheapest fix with the strongest likely impact?",
+  };
+}
+
+function revenueImpactAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const revenue = asRecord(scanContext.revenueImpactSummary);
+  const estimates = asArray(revenue.estimates).map(asRecord);
+  const topEstimate = estimates[0] ?? {};
+  const findingTitle = asString(topEstimate.findingTitle);
+  const riskArea = asString(topEstimate.riskArea);
+  const likelyImpact = asString(topEstimate.likelyImpact);
+
+  return {
+    matched: true,
+    topic: "business_impact",
+    directAnswer: findingTitle
+      ? `${findingTitle} is the clearest business-impact risk in this scan.`
+      : "The report estimates revenue impact directionally from the highest-priority findings, but it does not claim exact dollars without analytics data.",
+    evidence:
+      asString(topEstimate.explanation) ||
+      asString(revenue.summary) ||
+      asString(asRecord(scanContext.scoreExplanation).whyThisScore) ||
+      "The scan uses visible UX, conversion, trust, tracking, operations, and DOM signals to estimate business risk.",
+    businessMeaning:
+      riskArea || likelyImpact
+        ? `${riskArea}: ${likelyImpact}`.replace(/^:\s*/, "")
+        : "These findings matter because unclear paths, weak trust, incomplete tracking, or operational ambiguity can reduce conversion confidence, lead quality, attribution, or follow-up efficiency.",
+    suggestedFollowUp:
+      "Do you want me to rank the findings by likely business impact?",
   };
 }
 
@@ -1581,6 +2003,42 @@ function getExactAnswer(
     (normalized.includes("visual ux") && normalized.includes("ux/ui"))
   ) {
     return buildScoreSynchronizationAnswer(scanContext);
+  }
+
+  if (
+    hasAny(normalized, [
+      "who should this be compared",
+      "what should this be compared",
+      "compare against",
+      "competitive",
+      "better site",
+      "amazon",
+      "walmart",
+      "uline",
+    ])
+  ) {
+    return competitiveContextAnswer(scanContext);
+  }
+
+  if (hasRoiIntent(normalized)) {
+    return roiAnswer(message, scanContext);
+  }
+
+  if (hasCostIntent(normalized)) {
+    return costEstimateAnswer(scanContext);
+  }
+
+  if (
+    hasAny(normalized, [
+      "revenue",
+      "business impact",
+      "why should i care",
+      "affect sales",
+      "affect leads",
+      "cost money",
+    ])
+  ) {
+    return revenueImpactAnswer(scanContext);
   }
 
   if (

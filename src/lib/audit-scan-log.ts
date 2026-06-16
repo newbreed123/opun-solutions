@@ -36,6 +36,17 @@ export type AuditScanLogInput = {
   visualUxDesktopConcerns?: unknown[];
   topIssues: unknown[];
   benchmarkTags: string[];
+  benchmarkGroup?: string;
+  benchmarkPercentileEstimate?: number | null;
+  benchmarkLabel?: string;
+  benchmarkExplanation?: string;
+  submittedPageType?: string;
+  submittedPageTypeConfidence?: number;
+  submittedPageTypeEvidence?: unknown[];
+  scoringConfidence?: string;
+  revenueRiskAreas?: unknown[];
+  competitiveContext?: unknown;
+  scanCoverage?: unknown;
   source?: string;
 };
 
@@ -81,6 +92,17 @@ export type AuditScanRow = {
   visual_ux_desktop_concerns?: unknown[];
   top_issues: unknown[];
   benchmark_tags: string[];
+  benchmark_group?: string | null;
+  benchmark_percentile_estimate?: number | null;
+  benchmark_label?: string | null;
+  benchmark_explanation?: string | null;
+  submitted_page_type?: string | null;
+  submitted_page_type_confidence?: number | null;
+  submitted_page_type_evidence?: unknown[];
+  scoring_confidence?: string | null;
+  revenue_risk_areas?: unknown[];
+  competitive_context?: unknown;
+  scan_coverage?: unknown;
   contact_submitted: boolean;
   contact_email: string | null;
   contact_name: string | null;
@@ -94,6 +116,9 @@ export type AuditScanFilters = {
   status?: string;
   primaryConcern?: string;
 };
+
+const AUDIT_SCAN_LEGACY_SELECT =
+  "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,contact_submitted,contact_email,contact_name,source,created_at,updated_at";
 
 export function createAuditScanId() {
   return crypto.randomUUID();
@@ -157,6 +182,17 @@ export async function logAuditScan(input: AuditScanLogInput) {
     visual_ux_desktop_concerns: input.visualUxDesktopConcerns ?? [],
     top_issues: input.topIssues,
     benchmark_tags: input.benchmarkTags,
+    benchmark_group: withUnknownFallback(input.benchmarkGroup ?? ""),
+    benchmark_percentile_estimate: input.benchmarkPercentileEstimate ?? null,
+    benchmark_label: withUnknownFallback(input.benchmarkLabel ?? ""),
+    benchmark_explanation: input.benchmarkExplanation ?? null,
+    submitted_page_type: withUnknownFallback(input.submittedPageType ?? ""),
+    submitted_page_type_confidence: input.submittedPageTypeConfidence ?? null,
+    submitted_page_type_evidence: input.submittedPageTypeEvidence ?? [],
+    scoring_confidence: withUnknownFallback(input.scoringConfidence ?? ""),
+    revenue_risk_areas: input.revenueRiskAreas ?? [],
+    competitive_context: input.competitiveContext ?? {},
+    scan_coverage: input.scanCoverage ?? {},
     source: input.source ?? "opzix-audit",
   };
 
@@ -303,7 +339,7 @@ export async function listAuditScans(filters: AuditScanFilters = {}) {
 
   const query: Record<string, string | number | undefined> = {
     select:
-      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
+      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,benchmark_group,benchmark_percentile_estimate,benchmark_label,benchmark_explanation,submitted_page_type,submitted_page_type_confidence,submitted_page_type_evidence,scoring_confidence,revenue_risk_areas,competitive_context,scan_coverage,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
     order: "created_at.desc",
     limit: 100,
   };
@@ -352,7 +388,7 @@ export async function listAuditInsightScans() {
 
   const result = await safeAuditScanListFetch({
     select:
-      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
+      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,benchmark_group,benchmark_percentile_estimate,benchmark_label,benchmark_explanation,submitted_page_type,submitted_page_type_confidence,submitted_page_type_evidence,scoring_confidence,revenue_risk_areas,competitive_context,scan_coverage,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
     order: "created_at.desc",
     limit: 5000,
   });
@@ -380,9 +416,20 @@ async function safeAuditScanListFetch(
   query: Record<string, string | number | undefined>,
 ) {
   try {
-    return await supabaseAdminFetch<AuditScanRow[]>("audit_scans", {
+    const result = await supabaseAdminFetch<AuditScanRow[]>("audit_scans", {
       query,
     });
+
+    if (!result.ok && shouldRetryAuditListWithLegacySelect(result.error)) {
+      return await supabaseAdminFetch<AuditScanRow[]>("audit_scans", {
+        query: {
+          ...query,
+          select: AUDIT_SCAN_LEGACY_SELECT,
+        },
+      });
+    }
+
+    return result;
   } catch (error) {
     return {
       ok: false as const,
@@ -394,4 +441,13 @@ async function safeAuditScanListFetch(
           : "Could not reach Supabase audit scan storage.",
     };
   }
+}
+
+function shouldRetryAuditListWithLegacySelect(error: unknown) {
+  const message = String(error).toLowerCase();
+  return (
+    message.includes("column") && message.includes("does not exist") ||
+    message.includes("missing column") ||
+    message.includes("schema cache")
+  );
 }

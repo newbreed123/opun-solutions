@@ -46,8 +46,39 @@ type AssistantFinding = {
   severity: Severity;
   confidence?: string;
   businessImpact: string;
+  revenueImpact?: AssistantRevenueImpactEstimate;
   recommendedFirstAction: string;
   evidenceSummary: string;
+};
+
+type AssistantPageTypeDetection = {
+  submittedPageType: string;
+  confidence: number;
+  evidence: string[];
+  scoringNote: string;
+};
+
+type AssistantCompetitiveComparison = {
+  comparisonSet: string[];
+  expectedPatterns: string[];
+  strengths: string[];
+  weaknesses: string[];
+  explanation: string;
+};
+
+type AssistantRevenueImpactEstimate = {
+  findingTitle: string;
+  riskArea: string;
+  likelyImpact: string;
+  severity: string;
+  confidence: string;
+  explanation: string;
+};
+
+type AssistantRevenueImpactSummary = {
+  summary: string;
+  estimates: AssistantRevenueImpactEstimate[];
+  revenueRiskAreas: string[];
 };
 
 type AssistantConcern = {
@@ -143,9 +174,16 @@ type AssistantEcommerceMaturity = {
 };
 
 type AssistantScanCoverage = {
+  submittedUrlOnly?: boolean;
   screenshotMode: "viewport" | "full-page";
   domCoverage: "visible" | "full-page";
   scoringCoverage: "above-fold" | "near-fold" | "full-page";
+  aboveFoldCoverage?: string;
+  nearFoldCoverage?: string;
+  fullPageDomCoverage?: string;
+  screenshotCoverage?: string;
+  scoringCoverageSummary?: string;
+  coverageWarnings?: string[];
   aboveFoldSignals: Record<string, boolean | number | undefined>;
   nearFoldSignals: Record<string, boolean | number | undefined>;
   fullPageSignals: Record<string, boolean | number | undefined>;
@@ -153,6 +191,24 @@ type AssistantScanCoverage = {
   manualConfirmationSignals?: Record<string, boolean | undefined>;
   coverageSummary: string;
   explanation: string;
+};
+
+type AssistantBenchmarkContext = {
+  benchmarkGroup?: string;
+  percentileEstimate?: number | null;
+  benchmarkLabel?: string;
+  comparisonBasis?: string[];
+  strengthsVsBenchmark?: string[];
+  weaknessesVsBenchmark?: string[];
+  explanation?: string;
+  summary: string;
+  benchmarkTags: string[];
+  notes?: {
+    message: string;
+    evidence: string;
+    tags: string[];
+    tone: "positive" | "negative" | "mixed";
+  }[];
 };
 
 type AssistantAudit = {
@@ -170,10 +226,16 @@ type AssistantAudit = {
     whyThisScore: string;
     scoringConfidence?: "High" | "Moderate" | "Low";
     confidenceNote?: string;
+    benchmarkContext?: AssistantBenchmarkContext;
+    scanCoverage?: AssistantScanCoverage;
+    pageType?: AssistantPageTypeDetection;
   };
   positiveUxSignals?: Record<string, AssistantPositiveUxSignal>;
   ecommerceMaturity?: AssistantEcommerceMaturity;
   scanCoverage?: AssistantScanCoverage;
+  submittedPageType?: AssistantPageTypeDetection;
+  competitiveComparison?: AssistantCompetitiveComparison;
+  revenueImpactSummary?: AssistantRevenueImpactSummary;
   auditNarrative?: string;
   currentNarrativeArchetype?: string;
   narrativeProfile?: AssistantNarrativeProfile;
@@ -190,16 +252,7 @@ type AssistantAudit = {
   categories?: AssistantCategory[];
   recommendedNextSteps: AssistantRecommendedStep[];
   benchmarkTags?: string[];
-  benchmarkContext?: {
-    summary: string;
-    benchmarkTags: string[];
-    notes?: {
-      message: string;
-      evidence: string;
-      tags: string[];
-      tone: "positive" | "negative" | "mixed";
-    }[];
-  };
+  benchmarkContext?: AssistantBenchmarkContext;
   visualUxDiagnostics?: {
     score: number | null;
     visualMetricsAvailable?: boolean;
@@ -449,6 +502,9 @@ type ScanContext = {
   positiveUxSignals?: AssistantAudit["positiveUxSignals"];
   ecommerceMaturity?: AssistantAudit["ecommerceMaturity"];
   scanCoverage?: AssistantAudit["scanCoverage"];
+  submittedPageType?: AssistantAudit["submittedPageType"];
+  competitiveComparison?: AssistantAudit["competitiveComparison"];
+  revenueImpactSummary?: AssistantAudit["revenueImpactSummary"];
   currentNarrativeArchetype?: string;
   narrativeProfile?: AssistantNarrativeProfile;
   siteType?: StorefrontReviewSiteType;
@@ -855,6 +911,25 @@ function getBenchmarkTags(audit: AssistantAudit) {
 function getBenchmarkSummary(audit: AssistantAudit) {
   const tags = getBenchmarkTags(audit);
   const note = audit.benchmarkContext?.notes?.[0];
+  const context = audit.benchmarkContext;
+
+  if (context?.benchmarkGroup) {
+    if (
+      context.benchmarkLabel === "Insufficient Data" ||
+      context.percentileEstimate === null
+    ) {
+      return `${context.explanation ?? context.summary} The benchmark is available for ${context.benchmarkGroup}, but confidence is low and additional validation is required before assigning a percentile or competitive rank.`;
+    }
+
+    const percentile =
+      typeof context.percentileEstimate === "number"
+        ? `${context.percentileEstimate}th percentile`
+        : "directional percentile";
+    const label = context.benchmarkLabel
+      ? ` with a ${context.benchmarkLabel.toLowerCase()} benchmark label`
+      : "";
+    return `${context.explanation ?? context.summary} The scan is being compared against ${context.benchmarkGroup} at an estimated ${percentile}${label}.`;
+  }
 
   if (audit.benchmarkContext?.summary) {
     return `${audit.benchmarkContext.summary}${
@@ -1213,6 +1288,9 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
     positiveUxSignals: audit.positiveUxSignals,
     ecommerceMaturity: audit.ecommerceMaturity,
     scanCoverage: audit.scanCoverage,
+    submittedPageType: audit.submittedPageType,
+    competitiveComparison: audit.competitiveComparison,
+    revenueImpactSummary: audit.revenueImpactSummary,
     currentNarrativeArchetype: audit.currentNarrativeArchetype,
     narrativeProfile: audit.narrativeProfile,
     siteType: audit.siteType ?? audit.storefrontReviewContext?.siteType,
@@ -1356,6 +1434,9 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
     positiveUxSignals: context.positiveUxSignals,
     ecommerceMaturity: context.ecommerceMaturity,
     scanCoverage: context.scanCoverage,
+    submittedPageType: context.submittedPageType,
+    competitiveComparison: context.competitiveComparison,
+    revenueImpactSummary: context.revenueImpactSummary,
     metadata: context.metadata,
     platformVisibility: context.platformVisibility,
     trackingVisibility: getTrackingSummary(audit),
@@ -2182,13 +2263,22 @@ function buildScoreReasoningResponse(context: ScanContext): ChatMessage {
 function buildScanCoverageResponse(context: ScanContext): ChatMessage {
   const coverage = context.scanCoverage;
   const coverageText =
+    coverage?.scoringCoverageSummary ??
     coverage?.coverageSummary ??
     coverage?.explanation ??
     "This scan uses above-the-fold evidence for first impression and full-page DOM evidence for deeper commerce signals on the submitted URL.";
   const paragraphs = [
     "The scanner reviews the submitted URL, with heavier weighting on above-the-fold evidence for first impression and full-page DOM evidence for deeper commerce signals.",
     coverageText,
-    coverage?.explanation ?? null,
+    context.submittedPageType
+      ? `Submitted page type: ${context.submittedPageType.submittedPageType} at ${context.submittedPageType.confidence}% confidence. ${context.submittedPageType.scoringNote}`
+      : null,
+    coverage?.aboveFoldCoverage ?? null,
+    coverage?.nearFoldCoverage ?? null,
+    coverage?.fullPageDomCoverage ?? coverage?.explanation ?? null,
+    coverage?.coverageWarnings?.length
+      ? `Coverage warnings: ${coverage.coverageWarnings.join(" ")}`
+      : null,
     "If something appears lower on the submitted page, it should count for operations, trust, product discovery, support, shipping/returns, account, and fulfillment signals. It may still carry less weight for hero clarity, primary CTA, search prominence, and mobile first impression.",
   ].filter((paragraph): paragraph is string => Boolean(paragraph));
 
@@ -2197,6 +2287,58 @@ function buildScanCoverageResponse(context: ScanContext): ChatMessage {
     paragraphs,
     { topic: "priority" },
   );
+}
+
+function buildCompetitiveContextResponse(context: ScanContext): ChatMessage {
+  const competitive = context.competitiveComparison;
+  const benchmark = context.benchmarkContext;
+  const comparisonSet = competitive?.comparisonSet?.length
+    ? competitive.comparisonSet.join(", ")
+    : benchmark?.benchmarkGroup ?? "similar pages in the same conversion context";
+  const expectedPatterns = competitive?.expectedPatterns?.slice(0, 3).join(" ");
+  const weaknesses =
+    competitive?.weaknesses?.length
+      ? competitive.weaknesses.slice(0, 3).join(" ")
+      : benchmark?.weaknessesVsBenchmark?.slice(0, 3).join(" ");
+
+  return buildScanAnswer({
+    id: `assistant-competitive-context-${Date.now()}`,
+    topic: "benchmark",
+    directAnswer: `I would compare this scan against ${comparisonSet}.`,
+    evidence:
+      benchmark?.explanation ??
+      competitive?.explanation ??
+      "The comparison is directional and based on the submitted URL's visible public-page evidence.",
+    businessMeaning:
+      expectedPatterns ||
+      "A stronger comparable page usually makes the primary path obvious early, supports trust before commitment, and keeps discovery or contact actions easy to reach.",
+    nextQuestion: weaknesses
+      ? `The main gaps versus that context are: ${weaknesses}`
+      : "Do you want me to connect the benchmark gaps to the first fixes?",
+  });
+}
+
+function buildRevenueImpactResponse(context: ScanContext): ChatMessage {
+  const revenue = context.revenueImpactSummary;
+  const topEstimate = revenue?.estimates?.[0];
+
+  return buildScanAnswer({
+    id: `assistant-revenue-impact-${Date.now()}`,
+    topic: "priority",
+    directAnswer: topEstimate
+      ? `${topEstimate.findingTitle} is the clearest business-impact risk in this scan.`
+      : "The report estimates revenue impact directionally from the highest-priority findings, but it does not claim exact dollars without analytics data.",
+    evidence:
+      topEstimate?.explanation ??
+      revenue?.summary ??
+      context.scoreExplanation?.whyThisScore ??
+      "The scan uses visible UX, conversion, trust, tracking, operations, and DOM signals to estimate business risk.",
+    businessMeaning: topEstimate
+      ? `${topEstimate.riskArea}: ${topEstimate.likelyImpact}`
+      : "These findings matter because unclear paths, weak trust, incomplete tracking, or operational ambiguity can reduce conversion confidence, lead quality, attribution, or follow-up efficiency.",
+    nextQuestion:
+      "Do you want me to rank the findings by likely business impact?",
+  });
 }
 
 function getHighestImpactFinding(audit: AssistantAudit): RetrievedFinding {
@@ -3198,6 +3340,28 @@ function answerDirectQuestion(
   ) {
     topic = "ux";
     message = buildScoreSynchronizationResponse(context);
+  } else if (
+    normalized.includes("who should this be compared") ||
+    normalized.includes("what should this be compared") ||
+    normalized.includes("compare against") ||
+    normalized.includes("competitive") ||
+    normalized.includes("better site") ||
+    normalized.includes("amazon") ||
+    normalized.includes("walmart") ||
+    normalized.includes("uline")
+  ) {
+    topic = "benchmark";
+    message = buildCompetitiveContextResponse(context);
+  } else if (
+    normalized.includes("revenue") ||
+    normalized.includes("business impact") ||
+    normalized.includes("why should i care") ||
+    normalized.includes("affect sales") ||
+    normalized.includes("affect leads") ||
+    normalized.includes("cost money")
+  ) {
+    topic = "priority";
+    message = buildRevenueImpactResponse(context);
   } else if (
     normalized.includes("is this ecommerce") ||
     normalized.includes("is this an ecommerce") ||

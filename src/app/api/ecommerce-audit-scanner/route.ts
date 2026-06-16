@@ -70,6 +70,7 @@ type HeuristicFinding = {
   confidence: HeuristicConfidence;
   evidenceSummary: string;
   businessImpact: string;
+  revenueImpact?: RevenueImpactEstimate;
   recommendedFirstAction: string;
 };
 
@@ -130,9 +131,13 @@ type PositiveUxSignals = Record<PositiveUxSignalKey, PositiveUxSignal>;
 type OverallScoreExplanation = {
   positiveSignals: string[];
   majorPenalties: string[];
+  scoreReducers?: string[];
   whyThisScore: string;
   scoringConfidence?: ScoringConfidence;
   confidenceNote?: string;
+  benchmarkContext?: BenchmarkContext;
+  scanCoverage?: ScanCoverage;
+  pageType?: PageTypeDetection;
 };
 
 type EcommerceMaturityTier =
@@ -167,9 +172,16 @@ type CoverageSignalSet = {
 };
 
 type ScanCoverage = {
+  submittedUrlOnly: boolean;
   screenshotMode: "viewport" | "full-page";
   domCoverage: "visible" | "full-page";
   scoringCoverage: "above-fold" | "near-fold" | "full-page";
+  aboveFoldCoverage: string;
+  nearFoldCoverage: string;
+  fullPageDomCoverage: string;
+  screenshotCoverage: string;
+  scoringCoverageSummary: string;
+  coverageWarnings: string[];
   aboveFoldSignals: CoverageSignalSet;
   nearFoldSignals: CoverageSignalSet;
   fullPageSignals: CoverageSignalSet;
@@ -260,12 +272,70 @@ type BenchmarkNote = {
 };
 
 type BenchmarkContext = {
+  benchmarkGroup: string;
+  percentileEstimate: number | null;
+  benchmarkLabel:
+    | "Top Tier"
+    | "Above Average"
+    | "Average"
+    | "Below Average"
+    | "Needs Work"
+    | "Insufficient Data";
+  comparisonBasis: string[];
+  strengthsVsBenchmark: string[];
+  weaknessesVsBenchmark: string[];
+  explanation: string;
   summary: string;
   notes: BenchmarkNote[];
   benchmarkTags: string[];
   recurringPositivePatterns: string[];
   recurringNegativePatterns: string[];
   signalScore: number;
+};
+
+type PageTypeDetection = {
+  submittedPageType:
+    | "Homepage"
+    | "Product Detail Page"
+    | "Collection / Category Page"
+    | "Cart / Checkout"
+    | "Landing Page"
+    | "Lead Capture / Service Page"
+    | "Content / Article Page"
+    | "Unknown";
+  confidence: number;
+  evidence: string[];
+  scoringNote: string;
+};
+
+type CompetitiveComparison = {
+  comparisonSet: string[];
+  expectedPatterns: string[];
+  strengths: string[];
+  weaknesses: string[];
+  explanation: string;
+};
+
+type RevenueImpactEstimate = {
+  findingTitle: string;
+  riskArea:
+    | "Conversion"
+    | "Average Order Value"
+    | "Lead Quality"
+    | "Trust"
+    | "Tracking"
+    | "Operations"
+    | "Engagement";
+  likelyImpact: string;
+  severity: HeuristicSeverity;
+  confidence: HeuristicConfidence;
+  explanation: string;
+};
+
+type RevenueImpactSummary = {
+  summary: string;
+  estimates: RevenueImpactEstimate[];
+  revenueRiskAreas: string[];
 };
 
 const knownEnterpriseRetailDomains = [
@@ -404,6 +474,7 @@ function classifyStorefrontReviewContext({
 
   const isKnownEnterprise = domainMatches(domain, knownEnterpriseRetailDomains);
   const isKnownEducationContent = domainMatches(domain, knownEducationContentDomains);
+  const isKnownIndustrialCatalog = /(?:maxx-supply\.com|maxxsupply\.com|grainger\.com|uline\.com|mcmaster\.com|fastenal\.com|motion\.com|globalindustrial\.com)$/i.test(domain);
   const platformIsEnterprise = platform.name === "Enterprise / Custom Commerce Stack";
   const cartOrCheckoutVisible = commerce.cartVisible || commerce.checkoutVisible;
   const fullPage = diagnostics.fullPageDomSignals;
@@ -443,6 +514,11 @@ function classifyStorefrontReviewContext({
     "shipping",
     "returns",
     "store",
+    "sku",
+    "part",
+    "catalog",
+    "industrial",
+    "supply",
   ]);
   const hasEducationLanguage = textHasAny(pageCorpus, [
     "education",
@@ -486,6 +562,10 @@ function classifyStorefrontReviewContext({
 
   if (isKnownEnterprise) {
     supportingSignals.push("Known major enterprise retail domain.");
+  }
+
+  if (isKnownIndustrialCatalog) {
+    supportingSignals.push("Known industrial distributor or B2B catalog ecommerce domain.");
   }
 
   if (platformIsEnterprise) {
@@ -538,6 +618,20 @@ function classifyStorefrontReviewContext({
       confidence: catalogSignalsVisible || hasCommerceLanguage ? "High" : "Moderate",
       reason:
         "The public page appears to be part of a large or custom commerce environment where platform and purchase-path details may be intentionally abstracted.",
+      supportingSignals: supportingSignals.slice(0, 5),
+    };
+  }
+
+  if (
+    isKnownIndustrialCatalog ||
+    (hasStandardPlatformConfidence && (productCatalogPathVisible || hasCommerceLanguage))
+  ) {
+    return {
+      siteType: cartOrCheckoutVisible ? "ecommerce-storefront" : "catalog-commerce",
+      confidence: isKnownIndustrialCatalog || hasStandardPlatformConfidence ? "High" : "Moderate",
+      reason: cartOrCheckoutVisible
+        ? "The public page exposes standard ecommerce platform evidence and purchase-path signals."
+        : "The public page exposes standard ecommerce platform or industrial catalog evidence, but cart or checkout is not clearly visible in this sample.",
       supportingSignals: supportingSignals.slice(0, 5),
     };
   }
@@ -933,6 +1027,152 @@ function visibleEvidenceList(items: string[]) {
   return items.length > 0 ? items.join(", ") : "none detected";
 }
 
+function isEnterpriseVisibilityContext(
+  diagnostics: LiveDiagnosticsResult,
+  siteClassification?: SiteClassification,
+  visualUxDiagnostics?: VisualUxDiagnosticsResult,
+) {
+  const host = safeHost(diagnostics.finalUrl);
+  const combined = [
+    siteClassification?.siteType,
+    diagnostics.platformDetection.platformName,
+    visualUxDiagnostics?.uxArchetype,
+    diagnostics.title,
+    diagnostics.metaDescription,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    domainMatches(host, knownEnterpriseRetailDomains) ||
+    domainMatches(host, knownHealthcareCommerceDomains) ||
+    /enterprise|marketplace|healthcare commerce|pharmacy retail|custom commerce|pharmacy|prescription|rx|otc|patient/.test(
+      combined,
+    )
+  );
+}
+
+function healthcareCommerceCorpus(diagnostics: LiveDiagnosticsResult) {
+  return [
+    diagnostics.title,
+    diagnostics.metaDescription,
+    diagnostics.finalUrl,
+    diagnostics.commerceFlowSignals.ctaLabels.join(" "),
+    diagnostics.conversionSignals.ctaLabels.join(" "),
+    diagnostics.storefrontSignals.mobileCtaLabels.join(" "),
+    diagnostics.fullPageDomSignals.ctaLabels.join(" "),
+    diagnostics.fullPageDomSignals.productLinks.join(" "),
+    diagnostics.desktopVisualMetrics?.visibleTextSample,
+    diagnostics.mobileVisualMetrics?.visibleTextSample,
+    ...(diagnostics.desktopVisualMetrics?.visibleLinks ?? []),
+    ...(diagnostics.mobileVisualMetrics?.visibleLinks ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function enterpriseRetailJourneySignalCount(diagnostics: LiveDiagnosticsResult) {
+  const signals = diagnostics.storefrontSignals;
+  const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
+  const text = healthcareCommerceCorpus(diagnostics);
+  const discoveryVisible =
+    signals.productNavigationVisible ||
+    signals.collectionLinksVisible ||
+    commerce.productCatalogVisible ||
+    fullPage.categoryProductVisible ||
+    fullPage.productCardCount > 0 ||
+    fullPage.productLinks.length > 0;
+  const fulfillmentPathVisible =
+    /pickup|delivery|ship to|store locator|nearby store|curbside|same day/.test(
+      text,
+    );
+  const accountOrReorderVisible =
+    fullPage.accountLoginVisible ||
+    /account|sign in|login|log in|reorder|buy it again|purchase history/.test(
+      text,
+    );
+  const departmentPathVisible =
+    /department|departments|category|categories|shop by|aisle|grocery|pharmacy|electronics|home|fashion|beauty/.test(
+      text,
+    );
+
+  return [
+    signals.searchVisible || fullPage.searchVisible,
+    discoveryVisible,
+    commerce.cartVisible || fullPage.cartVisible,
+    fulfillmentPathVisible,
+    accountOrReorderVisible,
+    departmentPathVisible,
+    commerce.ctaCount > 0 || fullPage.ctaLabels.length > 0,
+  ].filter(Boolean).length;
+}
+
+function isHealthcareCommerceContext(
+  diagnostics: LiveDiagnosticsResult,
+  siteClassification?: SiteClassification,
+  visualUxDiagnostics?: VisualUxDiagnosticsResult,
+) {
+  const host = safeHost(diagnostics.finalUrl);
+  const combined = [
+    siteClassification?.siteType,
+    diagnostics.platformDetection.platformName,
+    visualUxDiagnostics?.uxArchetype,
+    healthcareCommerceCorpus(diagnostics),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    domainMatches(host, knownHealthcareCommerceDomains) ||
+    /healthcare commerce|pharmacy retail|pharmacy|prescription|rx|otc|patient|clinic|appointment|vaccination|medication/.test(
+      combined,
+    )
+  );
+}
+
+function healthcareJourneySignalCount(diagnostics: LiveDiagnosticsResult) {
+  const signals = diagnostics.storefrontSignals;
+  const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
+  const text = healthcareCommerceCorpus(diagnostics);
+  const accountVisible =
+    fullPage.accountLoginVisible ||
+    /account|sign in|login|log in|my cvs|extra care|extracare/.test(text);
+  const healthcarePathVisible =
+    /pharmacy|prescription|rx|otc|appointment|vaccination|minuteclinic|store locator|coupons|deals/.test(
+      text,
+    );
+  const discoveryVisible =
+    signals.productNavigationVisible ||
+    signals.collectionLinksVisible ||
+    commerce.productCatalogVisible ||
+    fullPage.categoryProductVisible ||
+    fullPage.productCardCount > 0 ||
+    fullPage.productLinks.length > 0;
+
+  return [
+    signals.searchVisible || fullPage.searchVisible,
+    discoveryVisible,
+    accountVisible,
+    healthcarePathVisible,
+    commerce.cartVisible || fullPage.cartVisible || commerce.checkoutVisible || fullPage.checkoutVisible,
+    commerce.ctaCount > 0 || fullPage.ctaLabels.length > 0,
+  ].filter(Boolean).length;
+}
+
+function isConfidenceReducerFinding(finding: HeuristicFinding) {
+  return (
+    finding.confidence === "Needs Review" ||
+    /visibility needs confirmation|confidence needs confirmation|manual review|enterprise tracking|server-side|consent-based|hidden/i.test(
+      `${finding.title} ${finding.businessImpact} ${finding.evidenceSummary}`,
+    )
+  );
+}
+
 function buildScoringEvidenceState(
   diagnostics: LiveDiagnosticsResult,
   visualUxDiagnostics: VisualUxDiagnosticsResult,
@@ -968,9 +1208,20 @@ function buildScoringEvidenceState(
     !domExtractionAvailable ||
     fullPageLinksUnexpectedZero ||
     /visual metrics|dom extraction|selector|page blocked|blocked|captcha/.test(rootCauseText);
+  const enterpriseVisibilityContext = isEnterpriseVisibilityContext(
+    diagnostics,
+    siteClassification,
+    visualUxDiagnostics,
+  );
+  const visibilityConfidenceLimited =
+    enterpriseVisibilityContext &&
+    (visibleMarketingTools(diagnostics).length <= 1 ||
+      platformNeedsManualReview(diagnostics));
   const scoringConfidence: ScoringConfidence = subsystemFailed
     ? "Low"
-    : diagnostics.warnings.length > 0 || diagnostics.failedRequests.length > 0
+    : visibilityConfidenceLimited ||
+        diagnostics.warnings.length > 0 ||
+        diagnostics.failedRequests.length > 0
       ? "Moderate"
       : "High";
   const unknownDomCategory = !domExtractionAvailable || fullPageLinksUnexpectedZero;
@@ -1000,6 +1251,8 @@ function buildScoringEvidenceState(
   const scoringConfidenceNote =
     scoringConfidence === "Low"
       ? "Some scanner subsystems could not evaluate this page. Findings should be treated as directional until visual and DOM extraction complete successfully."
+      : visibilityConfidenceLimited
+        ? "Some enterprise visibility signals were intentionally opaque or not exposed publicly, so tracking and platform findings reduce confidence more than score."
       : scoringConfidence === "Moderate"
         ? "Some public-page evidence was partial, so the score should be reviewed with the diagnostic details nearby."
         : "Core scanner subsystems collected enough evidence for a normal confidence score.";
@@ -1176,6 +1429,7 @@ function productDiscoveryFirstAction(diagnostics: LiveDiagnosticsResult) {
 function buildHeuristicFindings(
   diagnostics: LiveDiagnosticsResult,
   visualUxDiagnostics?: VisualUxDiagnosticsResult,
+  siteClassification?: SiteClassification,
   evidenceState?: ScoringEvidenceState,
 ): HeuristicFinding[] {
   const findings: HeuristicFinding[] = [];
@@ -1184,6 +1438,11 @@ function buildHeuristicFindings(
   const fullPage = diagnostics.fullPageDomSignals;
   const marketingTools = visibleMarketingTools(diagnostics);
   const trustSignalsVisible = trustSignalCount(diagnostics);
+  const enterpriseVisibilityContext = isEnterpriseVisibilityContext(
+    diagnostics,
+    siteClassification,
+    visualUxDiagnostics,
+  );
   const canEvaluate = (key: AuditCategoryKey) =>
     categoryEvidenceKnown(evidenceState, key);
 
@@ -1198,18 +1457,38 @@ function buildHeuristicFindings(
     });
 
   if (canEvaluate("conversionIssues") && !signals.mobileCtaVisibleAboveFold) {
+    const healthcareMultiPathHomepage =
+      isHealthcareCommerceContext(diagnostics, siteClassification, visualUxDiagnostics) &&
+      healthcareJourneySignalCount(diagnostics) >= 4;
+    const enterpriseMultiEntryHomepage =
+      !healthcareMultiPathHomepage &&
+      enterpriseVisibilityContext &&
+      enterpriseRetailJourneySignalCount(diagnostics) >= 4;
+
     addFinding({
-      title: "Mobile CTA Visibility Needs Review",
+      title: healthcareMultiPathHomepage
+        ? "Mobile Journey Priority Needs Review"
+        : enterpriseMultiEntryHomepage
+          ? "Mobile Journey Entry Priority Needs Review"
+          : "Mobile CTA Visibility Needs Review",
       category: "mobileConversion",
       primaryCategory: "conversionIssues",
       secondaryCategories: ["uxUiIssues"],
-      severity: "High",
+      severity: healthcareMultiPathHomepage || enterpriseMultiEntryHomepage ? "Medium" : "High",
       confidence: "Moderate",
-      businessImpact:
-        "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
-      recommendedFirstAction: mobileCtaFirstAction(diagnostics),
-      evidenceSummary:
-        `No strong CTA was detected in the first mobile viewport. ${summarizeCtaLabels(commerce.ctaLabels)} Mobile first-screen links: ${signals.mobileAboveFoldLinkCount}.`,
+      businessImpact: healthcareMultiPathHomepage
+        ? "Healthcare commerce homepages often support prescriptions, appointments, store lookup, account access, coupons, and shopping at once, so this is a journey-priority issue rather than proof that conversion is weak."
+        : enterpriseMultiEntryHomepage
+          ? "Enterprise retail homepages often convert through search, departments, pickup, delivery, reorder, account, and cart entry points, so the absence of one dominant promo CTA should be treated as journey prioritization rather than weak conversion."
+        : "Primary mobile CTA visibility may weaken after the hero section, making the next step less obvious for mobile shoppers.",
+      recommendedFirstAction: enterpriseMultiEntryHomepage
+        ? "Confirm search, departments, pickup, delivery, reorder, account, and cart are visually prioritized as the primary enterprise retail entry paths before treating secondary service CTAs as conversion drivers."
+        : mobileCtaFirstAction(diagnostics),
+      evidenceSummary: healthcareMultiPathHomepage
+        ? `No single dominant mobile CTA was detected, but ${healthcareJourneySignalCount(diagnostics)} healthcare commerce journey signal groups were visible. ${summarizeCtaLabels(commerce.ctaLabels)} Mobile first-screen links: ${signals.mobileAboveFoldLinkCount}.`
+        : enterpriseMultiEntryHomepage
+          ? `No single dominant mobile CTA was detected, but ${enterpriseRetailJourneySignalCount(diagnostics)} enterprise retail journey signal groups were visible. ${summarizeCtaLabels(commerce.ctaLabels)} Mobile first-screen links: ${signals.mobileAboveFoldLinkCount}.`
+        : `No strong CTA was detected in the first mobile viewport. ${summarizeCtaLabels(commerce.ctaLabels)} Mobile first-screen links: ${signals.mobileAboveFoldLinkCount}.`,
     });
   }
 
@@ -1354,29 +1633,36 @@ function buildHeuristicFindings(
 
   if (canEvaluate("trackingIssues") && marketingTools.length === 0) {
     addFinding({
-      title: "Marketing Attribution Visibility Appears Limited",
+      title: enterpriseVisibilityContext
+        ? "Measurement Visibility Needs Confirmation"
+        : "Marketing Attribution Visibility Appears Limited",
       category: "marketingVisibility",
       primaryCategory: "trackingIssues",
-      severity: "High",
-      confidence: "Moderate",
-      businessImpact:
-        "Limited visible analytics or marketing tags can make campaign performance harder to trust before increasing spend.",
+      severity: enterpriseVisibilityContext ? "Low" : "High",
+      confidence: enterpriseVisibilityContext ? "Needs Review" : "Moderate",
+      businessImpact: enterpriseVisibilityContext
+        ? "Enterprise healthcare, retail, banking, and insurance sites often hide, delay, consent-gate, or move analytics server-side, so missing public tags should reduce measurement confidence rather than imply weak tracking quality."
+        : "Limited visible analytics or marketing tags can make campaign performance harder to trust before increasing spend.",
       recommendedFirstAction:
-        "Verify GA4/GTM, ad pixels, email capture, and purchase or lead conversion events before scaling paid traffic.",
-      evidenceSummary:
-        "No supported marketing tools were detected from public page markup, visible DOM content, or loaded frontend assets.",
+        "Confirm client-side, server-side, consent-based, and delayed analytics coverage with internal tag documentation or analytics access before treating public tag visibility as a performance defect.",
+      evidenceSummary: enterpriseVisibilityContext
+        ? "No supported marketing tools were visible in public markup, but enterprise tracking may be hidden, delayed, consent-based, or server-side."
+        : "No supported marketing tools were detected from public page markup, visible DOM content, or loaded frontend assets.",
     });
   } else if (canEvaluate("trackingIssues") && marketingTools.length === 1) {
     addFinding({
-      title: "Tracking Stack Appears Limited",
+      title: enterpriseVisibilityContext
+        ? "Measurement Visibility Needs Confirmation"
+        : "Tracking Stack Appears Limited",
       category: "marketingVisibility",
       primaryCategory: "trackingIssues",
-      severity: "Medium",
-      confidence: "Moderate",
-      businessImpact:
-        "A thin visible tracking stack may leave gaps in attribution, retargeting, or customer follow-up visibility.",
+      severity: enterpriseVisibilityContext ? "Low" : "Medium",
+      confidence: enterpriseVisibilityContext ? "Needs Review" : "Moderate",
+      businessImpact: enterpriseVisibilityContext
+        ? "Only one public analytics signal was visible, but enterprise tracking may be hidden, delayed, consent-based, or server-side. This is a confidence limitation, not confirmed weak tracking."
+        : "A thin visible tracking stack may leave gaps in attribution, retargeting, or customer follow-up visibility.",
       recommendedFirstAction:
-        "Map the visible tag to the full purchase path and confirm whether missing analytics, pixel, or email events are intentionally handled server-side.",
+        "Map the visible tag to the full purchase path and confirm whether analytics, pixel, email, or conversion events are intentionally handled server-side or behind consent.",
       evidenceSummary: `Visible supported marketing tool: ${marketingTools[0].label}.`,
     });
   }
@@ -1417,13 +1703,16 @@ function buildHeuristicFindings(
 
   if (canEvaluate("technicalIssues") && platformNeedsManualReview(diagnostics)) {
     addFinding({
-      title: "Platform Visibility Needs Manual Review",
+      title: enterpriseVisibilityContext
+        ? "Platform Confidence Needs Confirmation"
+        : "Platform Visibility Needs Manual Review",
       category: "platformVisibility",
       primaryCategory: "technicalIssues",
-      severity: "Medium",
+      severity: enterpriseVisibilityContext ? "Low" : "Medium",
       confidence: "Needs Review",
-      businessImpact:
-        "Platform-specific recommendations should wait until the storefront foundation is confirmed.",
+      businessImpact: enterpriseVisibilityContext
+        ? "Platform opacity is normal for large healthcare, retail, marketplace, banking, and insurance sites. It should reduce platform confidence, not count as a customer-facing platform problem."
+        : "Platform-specific recommendations should wait until the storefront foundation is confirmed.",
       recommendedFirstAction:
         "Confirm platform clues from source assets, cart and checkout URLs, product URL patterns, and admin or team knowledge before making platform-specific recommendations.",
       evidenceSummary:
@@ -1476,12 +1765,21 @@ function categoryEvidencePenalty(
     findings,
     key as AuditCategoryKey,
   );
+  const enterpriseVisibilityContext = isEnterpriseVisibilityContext(
+    diagnostics,
+    siteClassification,
+  );
+  const enterpriseMultiEntryHomepage =
+    enterpriseVisibilityContext &&
+    enterpriseRetailJourneySignalCount(diagnostics) >= 4;
   const findingPressure = Math.min(
     14,
-    categoryFindings.reduce(
-      (total, finding) => total + Math.ceil(severityWeight(finding.severity) / 2),
-      0,
-    ),
+    categoryFindings
+      .filter((finding) => !isConfidenceReducerFinding(finding))
+      .reduce(
+        (total, finding) => total + Math.ceil(severityWeight(finding.severity) / 2),
+        0,
+      ),
   );
 
   if (key === "uxUiIssues") {
@@ -1497,7 +1795,7 @@ function categoryEvidencePenalty(
     return (
       findingPressure +
       visualPenalty +
-      (!signals.mobileCtaVisibleAboveFold ? 5 : 0) +
+      (!signals.mobileCtaVisibleAboveFold ? (enterpriseMultiEntryHomepage ? 1 : 5) : 0) +
       (signals.mobileCrowdingRisk ? 4 : 0) +
       (!signals.productNavigationVisible && !fullPage.categoryProductVisible ? 4 : 0) +
       (!signals.collectionLinksVisible && !fullPage.categoryProductVisible ? 3 : 0) +
@@ -1524,17 +1822,19 @@ function categoryEvidencePenalty(
       (!signals.policyVisible ? 2 : 0) +
       (!signals.paymentTrustVisible ? 3 : 0) +
       (!signals.reviewSignalsVisible ? 2 : 0) +
-      (!signals.mobileCtaVisibleAboveFold ? 3 : 0)
+      (!signals.mobileCtaVisibleAboveFold ? (enterpriseMultiEntryHomepage ? 1 : 3) : 0)
     );
   }
 
   if (key === "technicalIssues") {
     const siteType = siteClassification?.siteType.toLowerCase() ?? "";
     const isEnterpriseOrMarketplace =
-      siteType.includes("enterprise") || siteType.includes("marketplace");
+      siteType.includes("enterprise") ||
+      siteType.includes("marketplace") ||
+      enterpriseVisibilityContext;
     const platformReviewPenalty = platformNeedsManualReview(diagnostics)
       ? isEnterpriseOrMarketplace
-        ? 2
+        ? 0
         : 8
       : 0;
     const lowConfidencePenalty =
@@ -1543,6 +1843,12 @@ function categoryEvidencePenalty(
           ? 1
           : 3
         : 0;
+    const consolePenalty = isEnterpriseOrMarketplace
+      ? Math.min(2, diagnostics.consoleErrors.length)
+      : Math.min(10, diagnostics.consoleErrors.length * 3);
+    const failedRequestPenalty = isEnterpriseOrMarketplace
+      ? Math.min(2, diagnostics.failedRequests.length)
+      : Math.min(7, diagnostics.failedRequests.length * 2);
 
     return (
       findingPressure +
@@ -1551,19 +1857,34 @@ function categoryEvidencePenalty(
       platformReviewPenalty +
       lowConfidencePenalty +
       (diagnostics.platformDetection.confidenceLabel === "Moderate confidence" ? 1 : 0) +
-      Math.min(10, diagnostics.consoleErrors.length * 3) +
-      Math.min(7, diagnostics.failedRequests.length * 2)
+      consolePenalty +
+      failedRequestPenalty
     );
   }
 
   if (key === "trackingIssues") {
+    const trackingVisibilityPenalty =
+      marketingTools.length === 0
+        ? enterpriseVisibilityContext
+          ? 2
+          : 18
+        : marketingTools.length === 1
+          ? enterpriseVisibilityContext
+            ? 1
+            : 10
+          : marketingTools.length === 2
+            ? enterpriseVisibilityContext
+              ? 0
+              : 5
+            : 0;
+
     return (
       findingPressure +
-      (marketingTools.length === 0 ? 18 : marketingTools.length === 1 ? 10 : marketingTools.length === 2 ? 5 : 0) +
+      trackingVisibilityPenalty +
       (!signals.leadCaptureVisible ? 3 : 0) +
       (!signals.contactSupportVisible ? 2 : 0) +
-      Math.min(5, diagnostics.consoleErrors.length) +
-      Math.min(4, diagnostics.failedRequests.length)
+      (enterpriseVisibilityContext ? 0 : Math.min(5, diagnostics.consoleErrors.length)) +
+      (enterpriseVisibilityContext ? 0 : Math.min(4, diagnostics.failedRequests.length))
     );
   }
 
@@ -1759,6 +2080,14 @@ function adjustCategoryScoreForEcommerceMaturity({
     siteClassification.siteType,
     visualArchetype,
   );
+  const isHealthcareCommerce = isHealthcareCommerceContext(
+    diagnostics,
+    siteClassification,
+    visualUxDiagnostics,
+  );
+  const healthcareJourneySignals = isHealthcareCommerce
+    ? healthcareJourneySignalCount(diagnostics)
+    : 0;
   const hasSevereVisualOrMobileIssue = findings.some(
     (finding) =>
       (finding.severity === "High" || finding.severity === "Critical") &&
@@ -1773,6 +2102,13 @@ function adjustCategoryScoreForEcommerceMaturity({
     (finding) =>
       (finding.severity === "High" || finding.severity === "Critical") &&
       /cart|checkout/i.test(finding.title),
+  );
+  const hasCriticalCustomerFacingIssue = findings.some(
+    (finding) =>
+      finding.severity === "Critical" &&
+      (finding.primaryCategory === "uxUiIssues" ||
+        finding.primaryCategory === "conversionIssues" ||
+        finding.primaryCategory === "operationsIssues"),
   );
   let adjustedScore = score;
 
@@ -1800,6 +2136,21 @@ function adjustCategoryScoreForEcommerceMaturity({
 
     if (key === "technicalIssues" && platformNeedsManualReview(diagnostics)) {
       adjustedScore = Math.max(adjustedScore, 78);
+    }
+  }
+
+  if (isHealthcareCommerce && healthcareJourneySignals >= 4 && !hasCriticalCustomerFacingIssue) {
+    if (key === "uxUiIssues" && visualUxScore !== null && visualUxScore >= 50) {
+      adjustedScore = Math.max(adjustedScore, hasSevereVisualOrMobileIssue ? 68 : 74);
+    }
+
+    if (key === "conversionIssues" && !hasSevereCartCheckoutIssue) {
+      const conversionFloor =
+        positiveUxSignals.commerceConfidence.score >= 65 &&
+        positiveUxSignals.productDiscoveryStrength.score >= 65
+          ? 76
+          : 72;
+      adjustedScore = Math.max(adjustedScore, conversionFloor);
     }
   }
 
@@ -1928,6 +2279,9 @@ function applyLiveDiagnosticScoring(
       category.key === "uxUiIssues" && visualUxState?.available === false;
     const categoryFindings = findingsOwnedByCategory(findings, category.key);
     const influencingFindings = findingsInfluencingCategory(findings, category.key);
+    const scoreImpactFindings = [...categoryFindings, ...influencingFindings].filter(
+      (finding) => !isConfidenceReducerFinding(finding),
+    );
     const evidenceScore =
       categoryEvidenceState === "Unknown"
         ? 72
@@ -1966,7 +2320,7 @@ function applyLiveDiagnosticScoring(
     const resolvedEvidenceState: EvidenceState =
       categoryEvidenceState === "Unknown"
         ? "Unknown"
-        : score >= 80 && categoryFindings.length === 0 && influencingFindings.length === 0
+        : score >= 80 && scoreImpactFindings.length === 0
           ? "Positive"
           : "Negative";
     const scoreExplanation = buildScoreExplanation({
@@ -2180,11 +2534,40 @@ function buildScanCoverage(
     visualUxFindingCount: visualUxDiagnostics.findings.length,
     visualUxScore: visualUxDiagnostics.score,
   };
+  const coverageWarnings = [
+    !diagnostics.screenshotSuccess
+      ? "Screenshot capture did not complete successfully, so visual evidence should be manually confirmed."
+      : null,
+    !visualUxDiagnostics.visualMetricsAvailable
+      ? "Visual UX metrics were unavailable, so first-impression layout scoring is low confidence."
+      : null,
+    fullPage.visibleLinkCount === 0
+      ? "Full-page DOM extraction returned zero visible links; deeper page signals may be incomplete."
+      : null,
+  ].filter((warning): warning is string => Boolean(warning));
+  const screenshotCoverage =
+    diagnostics.screenshotModeUsed === "fullPage"
+      ? "Full-page screenshots were attempted for visual review."
+      : diagnostics.screenshotModeUsed === "viewport"
+        ? "Viewport screenshots were used for visual review."
+        : "Screenshot capture was skipped or unavailable.";
+  const scoringCoverageSummary =
+    "This score uses above-the-fold evidence for first impression and full-page DOM evidence for operations, trust, product discovery, and support signals on the submitted URL only.";
 
   return {
-    screenshotMode: "viewport",
+    submittedUrlOnly: true,
+    screenshotMode: diagnostics.screenshotModeUsed === "fullPage" ? "full-page" : "viewport",
     domCoverage: "full-page",
     scoringCoverage: "full-page",
+    aboveFoldCoverage:
+      "Above-fold evidence carries the most weight for first impression, mobile hierarchy, primary CTA clarity, search prominence, and visual UX.",
+    nearFoldCoverage:
+      "Near-fold evidence supports product discovery, early navigation, secondary CTAs, and reassurance cues that appear shortly after the first viewport.",
+    fullPageDomCoverage:
+      "Full-page DOM evidence counts for catalog/product links, support, account, shipping/returns, policy, forms, and operational continuity signals.",
+    screenshotCoverage,
+    scoringCoverageSummary,
+    coverageWarnings,
     aboveFoldSignals,
     nearFoldSignals,
     fullPageSignals,
@@ -2194,8 +2577,7 @@ function buildScanCoverage(
       trackingNeedsReview: visibleMarketingTools(diagnostics).length < 2,
       screenshotModeRequiresInterpretation: true,
     },
-    coverageSummary:
-      "This score uses above-the-fold evidence for first impression and full-page DOM evidence for operations, trust, product discovery, and support signals.",
+    coverageSummary: scoringCoverageSummary,
     explanation:
       "The scanner reviews the submitted URL only. Above-the-fold and near-fold signals influence first-impression UX, while full-page DOM sampling influences deeper product discovery, trust, shipping/returns, account, support, and operations scoring.",
   };
@@ -2626,6 +3008,7 @@ function calculateSeverityAdjustedPenalty({
     String(visualUxDiagnostics.uxArchetype ?? ""),
   );
   const penalty = findings.reduce((total, finding) => {
+    if (isConfidenceReducerFinding(finding)) return total;
     const isPlatformOpacity = /platform|manual review|platform evidence/i.test(finding.title);
     if (isPlatformOpacity && isEnterprise) return total + 0.5;
     if (finding.severity === "Critical") return total + 4;
@@ -5066,9 +5449,338 @@ function pushUnique(items: string[], item: string) {
   }
 }
 
+function benchmarkLabelForPercentile(
+  percentile: number,
+  scoringConfidence: ScoringConfidence,
+): BenchmarkContext["benchmarkLabel"] {
+  if (scoringConfidence === "Low") return "Insufficient Data";
+  if (percentile >= 85) return "Top Tier";
+  if (percentile >= 70) return "Above Average";
+  if (percentile >= 55) return "Average";
+  if (percentile >= 40) return "Below Average";
+  return "Needs Work";
+}
+
+function benchmarkGroupForScan({
+  diagnostics,
+  siteClassification,
+  reviewContext,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  siteClassification: SiteClassification;
+  reviewContext: StorefrontReviewContext;
+}) {
+  const combined = `${siteClassification.siteType} ${reviewContext.siteType} ${diagnostics.platformDetection.platformName}`.toLowerCase();
+  const url = diagnostics.finalUrl.toLowerCase();
+  const host = safeHost(diagnostics.finalUrl);
+  const healthcareCorpus = [
+    combined,
+    url,
+    diagnostics.title,
+    diagnostics.metaDescription,
+    diagnostics.desktopVisualMetrics?.visibleTextSample,
+    diagnostics.mobileVisualMetrics?.visibleTextSample,
+    diagnostics.fullPageDomSignals.ctaLabels.join(" "),
+    diagnostics.fullPageDomSignals.productLinks.join(" "),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    isNonStorefrontClassification(siteClassification.siteType) ||
+    reviewContext.siteType === "lead-generation"
+  ) {
+    return "Local Service / Lead Generation";
+  }
+
+  if (
+    domainMatches(host, knownHealthcareCommerceDomains) ||
+    /healthcare commerce|pharmacy|prescription|rx|clinic|patient|otc|medication|cvs|walgreens|riteaid|healthwarehouse/i.test(
+      healthcareCorpus,
+    )
+  ) {
+    return "Healthcare Commerce / Pharmacy Retail";
+  }
+
+  if (/grainger|uline|supply|industrial|b2b|parts|wholesale/i.test(combined + " " + url)) {
+    return "Industrial B2B / Catalog Commerce";
+  }
+
+  if (/amazon|walmart|target|marketplace|enterprise/i.test(combined + " " + url)) {
+    return "Enterprise Retail / Marketplace";
+  }
+
+  if (/education|course|training|content/i.test(combined)) {
+    return "Education / Content Commerce";
+  }
+
+  if (/shopify|dtc|brand|woocommerce|bigcommerce/i.test(combined)) {
+    return "DTC Brand / Specialty Store";
+  }
+
+  return "General Web Conversion";
+}
+
+function percentileFromScore({
+  overallScore,
+  visualUxDiagnostics,
+  scoringConfidence,
+}: {
+  overallScore: number;
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+  scoringConfidence: ScoringConfidence;
+}) {
+  if (scoringConfidence === "Low") {
+    return Math.max(30, Math.min(60, Math.round(overallScore * 0.7)));
+  }
+
+  const visualScore = usableVisualUxScore(visualUxDiagnostics);
+  const blended =
+    visualScore === null
+      ? overallScore
+      : Math.round(overallScore * 0.72 + visualScore * 0.28);
+
+  return Math.max(5, Math.min(95, blended));
+}
+
+function detectSubmittedPageType({
+  diagnostics,
+  siteClassification,
+}: {
+  diagnostics: LiveDiagnosticsResult;
+  siteClassification: SiteClassification;
+}): PageTypeDetection {
+  const finalUrl = diagnostics.finalUrl || "";
+  const path = (() => {
+    try {
+      return new URL(finalUrl).pathname.toLowerCase();
+    } catch {
+      return finalUrl.toLowerCase();
+    }
+  })();
+  const commerce = diagnostics.commerceFlowSignals;
+  const fullPage = diagnostics.fullPageDomSignals;
+  const text = [
+    diagnostics.title,
+    diagnostics.metaDescription,
+    diagnostics.desktopVisualMetrics?.visibleTextSample,
+    diagnostics.mobileVisualMetrics?.visibleTextSample,
+    ...commerce.ctaLabels,
+    ...fullPage.ctaLabels,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const evidence: string[] = [];
+  let submittedPageType: PageTypeDetection["submittedPageType"] = "Unknown";
+  let confidence = 48;
+  const isRootPath = path === "/" || path === "" || path === "/home";
+  const isCartOrCheckoutPath = /\/(cart|checkout|basket|bag)(\/|$)/i.test(path);
+
+  if (isRootPath) {
+    submittedPageType = "Homepage";
+    confidence = 80;
+    evidence.push("Submitted URL resolves to the root/home path.");
+  } else if (isCartOrCheckoutPath) {
+    submittedPageType = "Cart / Checkout";
+    confidence = 82;
+    evidence.push("Submitted URL path is a cart, basket, bag, or checkout path.");
+  } else if (
+    /\/(products?|p|item|sku)\//i.test(path) ||
+    (fullPage.productCardCount <= 2 && /add to cart|buy now|quantity|sku|variant/i.test(text))
+  ) {
+    submittedPageType = "Product Detail Page";
+    confidence = 78;
+    evidence.push("Product-detail language or URL structure was detected.");
+  } else if (
+    /\/(collections?|category|catalog|shop|store|products)(\/|$)/i.test(path) ||
+    fullPage.productCardCount >= 6 ||
+    fullPage.productLinks.length >= 6
+  ) {
+    submittedPageType = "Collection / Category Page";
+    confidence = 76;
+    evidence.push("Collection/catalog URL or multiple product links/cards were detected.");
+  } else if (
+    isNonStorefrontClassification(siteClassification.siteType) ||
+    (/contact|quote|estimate|consult|book|schedule|service/i.test(text) &&
+      !commerce.productCatalogVisible)
+  ) {
+    submittedPageType = "Lead Capture / Service Page";
+    confidence = 74;
+    evidence.push("Lead, service, form, or contact-oriented signals were stronger than product purchase signals.");
+  } else if (/\/(blog|article|guide|resources|learn|news)\//i.test(path)) {
+    submittedPageType = "Content / Article Page";
+    confidence = 78;
+    evidence.push("Content URL pattern was detected.");
+  } else if (/\/(landing|lp|offer|promo)\//i.test(path)) {
+    submittedPageType = "Landing Page";
+    confidence = 70;
+    evidence.push("Landing or campaign URL pattern was detected.");
+  }
+
+  if (commerce.checkoutVisible && submittedPageType !== "Cart / Checkout") {
+    evidence.push("Checkout signals exist in page assets or DOM, but the submitted URL is not a checkout page.");
+  }
+
+  if (commerce.formVisible && submittedPageType !== "Lead Capture / Service Page") {
+    evidence.push("A form is visible and may influence conversion-path scoring.");
+  }
+
+  if (fullPage.visibleLinkCount === 0) {
+    confidence = Math.min(confidence, 45);
+    evidence.push("Full-page DOM link extraction returned zero links, lowering page-type confidence.");
+  }
+
+  return {
+    submittedPageType,
+    confidence,
+    evidence: evidence.slice(0, 5),
+    scoringNote:
+      submittedPageType === "Homepage"
+        ? "Homepage scoring emphasizes first impression, navigation clarity, primary CTA visibility, and early discovery signals."
+        : submittedPageType === "Lead Capture / Service Page"
+          ? "Lead/service scoring emphasizes offer clarity, trust, form/contact paths, and service intent instead of ecommerce cart assumptions."
+          : submittedPageType === "Product Detail Page"
+            ? "Product-detail scoring emphasizes product confidence, purchase CTA clarity, trust, shipping/returns, and variant/order evidence."
+            : submittedPageType === "Collection / Category Page"
+              ? "Collection scoring emphasizes product discovery, filtering/search visibility, merchandising clarity, and path-to-product momentum."
+              : "This page type is directional; the score should be interpreted with the submitted URL's page purpose in mind.",
+  };
+}
+
+function buildCompetitiveComparison({
+  benchmarkContext,
+  pageType,
+}: {
+  benchmarkContext: BenchmarkContext;
+  pageType: PageTypeDetection;
+}): CompetitiveComparison {
+  const group = benchmarkContext.benchmarkGroup;
+  const comparisonSet =
+    group === "Enterprise Retail / Marketplace"
+      ? ["Amazon", "Walmart", "Target", "Best Buy"]
+      : group === "Healthcare Commerce / Pharmacy Retail"
+        ? ["CVS", "Walgreens", "Rite Aid", "HealthWarehouse"]
+      : group === "Industrial B2B / Catalog Commerce"
+        ? ["Grainger", "Uline", "McMaster-Carr", "Fastenal"]
+        : group === "Local Service / Lead Generation"
+          ? ["High-performing local service sites", "Booking-focused service pages", "Quote-request competitors"]
+          : group === "DTC Brand / Specialty Store"
+            ? ["Shopify Plus brand stores", "Specialty DTC competitors", "Category leaders"]
+            : ["Comparable public websites in the same conversion context"];
+  const expectedPatterns =
+    pageType.submittedPageType === "Lead Capture / Service Page"
+      ? [
+          "Clear service positioning above the fold.",
+          "Visible contact, quote, booking, or consultation path.",
+          "Trust proof near the primary action.",
+        ]
+      : [
+          "Fast path from first impression to discovery or action.",
+          "Visible trust and reassurance before commitment.",
+          "Clear tracking and operational signals for follow-up confidence.",
+        ];
+
+  return {
+    comparisonSet,
+    expectedPatterns,
+    strengths: benchmarkContext.strengthsVsBenchmark.slice(0, 3),
+    weaknesses: benchmarkContext.weaknessesVsBenchmark.slice(0, 3),
+    explanation: `Use ${group} as the primary comparison set for this ${pageType.submittedPageType.toLowerCase()} scan. The comparison is directional and based on visible public-page evidence, not private analytics or revenue data.`,
+  };
+}
+
+function revenueRiskAreaForFinding(finding: HeuristicFinding): RevenueImpactEstimate["riskArea"] {
+  const text = `${finding.title} ${finding.category} ${finding.businessImpact}`.toLowerCase();
+  if (/tracking|analytics|attribution|pixel|tag/.test(text)) return "Tracking";
+  if (/trust|review|policy|shipping|return|warranty|reassurance/.test(text)) return "Trust";
+  if (/support|contact|operation|fulfillment|order|account/.test(text)) return "Operations";
+  if (/lead|form|quote|booking|contact/.test(text)) return "Lead Quality";
+  if (/aov|bundle|upsell|cross-sell|merchandising|promotion/.test(text)) return "Average Order Value";
+  if (/mobile|cta|checkout|cart|conversion|buy/.test(text)) return "Conversion";
+  return "Engagement";
+}
+
+function estimateRevenueImpactForFinding(
+  finding: HeuristicFinding,
+): RevenueImpactEstimate {
+  const riskArea = revenueRiskAreaForFinding(finding);
+  const likelyImpact =
+    riskArea === "Conversion"
+      ? "May reduce the share of visitors who progress from interest to action."
+      : riskArea === "Average Order Value"
+        ? "May limit merchandising, bundling, or product-comparison opportunities that raise order value."
+        : riskArea === "Lead Quality"
+          ? "May reduce qualified inquiries or make intent harder to route."
+          : riskArea === "Trust"
+            ? "May increase hesitation before purchase, quote request, booking, or contact."
+            : riskArea === "Tracking"
+              ? "May make revenue attribution and follow-up performance harder to validate."
+              : riskArea === "Operations"
+                ? "May create support load, order uncertainty, or fulfillment friction."
+                : "May reduce engagement before visitors reach a decisive action.";
+
+  return {
+    findingTitle: finding.title,
+    riskArea,
+    likelyImpact,
+    severity: finding.severity,
+    confidence: finding.confidence,
+    explanation: `${finding.businessImpact} ${likelyImpact}`,
+  };
+}
+
+function buildRevenueImpactSummary(
+  findings: HeuristicFinding[],
+): RevenueImpactSummary {
+  const estimates = findings
+    .slice()
+    .sort((left, right) => severityWeight(right.severity) - severityWeight(left.severity))
+    .slice(0, 6)
+    .map(estimateRevenueImpactForFinding);
+  const revenueRiskAreas = Array.from(
+    new Set(estimates.map((estimate) => estimate.riskArea)),
+  );
+
+  return {
+    summary:
+      estimates.length > 0
+        ? "Revenue impact is estimated directionally from the finding type, severity, and visible public-page evidence. It does not use private analytics or claim a precise dollar value."
+        : "No specific revenue-impact estimates were generated because the scan did not surface enough prioritized findings.",
+    estimates,
+    revenueRiskAreas,
+  };
+}
+
+function attachRevenueImpactToFindings(
+  findings: HeuristicFinding[],
+  revenueImpactSummary: RevenueImpactSummary,
+): HeuristicFinding[] {
+  return findings.map((finding) => ({
+    ...finding,
+    revenueImpact: revenueImpactSummary.estimates.find(
+      (estimate) => estimate.findingTitle === finding.title,
+    ),
+  }));
+}
+
 function buildBenchmarkContext(
   diagnostics: LiveDiagnosticsResult,
   findings: HeuristicFinding[],
+  {
+    overallScore,
+    visualUxDiagnostics,
+    siteClassification,
+    reviewContext,
+    scoringConfidence,
+  }: {
+    overallScore: number;
+    visualUxDiagnostics: VisualUxDiagnosticsResult;
+    siteClassification: SiteClassification;
+    reviewContext: StorefrontReviewContext;
+    scoringConfidence: ScoringConfidence;
+  },
 ): BenchmarkContext {
   const signals = diagnostics.storefrontSignals;
   const commerce = diagnostics.commerceFlowSignals;
@@ -5081,6 +5793,9 @@ function buildBenchmarkContext(
   const addNote = (note: BenchmarkNote) => notes.push(note);
   const findingTitles = findings.map((finding) => finding.title);
   const has = (title: string) => findingTitles.includes(title);
+  const enterpriseMultiEntryHomepage =
+    isEnterpriseVisibilityContext(diagnostics, siteClassification, visualUxDiagnostics) &&
+    enterpriseRetailJourneySignalCount(diagnostics) >= 4;
 
   const mobileIsStrong =
     signals.mobileCtaVisibleAboveFold &&
@@ -5088,7 +5803,7 @@ function buildBenchmarkContext(
     signals.mobileAboveFoldLinkCount <= 18 &&
     signals.mobileVisibleTextLength <= 1800;
   const mobileIsWeak =
-    has("Mobile CTA Visibility Needs Review") ||
+    (!enterpriseMultiEntryHomepage && has("Mobile CTA Visibility Needs Review")) ||
     has("Mobile Readability May Be Crowded");
 
   if (mobileIsStrong) {
@@ -5116,6 +5831,19 @@ function buildBenchmarkContext(
   if (signals.mobileCtaVisibleAboveFold && commerce.ctaCount >= 2) {
     pushUnique(tags, "strong-cta-visibility");
     positivePatterns.push("CTA visibility is supported by above-fold mobile evidence and multiple action labels.");
+  } else if (
+    enterpriseMultiEntryHomepage &&
+    has("Mobile Journey Entry Priority Needs Review")
+  ) {
+    pushUnique(tags, "enterprise-journey-entry-visible");
+    positivePatterns.push("Enterprise journey entry points are visible through search, departments, fulfillment, reorder, account, or cart paths.");
+    addNote({
+      message:
+        "A single promo-style CTA was not required because multiple enterprise retail journey entries were visible.",
+      evidence: `Visible enterprise journey signal groups: ${enterpriseRetailJourneySignalCount(diagnostics)}; ${summarizeCtaLabels(commerce.ctaLabels)}`,
+      tags: ["enterprise-journey-entry-visible"],
+      tone: "mixed",
+    });
   } else if (has("Mobile CTA Visibility Needs Review") || commerce.ctaCount <= 1) {
     pushUnique(tags, "weak-cta-visibility");
     negativePatterns.push("CTA visibility may require manual review because the primary action is not strongly evidenced.");
@@ -5252,8 +5980,52 @@ function buildBenchmarkContext(
       : strongCount > weakCount
         ? "Compared with stronger storefront patterns in the current internal review set, this scan shows several more positive signals."
         : "Compared with stronger storefront patterns in the current internal review set, this scan is mixed, with both clearer signals and review areas visible.";
+  const benchmarkGroup = benchmarkGroupForScan({
+    diagnostics,
+    siteClassification,
+    reviewContext,
+  });
+  const rawPercentileEstimate = percentileFromScore({
+    overallScore,
+    visualUxDiagnostics,
+    scoringConfidence,
+  });
+  const percentileEstimate =
+    scoringConfidence === "Low" ? null : rawPercentileEstimate;
+  const benchmarkLabel = benchmarkLabelForPercentile(
+    rawPercentileEstimate,
+    scoringConfidence,
+  );
+  const comparisonBasis = [
+    `Benchmark group: ${benchmarkGroup}`,
+    `Overall score: ${overallScore}/100`,
+    usableVisualUxScore(visualUxDiagnostics) === null
+      ? "Visual UX score: unavailable"
+      : `Visual UX score: ${usableVisualUxScore(visualUxDiagnostics)}/100`,
+    `Scoring confidence: ${scoringConfidence}`,
+    `Visible evidence tags: ${tags.length > 0 ? tags.join(", ") : "mixed or limited"}`,
+  ];
+  const strengthsVsBenchmark =
+    positivePatterns.length > 0
+      ? positivePatterns.slice(0, 4)
+      : ["No standout strengths were strong enough to classify against the benchmark group."];
+  const weaknessesVsBenchmark =
+    negativePatterns.length > 0
+      ? negativePatterns.slice(0, 4)
+      : ["No major benchmark weaknesses were detected from the public-page evidence."];
+  const explanation =
+    scoringConfidence === "Low"
+      ? `Benchmark available for ${benchmarkGroup}, but confidence is low because scanner evidence was incomplete. Additional validation is required before assigning a percentile or competitive rank.`
+      : `Directional benchmark based on Opzix internal scoring model and visible public-page evidence. This submitted URL is compared against ${benchmarkGroup}, with an estimated ${rawPercentileEstimate}th percentile position and ${benchmarkLabel.toLowerCase()} label.`;
 
   return {
+    benchmarkGroup,
+    percentileEstimate,
+    benchmarkLabel,
+    comparisonBasis,
+    strengthsVsBenchmark,
+    weaknessesVsBenchmark,
+    explanation,
     summary,
     notes: notes.slice(0, 5),
     benchmarkTags: tags,
@@ -5391,19 +6163,21 @@ function buildStorefrontIdentityProfile({
       signals.productNavigationVisible ||
       signals.collectionLinksVisible ||
       signals.searchVisible);
+  const standardPlatformVisible =
+    !platformIsCustomEnterprise && platform.confidence >= 70;
   const trackingDepth = marketingTools.length;
   const hasLeadCapture = signals.leadCaptureVisible;
 
-  const businessScale =
-    hostIsEnterprise
-      ? "enterprise"
-      : educationHost
-        ? "education"
-        : hasLeadCapture
-          ? "lead-capture"
-          : commercePathVisible
-            ? "growth"
-            : "unknown";
+  let businessScale: StorefrontIdentityProfile["businessScale"] = "unknown";
+  if (hostIsEnterprise) {
+    businessScale = "enterprise";
+  } else if (educationHost) {
+    businessScale = "education";
+  } else if (commercePathVisible || (productEvidenceVisible && standardPlatformVisible)) {
+    businessScale = "growth";
+  } else if (hasLeadCapture) {
+    businessScale = "lead-capture";
+  }
 
   const architectureStyle =
     platformIsCustomEnterprise && hostIsEnterprise
@@ -5419,16 +6193,16 @@ function buildStorefrontIdentityProfile({
         ? "moderate"
         : "early";
 
-  const operationalPattern =
-    hostIsEnterprise && commercePathVisible
-      ? "enterprise-retail"
-      : educationHost
-        ? "education-commerce"
-        : hasLeadCapture
-          ? "lead-capture"
-          : productEvidenceVisible
-            ? "catalog-commerce"
-            : "unknown";
+  let operationalPattern: StorefrontIdentityProfile["operationalPattern"] = "unknown";
+  if (hostIsEnterprise && commercePathVisible) {
+    operationalPattern = "enterprise-retail";
+  } else if (educationHost) {
+    operationalPattern = "education-commerce";
+  } else if (productEvidenceVisible || standardPlatformVisible) {
+    operationalPattern = "catalog-commerce";
+  } else if (hasLeadCapture) {
+    operationalPattern = "lead-capture";
+  }
 
   const platformConfidence =
     platform.confidenceLabel === "High confidence"
@@ -5984,6 +6758,7 @@ export async function POST(request: Request) {
     const heuristicFindings = buildHeuristicFindings(
       diagnostics,
       visualUxDiagnostics,
+      siteClassification,
       scoringEvidenceState,
     );
     const scanCoverage = buildScanCoverage(diagnostics, visualUxDiagnostics);
@@ -6027,7 +6802,8 @@ export async function POST(request: Request) {
       ecommerceMaturity,
       evidenceState: scoringEvidenceState,
     });
-    const { overallScore, scoreExplanation } = overallScoring;
+    const overallScore = overallScoring.overallScore;
+    let scoreExplanation = overallScoring.scoreExplanation;
     const narrativeArchetypeProfile = resolveNarrativeArchetype({
       categories,
       diagnostics,
@@ -6116,7 +6892,33 @@ export async function POST(request: Request) {
         ...recommendedNextSteps.slice(1),
       ];
     }
-    const benchmarkContext = buildBenchmarkContext(diagnostics, heuristicFindings);
+    const pageTypeDetection = detectSubmittedPageType({
+      diagnostics,
+      siteClassification,
+    });
+    const benchmarkContext = buildBenchmarkContext(diagnostics, heuristicFindings, {
+      overallScore,
+      visualUxDiagnostics,
+      siteClassification,
+      reviewContext: storefrontReviewContext,
+      scoringConfidence: scoringEvidenceState.scoringConfidence,
+    });
+    const competitiveComparison = buildCompetitiveComparison({
+      benchmarkContext,
+      pageType: pageTypeDetection,
+    });
+    const revenueImpactSummary = buildRevenueImpactSummary(heuristicFindings);
+    const heuristicFindingsWithRevenueImpact = attachRevenueImpactToFindings(
+      heuristicFindings,
+      revenueImpactSummary,
+    );
+    scoreExplanation = {
+      ...scoreExplanation,
+      scoreReducers: scoreExplanation.majorPenalties,
+      benchmarkContext,
+      scanCoverage,
+      pageType: pageTypeDetection,
+    };
     const scanId = createAuditScanId();
     const overallStatus = adjustedStatus(overallScore);
     latestScore = overallScore;
@@ -6179,7 +6981,7 @@ export async function POST(request: Request) {
       connectedInsight,
       primaryOperationalConcern,
       topPriorityRisks,
-      heuristicFindings,
+      heuristicFindings: heuristicFindingsWithRevenueImpact,
       visualUxDiagnostics,
       visualMetricsDebug: visualUxDiagnostics.visualMetricsDebug,
       diagnostics,
@@ -6187,6 +6989,9 @@ export async function POST(request: Request) {
       recommendedNextSteps,
       benchmarkTags: benchmarkContext.benchmarkTags,
       benchmarkContext,
+      submittedPageType: pageTypeDetection,
+      competitiveComparison,
+      revenueImpactSummary,
     };
 
     await logAuditScan({
@@ -6227,8 +7032,22 @@ export async function POST(request: Request) {
         riskLabel: risk.riskLabel,
         severity: risk.severity,
         confidence: risk.confidence,
+        revenueImpact: revenueImpactSummary.estimates.find(
+          (estimate) => estimate.findingTitle === risk.riskLabel || estimate.findingTitle === risk.title,
+        ),
       })),
       benchmarkTags: benchmarkContext.benchmarkTags,
+      benchmarkGroup: benchmarkContext.benchmarkGroup,
+      benchmarkPercentileEstimate: benchmarkContext.percentileEstimate,
+      benchmarkLabel: benchmarkContext.benchmarkLabel,
+      benchmarkExplanation: benchmarkContext.explanation,
+      submittedPageType: pageTypeDetection.submittedPageType,
+      submittedPageTypeConfidence: pageTypeDetection.confidence,
+      submittedPageTypeEvidence: pageTypeDetection.evidence,
+      scoringConfidence: scoringEvidenceState.scoringConfidence,
+      revenueRiskAreas: revenueImpactSummary.revenueRiskAreas,
+      competitiveContext: competitiveComparison,
+      scanCoverage,
     });
 
     finalizeScannerDiagnostics(diagnostics.scanDiagnostics, {
