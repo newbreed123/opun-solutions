@@ -128,7 +128,7 @@ export default async function AdminScansPage({
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-dark-border bg-dark-card">
-          <table className="w-full min-w-[1540px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1680px] border-collapse text-left text-sm">
             <thead className="border-b border-dark-border bg-white/[0.035] text-xs uppercase tracking-[0.16em] text-muted">
               <tr>
                 <th className="px-4 py-3">Date</th>
@@ -137,6 +137,7 @@ export default async function AdminScansPage({
                 <th className="px-4 py-3">Score Stability</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Primary concern</th>
+                <th className="px-4 py-3">Roadmap</th>
                 <th className="px-4 py-3">Archetype</th>
                 <th className="px-4 py-3">Industry</th>
                 <th className="px-4 py-3">Platform</th>
@@ -221,6 +222,9 @@ function ScanRow({
       <td className="max-w-xs px-4 py-4 align-top text-secondary">
         {scan.primary_concern}
       </td>
+      <td className="max-w-xs px-4 py-4 align-top">
+        <RoadmapSummary value={scan.recommendation_roadmap} />
+      </td>
       <td className="px-4 py-4 align-top">
         <DataBadge value={scan.archetype} />
       </td>
@@ -266,6 +270,41 @@ function DataBadge({ value }: { value: string | null }) {
       <span className="truncate">{value || "unknown"}</span>
     </span>
   );
+}
+
+function RoadmapSummary({ value }: { value: unknown }) {
+  const roadmap = isRecord(value) ? value : {};
+  const steps = Array.isArray(roadmap.steps) ? roadmap.steps : [];
+  const firstStep = isRecord(steps[0])
+    ? steps[0]
+    : isRecord(roadmap.step1)
+      ? roadmap.step1
+      : null;
+
+  if (!firstStep) {
+    return <span className="text-xs text-muted">Not logged</span>;
+  }
+
+  const title = stringValue(firstStep.title) || "Roadmap step";
+  const cost = stringValue(firstStep.cost);
+  const timeline = stringValue(firstStep.timeline);
+
+  return (
+    <div className="space-y-1">
+      <p className="font-semibold leading-snug text-primary">{title}</p>
+      <p className="text-xs text-muted">
+        {[cost, timeline].filter(Boolean).join(" / ") || "Cost/timeline pending"}
+      </p>
+    </div>
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
 }
 
 function ReadinessBadge({ value }: { value: string | null }) {

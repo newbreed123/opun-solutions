@@ -28,6 +28,7 @@ import {
   sanitizeEvidenceText,
   summarizeCtaLabels,
 } from "@/lib/evidence-cleanup";
+import { detectAssistantIntent } from "@/lib/assistant-knowledge";
 
 type Severity = "Low" | "Medium" | "High" | "Critical" | string;
 
@@ -79,6 +80,40 @@ type AssistantRevenueImpactSummary = {
   summary: string;
   estimates: AssistantRevenueImpactEstimate[];
   revenueRiskAreas: string[];
+};
+
+type AssistantRecommendationRoadmapStep = {
+  stepNumber: number;
+  title: string;
+  cost: string;
+  timeline: string;
+  rationale: string;
+  validationTarget: string;
+  expectedImpact: string;
+  roiRationale: string;
+  sourceFinding?: string;
+  riskArea?: string;
+  confidence?: string;
+};
+
+type AssistantRecommendationRoadmap = {
+  summary: string;
+  primaryRecommendation: string;
+  source?: {
+    scanId?: string;
+    domain?: string;
+    siteType?: string;
+    benchmarkGroup?: string;
+    score?: number;
+  };
+  steps: AssistantRecommendationRoadmapStep[];
+  step1?: AssistantRecommendationRoadmapStep;
+  step2?: AssistantRecommendationRoadmapStep;
+  step3?: AssistantRecommendationRoadmapStep;
+  step4?: AssistantRecommendationRoadmapStep;
+  step5?: AssistantRecommendationRoadmapStep;
+  step6?: AssistantRecommendationRoadmapStep;
+  step7?: AssistantRecommendationRoadmapStep;
 };
 
 type AssistantConcern = {
@@ -173,6 +208,49 @@ type AssistantEcommerceMaturity = {
   explanation: string;
 };
 
+type AssistantScoreExplanationSnapshot = {
+  overallScore: number;
+  scoringConfidence?: "High" | "Moderate" | "Low";
+  scoringConfidenceNote?: string;
+  positiveSignals?: string[];
+  scoreReducers?: string[];
+  benchmarkContext?: AssistantBenchmarkContext;
+  benchmarkGroup?: string;
+  benchmarkLabel?: string;
+  visualMetricsAvailable?: boolean;
+  visualUxScore?: number | null;
+  evidenceUnknown?: boolean;
+  categoryScores?: {
+    key: string;
+    label: string;
+    score: number;
+    status: string;
+    evidenceState?: "Positive" | "Negative" | "Unknown";
+    scoringConfidence?: "High" | "Moderate" | "Low";
+    whatWouldImprove?: string;
+  }[];
+  whatWouldIncreaseScore?: string[];
+};
+
+type AssistantScoreNarrative = {
+  overallScore: number;
+  strongestPositives?: string[];
+  strongestReducers?: string[];
+  confidence?: "High" | "Moderate" | "Low";
+  confidenceExplanation?: string;
+  explanation?: string;
+  whatWouldIncreaseScore?: string[];
+  scoreChangeContext?: {
+    scanCount: number;
+    minScore: number;
+    maxScore: number;
+    scoreVariation: number;
+    scoreStability: "Stable" | "Moderate" | "Unstable";
+    latestChangeReasons?: string[];
+    explanation?: string;
+  };
+};
+
 type AssistantScanCoverage = {
   submittedUrlOnly?: boolean;
   screenshotMode: "viewport" | "full-page";
@@ -217,6 +295,8 @@ type AssistantAudit = {
   generatedAt: string;
   overallScore: number;
   overallStatus: string;
+  contactSubmitted?: boolean;
+  contact_submitted?: boolean;
   scoringConfidence?: "High" | "Moderate" | "Low";
   scoringConfidenceNote?: string;
   scoreMismatchWarnings?: string[];
@@ -230,12 +310,15 @@ type AssistantAudit = {
     scanCoverage?: AssistantScanCoverage;
     pageType?: AssistantPageTypeDetection;
   };
+  scoreExplanationSnapshot?: AssistantScoreExplanationSnapshot;
+  scoreNarrative?: AssistantScoreNarrative;
   positiveUxSignals?: Record<string, AssistantPositiveUxSignal>;
   ecommerceMaturity?: AssistantEcommerceMaturity;
   scanCoverage?: AssistantScanCoverage;
   submittedPageType?: AssistantPageTypeDetection;
   competitiveComparison?: AssistantCompetitiveComparison;
   revenueImpactSummary?: AssistantRevenueImpactSummary;
+  recommendationRoadmap?: AssistantRecommendationRoadmap;
   auditNarrative?: string;
   currentNarrativeArchetype?: string;
   narrativeProfile?: AssistantNarrativeProfile;
@@ -462,6 +545,43 @@ type ConversationState = {
   conversationStep: number;
   pendingFollowUp: PendingFollowUp | null;
   conversationDepthByTopic: Partial<Record<ConversationTopic, number>>;
+  recommendationTopic: string | null;
+  recommendationStep: string | null;
+  recommendationReason: string | null;
+  recommendationValidation: string | null;
+  recommendationExpectedImpact: string | null;
+  recommendationNextStep: string | null;
+  recommendationPhase: string | null;
+  recommendationCurrentStep: number | null;
+  recommendationRoadmap: RecommendationRoadmapStep[];
+  recommendationThreadSource: RecommendationThreadSource | null;
+};
+
+type RecommendationThreadSource = {
+  scanId?: string | null;
+  domain: string;
+  siteType?: string | null;
+  recommendationTopic?: string | null;
+};
+
+type RecommendationRoadmapStep = {
+  stepNumber: number;
+  title: string;
+  reason: string;
+  expectedImpact: string;
+  estimatedCost: string;
+  estimatedTimeline: string;
+};
+
+type RecommendationThread = {
+  source: RecommendationThreadSource;
+  topic: string;
+  step: string;
+  reason: string;
+  validation: string;
+  expectedImpact: string;
+  nextStep: string;
+  roadmap: RecommendationRoadmapStep[];
 };
 
 type BusinessAngle =
@@ -494,17 +614,23 @@ type AnswerSection = {
 };
 
 type ScanContext = {
+  scanId?: string;
+  website: string;
+  domain: string;
   score: number;
   status: string;
   scoringConfidence?: "High" | "Moderate" | "Low";
   scoringConfidenceNote?: string;
   scoreExplanation?: AssistantAudit["scoreExplanation"];
+  scoreExplanationSnapshot?: AssistantScoreExplanationSnapshot;
+  scoreNarrative?: AssistantScoreNarrative;
   positiveUxSignals?: AssistantAudit["positiveUxSignals"];
   ecommerceMaturity?: AssistantAudit["ecommerceMaturity"];
   scanCoverage?: AssistantAudit["scanCoverage"];
   submittedPageType?: AssistantAudit["submittedPageType"];
   competitiveComparison?: AssistantAudit["competitiveComparison"];
   revenueImpactSummary?: AssistantAudit["revenueImpactSummary"];
+  recommendationRoadmap?: AssistantAudit["recommendationRoadmap"];
   currentNarrativeArchetype?: string;
   narrativeProfile?: AssistantNarrativeProfile;
   siteType?: StorefrontReviewSiteType;
@@ -574,6 +700,75 @@ const quickReplyIcons: Record<QuickReplyIntent, typeof Wrench> = {
   ask_opzix_help: Handshake,
   ask_seriousness: ShieldAlert,
 };
+
+function hasSalesIntent(value: string) {
+  const normalized = normalizeText(value).replace(/\s+/g, " ").trim();
+  const frameworkIntent = detectAssistantIntent(value).intent;
+
+  if (
+    frameworkIntent === "cost_estimate" ||
+    frameworkIntent === "rebuild_vs_fix" ||
+    frameworkIntent === "roi_value" ||
+    frameworkIntent === "implementation_plan" ||
+    frameworkIntent === "opzix_recommendation"
+  ) {
+    return true;
+  }
+
+  return textIncludesAny(normalized, [
+    "cost",
+    "price",
+    "budget",
+    "estimate",
+    "how much",
+    "implementation cost",
+    "project cost",
+    "redesign cost",
+    "fix cost",
+    "what would opzix charge",
+    "opzix charge",
+    "expensive",
+    "rebuild",
+    "new site",
+    "new ecommerce",
+    "new ecommerce store",
+    "new store",
+    "build an ecommerce",
+    "build ecommerce",
+    "build a new",
+    "build new",
+    "replace the site",
+    "replace this site",
+    "start over",
+    "from scratch",
+    "without fixing",
+    "instead of fixing",
+    "quick wins",
+    "bigger redesign",
+    "roi",
+    "return on investment",
+    "worth fixing",
+    "worth the fix",
+    "worth the fixes",
+    "worth the cost",
+    "worth doing",
+    "worth spending",
+    "worth the investment",
+    "worth it",
+    "should i fix",
+    "should we fix",
+    "pay off",
+    "pays off",
+    "what would opzix do first",
+    "what would opzix fix first",
+    "what would you do first",
+    "what would you do",
+    "where would you start",
+    "where should we start",
+    "opzix do first",
+    "opzix fix first",
+  ]);
+}
 
 const intentKeywords: Record<AssistantIntent, string[]> = {
   ask_priority: [
@@ -1280,17 +1475,23 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
     visibilityFromEvidence(searchEvidence, /search|store search/i);
 
   return {
+    scanId: audit.scanId,
+    website: audit.website,
+    domain: normalizeDomain(audit.website),
     score: audit.overallScore,
     status: audit.overallStatus,
     scoringConfidence: audit.scoringConfidence,
     scoringConfidenceNote: audit.scoringConfidenceNote,
     scoreExplanation: audit.scoreExplanation,
+    scoreExplanationSnapshot: audit.scoreExplanationSnapshot,
+    scoreNarrative: audit.scoreNarrative,
     positiveUxSignals: audit.positiveUxSignals,
     ecommerceMaturity: audit.ecommerceMaturity,
     scanCoverage: audit.scanCoverage,
     submittedPageType: audit.submittedPageType,
     competitiveComparison: audit.competitiveComparison,
     revenueImpactSummary: audit.revenueImpactSummary,
+    recommendationRoadmap: audit.recommendationRoadmap,
     currentNarrativeArchetype: audit.currentNarrativeArchetype,
     narrativeProfile: audit.narrativeProfile,
     siteType: audit.siteType ?? audit.storefrontReviewContext?.siteType,
@@ -1403,8 +1604,10 @@ function normalizeScanContext(audit: AssistantAudit): ScanContext {
 function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
   return {
     url: audit.website,
+    scanId: audit.scanId,
     score: context.score,
     status: context.status,
+    leadSubmitted: audit.contactSubmitted ?? audit.contact_submitted ?? false,
     scoringConfidence: context.scoringConfidence,
     scoringConfidenceNote: context.scoringConfidenceNote,
     currentNarrativeArchetype: context.currentNarrativeArchetype,
@@ -1431,12 +1634,15 @@ function buildAiScanContext(audit: AssistantAudit, context: ScanContext) {
     })),
     categoryFindings: context.categoryFindings,
     scoreExplanation: context.scoreExplanation,
+    scoreExplanationSnapshot: context.scoreExplanationSnapshot,
+    scoreNarrative: context.scoreNarrative,
     positiveUxSignals: context.positiveUxSignals,
     ecommerceMaturity: context.ecommerceMaturity,
     scanCoverage: context.scanCoverage,
     submittedPageType: context.submittedPageType,
     competitiveComparison: context.competitiveComparison,
     revenueImpactSummary: context.revenueImpactSummary,
+    recommendationRoadmap: context.recommendationRoadmap,
     metadata: context.metadata,
     platformVisibility: context.platformVisibility,
     trackingVisibility: getTrackingSummary(audit),
@@ -1539,6 +1745,11 @@ function attachConversationProgression(
     conversationDepthByTopic[topic] = Math.min(5, nextDepth);
   }
 
+  const keepRecommendationThread =
+    turn.nextState.recommendationThreadSource !== null;
+  const recommendationSource =
+    turn.nextState.recommendationTopic !== null ? turn.nextState : previousState;
+
   return {
     ...turn,
     nextState: {
@@ -1551,6 +1762,36 @@ function attachConversationProgression(
       lastBusinessAngle:
         turn.nextState.lastBusinessAngle ?? previousState.lastBusinessAngle,
       conversationDepthByTopic,
+      recommendationTopic: keepRecommendationThread
+        ? recommendationSource.recommendationTopic
+        : null,
+      recommendationStep: keepRecommendationThread
+        ? recommendationSource.recommendationStep
+        : null,
+      recommendationReason: keepRecommendationThread
+        ? recommendationSource.recommendationReason
+        : null,
+      recommendationValidation: keepRecommendationThread
+        ? recommendationSource.recommendationValidation
+        : null,
+      recommendationExpectedImpact: keepRecommendationThread
+        ? recommendationSource.recommendationExpectedImpact
+        : null,
+      recommendationNextStep: keepRecommendationThread
+        ? recommendationSource.recommendationNextStep
+        : null,
+      recommendationPhase: keepRecommendationThread
+        ? recommendationSource.recommendationPhase
+        : null,
+      recommendationCurrentStep: keepRecommendationThread
+        ? recommendationSource.recommendationCurrentStep
+        : null,
+      recommendationRoadmap: keepRecommendationThread
+        ? recommendationSource.recommendationRoadmap
+        : [],
+      recommendationThreadSource: keepRecommendationThread
+        ? recommendationSource.recommendationThreadSource
+        : null,
     },
   };
 }
@@ -1569,6 +1810,20 @@ function buildLocalAssistantTurn(
   if (acknowledgementTurn) {
     return attachConversationProgression(
       acknowledgementTurn,
+      conversationState,
+      question,
+    );
+  }
+
+  const recommendationFollowUpTurn = buildRoadmapAwareRecommendationTurn(
+    question,
+    conversationState,
+    scanContext,
+  );
+
+  if (recommendationFollowUpTurn) {
+    return attachConversationProgression(
+      recommendationFollowUpTurn,
       conversationState,
       question,
     );
@@ -1618,6 +1873,24 @@ function buildLocalAssistantTurn(
 
 function normalizeText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9\s/-]/g, " ");
+}
+
+function normalizeDomain(value: string | undefined | null) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    return new URL(raw).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return raw
+      .replace(/^https?:\/\//i, "")
+      .split("/")[0]
+      ?.replace(/^www\./i, "")
+      .toLowerCase() ?? "";
+  }
 }
 
 function sentenceFragment(value: string) {
@@ -2219,38 +2492,99 @@ function buildScoreSynchronizationResponse(context: ScanContext): ChatMessage {
   );
 }
 
-function buildScoreReasoningResponse(context: ScanContext): ChatMessage {
-  if (context.scoringConfidence === "Low") {
-    return buildMessage(
-      `assistant-score-low-confidence-${Date.now()}`,
-      [
-        "Visual metrics and DOM extraction were unavailable during this scan. The score should be treated as low confidence rather than a confirmed assessment of the site's quality.",
-        context.scoringConfidenceNote ??
-          "Some scanner subsystems could not evaluate this page. Findings should be treated as directional until visual and DOM extraction complete successfully.",
-        "I would rerun the scan or manually verify the page before treating category reducers as confirmed issues.",
-      ],
-      { topic: "priority" },
-    );
-  }
-
-  const positives = context.scoreExplanation?.positiveSignals ?? [];
-  const penalties = context.scoreExplanation?.majorPenalties ?? [];
-  const maturity = context.ecommerceMaturity;
+function buildScoreReasoningResponse(
+  context: ScanContext,
+  input = "",
+): ChatMessage {
+  const normalized = normalizeText(input);
+  const narrative = context.scoreNarrative;
+  const snapshot = context.scoreExplanationSnapshot;
+  const confidence =
+    narrative?.confidence ??
+    snapshot?.scoringConfidence ?? context.scoringConfidence ?? "Moderate";
+  const confidenceNote =
+    narrative?.confidenceExplanation ??
+    snapshot?.scoringConfidenceNote ?? context.scoringConfidenceNote;
+  const positives =
+    narrative?.strongestPositives ??
+    snapshot?.positiveSignals ??
+    context.scoreExplanation?.positiveSignals ??
+    [];
+  const penalties =
+    narrative?.strongestReducers ??
+    snapshot?.scoreReducers ??
+    context.scoreExplanation?.majorPenalties ??
+    [];
+  const visualUnavailable =
+    snapshot?.visualMetricsAvailable === false ||
+    context.visualUxDiagnostics?.visualMetricsAvailable === false;
+  const evidenceUnknown =
+    snapshot?.evidenceUnknown === true || confidence === "Low";
+  const increaseScore =
+    narrative?.whatWouldIncreaseScore?.filter(Boolean) ??
+    snapshot?.whatWouldIncreaseScore?.filter(Boolean) ??
+    context.categories
+      ?.map((category) => category.scoreExplanation?.whatWouldImprove)
+      .filter((item): item is string => Boolean(item)) ??
+    [];
   const why =
+    narrative?.explanation ??
     context.scoreExplanation?.whyThisScore ??
-    `The score is ${context.score}/100 because the scan combines category scores, positive ecommerce maturity signals, and severity-adjusted findings.`;
+    `The score landed at ${context.score} because it is a weighted outcome: visible commerce strengths raised the score, while customer-path uncertainty and score reducers pulled it down.`;
+  const scoreChangeContext = narrative?.scoreChangeContext;
+  const asksScoreChange = textIncludesAny(normalized, [
+    "why did it change",
+    "why did the score change",
+    "why changed",
+    "score changed",
+    "score change",
+    "what changed",
+  ]);
+  const asksWhatMattersMost = textIncludesAny(normalized, [
+    "what matters most",
+    "biggest thing",
+    "biggest score reducer",
+    "what is hurting",
+    "hurting the score",
+    "most important",
+  ]);
+  const topReducer = penalties[0] ?? "purchase-path confidence";
+  const topPositiveText =
+    positives.slice(0, 3).join(", ") || "visible commerce strengths";
+  const leadParagraph = asksScoreChange
+    ? `Why it changed: ${
+        scoreChangeContext?.explanation ??
+        "The most recent score reflects the evidence available during this scan. Score changes usually come from differences in visible evidence, confidence, visual metric extraction, platform visibility, or dynamic content loaded during the scan."
+      }`
+    : asksWhatMattersMost
+      ? `What matters most: the biggest score reducer appears to be ${topReducer}. The scanner could see ${topPositiveText}, but it could not confidently verify enough of the customer purchase path to lift the overall score.`
+      : `Why the score landed here: ${why}`;
   const paragraphs = [
-    why,
+    leadParagraph,
     positives.length > 0
-      ? `Top positive signals: ${positives.slice(0, 3).join("; ")}.`
-      : "The scan did not list strong positive ecommerce maturity signals.",
-    maturity
-      ? `Ecommerce maturity: ${maturity.maturityTier}, ${maturity.maturityScore}/100. ${maturity.explanation}`
-      : null,
+      ? `Biggest positive signals: ${positives.slice(0, 3).join("; ")}.`
+      : "Biggest positive signals: the scan did not list strong public-page positives.",
     penalties.length > 0
-      ? `Main score reducers: ${penalties.slice(0, 3).join("; ")}.`
-      : "No major score reducers were listed beyond the category-level review.",
-    "Positive signals can lift the score, but they do not erase severe customer-facing UX, conversion, or operations findings.",
+      ? `Biggest reducers: ${penalties.slice(0, 3).join("; ")}.`
+      : "Biggest reducers: the scan did not list a single dominant reducer, so I would validate the purchase path manually.",
+    `Confidence level: ${confidence}. ${
+      confidence === "Low"
+        ? "This score is directional because some scanner subsystems could not fully evaluate the page."
+        : confidenceNote ?? "This is based on public-page evidence, not private analytics."
+    }`,
+    visualUnavailable
+      ? "Visual UX scoring was unavailable and did not fully contribute to the score."
+      : null,
+    evidenceUnknown && confidence !== "Low"
+      ? "Some evidence was unknown, so I would manually confirm the reducers before treating them as final."
+      : null,
+    asksScoreChange ? null : scoreChangeContext?.explanation ?? null,
+    increaseScore.length > 0
+      ? `What would increase the score: ${increaseScore
+          .slice(0, 3)
+          .map((item) => item.replace(/[.;\s]+$/g, ""))
+          .join("; ")}.`
+      : "What would increase the score: make the purchase path, trust signals, and primary mobile action easier to verify, then rerun the scan.",
   ].filter((paragraph): paragraph is string => Boolean(paragraph));
 
   return buildMessage(
@@ -2339,6 +2673,791 @@ function buildRevenueImpactResponse(context: ScanContext): ChatMessage {
     nextQuestion:
       "Do you want me to rank the findings by likely business impact?",
   });
+}
+
+function recommendationSignalText(item: Partial<AssistantRecommendedStep>) {
+  return [item.title, item.action, item.why, item.evidenceClue]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function sentenceCase(value: string) {
+  return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
+}
+
+function hasIndustrialSupplyContext(value: string) {
+  const normalized = value.toLowerCase();
+  const strongCatalogSignal =
+    /plumbing|pvc|cpvc|pipe|pipes|fittings?|valves?|flange|coupling|elbow|adapter|schedule 40|schedule 80|replacement parts?|part number|sku|specification|datasheet|technical/i.test(
+      normalized,
+    );
+  const b2bSupplySignal =
+    /industrial|supply|distributor|wholesale|contractor|trade/i.test(normalized) &&
+    /catalog|quote|rfq|procurement|sku|part number|specification|technical|product|category|search/i.test(
+      normalized,
+    );
+
+  return strongCatalogSignal || b2bSupplySignal;
+}
+
+function hasGroceryRecommendationContext(value: string) {
+  if (hasIndustrialSupplyContext(value)) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  const grocerySpecific =
+    /grocery|groceries|supermarket|fresh produce|organic food|natural food|weekly ad|shop by aisle|deli|bakery|seafood|prepared foods|recipes/.test(
+      normalized,
+    );
+  const fulfillmentCluster =
+    /pickup|curbside|same day|delivery/.test(normalized) &&
+    /departments|department|store locator|weekly ad|loyalty|rewards|pharmacy/.test(
+      normalized,
+    );
+  const knownGroceryBrand =
+    /sprouts|publix|kroger|wholefoods|whole foods|safeway|albertsons|wegmans|heb|meijer|harristeeter|harris teeter|walmart|walgreens|cvs/.test(
+      normalized,
+    ) &&
+    /grocery|pharmacy|pickup|delivery|store locator|weekly ad|departments/.test(
+      normalized,
+    );
+
+  return grocerySpecific || fulfillmentCluster || knownGroceryBrand;
+}
+
+function recommendationThreadSourceForContext(
+  context: ScanContext,
+  recommendationTopic?: string | null,
+): RecommendationThreadSource {
+  return {
+    scanId: context.scanId ?? null,
+    domain: context.domain || normalizeDomain(context.website),
+    siteType:
+      context.benchmarkContext?.benchmarkGroup ??
+      context.siteType ??
+      context.currentNarrativeArchetype ??
+      null,
+    recommendationTopic: recommendationTopic ?? null,
+  };
+}
+
+function recommendationThreadMatchesContext(
+  source: RecommendationThreadSource | null,
+  context: ScanContext,
+) {
+  if (!source) {
+    return false;
+  }
+
+  const current = recommendationThreadSourceForContext(context);
+  const sourceScanId = source.scanId?.trim();
+  const currentScanId = current.scanId?.trim();
+  const sourceDomain = normalizeDomain(source.domain);
+  const currentDomain = normalizeDomain(current.domain);
+  const sourceSiteType = String(source.siteType ?? "").trim().toLowerCase();
+  const currentSiteType = String(current.siteType ?? "").trim().toLowerCase();
+
+  return (
+    (Boolean(sourceScanId) && sourceScanId === currentScanId) ||
+    (Boolean(sourceDomain) && sourceDomain === currentDomain) ||
+    (Boolean(sourceSiteType) && sourceSiteType === currentSiteType)
+  );
+}
+
+function recommendationThreadFromRoadmap(
+  context: ScanContext,
+): RecommendationThread | null {
+  const roadmap = context.recommendationRoadmap;
+  const steps = roadmap?.steps ?? [];
+  const firstStep = steps[0];
+
+  if (!roadmap || !firstStep) {
+    return null;
+  }
+
+  const topic = roadmap.primaryRecommendation || firstStep.title;
+  const secondStep = steps[1];
+  const mappedSteps: RecommendationRoadmapStep[] = steps.map((step) => ({
+    stepNumber: step.stepNumber,
+    title: step.title,
+    reason: step.rationale,
+    expectedImpact: step.expectedImpact,
+    estimatedCost: step.cost,
+    estimatedTimeline: step.timeline,
+  }));
+
+  return {
+    source: {
+      ...recommendationThreadSourceForContext(context, topic),
+      scanId: roadmap.source?.scanId ?? context.scanId,
+      domain: roadmap.source?.domain ?? context.domain,
+      siteType: roadmap.source?.siteType ?? context.siteType,
+    },
+    topic,
+    step: `start with ${firstStep.title}`,
+    reason: firstStep.rationale,
+    validation: firstStep.validationTarget,
+    expectedImpact: firstStep.expectedImpact,
+    nextStep: secondStep
+      ? secondStep.title
+      : "Confirm impact and address the next score reducer.",
+    roadmap: mappedSteps,
+  };
+}
+
+function buildRecommendationThread(context: ScanContext): RecommendationThread {
+  const roadmapThread = recommendationThreadFromRoadmap(context);
+
+  if (roadmapThread) {
+    return roadmapThread;
+  }
+
+  const actionItems = context.actionItems ?? [];
+  const revenueEstimates = context.revenueImpactSummary?.estimates ?? [];
+  const strongestReducers = context.scoreNarrative?.strongestReducers ?? [];
+  const strongestPositives = context.scoreNarrative?.strongestPositives ?? [];
+  const signalText = [
+    context.siteType,
+    context.benchmarkContext?.benchmarkGroup,
+    context.benchmarkContext?.benchmarkLabel,
+    context.primaryOperationalConcern?.title,
+    context.primaryOperationalConcern?.riskLabel,
+    context.primaryOperationalConcern?.explanation,
+    ...actionItems.flatMap((item) => [item.title, item.action, item.why]),
+    ...revenueEstimates.flatMap((item) => [
+      item.findingTitle,
+      item.riskArea,
+      item.likelyImpact,
+      item.explanation,
+    ]),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const discoveryAction = actionItems.find((item) =>
+    /catalog|discovery|category|navigation|search|product|sku/i.test(
+      recommendationSignalText(item),
+    ),
+  );
+  const isB2bDiscovery =
+    /b2b|catalog|industrial|distributor|procurement|quote|sku/i.test(
+      signalText,
+    );
+  const topReducer =
+    strongestReducers.find((item) =>
+      /trust|checkout|purchase|cta|mobile/i.test(item),
+    ) ??
+    strongestReducers[0] ??
+    "purchase-path confidence";
+  const positiveText =
+    strongestPositives.slice(0, 3).join(", ") || "visible commerce strengths";
+
+  if (hasGroceryRecommendationContext(signalText)) {
+    const topic = "grocery discovery and fulfillment path";
+    return {
+      source: recommendationThreadSourceForContext(context, topic),
+      topic,
+      step: "validate grocery discovery and fulfillment choice",
+      reason:
+        "For grocery and supermarket retail, the first commercial question is whether shoppers can quickly find departments, search for items, choose pickup or delivery, and understand the next step.",
+      validation:
+        "Search usage, department navigation, pickup versus delivery flow, store locator usage, cart abandonment points, and mobile first-screen behavior.",
+      expectedImpact:
+        "Faster discovery, better department usage, more pickup/delivery engagement, and stronger conversion confidence.",
+      nextStep:
+        "Improve department search and the pickup/delivery entry points.",
+      roadmap: [
+        {
+          stepNumber: 1,
+          title: "Validate grocery discovery and fulfillment choice",
+          reason:
+            "This confirms whether shoppers can find departments, search for items, choose pickup or delivery, and understand the next step.",
+          expectedImpact:
+            "Faster discovery, better department usage, and more pickup/delivery engagement.",
+          estimatedCost: "$2,000-$5,000",
+          estimatedTimeline: "2-4 weeks",
+        },
+        {
+          stepNumber: 2,
+          title: "Improve department search and pickup/delivery entry points",
+          reason:
+            "Once the journey is validated, the next move is making the high-intent paths easier to reach.",
+          expectedImpact:
+            "More shoppers should reach departments, weekly offers, store selection, pickup, delivery, or cart continuation with fewer dead ends.",
+          estimatedCost: "$2,000-$6,000",
+          estimatedTimeline: "3-6 weeks",
+        },
+        {
+          stepNumber: 3,
+          title: "Strengthen fulfillment and trust signals",
+          reason:
+            "After discovery and entry points are clearer, the next goal is buyer confidence around availability, substitutions, fees, pickup windows, delivery, returns, and support.",
+          expectedImpact:
+            "Stronger conversion confidence and fewer hesitations before cart or checkout.",
+          estimatedCost: "$1,000-$3,000",
+          estimatedTimeline: "1-3 weeks",
+        },
+      ],
+    };
+  }
+
+  if (isB2bDiscovery && discoveryAction) {
+    const topic = "product discovery";
+    return {
+      source: recommendationThreadSourceForContext(context, topic),
+      topic,
+      step: "validate product discovery",
+      reason: `The scanner points to catalog discovery friction and product discovery clarity. ${sentenceCase(topReducer)} may be the biggest score reducer, but product discovery is the highest-ROI starting point because buyers need to find the right product or category before trust and checkout improvements can pay off.`,
+      validation:
+        "Category -> Product -> Cart or Quote -> Checkout. I would look for the exact step where buyers hesitate, loop back, search again, or lose confidence.",
+      expectedImpact:
+        "Customers should reach relevant product groups faster, understand the next step sooner, and move into cart, quote, or checkout with less friction.",
+      nextStep:
+        "Improve search visibility and category navigation.",
+      roadmap: [
+        {
+          stepNumber: 1,
+          title: "Validate product discovery",
+          reason:
+            "This confirms where buyers hesitate between category discovery, product detail, cart, quote, and checkout.",
+          expectedImpact:
+            "Customers should reach relevant product groups faster and understand the next step sooner.",
+          estimatedCost: "$2,000-$5,000",
+          estimatedTimeline: "2-4 weeks",
+        },
+        {
+          stepNumber: 2,
+          title: "Improve search visibility and category navigation",
+          reason:
+            "Once the discovery problem is confirmed, the next move is making search, category filters, and key product groups easier to reach.",
+          expectedImpact:
+            "More buyers should find the right category or SKU with fewer loops and less friction.",
+          estimatedCost: "$1,000-$3,000",
+          estimatedTimeline: "1-3 weeks",
+        },
+        {
+          stepNumber: 3,
+          title: "Strengthen trust signals around the buying path",
+          reason:
+            "By this point product discovery and search should be easier, so the next goal is increasing buyer confidence.",
+          expectedImpact:
+            "Shipping clarity, returns, reviews, certifications, and contact visibility should reduce hesitation before cart, quote, or checkout.",
+          estimatedCost: "$500-$2,000",
+          estimatedTimeline: "1-2 weeks",
+        },
+      ],
+    };
+  }
+
+  const genericTopic = topReducer.toLowerCase();
+  return {
+    source: recommendationThreadSourceForContext(context, genericTopic),
+    topic: genericTopic,
+    step: `validate ${genericTopic}`,
+    reason: `The scanner could see ${positiveText}, but ${topReducer} is the clearest customer-path constraint to validate before bigger work.`,
+    validation:
+      "Landing page -> product or service decision -> primary action -> trust confirmation -> final conversion step.",
+    expectedImpact:
+      "Better decision confidence and a clearer path to the next commercial action.",
+    nextStep:
+      "Address the next score reducer and confirm the changes with analytics or a manual journey review.",
+    roadmap: [
+      {
+        stepNumber: 1,
+        title: `Validate ${genericTopic}`,
+        reason:
+          "This confirms whether the top customer-path constraint is real before bigger work begins.",
+        expectedImpact:
+          "Better decision confidence and a clearer path to the next commercial action.",
+        estimatedCost: "$1,000-$3,000",
+        estimatedTimeline: "1-3 weeks",
+      },
+      {
+        stepNumber: 2,
+        title: "Fix the confirmed journey constraint",
+        reason:
+          "Once the problem is verified, the second step is applying the smallest change that removes the friction.",
+        expectedImpact:
+          "The path should become easier to complete and easier to measure.",
+        estimatedCost: "$2,000-$6,000",
+        estimatedTimeline: "2-6 weeks",
+      },
+      {
+        stepNumber: 3,
+        title: "Confirm impact and address the next reducer",
+        reason:
+          "After the first fix, the next priority should come from analytics, manual review, and the remaining score reducers.",
+        expectedImpact:
+          "A cleaner improvement loop and less risk of spending on the wrong issue.",
+        estimatedCost: "$1,000-$3,000",
+        estimatedTimeline: "1-3 weeks",
+      },
+    ],
+  };
+}
+
+function buildOpzixRecommendationResponse(
+  context: ScanContext,
+  thread = buildRecommendationThread(context),
+): ChatMessage {
+  return buildMessage(
+    `assistant-opzix-recommendation-${Date.now()}`,
+    [
+      `First, I would ${thread.step}.`,
+      `Why: ${thread.reason}`,
+      `What I would validate: ${thread.validation}`,
+      `Expected impact: ${thread.expectedImpact}`,
+      `What comes second: ${thread.nextStep}`,
+    ],
+    { topic: "priority", cta: true },
+  );
+}
+
+function recommendationFollowUpKind(input: string, state: ConversationState) {
+  if (!state.recommendationTopic) {
+    return null;
+  }
+
+  const normalized = normalizeText(input).replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "how much",
+      "cost",
+      "price",
+      "budget",
+      "that cost",
+      "this cost",
+      "cost estimate",
+    ])
+  ) {
+    return "cost" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "how long",
+      "timeline",
+      "take",
+      "time",
+      "how much time",
+      "how many weeks",
+    ])
+  ) {
+    return "timeline" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes seventh",
+      "what would you do seventh",
+      "seventh",
+      "step seven",
+      "step 7",
+    ])
+  ) {
+    return "seventh" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes sixth",
+      "what would you do sixth",
+      "sixth",
+      "step six",
+      "step 6",
+    ])
+  ) {
+    return "sixth" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes fifth",
+      "what would you do fifth",
+      "fifth",
+      "step five",
+      "step 5",
+    ])
+  ) {
+    return "fifth" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes fourth",
+      "what would you do fourth",
+      "fourth",
+      "step four",
+      "step 4",
+    ])
+  ) {
+    return "fourth" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes third",
+      "what would you do third",
+      "third",
+      "step three",
+      "step 3",
+    ])
+  ) {
+    return "third" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes second",
+      "what would you do second",
+      "second",
+      "step two",
+      "step 2",
+    ])
+  ) {
+    return "second" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes first",
+      "what would you do first",
+      "what is first",
+      "what should i fix first",
+      "what should we fix first",
+      "what to fix first",
+      "fix first",
+      "review first",
+      "first",
+      "step one",
+      "step 1",
+    ])
+  ) {
+    return "first" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what would i validate",
+      "what would you validate",
+      "what validate",
+      "validate",
+      "how would you validate",
+      "how validate",
+    ])
+  ) {
+    return "validation" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "expected impact",
+      "impact",
+      "what impact",
+      "what would happen",
+      "what changes",
+    ])
+  ) {
+    return "impact" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "what comes next",
+      "next",
+      "after that",
+    ])
+  ) {
+    return "next" as const;
+  }
+
+  if (
+    normalized === "why" ||
+    normalized === "why?" ||
+    textIncludesAny(normalized, ["why start there", "why that", "why first"])
+  ) {
+    return "why" as const;
+  }
+
+  if (
+    normalized === "how" ||
+    normalized === "how?" ||
+    textIncludesAny(normalized, ["how would you do that", "how would you start"])
+  ) {
+    return "how" as const;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "tell me more",
+      "explain more",
+      "go deeper",
+      "more detail",
+    ])
+  ) {
+    return "more" as const;
+  }
+
+  return null;
+}
+
+function roadmapStep(
+  state: ConversationState,
+  stepNumber: number | null | undefined,
+) {
+  const roadmap = state.recommendationRoadmap;
+
+  if (roadmap.length === 0) {
+    return null;
+  }
+
+  const resolvedStepNumber =
+    stepNumber ?? state.recommendationCurrentStep ?? roadmap[0]?.stepNumber ?? 1;
+
+  return (
+    roadmap.find((step) => step.stepNumber === resolvedStepNumber) ??
+    roadmap[0] ??
+    null
+  );
+}
+
+function roadmapActionPhrase(title: string) {
+  const trimmed = title.trim();
+  if (/^(validate|improve|strengthen|fix|confirm|map|review|audit|test|move|add)\b/i.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+
+  return `review ${trimmed}`;
+}
+
+function buildRecommendationThreadFollowUp(
+  input: string,
+  state: ConversationState,
+  context: ScanContext,
+): AssistantTurn | null {
+  const kind = recommendationFollowUpKind(input, state);
+
+  if (!kind || !state.recommendationTopic) {
+    return null;
+  }
+
+  if (!recommendationThreadMatchesContext(state.recommendationThreadSource, context)) {
+    const freshThread = buildRecommendationThread(context);
+    const freshState = withRecommendationThread(
+      createNextState(
+        "priority",
+        "ask_clarification",
+        context.primaryOperationalConcern
+          ? concernToFinding(context.primaryOperationalConcern, "priority")
+          : null,
+        context.primaryOperationalConcern?.riskLabel ?? topicLabel("priority"),
+        state.conversationStep,
+      ),
+      freshThread,
+    );
+
+    return buildRecommendationThreadFollowUp(input, freshState, context);
+  }
+
+  const step = state.recommendationStep ?? state.recommendationTopic;
+  const reason =
+    state.recommendationReason ??
+    "That is the recommendation because it is the highest-ROI customer-journey validation from the scan.";
+  const validation =
+    state.recommendationValidation ??
+    "I would validate the journey from first impression to the commercial action.";
+  const impact =
+    state.recommendationExpectedImpact ??
+    "The expected impact is better customer clarity and a cleaner path to conversion.";
+  const nextStep =
+    state.recommendationNextStep ??
+    "After that, I would address the next score reducer and confirm the changes with analytics.";
+  const currentStep = roadmapStep(state, state.recommendationCurrentStep);
+  const requestedStepNumber =
+    kind === "first"
+      ? 1
+      : kind === "second"
+      ? 2
+      : kind === "third"
+        ? 3
+        : kind === "fourth"
+          ? 4
+          : kind === "fifth"
+            ? 5
+            : kind === "sixth"
+              ? 6
+              : kind === "seventh"
+                ? 7
+        : kind === "next"
+          ? Math.min(
+              (state.recommendationCurrentStep ?? 1) + 1,
+              state.recommendationRoadmap.length || 3,
+            )
+          : null;
+  const requestedStep = roadmapStep(state, requestedStepNumber);
+  const costStep = currentStep ?? requestedStep;
+  const stepParagraphs = requestedStep
+    ? [
+        `${requestedStep.stepNumber === 1 ? "First" : requestedStep.stepNumber === 2 ? "Second" : requestedStep.stepNumber === 3 ? "Third" : requestedStep.stepNumber === 4 ? "Fourth" : requestedStep.stepNumber === 5 ? "Fifth" : requestedStep.stepNumber === 6 ? "Sixth" : requestedStep.stepNumber === 7 ? "Seventh" : `Step ${requestedStep.stepNumber}`}, I would ${roadmapActionPhrase(requestedStep.title)}.`,
+        requestedStep.reason,
+        `Expected impact: ${requestedStep.expectedImpact}`,
+        `Estimated effort: ${requestedStep.estimatedTimeline}.`,
+      ]
+    : null;
+  const paragraphsByKind = {
+    why: [
+      `Why I would start there: ${reason}`,
+      `The recommendation is still: ${step}.`,
+      `What comes next after that: ${nextStep}`,
+    ],
+    how: [
+      `How I would approach it: start with ${step}, then walk the journey step by step instead of redesigning broadly.`,
+      `What I would validate: ${validation}`,
+      `Expected impact: ${impact}`,
+    ],
+    validation: [
+      `What I would validate: ${validation}`,
+      "I would look for where users hesitate, loop back, search again, abandon, or lose confidence before the next commercial step.",
+      `This ties back to the recommendation: ${step}.`,
+    ],
+    impact: [
+      `Expected impact: ${impact}`,
+      "The point is not just to improve the page visually; it is to make the buying path easier to complete and easier to measure.",
+      `What comes second: ${nextStep}`,
+    ],
+    next:
+      stepParagraphs ?? [
+        `What comes second: ${nextStep}`,
+        `I would do that after ${step}, because the first step validates the main journey before secondary fixes absorb time or budget.`,
+      ],
+    first:
+      stepParagraphs ?? [
+        `First, I would ${step}.`,
+        reason,
+        `Estimated effort: ${currentStep?.estimatedTimeline ?? "1-3 weeks"}.`,
+      ],
+    second:
+      stepParagraphs ?? [
+        `Second, I would ${nextStep.toLowerCase()}`,
+        `I would do that after ${step}, because the first step validates the main journey before secondary fixes absorb time or budget.`,
+      ],
+    third:
+      stepParagraphs ?? [
+        "Third, I would strengthen trust signals around the buying path.",
+        "By this point the main discovery path should be clearer, so the next goal is increasing buyer confidence.",
+        "Estimated effort: 1-2 weeks.",
+      ],
+    fourth:
+      stepParagraphs ?? [
+        "Fourth, I would confirm the next roadmap constraint after the first three steps are validated.",
+        "The fourth step should come from the report roadmap, not a new finding explanation.",
+        "Estimated effort: 1-3 weeks.",
+      ],
+    fifth:
+      stepParagraphs ?? [
+        "Fifth, I would continue with the next roadmap item.",
+        "That answer should come from the report roadmap, not a new finding explanation.",
+        "Estimated effort: 1-3 weeks.",
+      ],
+    sixth:
+      stepParagraphs ?? [
+        "Sixth, I would continue with the next roadmap item.",
+        "That answer should come from the report roadmap, not a new finding explanation.",
+        "Estimated effort: 1-3 weeks.",
+      ],
+    seventh:
+      stepParagraphs ?? [
+        "Seventh, I would confirm measurement and the next operating constraint.",
+        "That answer should come from the report roadmap, not a new finding explanation.",
+        "Estimated effort: 1-3 weeks.",
+      ],
+    cost: [
+      costStep
+        ? `If you mean ${costStep.title}, I would estimate ${costStep.estimatedCost}.`
+        : "For the recommendation we were discussing, I would estimate a focused project rather than a full redesign.",
+      costStep
+        ? `Timeline: ${costStep.estimatedTimeline}.`
+        : "The exact range depends on how much navigation, category, search, content, and testing work is included.",
+      "That is very different from a full enterprise redesign or platform rebuild, which can be much larger.",
+    ],
+    timeline: [
+      costStep
+        ? `For ${costStep.title}, I would expect ${costStep.estimatedTimeline}.`
+        : "For the recommendation we were discussing, I would expect a focused validation or implementation window rather than a full rebuild timeline.",
+      costStep ? `Cost range: ${costStep.estimatedCost}.` : "",
+      "The timing depends on access to analytics, templates, product/category structure, and how quickly changes can be tested.",
+    ].filter(Boolean),
+    more: [
+      `Recommendation: ${step}.`,
+      `Why: ${reason}`,
+      `Validation: ${validation}`,
+      `Expected impact: ${impact}`,
+      `What comes next: ${nextStep}`,
+    ],
+  };
+
+  return {
+    message: buildMessage(
+      `assistant-recommendation-followup-${kind}-${Date.now()}`,
+      paragraphsByKind[kind],
+      { topic: "priority", cta: true },
+    ),
+    nextState: {
+      ...state,
+      currentTopic: "priority",
+      lastIntent: "ask_clarification",
+      lastExplainedTopic: "priority",
+      pendingFollowUp: pendingFollowUpForTopic("priority"),
+      conversationStep: state.conversationStep + 1,
+      recommendationCurrentStep:
+        requestedStep?.stepNumber ??
+        (kind === "cost" || kind === "timeline"
+          ? costStep?.stepNumber ?? state.recommendationCurrentStep
+          : state.recommendationCurrentStep),
+      recommendationPhase:
+        requestedStep?.stepNumber
+          ? `step_${requestedStep.stepNumber}`
+          : state.recommendationPhase,
+      recommendationThreadSource: state.recommendationThreadSource,
+    },
+  };
+}
+
+function buildRoadmapAwareRecommendationTurn(
+  input: string,
+  state: ConversationState,
+  context: ScanContext,
+) {
+  const existingTurn = buildRecommendationThreadFollowUp(input, state, context);
+
+  if (existingTurn) {
+    return existingTurn;
+  }
+
+  if (!context.recommendationRoadmap?.steps?.length) {
+    return null;
+  }
+
+  const freshThread = buildRecommendationThread(context);
+  const freshState = withRecommendationThread(
+    createNextState(
+      "priority",
+      "ask_clarification",
+      context.primaryOperationalConcern
+        ? concernToFinding(context.primaryOperationalConcern, "priority")
+        : null,
+      context.primaryOperationalConcern?.riskLabel ?? topicLabel("priority"),
+      state.conversationStep,
+    ),
+    freshThread,
+  );
+
+  return buildRecommendationThreadFollowUp(input, freshState, context);
 }
 
 function getHighestImpactFinding(audit: AssistantAudit): RetrievedFinding {
@@ -2707,6 +3826,14 @@ function resolveExpansionTopic(
 }
 
 function shouldExpandCurrentTopic(input: string, state: ConversationState) {
+  if (detectAssistantIntent(input).intent === "score_explanation") {
+    return false;
+  }
+
+  if (hasSalesIntent(input)) {
+    return false;
+  }
+
   if (!isExpansionIntent(input)) {
     return false;
   }
@@ -3321,12 +4448,23 @@ function answerDirectQuestion(
   state: ConversationState,
 ): AssistantTurn | null {
   const normalized = normalizeText(input);
+  const frameworkIntent = detectAssistantIntent(input).intent;
   const asksVisible = /\b(is|are|was|were|do|does|did|what)\b/.test(normalized);
   let message: ChatMessage | null = null;
   let topic: ConversationTopic | null = null;
   let finding: RetrievedFinding | null = null;
+  let recommendationThread: RecommendationThread | null = null;
 
-  if (detectIntent(input) === "ask_metadata") {
+  if (frameworkIntent === "score_explanation") {
+    topic = "priority";
+    message = buildScoreReasoningResponse(context, input);
+  } else if (frameworkIntent === "opzix_recommendation") {
+    topic = "priority";
+    recommendationThread = buildRecommendationThread(context);
+    message = buildOpzixRecommendationResponse(context, recommendationThread);
+  } else if (hasSalesIntent(input)) {
+    return null;
+  } else if (detectIntent(input) === "ask_metadata") {
     topic = "metadata";
     message = buildMetadataAnswer(input, context);
     finding =
@@ -3731,9 +4869,7 @@ function answerDirectQuestion(
     context.categoryFindings[topic]?.[0] ??
     state.lastFindingDiscussed;
 
-  return {
-    message,
-    nextState: createNextState(
+  const nextState = createNextState(
       topic,
       "ask_clarification",
       finding,
@@ -3742,7 +4878,13 @@ function answerDirectQuestion(
         topicLabel(topic),
       state.conversationStep,
       pendingFollowUpForTopic(topic),
-    ),
+    );
+
+  return {
+    message,
+    nextState: recommendationThread
+      ? withRecommendationThread(nextState, recommendationThread)
+      : nextState,
   };
 }
 
@@ -4330,6 +5472,10 @@ function detectIntent(value: string): AssistantIntent {
     return "unknown";
   }
 
+  if (hasSalesIntent(value)) {
+    return "unknown";
+  }
+
   if (textIncludesAny(normalizedSearch, intentKeywords.ask_metadata)) {
     return "ask_metadata";
   }
@@ -4378,6 +5524,35 @@ function createNextState(
     conversationStep: previousStep + 1,
     pendingFollowUp,
     conversationDepthByTopic: topic ? { [topic]: 1 } : {},
+    recommendationTopic: null,
+    recommendationStep: null,
+    recommendationReason: null,
+    recommendationValidation: null,
+    recommendationExpectedImpact: null,
+    recommendationNextStep: null,
+    recommendationPhase: null,
+    recommendationCurrentStep: null,
+    recommendationRoadmap: [],
+    recommendationThreadSource: null,
+  };
+}
+
+function withRecommendationThread(
+  state: ConversationState,
+  thread: RecommendationThread,
+): ConversationState {
+  return {
+    ...state,
+    recommendationTopic: thread.topic,
+    recommendationStep: thread.step,
+    recommendationReason: thread.reason,
+    recommendationValidation: thread.validation,
+    recommendationExpectedImpact: thread.expectedImpact,
+    recommendationNextStep: thread.nextStep,
+    recommendationPhase: "step_1",
+    recommendationCurrentStep: 1,
+    recommendationRoadmap: thread.roadmap,
+    recommendationThreadSource: thread.source,
   };
 }
 
@@ -4567,6 +5742,16 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       conversationStep: 0,
       pendingFollowUp: pendingFollowUpForTopic("priority"),
       conversationDepthByTopic: { priority: 1 },
+      recommendationTopic: null,
+      recommendationStep: null,
+      recommendationReason: null,
+      recommendationValidation: null,
+      recommendationExpectedImpact: null,
+      recommendationNextStep: null,
+      recommendationPhase: null,
+      recommendationCurrentStep: null,
+      recommendationRoadmap: [],
+      recommendationThreadSource: null,
     },
   );
 
@@ -4648,8 +5833,24 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       conversationStep: 0,
       pendingFollowUp: pendingFollowUpForTopic("priority"),
       conversationDepthByTopic: { priority: 1 },
+      recommendationTopic: null,
+      recommendationStep: null,
+      recommendationReason: null,
+      recommendationValidation: null,
+      recommendationExpectedImpact: null,
+      recommendationNextStep: null,
+      recommendationPhase: null,
+      recommendationCurrentStep: null,
+      recommendationRoadmap: [],
+      recommendationThreadSource: null,
     });
-  }, [audit.generatedAt, audit.website]);
+  }, [
+    audit.generatedAt,
+    audit.scanId,
+    audit.siteType,
+    audit.storefrontReviewContext?.siteType,
+    audit.website,
+  ]);
 
   function handleQuickReply(label: string, intent: AssistantIntent) {
     if (isAssistantLoading) {
@@ -4698,6 +5899,31 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
     if (acknowledgementTurn) {
       const progressedTurn = attachConversationProgression(
         acknowledgementTurn,
+        conversationState,
+        question,
+      );
+
+      setFreeTextQuestion("");
+      queueMessageAutoScroll({ force: true });
+      setMessages((current) => [
+        ...current,
+        userMessage,
+        progressedTurn.message,
+      ]);
+      setConversationState(progressedTurn.nextState);
+      setAiSuggestedReplies([]);
+      return;
+    }
+
+    const recommendationFollowUpTurn = buildRoadmapAwareRecommendationTurn(
+      question,
+      conversationState,
+      scanContext,
+    );
+
+    if (recommendationFollowUpTurn) {
+      const progressedTurn = attachConversationProgression(
+        recommendationFollowUpTurn,
         conversationState,
         question,
       );

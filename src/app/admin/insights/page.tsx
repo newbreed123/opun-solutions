@@ -2,6 +2,10 @@ import {
   listAuditInsightScans,
   type AuditScanRow,
 } from "@/lib/audit-scan-log";
+import {
+  listAssistantConversations,
+  type AssistantConversationRow,
+} from "@/lib/assistant-conversation-log";
 import { ScoreStabilityCell } from "@/components/admin/ScoreStabilityCell";
 import {
   buildScoreStabilityByDomain,
@@ -55,11 +59,27 @@ type Insights = {
   conversionByArchetype: ConversionGroupMetric[];
   conversionByBenchmarkGroup: ConversionGroupMetric[];
   conversionByRevenueRisk: ConversionGroupMetric[];
+  assistantQuestionInsights: AssistantQuestionInsights;
   recentScans: RecentScanRow[];
 };
 
 type RecentScanRow = AuditScanRow & {
   scoreStability: ScoreStabilitySummary | undefined;
+};
+
+type AssistantQuestionInsights = {
+  totalQuestions: number;
+  costQuestions: number;
+  rebuildQuestions: number;
+  roiQuestions: number;
+  bookingQuestions: number;
+  leadSubmittedQuestions: number;
+  recentQuestions: AssistantConversationRow[];
+  topAssistantQuestions: GroupMetric[];
+  topIntents: GroupMetric[];
+  commonQuestions: GroupMetric[];
+  questionsBySiteType: GroupMetric[];
+  questionsByLeadStatus: GroupMetric[];
 };
 
 export default async function AdminInsightsPage({
@@ -91,8 +111,11 @@ export default async function AdminInsightsPage({
     );
   }
 
-  const scans = await listAuditInsightScans();
-  const insights = buildInsights(scans.data);
+  const [scans, assistantConversations] = await Promise.all([
+    listAuditInsightScans(),
+    listAssistantConversations(),
+  ]);
+  const insights = buildInsights(scans.data, assistantConversations.data);
 
   return (
     <DashboardShell>
@@ -223,6 +246,74 @@ export default async function AdminInsightsPage({
             </div>
           </section>
 
+          <AnalyticsPanel title="Assistant Question Insights">
+            {!assistantConversations.ok ? (
+              <p className="mb-4 text-sm text-muted">
+                Assistant conversation logging is not available yet:{" "}
+                {assistantConversations.error}
+              </p>
+            ) : null}
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+              <MetricCard
+                label="Assistant questions"
+                value={insights.assistantQuestionInsights.totalQuestions}
+              />
+              <MetricCard
+                label="Cost Questions"
+                value={insights.assistantQuestionInsights.costQuestions}
+              />
+              <MetricCard
+                label="Rebuild Questions"
+                value={insights.assistantQuestionInsights.rebuildQuestions}
+              />
+              <MetricCard
+                label="ROI Questions"
+                value={insights.assistantQuestionInsights.roiQuestions}
+              />
+              <MetricCard
+                label="Booking/Contact"
+                value={insights.assistantQuestionInsights.bookingQuestions}
+              />
+              <MetricCard
+                label="Lead Submitted"
+                value={insights.assistantQuestionInsights.leadSubmittedQuestions}
+              />
+            </section>
+            <div className="mt-6">
+              <TopAssistantQuestionsCard
+                rows={insights.assistantQuestionInsights.topAssistantQuestions}
+              />
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-4">
+              <MetricRows
+                rows={insights.assistantQuestionInsights.topIntents}
+                emptyLabel="No assistant intents logged yet."
+              />
+              <MetricRows
+                rows={insights.assistantQuestionInsights.commonQuestions}
+                emptyLabel="No assistant questions logged yet."
+              />
+              <MetricRows
+                rows={insights.assistantQuestionInsights.questionsBySiteType}
+                emptyLabel="No site-type question data yet."
+              />
+              <MetricRows
+                rows={insights.assistantQuestionInsights.questionsByLeadStatus}
+                emptyLabel="No lead-submission question data yet."
+              />
+            </div>
+            <p className="mt-4 text-xs text-muted">
+              Launch fields: question asked, detected intent, site type, score,
+              and lead submitted. CTA click tracking can be added as a later
+              refinement.
+            </p>
+            <div className="mt-6">
+              <RecentAssistantQuestionsTable
+                conversations={insights.assistantQuestionInsights.recentQuestions}
+              />
+            </div>
+          </AnalyticsPanel>
+
           <AnalyticsPanel title="Recent Scans">
             <RecentScansTable scans={insights.recentScans} />
           </AnalyticsPanel>
@@ -232,7 +323,10 @@ export default async function AdminInsightsPage({
   );
 }
 
-function buildInsights(scans: AuditScanRow[]): Insights {
+function buildInsights(
+  scans: AuditScanRow[],
+  assistantConversations: AssistantConversationRow[] = [],
+): Insights {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfWeek = new Date(startOfToday);
@@ -272,11 +366,201 @@ function buildInsights(scans: AuditScanRow[]): Insights {
       scans,
       (scan) => scan.revenue_risk_areas,
     ),
+    assistantQuestionInsights: buildAssistantQuestionInsights(
+      assistantConversations,
+    ),
     recentScans: scans.slice(0, 12).map((scan) => ({
       ...scan,
       scoreStability: scoreStabilityByDomain.get(domainForScan(scan)),
     })),
   };
+}
+
+function buildAssistantQuestionInsights(
+  conversations: AssistantConversationRow[],
+): AssistantQuestionInsights {
+  return {
+    totalQuestions: conversations.length,
+    costQuestions: countByIntent(conversations, ["cost_estimate"]),
+    rebuildQuestions: countByIntent(conversations, ["rebuild_vs_fix"]),
+    roiQuestions: countByIntent(conversations, ["roi_value"]),
+    bookingQuestions: countByIntent(conversations, ["contact_or_booking"]),
+    leadSubmittedQuestions: conversations.filter(
+      (conversation) => conversation.lead_submitted,
+    ).length,
+    recentQuestions: conversations.slice(0, 12),
+    topAssistantQuestions: topAssistantQuestionRows(conversations),
+    topIntents: groupAssistantByValue(
+      conversations,
+      (conversation) => conversation.detected_intent,
+    ),
+    commonQuestions: groupAssistantByValue(
+      conversations,
+      (conversation) => normalizeQuestionLabel(conversation.question),
+    ).slice(0, 8),
+    questionsBySiteType: groupAssistantByValue(
+      conversations,
+      (conversation) => conversation.site_type,
+    ),
+    questionsByLeadStatus: groupAssistantByValue(conversations, (conversation) =>
+      conversation.lead_submitted ? "Lead submitted" : "No lead submitted",
+    ),
+  };
+}
+
+function TopAssistantQuestionsCard({ rows }: { rows: GroupMetric[] }) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-dark-deep/60 p-4">
+      <h3 className="text-sm font-bold text-primary">Top Assistant Questions</h3>
+      {rows.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">No assistant questions logged yet.</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {rows.map((row) => (
+            <div
+              key={row.label}
+              className="grid grid-cols-[minmax(0,auto)_1fr_auto] items-baseline gap-2 text-sm"
+            >
+              <span className="font-semibold text-secondary">{row.label}</span>
+              <span className="border-b border-dotted border-dark-border" />
+              <span className="font-bold text-primary">{row.count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function topAssistantQuestionRows(
+  conversations: AssistantConversationRow[],
+): GroupMetric[] {
+  const launchIntents = [
+    "cost_estimate",
+    "rebuild_vs_fix",
+    "roi_value",
+    "score_explanation",
+  ];
+  const allRows = groupAssistantByValue(
+    conversations,
+    (conversation) => conversation.detected_intent,
+  );
+
+  return allRows
+    .filter((row) => launchIntents.includes(row.label))
+    .map((row) => ({
+      ...row,
+      label: assistantIntentLabel(row.label),
+    }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+}
+
+function RecentAssistantQuestionsTable({
+  conversations,
+}: {
+  conversations: AssistantConversationRow[];
+}) {
+  if (conversations.length === 0) {
+    return <p className="text-sm text-muted">No assistant questions logged yet.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+        <thead className="border-b border-dark-border text-xs uppercase tracking-[0.16em] text-muted">
+          <tr>
+            <th className="px-3 py-3">Date</th>
+            <th className="px-3 py-3">Question</th>
+            <th className="px-3 py-3">Intent</th>
+            <th className="px-3 py-3">Site Type</th>
+            <th className="px-3 py-3">Score</th>
+            <th className="px-3 py-3">Lead Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {conversations.map((conversation) => (
+            <tr
+              key={conversation.id}
+              className="border-b border-dark-border last:border-b-0"
+            >
+              <td className="px-3 py-4 text-secondary">
+                {formatDate(conversation.created_at)}
+              </td>
+              <td className="max-w-sm px-3 py-4 text-primary">
+                {conversation.question}
+              </td>
+              <td className="px-3 py-4 text-secondary">
+                {cleanLabel(conversation.detected_intent)}
+              </td>
+              <td className="px-3 py-4 text-secondary">
+                {cleanLabel(conversation.site_type)}
+              </td>
+              <td className="px-3 py-4 text-primary">
+                {conversation.score ?? "unknown"}
+              </td>
+              <td className="px-3 py-4">
+                <ContactBadge contacted={conversation.lead_submitted} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function countByIntent(
+  conversations: AssistantConversationRow[],
+  intents: string[],
+) {
+  return conversations.filter((conversation) =>
+    intents.includes(conversation.detected_intent),
+  ).length;
+}
+
+function groupAssistantByValue(
+  conversations: AssistantConversationRow[],
+  getValue: (conversation: AssistantConversationRow) => string | null | undefined,
+) {
+  const counts = new Map<string, number>();
+
+  conversations.forEach((conversation) => {
+    const label = cleanLabel(getValue(conversation));
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({
+      label,
+      count,
+      percentage: percentage(count, conversations.length),
+    }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+}
+
+function normalizeQuestionLabel(question: string) {
+  return question.trim().replace(/\s+/g, " ").slice(0, 120);
+}
+
+function assistantIntentLabel(intent: string) {
+  const labels: Record<string, string> = {
+    cost_estimate: "Cost Estimate",
+    rebuild_vs_fix: "Rebuild vs Fix",
+    roi_value: "ROI Questions",
+    score_explanation: "Score Explanation",
+    fix_priority: "Fix Priority",
+    implementation_plan: "Implementation Plan",
+    platform_question: "Platform Questions",
+    benchmark_question: "Benchmark Questions",
+    competitive_question: "Competitive Questions",
+    revenue_impact: "Revenue Impact",
+    contact_or_booking: "Booking/Contact",
+    explain_finding: "Explain Finding",
+    compare_findings: "Compare Findings",
+    general_unknown: "Unknown",
+  };
+
+  return labels[intent] ?? cleanLabel(intent);
 }
 
 function countSince(scans: AuditScanRow[], startDate: Date) {

@@ -37,6 +37,9 @@ const knownGroceryRetail = [
 const knownIndustrialCatalog = [
   "maxx-supply.com",
   "maxxsupply.com",
+  "pvcsupply.com",
+  "pvcfittingsonline.com",
+  "supplyhouse.com",
   "grainger.com",
   "uline.com",
   "mcmaster.com",
@@ -147,29 +150,13 @@ export function classifySiteType(scanContext: {
   const isGroceryEnterpriseFlow =
     domainMatches(scannedUrl, groceryFlowEnterpriseDomains) &&
     (groceryMatches.length >= 3 || /\/(grocery|groceries|food|pickup-delivery|cp\/food|browse\/food)\b/i.test(scannedUrl || ""));
-  const hasStrongGrocerySignals =
-    isKnownGroceryDomain ||
-    isGroceryEnterpriseFlow ||
-    groceryMatches.length >= 4 ||
-    (groceryMatches.length >= 2 && textIncludes(text, ["weekly ad", "store locator", "pickup", "delivery", "departments", "shop by aisle"]));
-
-  // marketplace signals
-  const marketplaceTerms = ["marketplace", "seller", "vendors", "sell on", "shops", "multi-vendor", "third-party sellers"];
-  if (textIncludes(text, marketplaceTerms)) {
-    evidence.push("Marketplace language or seller/vendor references detected.");
-  }
-
-  // B2B signals
-  const b2bTerms = ["wholesale", "bulk", "distributor", "request a quote", "rfq", "procure", "part number", "sku", "commercial sales"];
-  if (textIncludes(text, b2bTerms)) {
-    evidence.push("B2B / wholesale or quote-request language detected.");
-  }
-
   const industrialCatalogTerms = [
     "plumbing",
     "pvc",
+    "cpvc",
     "fittings",
     "pipe",
+    "pipes",
     "valves",
     "industrial supply",
     "industrial supplies",
@@ -184,8 +171,44 @@ export function classifySiteType(scanContext: {
     "trade",
     "specifications",
     "catalog",
+    "schedule 40",
+    "schedule 80",
   ];
   const industrialMatches = matchingTerms(text, industrialCatalogTerms);
+  const hasIndustrialCatalogSignals =
+    isKnownIndustrialDomain ||
+    industrialMatches.length >= 3 ||
+    (industrialMatches.length >= 2 &&
+      (hasCatalog ||
+        ecommerceProbability.label === "High" ||
+        ecommerceProbability.label === "Moderate"));
+  const hasStrongGrocerySignals =
+    !hasIndustrialCatalogSignals &&
+    (isKnownGroceryDomain ||
+      isGroceryEnterpriseFlow ||
+      groceryMatches.length >= 4 ||
+      (groceryMatches.length >= 2 &&
+        textIncludes(text, [
+          "weekly ad",
+          "store locator",
+          "pickup",
+          "delivery",
+          "departments",
+          "shop by aisle",
+        ])));
+
+  // marketplace signals
+  const marketplaceTerms = ["marketplace", "seller", "vendors", "sell on", "shops", "multi-vendor", "third-party sellers"];
+  if (textIncludes(text, marketplaceTerms)) {
+    evidence.push("Marketplace language or seller/vendor references detected.");
+  }
+
+  // B2B signals
+  const b2bTerms = ["wholesale", "bulk", "distributor", "request a quote", "rfq", "procure", "part number", "sku", "commercial sales"];
+  if (textIncludes(text, b2bTerms)) {
+    evidence.push("B2B / wholesale or quote-request language detected.");
+  }
+
   if (isKnownIndustrialDomain) {
     evidence.push("Known industrial distributor or B2B catalog domain detected.");
   }
@@ -275,16 +298,12 @@ export function classifySiteType(scanContext: {
   let score = 50; // baseline
 
   // Use ecommerce probability as an important signal
-  if (hasStrongGrocerySignals) {
-    siteType = "Grocery / Supermarket Retail";
-    score = isKnownGroceryDomain || isGroceryEnterpriseFlow ? 84 : 72;
-  } else if (
-    isKnownIndustrialDomain ||
-    industrialMatches.length >= 3 ||
-    (industrialMatches.length >= 2 && (hasCatalog || ecommerceProbability.label === "High" || ecommerceProbability.label === "Moderate"))
-  ) {
+  if (hasIndustrialCatalogSignals) {
     siteType = "Industrial Distributor / B2B Catalog Commerce";
     score = isKnownIndustrialDomain ? 84 : 74;
+  } else if (hasStrongGrocerySignals) {
+    siteType = "Grocery / Supermarket Retail";
+    score = isKnownGroceryDomain || isGroceryEnterpriseFlow ? 84 : 72;
   } else if (ecommerceProbability.label === "Low" || serviceOnlyEvidence) {
     // prefer lead-generation or non-ecommerce
     if (hasForms || textIncludes(text, serviceTerms)) {

@@ -51,13 +51,14 @@ export default function Contact() {
   const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [sourcePage, setSourcePage] = useState("contact-general");
-  const [contactAttribution, setContactAttribution] = useState<ContactAttribution>({
-    scanId: "",
-    scannedUrl: "",
-    auditScore: "",
-    auditStatus: "",
-    primaryConcern: "",
-  });
+  const [contactAttribution, setContactAttribution] =
+    useState<ContactAttribution>({
+      scanId: "",
+      scannedUrl: "",
+      auditScore: "",
+      auditStatus: "",
+      primaryConcern: "",
+    });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -638,7 +639,7 @@ export default function Contact() {
                       Pick a time that works for you.
                     </p>
                     <Button
-                      href="https://calendly.com/opun/ecommerce-audit"
+                      href="https://calendly.com/adimdnewbreed/"
                       target="_blank"
                       rel="noopener noreferrer"
                       variant="primary"
@@ -889,9 +890,7 @@ export default function Contact() {
                     <option value="ecommerce-setup" id="contact-options">
                       Ecommerce Setup
                     </option>
-                    <option value="ai-chatbots">
-                      AI & Automation
-                    </option>
+                    <option value="ai-chatbots">AI & Automation</option>
                     <option value="google-ads">Google Ads & Tracking</option>
                     <option value="client-portal">
                       Client Portal & Dashboard

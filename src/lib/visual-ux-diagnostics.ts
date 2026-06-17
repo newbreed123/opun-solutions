@@ -167,10 +167,6 @@ export function resolveVisualUxArchetype(scanContext: {
     return "Lead Generation / Service Business";
   }
 
-  if (/grocery|supermarket|sprouts|publix|kroger|wholefoods|safeway|albertsons|wegmans|heb|meijer|harristeeter/.test(siteType + haystack)) {
-    return "Grocery / Supermarket Retail";
-  }
-
   const industrialTerms = [
     "industrial",
     "industrial supply",
@@ -180,9 +176,15 @@ export function resolveVisualUxArchetype(scanContext: {
     "trade",
     "plumbing",
     "pvc",
+    "cpvc",
     "pipe",
+    "pipes",
     "fittings",
     "valves",
+    "flange",
+    "coupling",
+    "schedule 40",
+    "schedule 80",
     "replacement parts",
     "part number",
     "sku",
@@ -190,8 +192,17 @@ export function resolveVisualUxArchetype(scanContext: {
     "datasheet",
     "technical",
   ];
-  if (siteType.includes("b2b") || siteType.includes("industrial") || includesAny(haystack, industrialTerms)) {
+  const hasIndustrialContext =
+    siteType.includes("b2b") ||
+    siteType.includes("industrial") ||
+    includesAny(haystack, industrialTerms);
+
+  if (hasIndustrialContext) {
     return "Industrial Distributor / B2B Catalog";
+  }
+
+  if (/grocery|supermarket|sprouts|publix|kroger|wholefoods|safeway|albertsons|wegmans|heb|meijer|harristeeter/.test(siteType + haystack)) {
+    return "Grocery / Supermarket Retail";
   }
 
   if (

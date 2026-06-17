@@ -167,6 +167,40 @@ type RevenueImpactSummary = {
   revenueRiskAreas: string[];
 };
 
+type RecommendationRoadmapStep = {
+  stepNumber: number;
+  title: string;
+  cost: string;
+  timeline: string;
+  rationale: string;
+  validationTarget: string;
+  expectedImpact: string;
+  roiRationale: string;
+  sourceFinding?: string;
+  riskArea?: string;
+  confidence?: string;
+};
+
+type RecommendationRoadmap = {
+  summary: string;
+  primaryRecommendation: string;
+  source?: {
+    scanId?: string;
+    domain?: string;
+    siteType?: string;
+    benchmarkGroup?: string;
+    score?: number;
+  };
+  steps: RecommendationRoadmapStep[];
+  step1?: RecommendationRoadmapStep;
+  step2?: RecommendationRoadmapStep;
+  step3?: RecommendationRoadmapStep;
+  step4?: RecommendationRoadmapStep;
+  step5?: RecommendationRoadmapStep;
+  step6?: RecommendationRoadmapStep;
+  step7?: RecommendationRoadmapStep;
+};
+
 type AuditResult = {
   scanId?: string;
   website: string;
@@ -185,6 +219,7 @@ type AuditResult = {
   submittedPageType?: PageTypeDetection;
   competitiveComparison?: CompetitiveComparison;
   revenueImpactSummary?: RevenueImpactSummary;
+  recommendationRoadmap?: RecommendationRoadmap;
   summary: string;
   executiveSummary: ExecutiveSummary;
   auditNarrative?: string;
@@ -620,7 +655,15 @@ function scoreTone(score: number) {
 }
 
 function actionPlanLabel(index: number) {
-  return index === 0 ? "First" : index === 1 ? "Next" : "Then";
+  return [
+    "First",
+    "Second",
+    "Third",
+    "Fourth",
+    "Fifth",
+    "Sixth",
+    "Seventh",
+  ][index] ?? "Then";
 }
 
 function scoreContext(category: AuditCategory) {
@@ -662,6 +705,31 @@ function primaryOperationalConcern(audit: AuditResult): OperationalConcernView {
 function primaryOperationalConcernTitle(audit: AuditResult) {
   const concern = primaryOperationalConcern(audit);
   return concern?.title || concern?.riskLabel || "Primary audit concern";
+}
+
+function roadmapStepsForAudit(audit: AuditResult): RecommendationRoadmapStep[] {
+  const roadmapSteps = audit.recommendationRoadmap?.steps ?? [];
+
+  if (roadmapSteps.length > 0) {
+    return roadmapSteps;
+  }
+
+  return audit.recommendedNextSteps.slice(0, 4).map((step, index) => ({
+    stepNumber: index + 1,
+    title: step.title || step.action || `Roadmap step ${index + 1}`,
+    cost: index === 0 ? "$1,000-$3,000" : "$500-$2,000",
+    timeline: index === 0 ? "1-3 weeks" : "1-2 weeks",
+    rationale: step.why,
+    validationTarget: step.evidenceClue || step.action,
+    expectedImpact: step.why,
+    roiRationale:
+      "This is a directional roadmap estimate generated from the prioritized scan findings.",
+    sourceFinding: step.evidenceClue || step.title,
+  }));
+}
+
+function primaryRoadmapStep(audit: AuditResult) {
+  return roadmapStepsForAudit(audit)[0] ?? null;
 }
 
 function auditAttribution(audit: AuditResult) {
@@ -976,11 +1044,12 @@ export default function EcommerceAuditScannerPage() {
                 <div>
                   <p className="audit-print-cta-label">Recommended next step</p>
                   <p className="audit-print-cta-title">
-                    Review this audit with Opzix
+                    {primaryRoadmapStep(audit)?.title ?? "Review this audit with Opzix"}
                   </p>
                   <p className="audit-print-cta-copy">
-                    Walk through the score, validate the public-page evidence,
-                    and turn the top findings into a practical fix list.
+                    {primaryRoadmapStep(audit)
+                      ? `${primaryRoadmapStep(audit)?.cost} / ${primaryRoadmapStep(audit)?.timeline}. ${primaryRoadmapStep(audit)?.rationale}`
+                      : "Walk through the score, validate the public-page evidence, and turn the top findings into a practical fix list."}
                   </p>
                 </div>
                 <div className="audit-print-schedule-box">
@@ -1283,6 +1352,89 @@ export default function EcommerceAuditScannerPage() {
                 </div>
               </div>
 
+              <div className="rounded-[2rem] border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/12 via-dark-card to-brand-cyan/8 p-6 shadow-[0_24px_70px_rgba(6,182,212,0.1)] md:p-8">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                  Action Plan
+                </p>
+                <h3 className="mt-3 text-3xl font-bold text-primary">
+                  Recommendation Roadmap
+                </h3>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-secondary">
+                  This roadmap is the shared source of truth for the report,
+                  assistant, admin view, and follow-up conversations.
+                </p>
+                <div className="mt-7 grid gap-4 lg:grid-cols-4">
+                  {roadmapStepsForAudit(audit).map((step, index) => (
+                    <div
+                      key={`${step.stepNumber}-${step.title}`}
+                      className="rounded-2xl border border-dark-border bg-dark-deep/75 p-5"
+                    >
+                      <div className="mb-5 flex items-center gap-3">
+                        <div className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-cyan/15 text-sm font-bold text-brand-cyan">
+                          {index + 1}
+                        </div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                          {actionPlanLabel(index)}
+                        </p>
+                      </div>
+                      <p className="text-lg font-semibold leading-snug text-primary">
+                        {step.title}
+                      </p>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                            Cost
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-primary">
+                            {step.cost}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                            Timeline
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-primary">
+                            {step.timeline}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-5 space-y-4">
+                        {step.sourceFinding && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                              Source
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-secondary">
+                              {sanitizeEvidenceText(step.sourceFinding)}
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                            Why
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-muted">
+                            {sanitizeEvidenceText(step.rationale, {
+                              maxLength: 180,
+                            })}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3.5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
+                            Validate
+                          </p>
+                          <p className="mt-1 text-sm font-semibold leading-6 text-primary">
+                            {sanitizeEvidenceText(step.validationTarget, {
+                              maxLength: 180,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="card-elevated p-6 md:p-8">
                 <div className="grid gap-7 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
                   <div>
@@ -1386,67 +1538,6 @@ export default function EcommerceAuditScannerPage() {
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
-
-              <div className="rounded-[2rem] border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/12 via-dark-card to-brand-cyan/8 p-6 shadow-[0_24px_70px_rgba(6,182,212,0.1)] md:p-8">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-                  Action Plan
-                </p>
-                <h3 className="mt-3 text-3xl font-bold text-primary">
-                  What to Review First
-                </h3>
-                <div className="mt-7 grid gap-4 lg:grid-cols-3">
-                  {audit.recommendedNextSteps.map((step, index) => (
-                    <div
-                      key={step.action}
-                      className="rounded-2xl border border-dark-border bg-dark-deep/75 p-5"
-                    >
-                      <div className="mb-5 flex items-center gap-3">
-                        <div className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-cyan/15 text-sm font-bold text-brand-cyan">
-                          {index + 1}
-                        </div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
-                          {actionPlanLabel(index)}
-                        </p>
-                      </div>
-                      <p className="text-lg font-semibold leading-snug text-primary">
-                        {step.title ?? step.action}
-                      </p>
-                      <div className="mt-5 space-y-4">
-                        {step.evidenceClue && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                              Evidence
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-secondary">
-                              {sanitizeEvidenceText(step.evidenceClue)}
-                            </p>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                            Impact
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-muted">
-                            {sanitizeEvidenceText(step.why, { maxLength: 180 })}
-                          </p>
-                        </div>
-                        {step.title && (
-                          <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3.5">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
-                              First action
-                            </p>
-                            <p className="mt-1 text-sm font-semibold leading-6 text-primary">
-                              {sanitizeEvidenceText(step.action, {
-                                maxLength: 180,
-                              })}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
 
@@ -2656,7 +2747,7 @@ export default function EcommerceAuditScannerPage() {
 
               <div className="border-t border-dark-border pt-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-                  Detailed Findings
+                  Technical Appendix
                 </p>
                 <h3 className="mt-3 text-3xl font-bold text-primary md:text-4xl">
                   Evidence by category

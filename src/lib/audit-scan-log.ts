@@ -45,6 +45,7 @@ export type AuditScanLogInput = {
   submittedPageTypeEvidence?: unknown[];
   scoringConfidence?: string;
   revenueRiskAreas?: unknown[];
+  recommendationRoadmap?: unknown;
   competitiveContext?: unknown;
   scanCoverage?: unknown;
   source?: string;
@@ -101,6 +102,7 @@ export type AuditScanRow = {
   submitted_page_type_evidence?: unknown[];
   scoring_confidence?: string | null;
   revenue_risk_areas?: unknown[];
+  recommendation_roadmap?: unknown;
   competitive_context?: unknown;
   scan_coverage?: unknown;
   contact_submitted: boolean;
@@ -191,6 +193,7 @@ export async function logAuditScan(input: AuditScanLogInput) {
     submitted_page_type_evidence: input.submittedPageTypeEvidence ?? [],
     scoring_confidence: withUnknownFallback(input.scoringConfidence ?? ""),
     revenue_risk_areas: input.revenueRiskAreas ?? [],
+    recommendation_roadmap: input.recommendationRoadmap ?? {},
     competitive_context: input.competitiveContext ?? {},
     scan_coverage: input.scanCoverage ?? {},
     source: input.source ?? "opzix-audit",
@@ -339,7 +342,7 @@ export async function listAuditScans(filters: AuditScanFilters = {}) {
 
   const query: Record<string, string | number | undefined> = {
     select:
-      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,benchmark_group,benchmark_percentile_estimate,benchmark_label,benchmark_explanation,submitted_page_type,submitted_page_type_confidence,submitted_page_type_evidence,scoring_confidence,revenue_risk_areas,competitive_context,scan_coverage,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
+      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,benchmark_group,benchmark_percentile_estimate,benchmark_label,benchmark_explanation,submitted_page_type,submitted_page_type_confidence,submitted_page_type_evidence,scoring_confidence,revenue_risk_areas,recommendation_roadmap,competitive_context,scan_coverage,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
     order: "created_at.desc",
     limit: 100,
   };
@@ -388,7 +391,7 @@ export async function listAuditInsightScans() {
 
   const result = await safeAuditScanListFetch({
     select:
-      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,benchmark_group,benchmark_percentile_estimate,benchmark_label,benchmark_explanation,submitted_page_type,submitted_page_type_confidence,submitted_page_type_evidence,scoring_confidence,revenue_risk_areas,competitive_context,scan_coverage,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
+      "id,scan_id,url,normalized_domain,score,status,primary_concern,archetype,industry,platform,site_type,site_type_confidence_label,site_type_confidence_score,site_type_evidence,ecommerce_probability_label,ecommerce_probability_score,platform_confidence_label,platform_confidence_score,platform_evidence,narrative_mode,business_context,recommended_action_style,traffic_readiness,tracking_readiness,trust_readiness,checkout_readiness,mobile_readiness,top_issues,benchmark_tags,benchmark_group,benchmark_percentile_estimate,benchmark_label,benchmark_explanation,submitted_page_type,submitted_page_type_confidence,submitted_page_type_evidence,scoring_confidence,revenue_risk_areas,recommendation_roadmap,competitive_context,scan_coverage,contact_submitted,contact_email,contact_name,source,created_at,updated_at",
     order: "created_at.desc",
     limit: 5000,
   });

@@ -19,8 +19,14 @@ import {
 import { classifySiteType, type SiteClassification } from "@/lib/site-classifier";
 import {
   createAuditScanId,
+  listAuditScans,
   logAuditScan,
+  normalizeScanDomain,
 } from "@/lib/audit-scan-log";
+import {
+  buildScoreStabilityByDomain,
+  type ScoreStabilitySummary,
+} from "@/lib/score-stability";
 import {
   buildExecutiveOpportunityText,
   sanitizeEvidenceText,
@@ -138,6 +144,49 @@ type OverallScoreExplanation = {
   benchmarkContext?: BenchmarkContext;
   scanCoverage?: ScanCoverage;
   pageType?: PageTypeDetection;
+};
+
+type ScoreExplanationSnapshot = {
+  overallScore: number;
+  scoringConfidence: ScoringConfidence;
+  scoringConfidenceNote: string;
+  positiveSignals: string[];
+  scoreReducers: string[];
+  benchmarkContext?: BenchmarkContext;
+  benchmarkGroup?: string;
+  benchmarkLabel?: string;
+  visualMetricsAvailable: boolean;
+  visualUxScore: number | null;
+  evidenceUnknown: boolean;
+  categoryScores: {
+    key: AuditCategoryKey;
+    label: string;
+    score: number;
+    status: string;
+    evidenceState?: EvidenceState;
+    scoringConfidence?: ScoringConfidence;
+    whatWouldImprove?: string;
+  }[];
+  whatWouldIncreaseScore: string[];
+};
+
+type ScoreNarrative = {
+  overallScore: number;
+  strongestPositives: string[];
+  strongestReducers: string[];
+  confidence: ScoringConfidence;
+  confidenceExplanation: string;
+  explanation: string;
+  whatWouldIncreaseScore: string[];
+  scoreChangeContext?: {
+    scanCount: number;
+    minScore: number;
+    maxScore: number;
+    scoreVariation: number;
+    scoreStability: ScoreStabilitySummary["scoreStability"];
+    latestChangeReasons: string[];
+    explanation: string;
+  };
 };
 
 type EcommerceMaturityTier =
@@ -338,6 +387,47 @@ type RevenueImpactSummary = {
   revenueRiskAreas: string[];
 };
 
+type RecommendationRoadmapStep = {
+  stepNumber: number;
+  title: string;
+  cost: string;
+  timeline: string;
+  rationale: string;
+  validationTarget: string;
+  expectedImpact: string;
+  roiRationale: string;
+  sourceFinding?: string;
+  riskArea?: RevenueImpactEstimate["riskArea"];
+  confidence?: HeuristicConfidence;
+};
+
+type RecommendationRoadmap = {
+  summary: string;
+  primaryRecommendation: string;
+  source: {
+    scanId: string;
+    domain: string;
+    siteType: string;
+    benchmarkGroup: string;
+    score: number;
+  };
+  steps: RecommendationRoadmapStep[];
+  step1?: RecommendationRoadmapStep;
+  step2?: RecommendationRoadmapStep;
+  step3?: RecommendationRoadmapStep;
+  step4?: RecommendationRoadmapStep;
+  step5?: RecommendationRoadmapStep;
+  step6?: RecommendationRoadmapStep;
+  step7?: RecommendationRoadmapStep;
+};
+
+type RecommendationRoadmapInputStep = {
+  title: string;
+  action: string;
+  why: string;
+  evidenceClue?: string;
+};
+
 const knownEnterpriseRetailDomains = [
   "amazon.com",
   "walmart.com",
@@ -436,9 +526,28 @@ function textMatches(text: string, terms: string[]) {
   return terms.filter((term) => text.includes(term));
 }
 
+function hasIndustrialSupplyEvidence(text: string) {
+  const strongCatalogSignal =
+    /plumbing|pvc|cpvc|pipe|pipes|fittings?|valves?|flange|coupling|elbow|adapter|schedule 40|schedule 80|replacement parts?|part number|sku|specification|datasheet|technical/i.test(
+      text,
+    );
+  const b2bSupplySignal =
+    /industrial|supply|distributor|wholesale|contractor|trade/i.test(text) &&
+    /catalog|quote|rfq|procurement|sku|part number|specification|technical|product|category|search/i.test(
+      text,
+    );
+
+  return strongCatalogSignal || b2bSupplySignal;
+}
+
 function hasGroceryRetailEvidence(host: string, text: string) {
   const matches = textMatches(text, groceryRetailTerms);
   const isKnownGrocery = domainMatches(host, knownGroceryRetailDomains);
+
+  if (!isKnownGrocery && hasIndustrialSupplyEvidence(text)) {
+    return false;
+  }
+
   const isEnterpriseGroceryFlow =
     domainMatches(host, groceryFlowEnterpriseDomains) &&
     (matches.length >= 3 || /\/(grocery|groceries|food|pickup-delivery|cp\/food|browse\/food)\b/i.test(text));
@@ -474,7 +583,7 @@ function classifyStorefrontReviewContext({
 
   const isKnownEnterprise = domainMatches(domain, knownEnterpriseRetailDomains);
   const isKnownEducationContent = domainMatches(domain, knownEducationContentDomains);
-  const isKnownIndustrialCatalog = /(?:maxx-supply\.com|maxxsupply\.com|grainger\.com|uline\.com|mcmaster\.com|fastenal\.com|motion\.com|globalindustrial\.com)$/i.test(domain);
+  const isKnownIndustrialCatalog = /(?:maxx-supply\.com|maxxsupply\.com|pvcsupply\.com|pvcfittingsonline\.com|supplyhouse\.com|grainger\.com|uline\.com|mcmaster\.com|fastenal\.com|motion\.com|globalindustrial\.com)$/i.test(domain);
   const platformIsEnterprise = platform.name === "Enterprise / Custom Commerce Stack";
   const cartOrCheckoutVisible = commerce.cartVisible || commerce.checkoutVisible;
   const fullPage = diagnostics.fullPageDomSignals;
@@ -3077,6 +3186,211 @@ function buildScoreWhy({
   return "The score is limited by the strongest customer-facing findings, with positive signals included where the public scan showed mature ecommerce patterns.";
 }
 
+function businessScoreLabel(value: string, mode: "positive" | "reducer") {
+  const normalized = value.toLowerCase();
+
+  if (/checkout|cart|purchase|buy/i.test(normalized)) {
+    return mode === "positive" ? "Purchase path visibility" : "Checkout path confidence";
+  }
+
+  if (/trust|review|security|policy|return|shipping/i.test(normalized)) {
+    return mode === "positive" ? "Trust signal visibility" : "Trust signal visibility";
+  }
+
+  if (/mobile|cta|call.to.action|action/i.test(normalized)) {
+    return mode === "positive" ? "Mobile action clarity" : "Mobile CTA visibility";
+  }
+
+  if (/search/i.test(normalized)) {
+    return "Search visibility";
+  }
+
+  if (/product|category|catalog|collection|sku|discovery/i.test(normalized)) {
+    return "Product discovery";
+  }
+
+  if (/navigation|hierarchy|menu/i.test(normalized)) {
+    return "Navigation clarity";
+  }
+
+  if (/enterprise|marketplace|maturity|retail/i.test(normalized)) {
+    return "Enterprise retail maturity";
+  }
+
+  if (/tracking|analytics|measurement/i.test(normalized)) {
+    return "Tracking confidence";
+  }
+
+  if (/platform|evidence|confidence|unknown|unavailable/i.test(normalized)) {
+    return mode === "positive" ? "Public evidence coverage" : "Scanner confidence";
+  }
+
+  if (/support|account|contact|procurement|quote/i.test(normalized)) {
+    return "Support and account path";
+  }
+
+  if (/visual|layout|density|content/i.test(normalized)) {
+    return mode === "positive" ? "Visual clarity" : "Visual purchase-path clarity";
+  }
+
+  return sanitizeEvidenceText(value.replace(/\([^)]*\)/g, ""), { maxLength: 70 });
+}
+
+function uniqueBusinessLabels(values: string[], mode: "positive" | "reducer") {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => businessScoreLabel(value, mode))
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function categoryReducerLabels(
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>,
+) {
+  const categoryLabels: Record<AuditCategoryKey, string> = {
+    uxUiIssues: "Product discovery and navigation clarity",
+    conversionIssues: "Checkout path confidence",
+    technicalIssues: "Platform confidence",
+    trackingIssues: "Tracking confidence",
+    operationsIssues: "Trust and support visibility",
+  };
+
+  return categories
+    .filter((category) => category.score < 70)
+    .sort((left, right) => left.score - right.score)
+    .map((category) => categoryLabels[category.key])
+    .filter(Boolean);
+}
+
+function fallbackPositiveLabels({
+  positiveUxSignals,
+  ecommerceMaturity,
+}: {
+  positiveUxSignals: PositiveUxSignals;
+  ecommerceMaturity: EcommerceMaturityScore;
+}) {
+  const labels: string[] = [];
+
+  if (positiveUxSignals.productDensity.label === "strong") {
+    labels.push("Product discovery");
+  }
+
+  if (
+    positiveUxSignals.categoryVisibility.label === "strong" ||
+    positiveUxSignals.hierarchyStrength.label === "strong"
+  ) {
+    labels.push("Navigation clarity");
+  }
+
+  if (positiveUxSignals.searchProminence.label === "strong") {
+    labels.push("Search visibility");
+  }
+
+  if (ecommerceMaturity.maturityTier === "enterprise") {
+    labels.push("Enterprise retail maturity");
+  }
+
+  return labels;
+}
+
+function buildScoreNarrative({
+  overallScore,
+  scoreExplanation,
+  scoreExplanationSnapshot,
+  scoringConfidence,
+  scoringConfidenceNote,
+  categories,
+  positiveUxSignals,
+  ecommerceMaturity,
+  siteClassification,
+  visualUxDiagnostics,
+}: {
+  overallScore: number;
+  scoreExplanation: OverallScoreExplanation;
+  scoreExplanationSnapshot: ScoreExplanationSnapshot;
+  scoringConfidence: ScoringConfidence;
+  scoringConfidenceNote: string;
+  categories: ReturnType<typeof applyLiveDiagnosticScoring>;
+  positiveUxSignals: PositiveUxSignals;
+  ecommerceMaturity: EcommerceMaturityScore;
+  siteClassification: SiteClassification;
+  visualUxDiagnostics: VisualUxDiagnosticsResult;
+}): ScoreNarrative {
+  const strongestPositives = [
+    ...uniqueBusinessLabels(scoreExplanation.positiveSignals, "positive"),
+    ...fallbackPositiveLabels({ positiveUxSignals, ecommerceMaturity }),
+  ].filter((value, index, list) => list.indexOf(value) === index).slice(0, 4);
+  const strongestReducers = [
+    ...uniqueBusinessLabels(scoreExplanation.majorPenalties, "reducer"),
+    ...categoryReducerLabels(categories),
+  ].filter((value, index, list) => list.indexOf(value) === index).slice(0, 4);
+  const positiveText =
+    strongestPositives.length > 0
+      ? strongestPositives.slice(0, 3).join(", ")
+      : "some commerce strengths";
+  const reducerText =
+    strongestReducers.length > 0
+      ? strongestReducers.slice(0, 3).join(", ")
+      : "the remaining customer-path uncertainty";
+  const visualArchetype = String(visualUxDiagnostics.uxArchetype ?? "");
+  const enterpriseContext = isEnterpriseOrMarketplaceContext(
+    siteClassification.siteType,
+    visualArchetype,
+  );
+  const explanation = `The score landed at ${overallScore} because it is a weighted outcome. The scanner could see ${positiveText}, but ${reducerText} pulled the overall score down.`;
+  const confidenceExplanation =
+    scoringConfidence === "Low"
+      ? "This score is directional because some scanner subsystems could not fully evaluate the page."
+      : enterpriseContext
+        ? "Because this is an enterprise retail site, some systems may intentionally be hidden from public view. The score should be treated as directional rather than a complete assessment."
+        : scoringConfidenceNote ||
+          "This score is based on public-page evidence, not private analytics or platform access.";
+
+  return {
+    overallScore,
+    strongestPositives,
+    strongestReducers,
+    confidence: scoringConfidence,
+    confidenceExplanation,
+    explanation,
+    whatWouldIncreaseScore: scoreExplanationSnapshot.whatWouldIncreaseScore
+      .map((item) => sanitizeEvidenceText(item.replace(/[.;\s]+$/g, ""), { maxLength: 120 }))
+      .filter(Boolean)
+      .slice(0, 4),
+  };
+}
+
+async function buildScoreChangeContext(
+  url: string,
+): Promise<ScoreNarrative["scoreChangeContext"]> {
+  const scans = await listAuditScans();
+
+  if (!scans.ok) {
+    return undefined;
+  }
+
+  const domain = normalizeScanDomain(url);
+  const summary = buildScoreStabilityByDomain(scans.data).get(domain);
+
+  if (!summary || summary.scanCount <= 1 || summary.scoreVariation === 0) {
+    return undefined;
+  }
+
+  return {
+    scanCount: summary.scanCount,
+    minScore: summary.minScore,
+    maxScore: summary.maxScore,
+    scoreVariation: summary.scoreVariation,
+    scoreStability: summary.scoreStability,
+    latestChangeReasons: summary.latestChangeReasons.slice(0, 4),
+    explanation:
+      `I see previous scans of this domain scored differently (${summary.minScore}-${summary.maxScore}). This usually happens when different evidence was visible, visual metrics succeeded or failed, dynamic content changed, or confidence changed. The most recent score reflects the evidence available during this scan.`,
+  };
+}
+
 function calculateOverallScoringResult({
   baseScore,
   categories,
@@ -3960,16 +4274,22 @@ function inferNarrativeMode({
   if (reviewContext.siteType === "lead-generation") return "Lead Generation / Service Business";
   if (reviewContext.siteType === "non-ecommerce-or-unclear") return "Non-Ecommerce / Unclear";
 
-  if (classified.includes("grocery") || hasGroceryRetailEvidence(host, text)) {
-    return "Grocery / Supermarket Retail";
-  }
   if (domainMatches(host, knownEnterpriseRetailDomains)) return "Enterprise Retail";
   if (domainMatches(host, knownHealthcareCommerceDomains)) return "Healthcare Commerce";
   if (domainMatches(host, knownB2BCommerceDomains)) return "B2B Commerce";
   if (domainMatches(host, knownEducationContentDomains)) return "Education Commerce";
 
   if (classified.includes("marketplace")) return "Marketplace";
-  if (classified.includes("b2b")) return "B2B Commerce";
+  if (
+    classified.includes("b2b") ||
+    classified.includes("industrial") ||
+    hasIndustrialSupplyEvidence(text)
+  ) {
+    return "B2B Commerce";
+  }
+  if (classified.includes("grocery") || hasGroceryRetailEvidence(host, text)) {
+    return "Grocery / Supermarket Retail";
+  }
   if (classified.includes("education")) return "Education Commerce";
   if (classified.includes("subscription")) return "Subscription Commerce";
   if (classified.includes("healthcare")) return "Healthcare Commerce";
@@ -5753,6 +6073,306 @@ function buildRevenueImpactSummary(
   };
 }
 
+function roadmapTextForStep(step: RecommendationRoadmapInputStep) {
+  return `${step.title} ${step.action} ${step.why}`.toLowerCase();
+}
+
+function roadmapStepCommercialModel({
+  text,
+  stepNumber,
+  siteType,
+  benchmarkGroup,
+}: {
+  text: string;
+  stepNumber: number;
+  siteType: string;
+  benchmarkGroup: string;
+}) {
+  const context = `${text} ${siteType} ${benchmarkGroup}`.toLowerCase();
+  const isEnterprise = /enterprise|marketplace|custom/.test(context);
+  const isB2b = /b2b|industrial|catalog|distributor|procurement|quote|sku/.test(context);
+
+  if (/trust|review|policy|shipping|return|warranty|reassurance/.test(context)) {
+    return {
+      cost: "$500-$2,000",
+      timeline: "1-2 weeks",
+      roiRationale:
+        "Trust work is usually a smaller lift and can reduce hesitation near the buying path quickly.",
+    };
+  }
+
+  if (/mobile|hierarchy|cta|above.fold|first screen/.test(context)) {
+    return {
+      cost: "$1,000-$4,000",
+      timeline: "1-3 weeks",
+      roiRationale:
+        "Mobile hierarchy work is usually high leverage because many visitors decide whether to continue from the first screen.",
+    };
+  }
+
+  if (/search|filter|navigation|category|collection/.test(context)) {
+    return {
+      cost: isEnterprise ? "$5,000-$15,000" : "$1,000-$3,000",
+      timeline: isEnterprise ? "4-8 weeks" : "1-3 weeks",
+      roiRationale:
+        "Search and navigation improvements usually pay off when customers already have product intent but need a faster path.",
+    };
+  }
+
+  if (/product discovery|catalog|sku|specification|product detail/.test(context)) {
+    return {
+      cost: isB2b ? "$2,000-$5,000" : "$1,500-$4,000",
+      timeline: "2-4 weeks",
+      roiRationale:
+        "Discovery validation has strong ROI because it confirms where buyers lose momentum before deeper redesign work starts.",
+    };
+  }
+
+  if (/tracking|analytics|attribution|pixel|tag/.test(context)) {
+    return {
+      cost: "$1,000-$3,000",
+      timeline: "1-3 weeks",
+      roiRationale:
+        "Measurement fixes improve ROI confidence by showing which changes actually affect conversion or lead quality.",
+    };
+  }
+
+  return {
+    cost: stepNumber === 1 ? "$1,000-$3,000" : "$1,000-$4,000",
+    timeline: stepNumber === 1 ? "1-3 weeks" : "2-4 weeks",
+    roiRationale:
+      "This is sized as a focused improvement step, not a full redesign or platform rebuild.",
+  };
+}
+
+function roadmapValidationTarget(text: string) {
+  const normalized = text.toLowerCase();
+
+  if (/grocery|supermarket|pickup|delivery|department/.test(normalized)) {
+    return "Search usage, department navigation, pickup or delivery entry, cart continuation, and mobile first-screen behavior.";
+  }
+
+  if (/catalog|product|category|sku|specification|search|navigation/.test(normalized)) {
+    return "Category -> Product -> Cart or Quote -> Checkout, including where buyers search again, loop back, or hesitate.";
+  }
+
+  if (/trust|review|policy|shipping|return|support|contact/.test(normalized)) {
+    return "Trust proof near the buying path, shipping or returns clarity, contact access, and buyer confidence before action.";
+  }
+
+  if (/mobile|cta|hierarchy|first screen/.test(normalized)) {
+    return "Mobile first-screen clarity, primary CTA visibility, scroll depth, and whether the next step is obvious.";
+  }
+
+  if (/tracking|analytics|attribution/.test(normalized)) {
+    return "Analytics coverage, conversion events, lead or cart events, attribution, and whether performance can be measured.";
+  }
+
+  return "The visible journey from first impression to commercial action, including where customers hesitate or lose confidence.";
+}
+
+function normalizeRoadmapTitle(title: string, action: string, stepNumber: number) {
+  return title.trim() || action.trim() || `Roadmap Step ${stepNumber}`;
+}
+
+function fallbackRoadmapSteps({
+  siteType,
+  benchmarkGroup,
+}: {
+  siteType: string;
+  benchmarkGroup: string;
+}): RecommendationRoadmapInputStep[] {
+  const context = `${siteType} ${benchmarkGroup}`.toLowerCase();
+
+  if (/b2b|industrial|catalog|distributor/.test(context)) {
+    return [
+      {
+        title: "Validate Product Discovery",
+        action:
+          "Walk the buyer journey from category discovery to product detail, cart or quote, and checkout.",
+        why:
+          "B2B buyers need to find the right product, SKU, or specification before trust and checkout improvements can pay off.",
+      },
+      {
+        title: "Store Search Visibility",
+        action:
+          "Move search, category filters, and key product groups into a clearer early browsing path.",
+        why:
+          "Search and category clarity reduce loops for buyers who already know what they need.",
+      },
+      {
+        title: "Mobile Content Hierarchy",
+        action:
+          "Reduce first-screen crowding and make product discovery, search, and the primary action easier to see on mobile.",
+        why:
+          "Mobile buyers need a clear first-screen path before they scroll into catalog detail.",
+      },
+      {
+        title: "Trust / Specification Access",
+        action:
+          "Place trust proof, shipping or returns details, support access, certifications, and technical specifications closer to product decisions.",
+        why:
+          "B2B buyers often need confidence and specification access before cart, quote, or procurement handoff.",
+      },
+      {
+        title: "Measurement Validation",
+        action:
+          "Confirm analytics coverage for search usage, category engagement, quote starts, cart starts, account login, and checkout or procurement handoff.",
+        why:
+          "Measurement validation shows whether the roadmap steps are improving buyer behavior instead of only changing the page visually.",
+      },
+    ];
+  }
+
+  return [
+    {
+      title: "Validate Primary Customer Path",
+      action:
+        "Walk the journey from first impression to product or service decision and primary action.",
+      why:
+        "This confirms the highest-impact friction before design or platform work expands.",
+    },
+    {
+      title: "Fix the Confirmed Constraint",
+      action:
+        "Apply the smallest UX, content, trust, or measurement change that removes the validated friction.",
+      why:
+        "Focused fixes usually produce better ROI than broad redesign work before the issue is confirmed.",
+    },
+    {
+      title: "Strengthen Trust Signals",
+      action:
+        "Move reassurance, support, policy, or proof points closer to the decision point.",
+      why:
+        "Trust proof can improve confidence without requiring a full rebuild.",
+    },
+    {
+      title: "Confirm Impact",
+      action:
+        "Review analytics, conversion events, and the next score reducer after the first change ships.",
+      why:
+        "The next priority should come from observed behavior, not only from a static scan.",
+    },
+    {
+      title: "Improve Mobile Hierarchy",
+      action:
+        "Make the primary action and decision path clearer in the first mobile viewport.",
+      why:
+        "Mobile hierarchy improvements can lift clarity without requiring a full redesign.",
+    },
+    {
+      title: "Measurement Validation",
+      action:
+        "Confirm analytics, conversion events, and follow-up tracking before expanding the project.",
+      why:
+        "Measurement validation keeps later roadmap decisions tied to observed behavior.",
+    },
+  ];
+}
+
+function buildRecommendationRoadmap({
+  scanId,
+  website,
+  siteType,
+  benchmarkGroup,
+  overallScore,
+  recommendedNextSteps,
+  revenueImpactSummary,
+}: {
+  scanId: string;
+  website: string;
+  siteType: string;
+  benchmarkGroup: string;
+  overallScore: number;
+  recommendedNextSteps: RecommendationRoadmapInputStep[];
+  revenueImpactSummary: RevenueImpactSummary;
+}): RecommendationRoadmap {
+  const baseSteps = [
+    ...recommendedNextSteps,
+    ...fallbackRoadmapSteps({ siteType, benchmarkGroup }),
+  ];
+  const dedupedSteps: typeof baseSteps = [];
+
+  for (const step of baseSteps) {
+    const normalizedTitle = normalizeRoadmapTitle(step.title, step.action, dedupedSteps.length + 1);
+    if (
+      dedupedSteps.some((existing) =>
+        normalizeRoadmapTitle(existing.title, existing.action, 1).toLowerCase() ===
+        normalizedTitle.toLowerCase(),
+      )
+    ) {
+      continue;
+    }
+
+    dedupedSteps.push({ ...step, title: normalizedTitle });
+
+    if (dedupedSteps.length >= 7) {
+      break;
+    }
+  }
+
+  const steps = dedupedSteps.slice(0, 7).map((step, index) => {
+    const stepNumber = index + 1;
+    const text = roadmapTextForStep(step);
+    const revenueImpact = revenueImpactSummary.estimates.find(
+      (estimate) =>
+        estimate.findingTitle === step.title ||
+        text.includes(estimate.findingTitle.toLowerCase()) ||
+        estimate.explanation.toLowerCase().includes(step.title.toLowerCase()),
+    );
+    const commercialModel = roadmapStepCommercialModel({
+      text,
+      stepNumber,
+      siteType,
+      benchmarkGroup,
+    });
+
+    return {
+      stepNumber,
+      title: step.title,
+      cost: commercialModel.cost,
+      timeline: commercialModel.timeline,
+      rationale: step.why,
+      validationTarget: roadmapValidationTarget(text),
+      expectedImpact:
+        revenueImpact?.likelyImpact ||
+        "A clearer customer path and a more measurable next action.",
+      roiRationale: commercialModel.roiRationale,
+      sourceFinding: step.evidenceClue || step.title,
+      riskArea: revenueImpact?.riskArea,
+      confidence: revenueImpact?.confidence,
+    };
+  });
+
+  const roadmap: RecommendationRoadmap = {
+    summary:
+      "A structured implementation roadmap for answering what comes next, how much it costs, how long it takes, and what the likely ROI is.",
+    primaryRecommendation: steps[0]?.title ?? "Validate Primary Customer Path",
+    source: {
+      scanId,
+      domain: normalizeScanDomain(website),
+      siteType,
+      benchmarkGroup,
+      score: overallScore,
+    },
+    steps,
+  };
+
+  steps.forEach((step) => {
+    const key = `step${step.stepNumber}` as
+      | "step1"
+      | "step2"
+      | "step3"
+      | "step4"
+      | "step5"
+      | "step6"
+      | "step7";
+    roadmap[key] = step;
+  });
+
+  return roadmap;
+}
+
 function attachRevenueImpactToFindings(
   findings: HeuristicFinding[],
   revenueImpactSummary: RevenueImpactSummary,
@@ -6919,10 +7539,68 @@ export async function POST(request: Request) {
       scanCoverage,
       pageType: pageTypeDetection,
     };
+    const scoreExplanationSnapshot: ScoreExplanationSnapshot = {
+      overallScore,
+      scoringConfidence: scoringEvidenceState.scoringConfidence,
+      scoringConfidenceNote: scoringEvidenceState.scoringConfidenceNote,
+      positiveSignals: scoreExplanation.positiveSignals.slice(0, 5),
+      scoreReducers: scoreExplanation.majorPenalties.slice(0, 5),
+      benchmarkContext,
+      benchmarkGroup: benchmarkContext.benchmarkGroup,
+      benchmarkLabel: benchmarkContext.benchmarkLabel,
+      visualMetricsAvailable: visualUxDiagnostics.visualMetricsAvailable,
+      visualUxScore: visualUxDiagnostics.score,
+      evidenceUnknown:
+        scoringEvidenceState.scoringConfidence === "Low" ||
+        !visualUxDiagnostics.visualMetricsAvailable ||
+        Object.values(scoringEvidenceState.categoryEvidenceState).some(
+          (state) => state === "Unknown",
+        ),
+      categoryScores: categories.map((category) => ({
+        key: category.key,
+        label: category.label,
+        score: category.score,
+        status: category.status,
+        evidenceState: category.evidenceState,
+        scoringConfidence: category.scoringConfidence,
+        whatWouldImprove: category.scoreExplanation?.whatWouldImprove,
+      })),
+      whatWouldIncreaseScore: [
+        ...categories
+          .map((category) => category.scoreExplanation?.whatWouldImprove)
+          .filter((item): item is string => Boolean(item))
+          .slice(0, 4),
+        ...recommendedNextSteps
+          .map((step) => step.action)
+          .filter(Boolean)
+          .slice(0, 2),
+      ].slice(0, 5),
+    };
+    const scoreNarrative = buildScoreNarrative({
+      overallScore,
+      scoreExplanation,
+      scoreExplanationSnapshot,
+      scoringConfidence: scoringEvidenceState.scoringConfidence,
+      scoringConfidenceNote: scoringEvidenceState.scoringConfidenceNote,
+      categories,
+      positiveUxSignals,
+      ecommerceMaturity,
+      siteClassification,
+      visualUxDiagnostics,
+    });
     const scanId = createAuditScanId();
     const overallStatus = adjustedStatus(overallScore);
     latestScore = overallScore;
     latestStatus = overallStatus;
+    const recommendationRoadmap = buildRecommendationRoadmap({
+      scanId,
+      website: values.website,
+      siteType: narrativeProfile.narrativeMode,
+      benchmarkGroup: benchmarkContext.benchmarkGroup,
+      overallScore,
+      recommendedNextSteps,
+      revenueImpactSummary,
+    });
     const primaryConcernTitle =
       primaryOperationalConcern?.title ||
       primaryOperationalConcern?.riskLabel ||
@@ -6947,7 +7625,7 @@ export async function POST(request: Request) {
       scanId,
     });
 
-    const audit = {
+    let audit = {
       scanId,
       website: values.website,
       mode: "mock",
@@ -6961,6 +7639,8 @@ export async function POST(request: Request) {
       scoreMismatchWarnings,
       evidenceState: scoringEvidenceState,
       scoreExplanation,
+      scoreExplanationSnapshot,
+      scoreNarrative,
       positiveUxSignals,
       ecommerceMaturity,
       scanCoverage,
@@ -6987,6 +7667,7 @@ export async function POST(request: Request) {
       diagnostics,
       categories,
       recommendedNextSteps,
+      recommendationRoadmap,
       benchmarkTags: benchmarkContext.benchmarkTags,
       benchmarkContext,
       submittedPageType: pageTypeDetection,
@@ -7046,9 +7727,21 @@ export async function POST(request: Request) {
       submittedPageTypeEvidence: pageTypeDetection.evidence,
       scoringConfidence: scoringEvidenceState.scoringConfidence,
       revenueRiskAreas: revenueImpactSummary.revenueRiskAreas,
+      recommendationRoadmap,
       competitiveContext: competitiveComparison,
       scanCoverage,
     });
+    const scoreChangeContext = await buildScoreChangeContext(values.website);
+
+    if (scoreChangeContext) {
+      audit = {
+        ...audit,
+        scoreNarrative: {
+          ...audit.scoreNarrative,
+          scoreChangeContext,
+        },
+      };
+    }
 
     finalizeScannerDiagnostics(diagnostics.scanDiagnostics, {
       success: true,

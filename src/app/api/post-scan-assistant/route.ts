@@ -4,6 +4,11 @@ import {
   sanitizeEvidenceText,
   summarizeMobileCtaEvidence,
 } from "@/lib/evidence-cleanup";
+import {
+  detectAssistantIntent,
+  type AssistantIntentDetection,
+} from "@/lib/assistant-knowledge";
+import { logAssistantConversation } from "@/lib/assistant-conversation-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -739,6 +744,24 @@ function archetypeFrame(scanContext: Record<string, unknown>) {
   return profileFrame;
 }
 function formatExactAnswer(answer: ExactAnswer) {
+  if (
+    answer.topic === "cost_estimate" ||
+    answer.topic === "new_store_cost" ||
+    answer.topic === "roi" ||
+    answer.topic === "score_reasoning" ||
+    answer.topic === "opzix_recommendation"
+  ) {
+    return [
+      answer.directAnswer,
+      answer.evidence,
+      answer.businessMeaning,
+      answer.suggestedFollowUp,
+    ]
+      .map((part) => sanitizeEvidenceText(part, { maxLength: 900 }))
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
   return buildConsultantResponse(answer);
 }
 
@@ -1258,7 +1281,13 @@ function getPrimaryConcern(scanContext: Record<string, unknown>) {
 }
 
 function getActionItems(scanContext: Record<string, unknown>) {
-  return asArray(scanContext.whatToReviewFirst).map(asRecord);
+  const direct = asArray(scanContext.whatToReviewFirst).map(asRecord);
+
+  if (direct.length > 0) {
+    return direct;
+  }
+
+  return asArray(scanContext.recommendedNextSteps).map(asRecord);
 }
 
 function technicalSignalsSummary(scanContext: Record<string, unknown>) {
@@ -1469,58 +1498,238 @@ function ctaExactAnswer(
   };
 }
 
-function positiveSignalAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+function buildAssistantResponseContext(
+  scanContext: Record<string, unknown>,
+  intent: AssistantIntentDetection["intent"],
+) {
+  const scoreNarrative = asRecord(scanContext.scoreNarrative);
+  const scoreChangeContext = asRecord(scoreNarrative.scoreChangeContext);
+  const benchmark = asRecord(scanContext.benchmarkContext);
+  const platform = asRecord(scanContext.platform);
+  const reviewContext = asRecord(scanContext.storefrontReviewContext);
+  const siteType =
+    asString(scanContext.siteType) ||
+    asString(reviewContext.siteType) ||
+    asString(scanContext.currentNarrativeArchetype);
+  const benchmarkGroup =
+    asString(benchmark.benchmarkGroup) ||
+    asString(scoreNarrative.benchmarkGroup) ||
+    asString(scanContext.benchmarkGroup);
+  const benchmarkLabel =
+    asString(benchmark.benchmarkLabel) ||
+    asString(scoreNarrative.benchmarkLabel) ||
+    asString(scanContext.benchmarkLabel);
+  const platformName =
+    platformNameFromContext(platform) ||
+    asString(platform.platformName) ||
+    asString(platform.name) ||
+    asString(scanContext.platformName);
+  const primary = getPrimaryConcern(scanContext);
+  const strongestReducers = asArray(scoreNarrative.strongestReducers)
+    .map((item) => asString(item))
+    .filter(Boolean);
+  const strongestPositives = asArray(scoreNarrative.strongestPositives)
+    .map((item) => asString(item))
+    .filter(Boolean);
+  const score =
+    typeof scoreNarrative.overallScore === "number"
+      ? scoreNarrative.overallScore
+      : typeof scanContext.score === "number"
+        ? scanContext.score
+        : typeof scanContext.overallScore === "number"
+          ? scanContext.overallScore
+          : null;
+
+  return {
+    intent,
+    siteType,
+    benchmarkGroup,
+    benchmarkLabel,
+    score,
+    confidence:
+      asString(scoreNarrative.confidence) ||
+      asString(scanContext.scoringConfidence),
+    platformName,
+    platformConfidence:
+      asString(platform.confidenceLabel) ||
+      asString(platform.platformConfidenceLabel) ||
+      asString(scanContext.platformConfidenceLabel),
+    primaryConcernTitle:
+      asString(primary.title) ||
+      asString(primary.riskLabel) ||
+      strongestReducers[0],
+    strongestReducers,
+    strongestPositives,
+    scoreExplanation: asString(scoreNarrative.explanation),
+    scoreChangeExplanation: asString(scoreChangeContext.explanation),
+    historicalScoreRange:
+      typeof scoreChangeContext.minScore === "number" &&
+      typeof scoreChangeContext.maxScore === "number"
+        ? `${scoreChangeContext.minScore}-${scoreChangeContext.maxScore}`
+        : "",
+    isEnterpriseRetail:
+      /enterprise|marketplace|custom-enterprise/i.test(
+        `${siteType} ${benchmarkGroup} ${benchmarkLabel}`,
+      ),
+    isB2b:
+      /b2b|industrial|distributor|procurement|quote|catalog/i.test(
+        `${siteType} ${benchmarkGroup} ${benchmarkLabel}`,
+      ) &&
+      !/enterprise retail|marketplace/i.test(`${benchmarkGroup} ${benchmarkLabel}`),
+  };
+}
+
+function platformNameFromContext(platform: Record<string, unknown>) {
+  return (
+    asString(platform.name) ||
+    asString(platform.platformName) ||
+    asString(platform.detectedPlatform)
+  );
+}
+
+function positiveSignalAnswer(
+  scanContext: Record<string, unknown>,
+  message = "",
+): ExactAnswer {
+  const responseContext = buildAssistantResponseContext(
+    scanContext,
+    "score_explanation",
+  );
   const explanation = asRecord(scanContext.scoreExplanation);
+  const snapshot = asRecord(scanContext.scoreExplanationSnapshot);
+  const narrative = asRecord(scanContext.scoreNarrative);
+  const scoreChangeContext = asRecord(narrative.scoreChangeContext);
   const scoringConfidence =
+    asString(narrative.confidence) ||
+    asString(snapshot.scoringConfidence) ||
     asString(scanContext.scoringConfidence) ||
     asString(explanation.scoringConfidence);
   const confidenceNote =
+    asString(narrative.confidenceExplanation) ||
+    asString(snapshot.scoringConfidenceNote) ||
     asString(scanContext.scoringConfidenceNote) ||
     asString(explanation.confidenceNote);
-
-  if (scoringConfidence === "Low") {
-    return {
-      matched: true,
-      topic: "score_reasoning",
-      directAnswer:
-        "Visual metrics and DOM extraction were unavailable during this scan. The score should be treated as low confidence rather than a confirmed assessment of the site's quality.",
-      evidence:
-        confidenceNote ||
-        "Some scanner subsystems could not evaluate this page. Findings should be treated as directional until visual and DOM extraction complete successfully.",
-      businessMeaning:
-        "Missing evidence should not create confirmed penalties or rewards. Rerun the scan or manually verify the page before treating category reducers as site-quality issues.",
-      suggestedFollowUp:
-        "Do you want me to separate confirmed signals from unknown signals?",
-    };
-  }
-
-  const maturity = asRecord(scanContext.ecommerceMaturity);
-  const positives = asArray(explanation.positiveSignals)
+  const positives = (
+    asArray(narrative.strongestPositives).length
+      ? asArray(narrative.strongestPositives)
+      : asArray(snapshot.positiveSignals).length
+        ? asArray(snapshot.positiveSignals)
+      : asArray(explanation.positiveSignals)
+  )
     .map((signal) => asString(signal))
     .filter(Boolean);
-  const penalties = asArray(explanation.majorPenalties)
+  const penalties = (
+    asArray(narrative.strongestReducers).length
+      ? asArray(narrative.strongestReducers)
+      : asArray(snapshot.scoreReducers).length
+        ? asArray(snapshot.scoreReducers)
+      : asArray(explanation.majorPenalties)
+  )
     .map((penalty) => asString(penalty))
     .filter(Boolean);
-  const why = asString(explanation.whyThisScore);
+  const why = asString(narrative.explanation) || asString(explanation.whyThisScore);
+  const snapshotScore =
+    typeof narrative.overallScore === "number"
+      ? narrative.overallScore
+      : typeof snapshot.overallScore === "number"
+        ? snapshot.overallScore
+        : null;
   const score =
-    typeof scanContext.score === "number" ? `${scanContext.score}/100` : "the current score";
+    snapshotScore !== null
+      ? `${snapshotScore}/100`
+      : typeof scanContext.score === "number"
+        ? `${scanContext.score}/100`
+        : "the current score";
+  const visualUnavailable =
+    snapshot.visualMetricsAvailable === false ||
+    asRecord(scanContext.visualUxDiagnostics).visualMetricsAvailable === false;
+  const evidenceUnknown =
+    snapshot.evidenceUnknown === true || scoringConfidence === "Low";
+  const improvementSteps = (
+    asArray(narrative.whatWouldIncreaseScore).length
+      ? asArray(narrative.whatWouldIncreaseScore)
+      : asArray(snapshot.whatWouldIncreaseScore)
+  )
+    .map((step) => asString(step))
+    .filter(Boolean);
+  const scoreChangeExplanation = asString(scoreChangeContext.explanation);
+  const normalized = normalizeText(message);
+  const asksWhatMattersMost = hasAny(normalized, [
+    "what matters most",
+    "biggest thing",
+    "biggest score reducer",
+    "what is hurting",
+    "hurting the score",
+    "most important",
+  ]);
+  const asksScoreChange = hasAny(normalized, [
+    "why did it change",
+    "why did the score change",
+    "why changed",
+    "score changed",
+    "score change",
+    "what changed",
+  ]);
+  const topReducer =
+    responseContext.strongestReducers[0] ||
+    penalties[0] ||
+    "purchase-path confidence";
+  const topPositiveText =
+    responseContext.strongestPositives.slice(0, 3).join(", ") ||
+    positives.slice(0, 3).join(", ") ||
+    "visible commerce strengths";
 
   return {
     matched: true,
     topic: "score_reasoning",
-    directAnswer: why || `The score is ${score} because the scan combines category scores, positive ecommerce maturity signals, and severity-adjusted findings.`,
+    directAnswer: asksScoreChange
+      ? `Why it changed: ${
+          scoreChangeExplanation ||
+          `The most recent score reflects the evidence available during this scan. Score changes usually come from differences in visible evidence, confidence, visual metric extraction, platform visibility, or dynamic content loaded during the scan.`
+        }`
+      : asksWhatMattersMost
+        ? `What matters most: the biggest score reducer appears to be ${topReducer}. The scanner could see ${topPositiveText}, but it could not confidently verify enough of the customer purchase path to lift the overall score.`
+        : `Why the score landed here: ${
+        why ||
+        `The score is ${score} because it is a weighted outcome: visible commerce strengths raised the score, while customer-path uncertainty and score reducers pulled it down.`
+      }`,
     evidence:
-      positives.length > 0
-        ? `Top positive signals: ${positives.slice(0, 3).join("; ")}.`
-        : typeof maturity.maturityScore === "number"
-          ? `Ecommerce maturity was scored at ${maturity.maturityScore}/100.`
-          : "The scan did not surface strong positive ecommerce maturity signals in the score explanation.",
+      [
+        positives.length > 0
+          ? `Biggest positive signals: ${positives.slice(0, 3).join("; ")}.`
+          : "Biggest positive signals: the scan did not list strong public-page positives.",
+        penalties.length > 0
+          ? `Biggest reducers: ${penalties.slice(0, 3).join("; ")}.`
+          : "Biggest reducers: the scan did not list a single dominant reducer, so I would validate the purchase path manually.",
+      ]
+        .filter(Boolean)
+        .join(" "),
     businessMeaning:
-      penalties.length > 0
-        ? `Main score reducers: ${penalties.slice(0, 3).join("; ")}.`
-        : "There were no major score reducers listed beyond the category-level review items.",
+      [
+        `Confidence level: ${scoringConfidence || "Moderate"}. ${
+          scoringConfidence === "Low"
+            ? "This score is directional because some scanner subsystems could not fully evaluate the page."
+            : confidenceNote ||
+              "This score is based on public-page evidence, not private analytics."
+        }`,
+        visualUnavailable
+          ? "Visual UX scoring was unavailable and did not fully contribute to the score."
+          : "",
+        evidenceUnknown && scoringConfidence !== "Low"
+          ? "Some evidence was unknown, so I would manually confirm the reducers before treating them as final."
+          : "",
+        asksScoreChange ? "" : scoreChangeExplanation,
+        improvementSteps.length
+          ? `What would increase the score: ${improvementSteps
+              .slice(0, 3)
+              .map((step) => step.replace(/[.;\s]+$/g, ""))
+              .join("; ")}.`
+          : "What would increase the score: make the purchase path, trust signals, and primary mobile action easier to verify, then rerun the scan.",
+      ]
+        .filter(Boolean)
+        .join(" "),
     suggestedFollowUp:
-      "Do you want me to compare the positive signals with the biggest reducers?",
+      "Would you like Opzix to review this manually?",
   };
 }
 
@@ -1836,33 +2045,161 @@ function hasCostIntent(normalized: string) {
     "what would opzix charge",
     "opzix charge",
     "expensive",
+    "quick wins",
+    "bigger redesign",
+    "redesign work",
+  ]);
+}
+
+function hasNewStoreIntent(normalized: string) {
+  return hasAny(normalized, [
+    "rebuild",
+    "new site",
+    "new ecommerce",
+    "new ecommerce store",
+    "new store",
+    "build an ecommerce",
+    "build ecommerce",
+    "build a new",
+    "build new",
+    "from scratch",
+    "without fixing",
+    "instead of fixing",
+    "replace the site",
+    "replace this site",
+    "start over",
   ]);
 }
 
 function hasRoiIntent(normalized: string) {
   return hasAny(normalized, [
     "worth fixing",
+    "worth the fix",
+    "worth the fixes",
+    "worth the cost",
+    "worth doing",
+    "worth spending",
+    "worth the investment",
     "worth it",
+    "should i fix",
+    "should we fix",
     "highest roi",
     "best roi",
     "return on investment",
     "roi",
+    "pay off",
+    "pays off",
   ]);
 }
 
-function costEstimateAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+function costEstimateAnswer(
+  scanContext: Record<string, unknown>,
+  message = "",
+): ExactAnswer {
   const estimate = estimateImplementationCost(scanContext);
   const confidenceLabel = estimate.confidence.split(" - ")[0].toLowerCase();
+  const responseContext = buildAssistantResponseContext(
+    scanContext,
+    "cost_estimate",
+  );
+  const normalized = normalizeText(message);
+  const asksCostAnalysis = hasAny(normalized, [
+    "why expensive",
+    "why is it expensive",
+    "why is it so expensive",
+    "cost analysis",
+    "cost breakdown",
+    "break down",
+    "breakdown",
+    "why so much",
+  ]);
+
+  if (asksCostAnalysis) {
+    const enterpriseContext = responseContext.isEnterpriseRetail;
+
+    return {
+      matched: true,
+      topic: "cost_estimate",
+      directAnswer: enterpriseContext
+        ? "The estimate is high because enterprise retail work is priced around systems risk, not because the homepage itself is expensive to adjust."
+        : `The estimate reaches ${estimate.estimatedRange} because the scan suggests more than a tiny copy or styling tweak.`,
+      evidence: enterpriseContext
+        ? "A true enterprise implementation can involve checkout systems, fulfillment, inventory, account systems, search, delivery, store systems, analytics, and platform governance. The homepage fixes themselves may only be a small part of that."
+        : estimate.reasoning.join(" "),
+      businessMeaning: enterpriseContext
+        ? "I would separate the work into two scopes: a smaller public-page UX validation/fix, and a much larger enterprise architecture scope only if internal systems, integrations, or platform constraints are confirmed."
+        : "I would separate quick wins from structural work before quoting. The lower-cost version handles the visible scanned issues; the higher-cost version assumes templates, navigation, tracking, or platform work.",
+      suggestedFollowUp: "Would you like Opzix to review this manually?",
+    };
+  }
+
+  const roadmapSummary = roadmapCostSummary(scanContext);
+  const firstRoadmap = firstRoadmapStep(scanContext);
+
+  if (roadmapSummary && firstRoadmap) {
+    return {
+      matched: true,
+      topic: "cost_estimate",
+      directAnswer:
+        `Based on this scan, I would price the first roadmap step, ${asString(firstRoadmap.title)}, at ${asString(firstRoadmap.cost) || asString(firstRoadmap.estimatedCost)}, with an estimated timeline of ${asString(firstRoadmap.timeline) || asString(firstRoadmap.estimatedTimeline)}.`,
+      evidence: `Roadmap cost view: ${roadmapSummary}.`,
+      businessMeaning:
+        "This keeps the estimate tied to a practical sequence instead of treating the scan as one vague project. The early steps validate ROI before larger redesign or platform work.",
+      suggestedFollowUp: "Would you like Opzix to review this manually?",
+    };
+  }
 
   return {
     matched: true,
     topic: "cost_estimate",
-    directAnswer: `Based on this scan, I would frame this as a ${estimate.projectSize} implementation: ${estimate.estimatedRange}, with an estimated effort of ${estimate.estimatedEffort}.`,
+    directAnswer: `Based on this scan, I would estimate a ${estimate.projectSize} implementation: ${estimate.estimatedRange}, with an estimated effort of ${estimate.estimatedEffort}.`,
     evidence: estimate.reasoning.join(" "),
     businessMeaning:
       `I would treat this as a directional estimate with ${confidenceLabel} confidence. Final pricing depends on platform, theme complexity, templates, content, analytics needs, and whether scope grows beyond the scanned issues.`,
-    suggestedFollowUp:
-      "Do you want me to separate the low-cost quick wins from the bigger redesign work?",
+    suggestedFollowUp: "Would you like Opzix to review this manually?",
+  };
+}
+
+function newStoreCostAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const estimate = estimateImplementationCost(scanContext);
+  const responseContext = buildAssistantResponseContext(
+    scanContext,
+    "rebuild_vs_fix",
+  );
+
+  if (responseContext.isEnterpriseRetail) {
+    const reducer =
+      responseContext.strongestReducers[0] ||
+      responseContext.primaryConcernTitle ||
+      "purchase-path confidence";
+
+    return {
+      matched: true,
+      topic: "new_store_cost",
+      directAnswer:
+        "Based on this scan, I would not recommend a rebuild. For an enterprise retail or marketplace site, a public scan is not enough evidence to justify replacing the commerce platform.",
+      evidence:
+        `The current score context points to ${reducer}, not proof that the underlying enterprise commerce system is broken. Platform read: ${responseContext.platformName || "not fully visible"}${responseContext.platformConfidence ? `, ${responseContext.platformConfidence} confidence` : ""}.`,
+      businessMeaning:
+        "The practical recommendation is a targeted review of purchase-path visibility, trust signals, mobile action clarity, tracking, and platform evidence before any rebuild conversation. A true enterprise rebuild would be a custom architecture and integration program, not a standard new-store project.",
+      suggestedFollowUp: "Would you like Opzix to review this manually?",
+    };
+  }
+
+  const b2bContext = responseContext.isB2b;
+
+  return {
+    matched: true,
+    topic: "new_store_cost",
+    directAnswer: b2bContext
+      ? "Based on this scan, I would not immediately rebuild the site. The visible issues look more like UX, product discovery, and information architecture problems than proof that the platform itself has to be replaced."
+      : "Based on this scan, I would price a new ecommerce build separately from fixing the current site. I would still validate whether the visible issues are cheaper UX and discovery fixes before recommending a full rebuild.",
+    evidence:
+      "New basic ecommerce store: $3,000-$8,000, usually 2-6 weeks. New professional B2B store: $8,000-$25,000, usually 1-3 months. Enterprise B2B commerce platform: $25,000-$100,000+, usually 3-12 months.",
+    businessMeaning: b2bContext
+      ? `For this scan, the lower-cost path is likely a ${estimate.estimatedRange} UX improvement project before a rebuild. A professional B2B rebuild would make sense if you need custom UX, stronger category architecture, advanced search, quote-request workflows, account experience, tracking, or reporting.`
+      : `For this scan, the lower-cost path is likely a ${estimate.estimatedRange} targeted improvement project before a rebuild. A rebuild should only enter the conversation if platform limits, migration needs, integrations, or internal operating constraints are confirmed outside the public scan.`,
+    suggestedFollowUp: "Would you like Opzix to review this manually?",
   };
 }
 
@@ -1871,7 +2208,33 @@ function roiAnswer(
   scanContext: Record<string, unknown>,
 ): ExactAnswer {
   const normalized = normalizeText(message);
+  const firstRoadmap = firstRoadmapStep(scanContext);
+
+  if (firstRoadmap) {
+    const title = asString(firstRoadmap.title) || "the first roadmap step";
+    const cost = asString(firstRoadmap.cost) || asString(firstRoadmap.estimatedCost);
+    const timeline =
+      asString(firstRoadmap.timeline) || asString(firstRoadmap.estimatedTimeline);
+    const impact =
+      asString(firstRoadmap.expectedImpact) ||
+      "a clearer customer path and a more measurable next action";
+    const roiRationale =
+      asString(firstRoadmap.roiRationale) ||
+      "This is the highest-ROI starting point because it validates the customer path before larger work.";
+
+    return {
+      matched: true,
+      topic: "roi",
+      directAnswer: `The highest-ROI first move appears to be ${title}.`,
+      evidence: roiRationale,
+      businessMeaning:
+        `Effort: ${timeline || "directional timeline not set"}${cost ? `, ${cost}` : ""}. Likely impact: ${impact.replace(/[.]+$/g, "")}. Risk: this is still directional until validated with analytics, platform access, or manual journey review.`,
+      suggestedFollowUp: "Would you like Opzix to review this manually?",
+    };
+  }
+
   const estimate = estimateImplementationCost(scanContext);
+  const responseContext = buildAssistantResponseContext(scanContext, "roi_value");
   const revenue = asRecord(scanContext.revenueImpactSummary);
   const estimates = asArray(revenue.estimates).map(asRecord);
   const findings = allFindingRecords(scanContext);
@@ -1895,39 +2258,415 @@ function roiAnswer(
     ) ?? findings[0];
   const topAction = actionItems[0];
   const roiFocus =
+    responseContext.strongestReducers[0] ||
     asString(roiSource?.findingTitle) ||
     (topFinding ? findingTitle(topFinding) : "") ||
     asString(topAction?.title) ||
     asString(topAction?.action) ||
     "the first conversion-path cleanup";
+  const positiveContext =
+    responseContext.strongestPositives.slice(0, 3).join(", ") ||
+    "visible commerce strengths";
+  const effort =
+    responseContext.isEnterpriseRetail
+      ? "targeted review and validation first, not a rebuild"
+      : `${estimate.estimatedEffort} in the ${estimate.projectSize.toLowerCase()} scope`;
+  const likelyImpact =
+    /checkout|purchase|trust|mobile|cta|tracking/i.test(roiFocus)
+      ? "higher confidence in the purchase path and better measurement of shopper intent"
+      : "better shopper clarity and a cleaner path to the intended next action";
+  const risk =
+    responseContext.isEnterpriseRetail
+      ? "enterprise sites can hide checkout, account, personalization, and platform signals from public scans, so validate with analytics and platform access before spending heavily"
+      : "directional scan only; validate with analytics, checkout data, and platform access";
 
   if (hasAny(normalized, ["highest roi", "best roi", "which fix"])) {
     return {
       matched: true,
       topic: "roi",
-      directAnswer: `Based on this scan, the highest-ROI fix is likely ${roiFocus}.`,
+      directAnswer: `The highest-ROI opportunity appears to be ${roiFocus}.`,
       evidence:
-        asString(roiSource?.explanation) ||
-        (topFinding ? findingEvidence(topFinding) : "") ||
-        "The scan prioritizes visible conversion, discovery, trust, and mobile-path issues.",
-      businessMeaning:
-        `Effort: ${estimate.estimatedEffort} in the ${estimate.projectSize.toLowerCase()} scope. Likely impact: better shopper clarity. Risk: directional scan only; validate with analytics, checkout data, and platform access.`,
-      suggestedFollowUp:
-        "Do you want me to rank the first three fixes by effort versus impact?",
+        `The scanner could see ${positiveContext}, but ${roiFocus} is still reducing confidence in the customer path.`,
+      businessMeaning: `Effort: ${effort}. Likely impact: ${likelyImpact}. Risk: ${risk}.`,
+      suggestedFollowUp: "Would you like Opzix to review this manually?",
     };
   }
 
   return {
     matched: true,
     topic: "roi",
-    directAnswer: `Based on this scan, it is worth fixing if the goal is to improve the shopper path without jumping straight into a full rebuild.`,
+    directAnswer: `The highest-ROI opportunity appears to be ${roiFocus}. Based on this scan, it is worth fixing if the goal is to improve the shopper path without jumping straight into a full rebuild.`,
     evidence:
-      estimate.reasoning.join(" ") ||
-      "The scan points to visible customer-journey issues rather than private backend evidence.",
+      `The scanner could see ${positiveContext}, but ${roiFocus} is the clearest issue to validate before bigger work.`,
+    businessMeaning: `Effort: ${effort}. Likely impact: ${likelyImpact}. Risk: ${risk}.`,
+    suggestedFollowUp: "Would you like Opzix to review this manually?",
+  };
+}
+
+function recommendationText(record: Record<string, unknown>) {
+  return [
+    asString(record.title),
+    asString(record.action),
+    asString(record.description),
+    asString(record.why),
+    asString(record.findingTitle),
+    asString(record.riskArea),
+    asString(record.likelyImpact),
+    asString(record.explanation),
+    asString(record.evidenceSummary),
+  ].join(" ");
+}
+
+function roadmapStepsFromContext(scanContext: Record<string, unknown>) {
+  const roadmap = asRecord(scanContext.recommendationRoadmap);
+  const steps = asArray(roadmap.steps).map(asRecord);
+
+  if (steps.length > 0) {
+    return steps;
+  }
+
+  return ["step1", "step2", "step3", "step4", "step5", "step6", "step7"]
+    .map((key) => asRecord(roadmap[key]))
+    .filter((step) => asString(step.title));
+}
+
+function roadmapStepLabel(step: Record<string, unknown>) {
+  const stepNumber = typeof step.stepNumber === "number" ? step.stepNumber : null;
+  const title = asString(step.title) || "Roadmap step";
+  const cost = asString(step.cost) || asString(step.estimatedCost);
+  const timeline = asString(step.timeline) || asString(step.estimatedTimeline);
+  const suffix = [cost, timeline].filter(Boolean).join(", ");
+
+  return `${stepNumber ? `Step ${stepNumber}: ` : ""}${title}${suffix ? ` (${suffix})` : ""}`;
+}
+
+function firstRoadmapStep(scanContext: Record<string, unknown>) {
+  return roadmapStepsFromContext(scanContext)[0] ?? null;
+}
+
+function roadmapCostSummary(scanContext: Record<string, unknown>) {
+  return roadmapStepsFromContext(scanContext)
+    .slice(0, 7)
+    .map(roadmapStepLabel)
+    .join("; ");
+}
+
+function requestedRoadmapStepNumber(normalized: string) {
+  if (
+    hasAny(normalized, [
+      "what comes first",
+      "what is first",
+      "first step",
+      "step 1",
+      "step one",
+      "what should come first",
+    ])
+  ) {
+    return 1;
+  }
+
+  if (
+    hasAny(normalized, [
+      "what comes second",
+      "second step",
+      "step 2",
+      "step two",
+    ])
+  ) {
+    return 2;
+  }
+
+  if (
+    hasAny(normalized, [
+      "what comes third",
+      "third step",
+      "step 3",
+      "step three",
+    ])
+  ) {
+    return 3;
+  }
+
+  if (
+    hasAny(normalized, [
+      "what comes fourth",
+      "fourth step",
+      "step 4",
+      "step four",
+    ])
+  ) {
+    return 4;
+  }
+
+  if (
+    hasAny(normalized, [
+      "what comes fifth",
+      "fifth step",
+      "step 5",
+      "step five",
+    ])
+  ) {
+    return 5;
+  }
+
+  if (
+    hasAny(normalized, [
+      "what comes sixth",
+      "sixth step",
+      "step 6",
+      "step six",
+    ])
+  ) {
+    return 6;
+  }
+
+  if (
+    hasAny(normalized, [
+      "what comes seventh",
+      "seventh step",
+      "step 7",
+      "step seven",
+    ])
+  ) {
+    return 7;
+  }
+
+  return null;
+}
+
+function roadmapStepAnswer(
+  scanContext: Record<string, unknown>,
+  stepNumber: number,
+): ExactAnswer | null {
+  const step = roadmapStepsFromContext(scanContext).find(
+    (item) => item.stepNumber === stepNumber,
+  );
+
+  if (!step) {
+    return null;
+  }
+
+  const title = asString(step.title) || `Step ${stepNumber}`;
+  const cost = asString(step.cost) || asString(step.estimatedCost);
+  const timeline = asString(step.timeline) || asString(step.estimatedTimeline);
+
+  return {
+    matched: true,
+    topic: "implementation_plan",
+    directAnswer: `Step ${stepNumber} is ${title}.`,
+    evidence:
+      [cost ? `Cost: ${cost}.` : "", timeline ? `Timeline: ${timeline}.` : ""]
+        .filter(Boolean)
+        .join(" ") ||
+      "This comes from the structured recommendation roadmap.",
     businessMeaning:
-      `Effort: ${estimate.estimatedEffort}. Likely impact: cleaner discovery, trust, or conversion flow. Risk: confirm against analytics, platform constraints, and a manual walkthrough before over-investing.`,
+      [
+        asString(step.rationale),
+        asString(step.validationTarget)
+          ? `What I would validate: ${asString(step.validationTarget)}`
+          : "",
+        asString(step.expectedImpact)
+          ? `Expected impact: ${asString(step.expectedImpact)}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    suggestedFollowUp: "Would you like Opzix to review this manually?",
+  };
+}
+
+function hasIndustrialSupplyContext(value: string) {
+  const normalized = value.toLowerCase();
+  const strongCatalogSignal =
+    /plumbing|pvc|cpvc|pipe|pipes|fittings?|valves?|flange|coupling|elbow|adapter|schedule 40|schedule 80|replacement parts?|part number|sku|specification|datasheet|technical/i.test(
+      normalized,
+    );
+  const b2bSupplySignal =
+    /industrial|supply|distributor|wholesale|contractor|trade/i.test(normalized) &&
+    /catalog|quote|rfq|procurement|sku|part number|specification|technical|product|category|search/i.test(
+      normalized,
+    );
+
+  return strongCatalogSignal || b2bSupplySignal;
+}
+
+function hasGroceryRecommendationContext(value: string) {
+  if (hasIndustrialSupplyContext(value)) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  const grocerySpecific =
+    /grocery|groceries|supermarket|fresh produce|organic food|natural food|weekly ad|shop by aisle|deli|bakery|seafood|prepared foods|recipes/.test(
+      normalized,
+    );
+  const fulfillmentCluster =
+    /pickup|curbside|same day|delivery/.test(normalized) &&
+    /departments|department|store locator|weekly ad|loyalty|rewards|pharmacy/.test(
+      normalized,
+    );
+  const knownGroceryBrand =
+    /sprouts|publix|kroger|wholefoods|whole foods|safeway|albertsons|wegmans|heb|meijer|harristeeter|harris teeter|walmart|walgreens|cvs/.test(
+      normalized,
+    ) &&
+    /grocery|pharmacy|pickup|delivery|store locator|weekly ad|departments/.test(
+      normalized,
+    );
+
+  return grocerySpecific || fulfillmentCluster || knownGroceryBrand;
+}
+
+function buildHighestROIRecommendation(scanContext: Record<string, unknown>) {
+  const roadmapSteps = roadmapStepsFromContext(scanContext);
+  const firstStep = roadmapSteps[0];
+  const secondStep = roadmapSteps[1];
+
+  if (firstStep) {
+    const title = asString(firstStep.title) || "validate the primary customer path";
+    const rationale =
+      asString(firstStep.rationale) ||
+      asString(firstStep.roiRationale) ||
+      "This is the first structured roadmap step from the scan.";
+
+    return {
+      title: `start with ${title}`,
+      why: [
+        rationale,
+        asString(firstStep.roiRationale),
+        asString(firstStep.cost) || asString(firstStep.estimatedCost)
+          ? `Estimated cost: ${asString(firstStep.cost) || asString(firstStep.estimatedCost)}.`
+          : "",
+        asString(firstStep.timeline) || asString(firstStep.estimatedTimeline)
+          ? `Estimated timeline: ${asString(firstStep.timeline) || asString(firstStep.estimatedTimeline)}.`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      validate:
+        asString(firstStep.validationTarget) ||
+        "The customer path from first impression to commercial action.",
+      expectedImpact:
+        asString(firstStep.expectedImpact) ||
+        "A clearer customer path and a more measurable next action.",
+      comesSecond: secondStep
+        ? roadmapStepLabel(secondStep)
+        : "Confirm impact and address the next score reducer.",
+      action: "",
+    };
+  }
+
+  const responseContext = buildAssistantResponseContext(
+    scanContext,
+    "opzix_recommendation",
+  );
+  const actionItems = getActionItems(scanContext);
+  const revenue = asRecord(scanContext.revenueImpactSummary);
+  const revenueEstimates = asArray(revenue.estimates).map(asRecord);
+  const findings = allFindingRecords(scanContext);
+  const primary = getPrimaryConcern(scanContext);
+  const allSignals = [
+    ...actionItems.map(recommendationText),
+    ...revenueEstimates.map(recommendationText),
+    ...findings.map(findingText),
+    asString(primary.title),
+    asString(primary.riskLabel),
+    asString(primary.explanation),
+    responseContext.siteType,
+    responseContext.benchmarkGroup,
+    responseContext.benchmarkLabel,
+  ].join(" ");
+  const discoveryCandidate =
+    actionItems.find((item) =>
+      /catalog|discovery|category|navigation|search|product|sku/i.test(
+        recommendationText(item),
+      ),
+    ) ||
+    revenueEstimates.find((item) =>
+      /catalog|discovery|category|navigation|search|product|sku/i.test(
+        recommendationText(item),
+      ),
+    ) ||
+    findings.find((finding) =>
+      /catalog|discovery|category|navigation|search|product|sku/i.test(
+        findingText(finding),
+      ),
+    );
+  const trustCandidate =
+    responseContext.strongestReducers.find((item) =>
+      /trust|checkout|purchase|cta|mobile/i.test(item),
+    ) || responseContext.strongestReducers[0];
+  const b2bDiscoveryContext =
+    responseContext.isB2b ||
+    /b2b|catalog|industrial|distributor|procurement|quote|sku/i.test(
+      allSignals,
+    );
+
+  if (hasGroceryRecommendationContext(allSignals)) {
+    return {
+      title: "validate grocery discovery and fulfillment choice",
+      why:
+        "For grocery and supermarket retail, the first commercial question is whether shoppers can quickly find departments, search for items, choose pickup or delivery, and understand the next step.",
+      validate:
+        "Search usage, department navigation, pickup versus delivery flow, store locator usage, cart abandonment points, and mobile first-screen behavior.",
+      expectedImpact:
+        "Faster discovery, better department usage, more pickup/delivery engagement, and stronger conversion confidence.",
+      comesSecond:
+        "Improve department search and the pickup/delivery entry points.",
+      action: "",
+    };
+  }
+
+  if (b2bDiscoveryContext && discoveryCandidate) {
+    const action =
+      asString(asRecord(discoveryCandidate).action) ||
+      asString(asRecord(discoveryCandidate).recommendedFirstAction) ||
+      "walk the buyer journey from category discovery to product detail, cart or quote, and checkout";
+    const reducerNote =
+      trustCandidate && !/product|catalog|discovery|category|search|navigation/i.test(trustCandidate)
+        ? `${trustCandidate} may be the biggest score reducer, but product discovery is the highest-ROI starting point because buyers need to find the right product or category before trust and checkout improvements can pay off.`
+        : "Product discovery is the highest-ROI starting point because B2B buyers need to find the right category, SKU, or product path before narrower conversion fixes matter.";
+
+    return {
+      title: "validate product discovery",
+      why:
+        `The scanner points to catalog discovery friction and product discovery clarity. ${reducerNote}`,
+      validate:
+        "Category -> Product -> Cart or Quote -> Checkout. I would look for the exact step where buyers hesitate, loop back, search again, or lose confidence.",
+      expectedImpact:
+        "Customers should reach relevant product groups faster, understand the next step sooner, and move into cart, quote, or checkout with less friction.",
+      comesSecond:
+        "After that, I would improve search visibility, strengthen trust signals near the buying path, and tighten the mobile CTA.",
+      action: sanitizeEvidenceText(action, { maxLength: 220 }),
+    };
+  }
+
+  const reducer = trustCandidate || "purchase-path confidence";
+  return {
+    title: `validate ${reducer.toLowerCase()}`,
+    why:
+      `This appears to be the highest-ROI starting point because ${reducer} is the clearest customer-path constraint in the score narrative.`,
+    validate:
+      "I would walk the journey from landing page to product or service decision, primary action, trust confirmation, and final conversion step.",
+    expectedImpact:
+      "The expected impact is better decision confidence and a clearer path to the next commercial action.",
+    comesSecond:
+      "After that, I would address the next score reducer and confirm the changes with analytics or a manual journey review.",
+    action: "",
+  };
+}
+
+function opzixRecommendationAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const recommendation = buildHighestROIRecommendation(scanContext);
+
+  return {
+    matched: true,
+    topic: "opzix_recommendation",
+    directAnswer: `First, I would ${recommendation.title}.`,
+    evidence: `Why: ${recommendation.why}`,
+    businessMeaning:
+      `What I would validate: ${recommendation.validate}`,
     suggestedFollowUp:
-      "Do you want me to identify the cheapest fix with the strongest likely impact?",
+      `Expected impact: ${recommendation.expectedImpact}\n\nWhat comes second: ${recommendation.comesSecond}`,
   };
 }
 
@@ -1959,6 +2698,180 @@ function revenueImpactAnswer(scanContext: Record<string, unknown>): ExactAnswer 
   };
 }
 
+function priorityFrameworkAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const roadmapFirst = roadmapStepAnswer(scanContext, 1);
+
+  if (roadmapFirst) {
+    return roadmapFirst;
+  }
+
+  const primary = getPrimaryConcern(scanContext);
+  const actionItems = getActionItems(scanContext);
+  const topAction = actionItems[0];
+  const findings = allFindingRecords(scanContext);
+  const firstFinding = findings[0];
+  const firstTitle =
+    asString(topAction?.title) ||
+    asString(primary.title) ||
+    asString(primary.riskLabel) ||
+    (firstFinding ? findingTitle(firstFinding) : "the highest-priority customer journey issue");
+  const why =
+    asString(topAction?.why) ||
+    asString(primary.explanation) ||
+    (firstFinding ? findingEvidence(firstFinding) : "");
+  const action =
+    asString(topAction?.action) ||
+    asString(primary.recommendedFirstAction) ||
+    asString(firstFinding?.recommendedFirstAction);
+
+  return {
+    matched: true,
+    topic: "priority",
+    directAnswer: `The first thing I would review is ${firstTitle}.`,
+    evidence:
+      why ||
+      "The scan is using the top visible finding and recommended first action to choose the starting point.",
+    businessMeaning:
+      [
+        "Why first: this is the issue most likely to affect the customer path before smaller optimizations matter.",
+        action ? `What to check: ${sanitizeEvidenceText(action, { maxLength: 220 })}` : "",
+        "Success looks like shoppers can find the right path faster and the team can measure whether the change improves behavior.",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    suggestedFollowUp: "Would you like Opzix to review this manually?",
+  };
+}
+
+function implementationPlanAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const roadmapSteps = roadmapStepsFromContext(scanContext);
+
+  if (roadmapSteps.length > 0) {
+    const firstStep = roadmapSteps[0];
+    const plan = roadmapSteps.slice(0, 7).map(roadmapStepLabel).join("; ");
+
+    return {
+      matched: true,
+      topic: "implementation_plan",
+      directAnswer:
+        `Based on this scan, I would use a structured recommendation roadmap starting with ${asString(firstStep.title)}.`,
+      evidence: plan,
+      businessMeaning:
+        "This roadmap separates validation, implementation, and follow-up work so cost, timeline, and ROI can be discussed step by step instead of as one oversized project.",
+      suggestedFollowUp: "Would you like Opzix to review this manually?",
+    };
+  }
+
+  const estimate = estimateImplementationCost(scanContext);
+  const actionItems = getActionItems(scanContext);
+  const quickWin =
+    asString(actionItems[0]?.action) ||
+    asString(actionItems[0]?.title) ||
+    "tighten the clearest customer-path issue from the scan";
+  const secondAction =
+    asString(actionItems[1]?.action) ||
+    asString(actionItems[1]?.title) ||
+    "improve the next discovery, trust, or conversion bottleneck";
+
+  return {
+    matched: true,
+    topic: "implementation_plan",
+    directAnswer:
+      "Based on this scan, I would split the work into quick wins, 30-day improvements, and larger project work.",
+    evidence:
+      `Quick wins: ${sanitizeEvidenceText(quickWin, { maxLength: 220 })}. 30-day improvements: ${sanitizeEvidenceText(secondAction, { maxLength: 220 })}. Larger project: ${estimate.projectSize} scope, roughly ${estimate.estimatedRange} and ${estimate.estimatedEffort}.`,
+    businessMeaning:
+      "What to measure: product/category engagement, search usage, CTA clicks, quote or checkout starts, lead quality, and whether users reach the intended next step with fewer dead ends.",
+    suggestedFollowUp: "Would you like Opzix to review this manually?",
+  };
+}
+
+function contactOrBookingAnswer(scanContext: Record<string, unknown>): ExactAnswer {
+  const primary = getPrimaryConcern(scanContext);
+  const title = asString(primary.title) || asString(primary.riskLabel);
+
+  return {
+    matched: true,
+    topic: "contact_or_booking",
+    directAnswer:
+      "Yes. Opzix can review this manually and turn the scan into a practical ecommerce fix plan.",
+    evidence: title
+      ? `The manual review would start with ${title}.`
+      : "The manual review would validate the scan findings against the live storefront, platform constraints, and customer journey.",
+    businessMeaning:
+      "The goal would be to separate quick fixes from rebuild-level work, confirm what is real versus directional scan evidence, and identify the highest-ROI next step.",
+    suggestedFollowUp: "Would you like Opzix to review this manually?",
+  };
+}
+
+function platformExactAnswer(
+  message: string,
+  scanContext: Record<string, unknown>,
+): ExactAnswer {
+  const normalized = normalizeText(message);
+  const platform = asRecord(scanContext.platform);
+  const name = platformName(platform);
+  const isEnterpriseStack = name === "Enterprise / Custom Commerce Stack";
+
+  return {
+    matched: true,
+    topic: "platform",
+    directAnswer: platformDirectAnswer(platform, normalized),
+    evidence: isEnterpriseStack
+      ? platformEvidenceSummary(
+          platform,
+          asString(scanContext.platformVisibility) ||
+            "The public page exposes mixed or limited standard-platform evidence.",
+        )
+      : platformEvidenceSummary(
+          platform,
+          asString(scanContext.platformVisibility) ||
+            "The scan included platform visibility context.",
+        ),
+    businessMeaning: isEnterpriseStack
+      ? "Platform-specific assumptions should be manually confirmed before recommending Magento, Shopify, BigCommerce, or WooCommerce-specific fixes."
+      : isLowEcommerceProbability(platform)
+        ? "The scan should treat this URL as a possible lead-generation or informational entry point until a human confirms where the commerce journey actually starts."
+        : "Platform detection is useful context, but it should not be treated as a private-system inspection.",
+    suggestedFollowUp:
+      "Do you want me to connect platform visibility with the technical findings?",
+  };
+}
+
+function answerFromDetectedIntent(
+  message: string,
+  scanContext: Record<string, unknown>,
+  detection: AssistantIntentDetection,
+): ExactAnswer | null {
+  switch (detection.intent) {
+    case "cost_estimate":
+      return costEstimateAnswer(scanContext, message);
+    case "rebuild_vs_fix":
+      return newStoreCostAnswer(scanContext);
+    case "roi_value":
+      return roiAnswer(message, scanContext);
+    case "fix_priority":
+      return priorityFrameworkAnswer(scanContext);
+    case "implementation_plan":
+      return implementationPlanAnswer(scanContext);
+    case "opzix_recommendation":
+      return opzixRecommendationAnswer(scanContext);
+    case "score_explanation":
+      return positiveSignalAnswer(scanContext, message);
+    case "competitive_question":
+    case "benchmark_question":
+      return competitiveContextAnswer(scanContext);
+    case "platform_question":
+      return platformExactAnswer(message, scanContext);
+    case "revenue_impact":
+      return revenueImpactAnswer(scanContext);
+    case "contact_or_booking":
+      return contactOrBookingAnswer(scanContext);
+    default:
+      return null;
+  }
+}
+
 function getExactAnswer(
   message: string,
   rawScanContext: unknown,
@@ -1966,6 +2879,16 @@ function getExactAnswer(
   const scanContext = asRecord(rawScanContext);
   const normalized = normalizeText(message);
   const exact = getNestedRecord(scanContext, "exactCommerceVisibility");
+  const detectedIntent = detectAssistantIntent(message);
+  const frameworkAnswer = answerFromDetectedIntent(
+    message,
+    scanContext,
+    detectedIntent,
+  );
+
+  if (frameworkAnswer?.matched) {
+    return frameworkAnswer;
+  }
 
   const glossaryAnswer = buildGlossaryExactAnswer(message, scanContext);
   if (glossaryAnswer.matched) {
@@ -2020,12 +2943,16 @@ function getExactAnswer(
     return competitiveContextAnswer(scanContext);
   }
 
+  if (hasNewStoreIntent(normalized)) {
+    return newStoreCostAnswer(scanContext);
+  }
+
   if (hasRoiIntent(normalized)) {
     return roiAnswer(message, scanContext);
   }
 
   if (hasCostIntent(normalized)) {
-    return costEstimateAnswer(scanContext);
+    return costEstimateAnswer(scanContext, message);
   }
 
   if (
@@ -2634,7 +3561,26 @@ function getExactAnswer(
     );
   }
 
-  if (hasAny(normalized, ["what to fix first", "fix first", "opzix fix first", "review first", "what should be reviewed first", "why platform is first", "why is platform first"])) {
+  const requestedRoadmapStep = requestedRoadmapStepNumber(normalized);
+  if (requestedRoadmapStep && roadmapStepsFromContext(scanContext).length > 0) {
+    return (
+      roadmapStepAnswer(scanContext, requestedRoadmapStep) ?? {
+        matched: false,
+        topic: "",
+        directAnswer: "",
+        evidence: "",
+        businessMeaning: "",
+        suggestedFollowUp: "",
+      }
+    );
+  }
+
+  if (hasAny(normalized, ["what to fix first", "what should i fix first", "what should we fix first", "fix first", "opzix fix first", "review first", "what should be reviewed first", "why platform is first", "why is platform first"])) {
+    const roadmapFirst = roadmapStepAnswer(scanContext, 1);
+    if (roadmapFirst) {
+      return roadmapFirst;
+    }
+
     const visualPriority = getVisualFirstPriorityFinding(scanContext);
 
     if (visualPriority?.source === "visual") {
@@ -2804,6 +3750,85 @@ function parseAssistantJson(text: string) {
   }
 }
 
+function scanDomain(scanContext: Record<string, unknown>) {
+  const directDomain =
+    asString(scanContext.normalizedDomain) ||
+    asString(scanContext.normalized_domain) ||
+    asString(scanContext.domain);
+  if (directDomain) {
+    return directDomain;
+  }
+
+  const url =
+    asString(scanContext.scannedUrl) ||
+    asString(scanContext.website) ||
+    asString(scanContext.url) ||
+    asString(scanContext.finalUrl);
+
+  if (!url) {
+    return null;
+  }
+
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return url
+      .replace(/^https?:\/\//i, "")
+      .split("/")[0]
+      ?.replace(/^www\./, "")
+      .toLowerCase() ?? null;
+  }
+}
+
+function numericScore(scanContext: Record<string, unknown>) {
+  const score = scanContext.score ?? scanContext.overallScore;
+  return typeof score === "number" && Number.isFinite(score) ? score : null;
+}
+
+function leadSubmitted(scanContext: Record<string, unknown>) {
+  return (
+    scanContext.leadSubmitted === true ||
+    scanContext.lead_submitted === true ||
+    scanContext.contactSubmitted === true ||
+    scanContext.contact_submitted === true
+  );
+}
+
+function scanId(scanContext: Record<string, unknown>) {
+  return (
+    asString(scanContext.scanId) ||
+    asString(scanContext.scan_id) ||
+    asString(scanContext.id) ||
+    null
+  );
+}
+
+async function logAssistantQuestion(
+  question: string,
+  rawScanContext: unknown,
+  detection: AssistantIntentDetection,
+  answer: string,
+) {
+  const scanContext = asRecord(rawScanContext);
+
+  await logAssistantConversation({
+    scanId: scanId(scanContext),
+    domain: scanDomain(scanContext),
+    question,
+    detectedIntent: detection.intent,
+    intentConfidence: detection.confidence,
+    answerPreview: answer,
+    siteType:
+      asString(scanContext.siteType) ||
+      asString(asRecord(scanContext.storefrontReviewContext).siteType),
+    score: numericScore(scanContext),
+    scoringConfidence:
+      asString(scanContext.scoringConfidence) ||
+      asString(asRecord(scanContext.scoreExplanation).scoringConfidence),
+    leadSubmitted: leadSubmitted(scanContext),
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as PostScanAssistantRequest;
@@ -2818,6 +3843,7 @@ export async function POST(request: NextRequest) {
 
     const conversationHistory = safeConversationHistory(body.conversationHistory);
     const scanContext = body.scanContext ?? {};
+    const detectedIntent = detectAssistantIntent(message);
     const exactAnswer = getExactAnswer(message, scanContext);
 
     if (exactAnswer.matched) {
@@ -2841,10 +3867,13 @@ export async function POST(request: NextRequest) {
       }
 
       const suggestedReplies = [...baseReplies, ...extraReplies].filter(Boolean);
+      const reply = formatExactAnswer(exactAnswer);
+
+      await logAssistantQuestion(message, scanContext, detectedIntent, reply);
 
       return NextResponse.json(
         {
-          reply: formatExactAnswer(exactAnswer),
+          reply,
           suggestedReplies,
         },
         { status: 200 },
@@ -2933,6 +3962,8 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
+
+    await logAssistantQuestion(message, scanContext, detectedIntent, parsed.reply);
 
     return NextResponse.json(parsed, { status: 200 });
   } catch (error) {
