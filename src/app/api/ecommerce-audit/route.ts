@@ -12,6 +12,7 @@ import {
   ValidationIssue,
 } from "@/lib/form-submissions";
 import {
+  CONTACT_EMAIL,
   logSuccessfulLeadSubmission,
   sendLeadNotification,
 } from "@/lib/lead-notifications";
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "We received your audit request, but notification delivery is not configured. Please email hello@opzix.com directly.",
+            `We received your audit request, but notification delivery is not configured. Please email ${CONTACT_EMAIL} directly.`,
           notification,
         },
         { status: 503 },

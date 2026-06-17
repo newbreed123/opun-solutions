@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mail, Phone, Linkedin, Twitter, Instagram } from "lucide-react";
+import { Mail, Linkedin, Twitter, Instagram } from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -100,19 +100,10 @@ export default function Footer() {
               <li className="flex items-center gap-2">
                 <Mail size={16} className="text-brand-cyan flex-shrink-0" />
                 <a
-                  href="mailto:hello@opzix.com"
+                  href="mailto:hello@opzix.io"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  hello@opzix.com
-                </a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone size={16} className="text-brand-cyan flex-shrink-0" />
-                <a
-                  href="tel:+1234567890"
-                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
-                >
-                  +1 (234) 567-890
+                  hello@opzix.io
                 </a>
               </li>
             </ul>

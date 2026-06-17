@@ -1,5 +1,7 @@
 import { NormalizedLead } from "@/lib/leads";
 
+export const CONTACT_EMAIL = "hello@opzix.io";
+
 type LeadNotificationResult =
   | {
       ok: true;
@@ -77,16 +79,8 @@ function buildLeadEmail(lead: NormalizedLead) {
 export async function sendLeadNotification(
   lead: NormalizedLead,
 ): Promise<LeadNotificationResult> {
-  const recipient = process.env.CONTACT_NOTIFICATION_EMAIL?.trim();
+  const recipient = CONTACT_EMAIL;
   const testMode = process.env.CONTACT_EMAIL_TEST_MODE === "true";
-
-  if (!recipient) {
-    return {
-      ok: false,
-      provider: "not-configured",
-      error: "CONTACT_NOTIFICATION_EMAIL is not configured.",
-    };
-  }
 
   const email = buildLeadEmail(lead);
 
