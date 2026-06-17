@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Button from "@/components/Button";
 import PostScanAssistant from "@/components/PostScanAssistant";
 import Section from "@/components/Section";
@@ -767,12 +767,57 @@ export default function EcommerceAuditScannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [audit, setAudit] = useState<AuditResult | null>(null);
+  const [resultsInView, setResultsInView] = useState(false);
   const [showRawLogs, setShowRawLogs] = useState(false);
   const [showVisibilityDetails, setShowVisibilityDetails] = useState(false);
   const [expandedScreenshot, setExpandedScreenshot] = useState<{
     src: string;
     label: string;
   } | null>(null);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+
+  function scrollToResults(behavior: ScrollBehavior = "smooth") {
+    resultsRef.current?.scrollIntoView({ behavior, block: "start" });
+  }
+
+  useEffect(() => {
+    if (!audit) {
+      setResultsInView(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      scrollToResults("smooth");
+    }, 150);
+
+    return () => window.clearTimeout(timeout);
+  }, [audit]);
+
+  useEffect(() => {
+    if (!audit || !resultsRef.current) {
+      return;
+    }
+
+    const updateResultsVisibility = () => {
+      const rect = resultsRef.current?.getBoundingClientRect();
+
+      if (!rect) {
+        setResultsInView(false);
+        return;
+      }
+
+      setResultsInView(rect.top <= 160 && rect.bottom > 160);
+    };
+
+    updateResultsVisibility();
+    window.addEventListener("scroll", updateResultsVisibility, { passive: true });
+    window.addEventListener("resize", updateResultsVisibility);
+
+    return () => {
+      window.removeEventListener("scroll", updateResultsVisibility);
+      window.removeEventListener("resize", updateResultsVisibility);
+    };
+  }, [audit]);
 
   function handleExportReport() {
     if (!audit) {
@@ -863,7 +908,11 @@ export default function EcommerceAuditScannerPage() {
   return (
     <>
       <Section bgColor="secondary" className="hero-atmosphere" padded>
-        <div className="grid min-w-0 items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+        <div
+          className={`grid min-w-0 items-center gap-10 ${
+            audit ? "" : "lg:grid-cols-[1.05fr_0.95fr]"
+          }`}
+        >
           <div className="min-w-0">
             <p className="mb-5 text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
               Ecommerce Systems Audit Tool
@@ -928,66 +977,124 @@ export default function EcommerceAuditScannerPage() {
                     {error}
                   </div>
                 )}
+
+                {isLoading && (
+                  <div className="w-full rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 p-4">
+                    <div className="flex items-start gap-3">
+                      <Loader2 className="mt-1 h-5 w-5 flex-none animate-spin text-brand-cyan" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-primary">
+                          Scanning your storefront...
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-secondary">
+                          Checking UX, tracking, conversion, and operations...
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full w-2/3 animate-pulse rounded-full bg-brand-cyan/80" />
+                    </div>
+                  </div>
+                )}
+
+                {audit && !isLoading && (
+                  <div className="w-full rounded-2xl border border-emerald-300/30 bg-emerald-400/10 p-4">
+                    <div className="flex items-start gap-3">
+                      <Check className="mt-1 h-5 w-5 flex-none text-emerald-200" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-primary">
+                          Scan complete — your audit report is ready.
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-secondary">
+                          View your score, roadmap, and Opzix assistant below.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => scrollToResults()}
+                        className="btn btn-primary min-h-11 !w-full !max-w-full"
+                      >
+                        View Results
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExportReport}
+                        className="btn btn-secondary min-h-11 !w-full !max-w-full"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download PDF
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-                <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1">
-                  MVP mock report
-                </span>
-                <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1">
-                  No external scanning yet
-                </span>
-                <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1">
-                  API-ready foundation
-                </span>
-              </div>
+              {!audit && (
+                <>
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                    <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1">
+                      MVP mock report
+                    </span>
+                    <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1">
+                      No external scanning yet
+                    </span>
+                    <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1">
+                      API-ready foundation
+                    </span>
+                  </div>
 
-              <p className="mt-4 text-sm leading-relaxed text-muted">
-                This MVP currently uses mock strategic analysis plus lightweight
-                live diagnostics. Lighthouse performance signals, deeper
-                metadata checks, and richer browser diagnostics will be added in
-                the next phase.
-              </p>
+                  <p className="mt-4 text-sm leading-relaxed text-muted">
+                    This MVP currently uses mock strategic analysis plus lightweight
+                    live diagnostics. Lighthouse performance signals, deeper
+                    metadata checks, and richer browser diagnostics will be added in
+                    the next phase.
+                  </p>
+                </>
+              )}
             </form>
           </div>
 
-          <div className="card-elevated relative min-w-0 max-w-full overflow-hidden p-5 md:p-6">
-            <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-brand-blue/25 blur-3xl" />
-            <div className="absolute -bottom-24 -left-16 h-52 w-52 rounded-full bg-brand-cyan/15 blur-3xl" />
-            <div className="relative rounded-2xl border border-dark-border bg-dark-deep/80 p-5">
-              <div className="mb-6 flex items-start justify-between gap-4 border-b border-dark-border pb-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
-                    Audit Preview
-                  </p>
-                  <h2 className="mt-2 text-2xl font-bold text-primary">
-                    Store systems report
-                  </h2>
+          {!audit && (
+            <div className="card-elevated relative min-w-0 max-w-full overflow-hidden p-5 md:p-6">
+              <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-brand-blue/25 blur-3xl" />
+              <div className="absolute -bottom-24 -left-16 h-52 w-52 rounded-full bg-brand-cyan/15 blur-3xl" />
+              <div className="relative rounded-2xl border border-dark-border bg-dark-deep/80 p-5">
+                <div className="mb-6 flex items-start justify-between gap-4 border-b border-dark-border pb-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+                      Audit Preview
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold text-primary">
+                      Store systems report
+                    </h2>
+                  </div>
+                  <Sparkles className="h-6 w-6 flex-none text-brand-cyan" />
                 </div>
-                <Sparkles className="h-6 w-6 flex-none text-brand-cyan" />
-              </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                {scoreCards.map((card) => {
-                  const Icon = card.icon;
-                  return (
-                    <div
-                      key={card.label}
-                      className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"
-                    >
-                      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
-                        <Icon className="h-5 w-5" />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {scoreCards.map((card) => {
+                    const Icon = card.icon;
+                    return (
+                      <div
+                        key={card.label}
+                        className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"
+                      >
+                        <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <p className="font-bold text-primary">{card.label}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-muted">
+                          {card.description}
+                        </p>
                       </div>
-                      <p className="font-bold text-primary">{card.label}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-muted">
-                        {card.description}
-                      </p>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </Section>
 
@@ -1011,7 +1118,11 @@ export default function EcommerceAuditScannerPage() {
               ))}
             </div>
           ) : (
-            <div className="space-y-8">
+            <div
+              ref={resultsRef}
+              id="audit-results"
+              className="scroll-mt-24 space-y-8"
+            >
               <div className="audit-print-only audit-print-header">
                 <div className="audit-print-brand-row">
                   <div className="audit-print-logo-mark">O</div>
@@ -2988,6 +3099,30 @@ export default function EcommerceAuditScannerPage() {
                 alt={expandedScreenshot.label}
                 className="mx-auto h-auto max-w-full rounded-2xl border border-dark-border"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {audit && !resultsInView && (
+        <div className="fixed inset-x-3 bottom-3 z-[70] md:hidden">
+          <div className="rounded-2xl border border-brand-cyan/40 bg-dark-card/95 p-3 shadow-card-glow backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-primary">
+                  Audit ready
+                </p>
+                <p className="truncate text-xs text-secondary">
+                  View your score and report.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => scrollToResults()}
+                className="btn btn-primary min-h-10 !w-auto !max-w-none flex-none px-4 py-2 text-sm"
+              >
+                View Results
+              </button>
             </div>
           </div>
         </div>
