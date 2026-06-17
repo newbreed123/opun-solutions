@@ -54,6 +54,7 @@ export type ScannerStageLog = {
   level: "info" | "warn" | "error";
   viewport?: "desktop" | "mobile";
   url?: string;
+  debug?: Record<string, unknown>;
 };
 
 export type ScannerDiagnostics = {
@@ -393,6 +394,7 @@ export function addScannerStageLog(
     level?: "info" | "warn" | "error";
     viewport?: "desktop" | "mobile";
     url?: string;
+    debug?: Record<string, unknown>;
   },
 ) {
   if (!diagnostics) return;
@@ -406,6 +408,7 @@ export function addScannerStageLog(
     level: details?.level ?? "info",
     viewport: details?.viewport,
     url: details?.url,
+    debug: details?.debug,
   };
   diagnostics.stageLogs.push(log);
 
@@ -2898,36 +2901,78 @@ function serverlessChromiumHeadless() {
   return (serverlessChromium as { headless?: boolean }).headless ?? true;
 }
 
+function browserLaunchRuntimeDebug(
+  packageStrategy: string,
+  executablePath: string | undefined,
+  launchOptions?: LaunchOptions,
+) {
+  return {
+    runtime: process.env.NEXT_RUNTIME ?? "nodejs",
+    nodeEnv: process.env.NODE_ENV ?? "unknown",
+    vercel: process.env.VERCEL ?? "0",
+    platform: process.platform,
+    packageStrategy,
+    executablePath: executablePath ?? null,
+    launchOptions: launchOptions ? safeLaunchOptionsForLog(launchOptions) : null,
+  };
+}
+
+function errorDebug(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorMessage: error instanceof Error ? error.message : String(error),
+    errorStack: error instanceof Error ? error.stack : undefined,
+  };
+}
+
 async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
   const useServerlessChromium = isServerlessBrowserRuntime();
   const localExecutablePath = useServerlessChromium ? null : localBrowserExecutablePath();
   const packageStrategy = useServerlessChromium ? "sparticuz-chromium" : "local-playwright";
-  const executablePath = useServerlessChromium
-    ? await serverlessChromium.executablePath()
-    : localExecutablePath ?? undefined;
-  const launchOptions: LaunchOptions = useServerlessChromium
-    ? {
-        args: serverlessChromium.args,
+  const launchStart = Date.now();
+  let executablePath: string | undefined;
+  let launchOptions: LaunchOptions | undefined;
+
+  try {
+    addScannerStageLog(
+      scanDiagnostics,
+      "browser_launch",
+      useServerlessChromium
+        ? "Resolving Sparticuz Chromium executable"
+        : "Resolving local Playwright browser",
+      {
+        url: scanDiagnostics?.requestedUrl,
+        debug: browserLaunchRuntimeDebug(packageStrategy, executablePath),
+      },
+    );
+
+    if (useServerlessChromium) {
+      serverlessChromium.setGraphicsMode = false;
+      executablePath = await serverlessChromium.executablePath();
+      launchOptions = {
+        args: [
+          ...serverlessChromium.args,
+          "--disable-dev-shm-usage",
+          "--user-data-dir=/tmp/chromium-user-data",
+          "--data-path=/tmp/chromium-data",
+          "--disk-cache-dir=/tmp/chromium-cache",
+        ],
         executablePath,
         headless: serverlessChromiumHeadless(),
-      }
-    : {
+      };
+    } else {
+      executablePath = localExecutablePath ?? undefined;
+      launchOptions = {
         headless: true,
         ...(localExecutablePath ? { executablePath: localExecutablePath } : {}),
       };
-  const launchStart = Date.now();
+    }
 
-  console.info("[scanner] Browser launch configuration", {
-    runtime: process.env.NEXT_RUNTIME ?? "nodejs",
-    environment: process.env.NODE_ENV ?? "unknown",
-    vercel: process.env.VERCEL ?? "0",
-    platform: process.platform,
-    executablePath: executablePath ?? "Playwright local default",
-    packageStrategy,
-    launchOptions: safeLaunchOptionsForLog(launchOptions),
-  });
+    console.info(
+      "[scanner] Browser launch configuration",
+      browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
+    );
 
-  try {
     addScannerStageLog(
       scanDiagnostics,
       "browser_launch",
@@ -2938,6 +2983,7 @@ async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
           : "Launching local Playwright browser",
       {
         url: scanDiagnostics?.requestedUrl,
+        debug: browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
       },
     );
     const browser = await playwrightChromium.launch(launchOptions);
@@ -2954,17 +3000,16 @@ async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
           scanDiagnostics.requestedUrl,
         );
       }
-      console.error("[scanner] Browser launch failed", {
-        runtime: process.env.NEXT_RUNTIME ?? "nodejs",
-        environment: process.env.NODE_ENV ?? "unknown",
-        vercel: process.env.VERCEL ?? "0",
-        platform: process.platform,
-        executablePath: executablePath ?? "Playwright local default",
-        packageStrategy,
-        launchOptions: safeLaunchOptionsForLog(launchOptions),
-        errorMessage: primaryError instanceof Error ? primaryError.message : String(primaryError),
-        errorStack: primaryError instanceof Error ? primaryError.stack : undefined,
+      const debug = {
+        ...browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
+        ...errorDebug(primaryError),
+      };
+      addScannerStageLog(scanDiagnostics, "browser_launch", "Browser launch failed before navigation", {
+        level: "error",
+        url: scanDiagnostics?.requestedUrl,
+        debug,
       });
+      console.error("[scanner] Browser launch failed", debug);
       throw primaryError;
     }
 
@@ -2975,6 +3020,10 @@ async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
       {
         level: "warn",
         url: scanDiagnostics?.requestedUrl,
+        debug: {
+          ...browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
+          ...errorDebug(primaryError),
+        },
       },
     );
 
@@ -2984,13 +3033,7 @@ async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
         channel: "chrome",
       };
       console.info("[scanner] Browser fallback launch configuration", {
-        runtime: process.env.NEXT_RUNTIME ?? "nodejs",
-        environment: process.env.NODE_ENV ?? "unknown",
-        vercel: process.env.VERCEL ?? "0",
-        platform: process.platform,
-        executablePath: "Chrome channel",
-        packageStrategy: "local-playwright",
-        launchOptions: safeLaunchOptionsForLog(chromeLaunchOptions),
+        ...browserLaunchRuntimeDebug("local-playwright", "Chrome channel", chromeLaunchOptions),
       });
       const browser = await playwrightChromium.launch(chromeLaunchOptions);
       addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
@@ -3005,20 +3048,19 @@ async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
           scanDiagnostics.requestedUrl,
         );
       }
-      console.error("[scanner] Browser fallback launch failed", {
-        runtime: process.env.NEXT_RUNTIME ?? "nodejs",
-        environment: process.env.NODE_ENV ?? "unknown",
-        vercel: process.env.VERCEL ?? "0",
-        platform: process.platform,
-        executablePath: "Chrome channel",
-        packageStrategy: "local-playwright",
-        launchOptions: safeLaunchOptionsForLog({
+      const fallbackDebug = {
+        ...browserLaunchRuntimeDebug("local-playwright", "Chrome channel", {
           headless: true,
           channel: "chrome",
         }),
-        errorMessage: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-        errorStack: fallbackError instanceof Error ? fallbackError.stack : undefined,
+        ...errorDebug(fallbackError),
+      };
+      addScannerStageLog(scanDiagnostics, "browser_launch", "Browser fallback launch failed", {
+        level: "error",
+        url: scanDiagnostics?.requestedUrl,
+        debug: fallbackDebug,
       });
+      console.error("[scanner] Browser fallback launch failed", fallbackDebug);
       throw fallbackError;
     }
   }
