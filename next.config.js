@@ -7,6 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["@sparticuz/chromium", "playwright-core"],
+  outputFileTracingIncludes: {
+    "/api/browser-health": ["./node_modules/@sparticuz/chromium/bin/**/*"],
+    "/api/ecommerce-audit-scanner": ["./node_modules/@sparticuz/chromium/bin/**/*"],
+    "/api/scanner-health": ["./node_modules/@sparticuz/chromium/bin/**/*"],
+  },
   turbopack: {
     root: __dirname,
   },

@@ -31,6 +31,8 @@ export async function GET() {
       using: metadata.using,
       executablePath: metadata.executablePath,
       executablePathExists: metadata.executablePathExists,
+      sparticuzChromiumBinPath: metadata.sparticuzChromiumBinPath,
+      sparticuzChromiumBinExists: metadata.sparticuzChromiumBinExists,
       serverExternalPackagesConfigured: true,
       serverExternalPackages: browserLauncherServerExternalPackages,
       timing: {

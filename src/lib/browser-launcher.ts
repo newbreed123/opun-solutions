@@ -1,10 +1,19 @@
 import { existsSync } from "fs";
+import path from "path";
 import type { Browser, LaunchOptions } from "playwright-core";
 
 export const browserLauncherServerExternalPackages = [
   "@sparticuz/chromium",
   "playwright-core",
 ] as const;
+
+export const sparticuzChromiumBinPath = path.join(
+  process.cwd(),
+  "node_modules",
+  "@sparticuz",
+  "chromium",
+  "bin",
+);
 
 type SparticuzChromium = typeof import("@sparticuz/chromium").default;
 
@@ -18,6 +27,8 @@ export type ScannerBrowserLaunchMetadata = {
   using: BrowserLaunchUsing;
   executablePath?: string;
   executablePathExists: boolean | null;
+  sparticuzChromiumBinPath: string;
+  sparticuzChromiumBinExists: boolean | null;
   launchOptions: {
     args?: string[];
     channel?: string;
@@ -112,6 +123,8 @@ function launchMetadata(
     using,
     executablePath,
     executablePathExists: executablePathExists(executablePath),
+    sparticuzChromiumBinPath,
+    sparticuzChromiumBinExists: executablePathExists(sparticuzChromiumBinPath),
     launchOptions: {
       args: Array.isArray(launchOptions.args) ? launchOptions.args : undefined,
       channel: launchOptions.channel,
