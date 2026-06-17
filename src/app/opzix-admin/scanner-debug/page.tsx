@@ -43,7 +43,7 @@ export default async function ScannerDebugPage({
     );
   }
 
-  const runtime = getScannerRuntimeInfo();
+  const runtime = await getScannerRuntimeInfo();
   const lastScan = await readLatestScannerDebugRecord();
 
   return (
@@ -116,11 +116,17 @@ export default async function ScannerDebugPage({
         <DebugPanel title="Environment">
           <KeyValue label="NODE_ENV" value={runtime.nodeEnv} />
           <KeyValue label="NEXT_RUNTIME" value={runtime.nextRuntime} />
+          <KeyValue label="VERCEL" value={runtime.vercel} />
           <KeyValue label="Platform" value={runtime.platform} />
           <KeyValue label="Playwright" value={runtime.playwrightVersion} />
+          <KeyValue label="Browser strategy" value={runtime.packageStrategy} />
           <KeyValue
             label="Browser executable"
             value={runtime.browserExecutablePath}
+          />
+          <KeyValue
+            label="Browser path source"
+            value={runtime.browserExecutablePathSource}
           />
         </DebugPanel>
 

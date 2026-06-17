@@ -48,7 +48,7 @@ export async function GET() {
   return NextResponse.json({
     success: results.every((result) => result.success),
     totalElapsedMs: Date.now() - startedAt,
-    runtime: getScannerRuntimeInfo(),
+    runtime: await getScannerRuntimeInfo(),
     results,
   });
 }

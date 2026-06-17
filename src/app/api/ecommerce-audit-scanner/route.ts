@@ -7311,6 +7311,8 @@ export async function POST(request: Request) {
     latestDiagnostics = diagnostics;
 
     if (diagnostics.scanError) {
+      const browserLaunchFailed = diagnostics.scanError === "Browser launch failed";
+
       await saveScannerDebugRecord(
         buildScannerDebugRecord({
           url: values.website,
@@ -7324,6 +7326,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
+          scannerAvailable: !browserLaunchFailed,
+          reason: browserLaunchFailed ? "Browser launch failed" : diagnostics.scanError,
           error: diagnostics.scanError,
           currentStage: diagnostics.scanDiagnostics?.currentStage,
           failedUrl:
