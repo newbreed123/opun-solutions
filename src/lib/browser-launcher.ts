@@ -1,7 +1,12 @@
 import { existsSync } from "fs";
-import chromium from "@sparticuz/chromium";
-import { chromium as playwrightChromium, type Browser, type LaunchOptions } from "playwright-core";
-import playwrightCorePackage from "playwright-core/package.json";
+import type { Browser, LaunchOptions } from "playwright-core";
+
+export const browserLauncherServerExternalPackages = [
+  "@sparticuz/chromium",
+  "playwright-core",
+] as const;
+
+type SparticuzChromium = typeof import("@sparticuz/chromium").default;
 
 export type BrowserLaunchUsing = "sparticuz-chromium" | "local-playwright";
 
@@ -63,8 +68,25 @@ function localBrowserExecutablePath() {
   );
 }
 
-function chromiumHeadless() {
-  return (chromium as typeof chromium & { headless?: boolean }).headless ?? true;
+function chromiumHeadless(chromium: SparticuzChromium) {
+  return (chromium as SparticuzChromium & { headless?: boolean }).headless ?? true;
+}
+
+async function loadSparticuzChromium(): Promise<SparticuzChromium> {
+  return (await import("@sparticuz/chromium")).default;
+}
+
+async function loadPlaywrightChromium() {
+  return (await import("playwright-core")).chromium;
+}
+
+async function getPlaywrightCoreVersion() {
+  try {
+    const packageInfo = await import("playwright-core/package.json");
+    return packageInfo.default.version;
+  } catch {
+    return "unknown";
+  }
 }
 
 function executablePathExists(executablePath: string | undefined) {
@@ -122,12 +144,13 @@ export async function launchScannerBrowser(): Promise<ScannerBrowserLaunchResult
 
   try {
     if (isProduction) {
+      const chromium = await loadSparticuzChromium();
       chromium.setGraphicsMode = false;
       executablePath = await chromium.executablePath();
       launchOptions = {
         args: chromium.args,
         executablePath,
-        headless: chromiumHeadless(),
+        headless: chromiumHeadless(chromium),
       };
     } else {
       executablePath = localBrowserExecutablePath();
@@ -153,6 +176,7 @@ export async function launchScannerBrowser(): Promise<ScannerBrowserLaunchResult
       executablePathExists: metadata.executablePathExists,
     });
 
+    const playwrightChromium = await loadPlaywrightChromium();
     const browser = await playwrightChromium.launch(launchOptions);
 
     return {
@@ -175,8 +199,9 @@ export async function getBrowserLauncherRuntimeInfo(): Promise<BrowserLauncherRu
   let browserExecutablePathSource: string = packageStrategy;
 
   try {
+    const playwrightChromium = await loadPlaywrightChromium();
     browserExecutablePath = isProduction
-      ? await chromium.executablePath()
+      ? await (await loadSparticuzChromium()).executablePath()
       : localBrowserExecutablePath() ?? playwrightChromium.executablePath();
     browserExecutablePathSource = isProduction
       ? "sparticuz-chromium"
@@ -192,7 +217,7 @@ export async function getBrowserLauncherRuntimeInfo(): Promise<BrowserLauncherRu
     nodeEnv: process.env.NODE_ENV ?? "unknown",
     nextRuntime: process.env.NEXT_RUNTIME ?? "nodejs",
     platform: process.platform,
-    playwrightVersion: playwrightCorePackage.version,
+    playwrightVersion: await getPlaywrightCoreVersion(),
     vercel: process.env.VERCEL ?? "0",
     packageStrategy,
     browserExecutablePath,

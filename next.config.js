@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ["@sparticuz/chromium"],
+  serverExternalPackages: ["@sparticuz/chromium", "playwright-core"],
   turbopack: {
     root: __dirname,
   },

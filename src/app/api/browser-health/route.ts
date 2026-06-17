@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { launchScannerBrowser } from "@/lib/browser-launcher";
+import {
+  browserLauncherServerExternalPackages,
+  launchScannerBrowser,
+} from "@/lib/browser-launcher";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +31,8 @@ export async function GET() {
       using: metadata.using,
       executablePath: metadata.executablePath,
       executablePathExists: metadata.executablePathExists,
+      serverExternalPackagesConfigured: true,
+      serverExternalPackages: browserLauncherServerExternalPackages,
       timing: {
         elapsedMs: Date.now() - startedAt,
       },
@@ -52,6 +57,8 @@ export async function GET() {
           error && typeof error === "object" && "metadata" in error
             ? (error as { metadata?: unknown }).metadata
             : null,
+        serverExternalPackagesConfigured: true,
+        serverExternalPackages: browserLauncherServerExternalPackages,
         timing: {
           elapsedMs: Date.now() - startedAt,
         },
