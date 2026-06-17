@@ -450,6 +450,15 @@ function toScannerErrorDiagnostic(
   };
 }
 
+function scannerErrorDebug(error: unknown) {
+  return {
+    name: error instanceof Error ? error.name : "UnknownError",
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    cause: error instanceof Error ? error.cause : undefined,
+  };
+}
+
 function recordScannerError(
   diagnostics: ScannerDiagnostics,
   error: unknown,
@@ -465,6 +474,7 @@ function recordScannerError(
   addScannerStageLog(diagnostics, stage, scannerError.category, {
     level: "error",
     url: failedUrl,
+    debug: scannerErrorDebug(error),
   });
   lastScannerDiagnostics = diagnostics;
   return scannerError;
@@ -638,13 +648,26 @@ async function scanViewport({
       viewport: viewport.name,
       url: website,
     });
-    context = await browser.newContext({
-      viewport: { width: viewport.width, height: viewport.height },
-      deviceScaleFactor: viewport.deviceScaleFactor ?? 1,
-      isMobile: viewport.isMobile ?? false,
-      userAgent: viewport.userAgent,
-      ignoreHTTPSErrors: true,
-    });
+    try {
+      context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        deviceScaleFactor: viewport.deviceScaleFactor ?? 1,
+        isMobile: viewport.isMobile ?? false,
+        userAgent: viewport.userAgent,
+        ignoreHTTPSErrors: true,
+      });
+    } catch (error) {
+      addScannerStageLog(scanDiagnostics, "browser_context_creation", "Browser context creation failed", {
+        level: "error",
+        viewport: viewport.name,
+        url: website,
+        debug: {
+          viewport,
+          ...scannerErrorDebug(error),
+        },
+      });
+      throw error;
+    }
     addTiming(scanDiagnostics, "browserContextCreationMs", Date.now() - contextStart);
 
     const pageStart = Date.now();
@@ -652,7 +675,21 @@ async function scanViewport({
       viewport: viewport.name,
       url: website,
     });
-    const page = await context.newPage();
+    let page: Page;
+    try {
+      page = await context.newPage();
+    } catch (error) {
+      addScannerStageLog(scanDiagnostics, "page_creation", "Page creation failed", {
+        level: "error",
+        viewport: viewport.name,
+        url: website,
+        debug: {
+          viewport,
+          ...scannerErrorDebug(error),
+        },
+      });
+      throw error;
+    }
     addTiming(scanDiagnostics, "pageCreationMs", Date.now() - pageStart);
     attachDiagnostics(page, consoleErrors, failedRequests);
 
@@ -2870,6 +2907,13 @@ async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
 
     const launchResult = await launchScannerBrowser();
     const { browser, ...launchDebug } = launchResult;
+    browser.on("disconnected", () => {
+      addScannerStageLog(scanDiagnostics, scanDiagnostics?.currentStage ?? "browser_launch", "Browser disconnected", {
+        level: "warn",
+        url: scanDiagnostics?.requestedUrl,
+        debug: launchDebug,
+      });
+    });
     addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
     addScannerStageLog(
       scanDiagnostics,

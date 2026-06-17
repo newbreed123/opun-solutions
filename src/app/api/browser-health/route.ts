@@ -14,13 +14,20 @@ export async function GET() {
 
   try {
     launchResult = await launchScannerBrowser();
-    const page = await launchResult.browser.newPage();
+    const context = await launchResult.browser.newContext({
+      viewport: { width: 1440, height: 1200 },
+      deviceScaleFactor: 1,
+      isMobile: false,
+      ignoreHTTPSErrors: true,
+    });
+    const page = await context.newPage();
     await page.goto("https://example.com", {
       waitUntil: "domcontentloaded",
       timeout: 15000,
     });
     const title = await page.title();
     await page.close().catch(() => undefined);
+    await context.close().catch(() => undefined);
     await launchResult.browser.close().catch(() => undefined);
 
     const { browser: _browser, ...metadata } = launchResult;
@@ -33,6 +40,8 @@ export async function GET() {
       executablePathExists: metadata.executablePathExists,
       sparticuzChromiumBinPath: metadata.sparticuzChromiumBinPath,
       sparticuzChromiumBinExists: metadata.sparticuzChromiumBinExists,
+      contextCreated: true,
+      pageCreated: true,
       serverExternalPackagesConfigured: true,
       serverExternalPackages: browserLauncherServerExternalPackages,
       timing: {
