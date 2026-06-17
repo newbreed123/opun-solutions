@@ -883,47 +883,52 @@ export default function EcommerceAuditScannerPage() {
               onSubmit={handleSubmit}
               className="mt-8 max-w-full overflow-hidden rounded-[2rem] border border-dark-border bg-dark-card p-4 shadow-card-glow sm:p-5"
             >
-              <label
-                htmlFor="website"
-                className="mb-3 block text-sm font-semibold text-primary"
-              >
-                Website URL
-              </label>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <input
-                  id="website"
-                  type="text"
-                  inputMode="url"
-                  value={website}
-                  onChange={(event) => setWebsite(event.target.value)}
-                  placeholder="https://yourstore.com"
-                  className="min-h-12 w-full rounded-xl border border-dark-border bg-dark-deep px-4 text-primary outline-none transition-colors placeholder:text-muted focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20"
-                  disabled={isLoading}
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="btn btn-primary min-h-12 w-full sm:w-auto sm:min-w-[11rem]"
+              <div className="w-full min-w-0 space-y-4">
+                <label
+                  htmlFor="website"
+                  className="block text-sm font-semibold text-primary"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Scanning
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Run Scan
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {error && (
-                <div className="mt-4 rounded-2xl border border-red-300/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-100">
-                  {error}
+                  Website URL
+                </label>
+                <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row">
+                  <input
+                    id="website"
+                    type="text"
+                    inputMode="url"
+                    value={website}
+                    onChange={(event) => setWebsite(event.target.value)}
+                    placeholder="https://yourstore.com"
+                    className="min-h-12 w-full min-w-0 rounded-xl border border-dark-border bg-dark-deep px-4 text-primary outline-none transition-colors placeholder:text-muted focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 sm:flex-1"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="btn btn-primary min-h-12 !w-full !max-w-full min-w-0 sm:!w-auto sm:min-w-[11rem]"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Scanning
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Run Scan
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
+
+                {error && (
+                  <div
+                    className="block w-full min-w-0 max-w-full whitespace-normal break-words rounded-2xl border border-red-300/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-100"
+                    style={{ width: "100%" }}
+                  >
+                    {error}
+                  </div>
+                )}
+              </div>
 
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
                 <span className="rounded-full border border-dark-border bg-white/[0.035] px-3 py-1">
