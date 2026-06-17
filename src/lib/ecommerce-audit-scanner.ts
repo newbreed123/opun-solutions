@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
 import { mkdir, readdir, stat, unlink } from "fs/promises";
 import path from "path";
-import serverlessChromium from "@sparticuz/chromium";
-import { chromium as playwrightChromium, type Browser, type BrowserContext, type LaunchOptions, type Page } from "playwright-core";
-import playwrightCorePackage from "playwright-core/package.json";
+import {
+  getBrowserLauncherRuntimeInfo,
+  launchScannerBrowser,
+} from "@/lib/browser-launcher";
+import type { Browser, BrowserContext, Page } from "playwright-core";
 
 const screenshotDir = path.join(process.cwd(), "public", "audit-screenshots");
 const screenshotPublicPath = "/api/audit-screenshot";
@@ -349,40 +351,18 @@ export function getLastScannerDiagnostics() {
   return lastScannerDiagnostics;
 }
 
-function isServerlessBrowserRuntime() {
-  return process.env.VERCEL === "1" || process.env.NODE_ENV === "production";
-}
-
 export async function getScannerRuntimeInfo(): Promise<ScannerRuntimeInfo> {
-  let browserExecutablePath = "unknown";
-  let browserExecutablePathSource = "playwright-default";
-  const useServerlessChromium = isServerlessBrowserRuntime();
-  const localExecutablePath = useServerlessChromium ? null : localBrowserExecutablePath();
-
-  try {
-    if (useServerlessChromium) {
-      browserExecutablePath = await serverlessChromium.executablePath();
-      browserExecutablePathSource = "sparticuz-chromium";
-    } else {
-      browserExecutablePath = localExecutablePath ?? playwrightChromium.executablePath();
-      browserExecutablePathSource = localExecutablePath
-        ? "development-env-override"
-        : "playwright-default-development";
-    }
-  } catch (error) {
-    browserExecutablePath = `unavailable: ${error instanceof Error ? error.message : String(error)}`;
-    browserExecutablePathSource = "unavailable";
-  }
+  const runtime = await getBrowserLauncherRuntimeInfo();
 
   return {
-    nodeEnv: process.env.NODE_ENV ?? "unknown",
-    nextRuntime: process.env.NEXT_RUNTIME ?? "nodejs",
-    platform: process.platform,
-    playwrightVersion: playwrightCorePackage.version,
-    vercel: process.env.VERCEL ?? "0",
-    packageStrategy: useServerlessChromium ? "sparticuz-chromium" : "local-playwright",
-    browserExecutablePath,
-    browserExecutablePathSource,
+    nodeEnv: runtime.nodeEnv,
+    nextRuntime: runtime.nextRuntime,
+    platform: runtime.platform,
+    playwrightVersion: runtime.playwrightVersion,
+    vercel: runtime.vercel,
+    packageStrategy: runtime.packageStrategy,
+    browserExecutablePath: runtime.browserExecutablePath,
+    browserExecutablePathSource: runtime.browserExecutablePathSource,
   };
 }
 
@@ -2875,194 +2855,63 @@ async function preparePageForScreenshot(page: Page) {
     });
 }
 
-function localBrowserExecutablePath() {
-  if (process.env.NODE_ENV === "production") {
-    return null;
-  }
-
-  return (
-    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?.trim() ||
-    process.env.BROWSER_EXECUTABLE_PATH?.trim() ||
-    process.env.CHROME_EXECUTABLE_PATH?.trim() ||
-    null
-  );
-}
-
-function safeLaunchOptionsForLog(options: LaunchOptions) {
-  return {
-    headless: options.headless,
-    args: Array.isArray(options.args) ? options.args : [],
-    executablePath: options.executablePath,
-    channel: options.channel,
-  };
-}
-
-function serverlessChromiumHeadless() {
-  return (serverlessChromium as { headless?: boolean }).headless ?? true;
-}
-
-function browserLaunchRuntimeDebug(
-  packageStrategy: string,
-  executablePath: string | undefined,
-  launchOptions?: LaunchOptions,
-) {
-  return {
-    runtime: process.env.NEXT_RUNTIME ?? "nodejs",
-    nodeEnv: process.env.NODE_ENV ?? "unknown",
-    vercel: process.env.VERCEL ?? "0",
-    platform: process.platform,
-    packageStrategy,
-    executablePath: executablePath ?? null,
-    launchOptions: launchOptions ? safeLaunchOptionsForLog(launchOptions) : null,
-  };
-}
-
-function errorDebug(error: unknown) {
-  return {
-    errorName: error instanceof Error ? error.name : "UnknownError",
-    errorMessage: error instanceof Error ? error.message : String(error),
-    errorStack: error instanceof Error ? error.stack : undefined,
-  };
-}
-
 async function launchBrowser(scanDiagnostics?: ScannerDiagnostics) {
-  const useServerlessChromium = isServerlessBrowserRuntime();
-  const localExecutablePath = useServerlessChromium ? null : localBrowserExecutablePath();
-  const packageStrategy = useServerlessChromium ? "sparticuz-chromium" : "local-playwright";
   const launchStart = Date.now();
-  let executablePath: string | undefined;
-  let launchOptions: LaunchOptions | undefined;
 
   try {
     addScannerStageLog(
       scanDiagnostics,
       "browser_launch",
-      useServerlessChromium
-        ? "Resolving Sparticuz Chromium executable"
-        : "Resolving local Playwright browser",
+      "Launching scanner browser",
       {
         url: scanDiagnostics?.requestedUrl,
-        debug: browserLaunchRuntimeDebug(packageStrategy, executablePath),
       },
     );
 
-    if (useServerlessChromium) {
-      serverlessChromium.setGraphicsMode = false;
-      executablePath = await serverlessChromium.executablePath();
-      launchOptions = {
-        args: [
-          ...serverlessChromium.args,
-          "--disable-dev-shm-usage",
-          "--user-data-dir=/tmp/chromium-user-data",
-          "--data-path=/tmp/chromium-data",
-          "--disk-cache-dir=/tmp/chromium-cache",
-        ],
-        executablePath,
-        headless: serverlessChromiumHeadless(),
-      };
-    } else {
-      executablePath = localExecutablePath ?? undefined;
-      launchOptions = {
-        headless: true,
-        ...(localExecutablePath ? { executablePath: localExecutablePath } : {}),
-      };
-    }
-
-    console.info(
-      "[scanner] Browser launch configuration",
-      browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
-    );
-
-    addScannerStageLog(
-      scanDiagnostics,
-      "browser_launch",
-      useServerlessChromium
-        ? "Launching Sparticuz Chromium for serverless runtime"
-        : localExecutablePath
-          ? "Launching development browser executable override"
-          : "Launching local Playwright browser",
-      {
-        url: scanDiagnostics?.requestedUrl,
-        debug: browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
-      },
-    );
-    const browser = await playwrightChromium.launch(launchOptions);
+    const launchResult = await launchScannerBrowser();
+    const { browser, ...launchDebug } = launchResult;
     addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
-    return browser;
-  } catch (primaryError) {
-    if (useServerlessChromium || localExecutablePath) {
-      addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
-      if (scanDiagnostics) {
-        scanDiagnostics.error = toScannerErrorDiagnostic(
-          primaryError,
-          "browser_launch",
-          scanDiagnostics,
-          scanDiagnostics.requestedUrl,
-        );
-      }
-      const debug = {
-        ...browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
-        ...errorDebug(primaryError),
-      };
-      addScannerStageLog(scanDiagnostics, "browser_launch", "Browser launch failed before navigation", {
-        level: "error",
-        url: scanDiagnostics?.requestedUrl,
-        debug,
-      });
-      console.error("[scanner] Browser launch failed", debug);
-      throw primaryError;
-    }
-
     addScannerStageLog(
       scanDiagnostics,
       "browser_launch",
-      "Default Chromium launch failed in development, falling back to Chrome channel",
+      "Scanner browser launched",
       {
-        level: "warn",
         url: scanDiagnostics?.requestedUrl,
-        debug: {
-          ...browserLaunchRuntimeDebug(packageStrategy, executablePath, launchOptions),
-          ...errorDebug(primaryError),
-        },
+        debug: launchDebug,
       },
     );
 
-    try {
-      const chromeLaunchOptions: LaunchOptions = {
-        headless: true,
-        channel: "chrome",
-      };
-      console.info("[scanner] Browser fallback launch configuration", {
-        ...browserLaunchRuntimeDebug("local-playwright", "Chrome channel", chromeLaunchOptions),
-      });
-      const browser = await playwrightChromium.launch(chromeLaunchOptions);
-      addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
-      return browser;
-    } catch (fallbackError) {
-      addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
-      if (scanDiagnostics) {
-        scanDiagnostics.error = toScannerErrorDiagnostic(
-          fallbackError,
-          "browser_launch",
-          scanDiagnostics,
-          scanDiagnostics.requestedUrl,
-        );
-      }
-      const fallbackDebug = {
-        ...browserLaunchRuntimeDebug("local-playwright", "Chrome channel", {
-          headless: true,
-          channel: "chrome",
-        }),
-        ...errorDebug(fallbackError),
-      };
-      addScannerStageLog(scanDiagnostics, "browser_launch", "Browser fallback launch failed", {
-        level: "error",
-        url: scanDiagnostics?.requestedUrl,
-        debug: fallbackDebug,
-      });
-      console.error("[scanner] Browser fallback launch failed", fallbackDebug);
-      throw fallbackError;
+    return browser;
+  } catch (error) {
+    addTiming(scanDiagnostics, "browserLaunchMs", Date.now() - launchStart);
+    if (scanDiagnostics) {
+      scanDiagnostics.error = toScannerErrorDiagnostic(
+        error,
+        "browser_launch",
+        scanDiagnostics,
+        scanDiagnostics.requestedUrl,
+      );
     }
+    addScannerStageLog(scanDiagnostics, "browser_launch", "Browser launch failed before navigation", {
+      level: "error",
+      url: scanDiagnostics?.requestedUrl,
+      debug:
+        error && typeof error === "object" && "metadata" in error
+          ? {
+              metadata: (error as { metadata?: unknown }).metadata,
+              message: error instanceof Error ? error.message : String(error),
+              name: error instanceof Error ? error.name : "UnknownError",
+              stack: error instanceof Error ? error.stack : undefined,
+              cause: error instanceof Error ? error.cause : undefined,
+            }
+          : {
+              message: error instanceof Error ? error.message : String(error),
+              name: error instanceof Error ? error.name : "UnknownError",
+              stack: error instanceof Error ? error.stack : undefined,
+              cause: error instanceof Error ? error.cause : undefined,
+            },
+    });
+    throw error;
   }
 }
 
