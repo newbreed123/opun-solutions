@@ -7,10 +7,17 @@ import {
 } from "@/lib/browser-launcher";
 import type { Browser, BrowserContext, Page } from "playwright-core";
 
-const screenshotDir = path.join(process.cwd(), "public", "audit-screenshots");
+function isVercelRuntime() {
+  return process.env.VERCEL === "1";
+}
+
+const screenshotDir = isVercelRuntime()
+  ? path.join("/tmp", "audit-screenshots")
+  : path.join(process.cwd(), "public", "audit-screenshots");
 const screenshotPublicPath = "/api/audit-screenshot";
 const screenshotMaxAgeMs = 1000 * 60 * 60;
 const navigationTimeoutMs = 15000;
+const screenshotTimeoutMs = isVercelRuntime() ? 8000 : 20000;
 
 export type ScannerStage =
   | "idle"
@@ -514,13 +521,9 @@ export async function runLightweightEcommerceDiagnostics(
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   const warnings: string[] = [];
-  let browser: Browser | null = null;
 
   try {
-    browser = await launchBrowser(scanDiagnostics);
-
-    const desktop = await scanViewport({
-      browser,
+    const desktop = await scanViewportWithBrowser({
       website,
       viewport: desktopViewport,
       scanId,
@@ -529,8 +532,7 @@ export async function runLightweightEcommerceDiagnostics(
       scanDiagnostics,
     });
 
-    const mobile = await scanViewport({
-      browser,
+    const mobile = await scanViewportWithBrowser({
       website,
       viewport: mobileViewport,
       scanId,
@@ -616,10 +618,44 @@ export async function runLightweightEcommerceDiagnostics(
       scanError: scannerError.category,
       scanDiagnostics,
     };
+  }
+}
+
+async function scanViewportWithBrowser(options: {
+  website: string;
+  viewport: ViewportDefinition;
+  scanId: string;
+  consoleErrors: string[];
+  failedRequests: string[];
+  scanDiagnostics: ScannerDiagnostics;
+}) {
+  addScannerStageLog(
+    options.scanDiagnostics,
+    "browser_launch",
+    `Launching isolated ${options.viewport.name} browser`,
+    {
+      viewport: options.viewport.name,
+      url: options.website,
+    },
+  );
+  const browser = await launchBrowser(options.scanDiagnostics);
+
+  try {
+    return await scanViewport({
+      browser,
+      ...options,
+    });
   } finally {
-    if (browser) {
-      await browser.close().catch(() => undefined);
-    }
+    addScannerStageLog(
+      options.scanDiagnostics,
+      options.scanDiagnostics.currentStage,
+      `Closing isolated ${options.viewport.name} browser`,
+      {
+        viewport: options.viewport.name,
+        url: options.website,
+      },
+    );
+    await browser.close().catch(() => undefined);
   }
 }
 
@@ -2766,10 +2802,12 @@ async function captureScreenshot(
     label: string;
     mode: ScannerDiagnostics["screenshotModeUsed"];
     fullPage: boolean;
-  }> = [
-    { label: "normal viewport screenshot", mode: "viewport", fullPage: false },
-    { label: "fallback viewport screenshot", mode: "viewport", fullPage: false },
-  ];
+  }> = isVercelRuntime()
+    ? [{ label: "serverless viewport screenshot", mode: "viewport", fullPage: false }]
+    : [
+        { label: "normal viewport screenshot", mode: "viewport", fullPage: false },
+        { label: "fallback viewport screenshot", mode: "viewport", fullPage: false },
+      ];
   const warnings: string[] = [];
 
   await preparePageForScreenshot(page);
@@ -2785,7 +2823,7 @@ async function captureScreenshot(
         path: filepath,
         fullPage: attempt.fullPage,
         animations: "disabled",
-        timeout: 20000,
+        timeout: screenshotTimeoutMs,
       });
       addTiming(scanDiagnostics, "screenshotMs", Date.now() - screenshotStart);
 

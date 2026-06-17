@@ -5,7 +5,9 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const screenshotDir = path.join(process.cwd(), "public", "audit-screenshots");
+const screenshotDir = process.env.VERCEL === "1"
+  ? path.join("/tmp", "audit-screenshots")
+  : path.join(process.cwd(), "public", "audit-screenshots");
 const filenamePattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(desktop|mobile)\.png$/i;
 
