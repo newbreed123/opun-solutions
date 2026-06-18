@@ -1,6 +1,7 @@
 import { NormalizedLead } from "@/lib/leads";
 
 export const CONTACT_EMAIL = "hello@opzix.io";
+const DEFAULT_FROM_EMAIL = "Opzix Audit <onboarding@resend.dev>";
 
 type LeadNotificationResult =
   | {
@@ -14,6 +15,7 @@ type LeadNotificationResult =
       ok: false;
       provider: "resend" | "not-configured";
       error: string;
+      recipient: string;
       status?: number;
     };
 
@@ -76,10 +78,18 @@ function buildLeadEmail(lead: NormalizedLead) {
   };
 }
 
+export function getContactNotificationEmail() {
+  return process.env.CONTACT_NOTIFICATION_EMAIL?.trim() || CONTACT_EMAIL;
+}
+
+function getContactFromEmail() {
+  return process.env.CONTACT_FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL;
+}
+
 export async function sendLeadNotification(
   lead: NormalizedLead,
 ): Promise<LeadNotificationResult> {
-  const recipient = CONTACT_EMAIL;
+  const recipient = getContactNotificationEmail();
   const testMode = process.env.CONTACT_EMAIL_TEST_MODE === "true";
 
   const email = buildLeadEmail(lead);
@@ -105,9 +115,13 @@ export async function sendLeadNotification(
     return {
       ok: false,
       provider: "not-configured",
-      error: "RESEND_API_KEY is not configured.",
+      recipient,
+      error:
+        "RESEND_API_KEY is not configured for lead notifications. Set RESEND_API_KEY in the deployment environment.",
     };
   }
+
+  const from = getContactFromEmail();
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -116,9 +130,7 @@ export async function sendLeadNotification(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from:
-        process.env.CONTACT_FROM_EMAIL?.trim() ||
-        "Opzix Audit <onboarding@resend.dev>",
+      from,
       to: [recipient],
       reply_to: lead.email,
       subject: email.subject,
@@ -134,6 +146,7 @@ export async function sendLeadNotification(
       ok: false,
       provider: "resend",
       status: response.status,
+      recipient,
       error:
         payload.message ||
         payload.error ||

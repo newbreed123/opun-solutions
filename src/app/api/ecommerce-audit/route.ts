@@ -12,7 +12,7 @@ import {
   ValidationIssue,
 } from "@/lib/form-submissions";
 import {
-  CONTACT_EMAIL,
+  getContactNotificationEmail,
   logSuccessfulLeadSubmission,
   sendLeadNotification,
 } from "@/lib/lead-notifications";
@@ -92,11 +92,16 @@ export async function POST(request: NextRequest) {
 
     if (!notification.ok) {
       console.error("Ecommerce audit notification failed:", notification);
+      const deliveryStatus =
+        notification.provider === "not-configured"
+          ? "not configured"
+          : "currently unavailable";
+
       return NextResponse.json(
         {
           success: false,
           error:
-            `We received your audit request, but notification delivery is not configured. Please email ${CONTACT_EMAIL} directly.`,
+            `We received your audit request, but notification delivery is ${deliveryStatus}. Please email ${getContactNotificationEmail()} directly.`,
           notification,
         },
         { status: 503 },
