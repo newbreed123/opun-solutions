@@ -288,15 +288,30 @@ function RoadmapSummary({ value }: { value: unknown }) {
   const title = stringValue(firstStep.title) || "Roadmap step";
   const cost = stringValue(firstStep.cost);
   const timeline = stringValue(firstStep.timeline);
+  const rangeLabel = roadmapRangeLabel(title);
 
   return (
     <div className="space-y-1">
       <p className="font-semibold leading-snug text-primary">{title}</p>
       <p className="text-xs text-muted">
-        {[cost, timeline].filter(Boolean).join(" / ") || "Cost/timeline pending"}
+        {[cost ? `${rangeLabel}: ${cost}` : "", timeline ? `Timeline: ${timeline}` : ""]
+          .filter(Boolean)
+          .join(" / ") || "Planning range pending"}
       </p>
     </div>
   );
+}
+
+function roadmapRangeLabel(title: string) {
+  if (/\b(confirm|confirmation|validate|validation|discovery call|audit|consult)\b/i.test(title)) {
+    return "Consulting range";
+  }
+
+  if (/\b(review|discovery|friction|improve|improvement|clarity|strengthen|fix)\b/i.test(title)) {
+    return "Improvement range";
+  }
+
+  return "Investment range";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

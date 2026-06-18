@@ -74,12 +74,12 @@ const funnelNodes = [
     icon: ClipboardCheck,
   },
   {
-    label: "CRM / Email Routing",
+    label: "CRM Routing",
     detail: "Clean handoff to the right workflow",
     icon: Mail,
   },
   {
-    label: "Booking or Sales Conversation",
+    label: "Booking / Sales Call",
     detail: "Qualified next step with context",
     icon: CalendarCheck,
   },
@@ -88,6 +88,30 @@ const funnelNodes = [
     detail: "Clear journey from interest to action",
     icon: Users,
   },
+];
+
+const funnelPhases = [
+  {
+    label: "Attract",
+    summary: "Bring the right visitor into a focused path.",
+    nodes: funnelNodes.slice(0, 2),
+  },
+  {
+    label: "Qualify",
+    summary: "Collect intent, fit, urgency, and request context.",
+    nodes: funnelNodes.slice(2, 4),
+  },
+  {
+    label: "Convert",
+    summary: "Route, book, and follow up with the next step clear.",
+    nodes: funnelNodes.slice(4),
+  },
+];
+
+const automationHighlights = [
+  { label: "AI qualification", icon: MessageSquare },
+  { label: "Booking handoff", icon: CalendarCheck },
+  { label: "Follow-up workflow", icon: Zap },
 ];
 
 export function AuditPreviewMockup({ className = "" }: MockupProps) {
@@ -337,10 +361,10 @@ export function LeadSystemDashboardMockup({ className = "" }: MockupProps) {
 
 export function FunnelArchitectureDiagram({ className = "" }: MockupProps) {
   return (
-    <div className={`card-elevated relative w-full min-w-0 max-w-full overflow-hidden p-5 md:p-6 ${className}`}>
+    <div className={`card-elevated relative w-full min-w-0 max-w-full self-start overflow-hidden p-5 md:p-6 lg:p-7 ${className}`}>
       <div className="absolute left-1/2 top-8 h-48 w-48 -translate-x-1/2 rounded-full bg-brand-blue/20 blur-3xl" />
       <div className="relative">
-        <div className="mb-6 text-center">
+        <div className="mb-7 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
             Connected Funnel
           </p>
@@ -349,40 +373,73 @@ export function FunnelArchitectureDiagram({ className = "" }: MockupProps) {
           </h3>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-7">
-          {funnelNodes.map((node, index) => {
-            const Icon = node.icon;
+        <div className="grid gap-5 lg:grid-cols-3">
+          {funnelPhases.map((phase, phaseIndex) => {
             return (
-              <div key={node.label} className="relative">
-                <div className="h-full rounded-2xl border border-dark-border bg-white/[0.035] p-4 text-left">
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
-                    <Icon className="h-5 w-5" />
+              <div
+                key={phase.label}
+                className="relative min-w-0 border-t border-brand-cyan/30 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 first:lg:border-l-0 first:lg:pl-0"
+              >
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-brand-cyan">
+                      0{phaseIndex + 1}
+                    </p>
+                    <p className="mt-1 text-base font-bold text-primary">
+                      {phase.label}
+                    </p>
                   </div>
-                  <p className="text-sm font-bold text-primary">{node.label}</p>
-                  <p className="mt-2 text-xs leading-relaxed text-muted">
-                    {node.detail}
-                  </p>
+                  {phaseIndex < funnelPhases.length - 1 && (
+                    <ArrowRight className="mt-1 hidden h-5 w-5 flex-none text-brand-cyan/70 lg:block" />
+                  )}
                 </div>
-                {index < funnelNodes.length - 1 && (
-                  <>
-                    <ArrowDown className="mx-auto my-1 h-4 w-4 text-brand-cyan/70 lg:hidden" />
-                    <ArrowRight className="absolute -right-3 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 text-brand-cyan/70 lg:block" />
-                  </>
+
+                <p className="mb-4 min-h-[2.5rem] text-sm leading-relaxed text-secondary">
+                  {phase.summary}
+                </p>
+
+                <div className="space-y-3">
+                  {phase.nodes.map((node) => {
+                    const Icon = node.icon;
+                    return (
+                      <div key={node.label} className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold leading-snug text-primary">
+                            {node.label}
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-muted">
+                            {node.detail}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {phaseIndex < funnelPhases.length - 1 && (
+                  <ArrowDown className="mx-auto mt-5 h-4 w-4 text-brand-cyan/70 lg:hidden" />
                 )}
               </div>
             );
           })}
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {["AI assistant", "Booking", "Follow-up automation"].map((item) => (
-            <div
-              key={item}
-              className="rounded-2xl border border-brand-cyan/20 bg-brand-cyan/10 px-4 py-3 text-sm font-semibold text-primary"
-            >
-              {item}
-            </div>
-          ))}
+        <div className="mt-7 grid gap-3 md:grid-cols-3">
+          {automationHighlights.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.label}
+                className="flex items-center gap-3 rounded-2xl border border-brand-cyan/20 bg-brand-cyan/10 px-4 py-3 text-sm font-semibold text-primary"
+              >
+                <Icon className="h-4 w-4 flex-none text-brand-cyan" />
+                <span className="min-w-0">{item.label}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

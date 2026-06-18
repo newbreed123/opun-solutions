@@ -728,6 +728,89 @@ function roadmapStepsForAudit(audit: AuditResult): RecommendationRoadmapStep[] {
   }));
 }
 
+const ROADMAP_ESTIMATE_DISCLAIMER =
+  "These are directional planning estimates based on public-page signals and common implementation ranges. Final scope may vary after a manual review.";
+
+function roadmapRangeLabel(title: string) {
+  if (/\b(confirm|confirmation|validate|validation|discovery call|audit|consult)\b/i.test(title)) {
+    return "Consulting Range";
+  }
+
+  if (/\b(review|discovery|friction|improve|improvement|clarity|strengthen|fix)\b/i.test(title)) {
+    return "Improvement Range";
+  }
+
+  return "Investment Range";
+}
+
+function parseRoadmapRange(range: string) {
+  const matches = range.match(/\$?\s*([0-9][0-9,]*)/g);
+
+  if (!matches || matches.length < 2) {
+    return null;
+  }
+
+  const [low, high] = matches.slice(0, 2).map((value) =>
+    Number(value.replace(/[^0-9]/g, "")),
+  );
+
+  return Number.isFinite(low) && Number.isFinite(high) ? { low, high } : null;
+}
+
+function parseTimelineWeeks(timeline: string) {
+  const normalized = timeline.toLowerCase();
+  const matches = normalized.match(/([0-9]+(?:\.[0-9]+)?)/g);
+
+  if (!matches || matches.length === 0) {
+    return null;
+  }
+
+  const multiplier = normalized.includes("month") ? 4 : 1;
+  const low = Number(matches[0]) * multiplier;
+  const high = Number(matches[1] ?? matches[0]) * multiplier;
+
+  return Number.isFinite(low) && Number.isFinite(high) ? { low, high } : null;
+}
+
+function formatCurrencyRangeValue(value: number) {
+  return `$${Math.round(value).toLocaleString("en-US")}`;
+}
+
+function initialImprovementEstimate(steps: RecommendationRoadmapStep[]) {
+  const parsedSteps = steps
+    .map((step) => ({
+      investment: parseRoadmapRange(step.cost),
+      timeline: parseTimelineWeeks(step.timeline),
+    }))
+    .filter(
+      (step): step is {
+        investment: { low: number; high: number };
+        timeline: { low: number; high: number } | null;
+      } => Boolean(step.investment),
+    );
+
+  if (parsedSteps.length < 2) {
+    return null;
+  }
+
+  const low = parsedSteps.reduce((total, step) => total + step.investment.low, 0);
+  const high = parsedSteps.reduce((total, step) => total + step.investment.high, 0);
+  const timelineSteps = parsedSteps.filter(
+    (step): step is {
+      investment: { low: number; high: number };
+      timeline: { low: number; high: number };
+    } => Boolean(step.timeline),
+  );
+
+  return {
+    range: `${formatCurrencyRangeValue(low)}-${formatCurrencyRangeValue(high)}`,
+    timeline:
+      timelineSteps.length >= 2
+        ? `${timelineSteps.reduce((total, step) => total + step.timeline.low, 0)}-${timelineSteps.reduce((total, step) => total + step.timeline.high, 0)} weeks`
+        : null,
+  };
+}
+
 function primaryRoadmapStep(audit: AuditResult) {
   return roadmapStepsForAudit(audit)[0] ?? null;
 }
@@ -1164,7 +1247,7 @@ export default function EcommerceAuditScannerPage() {
                   </p>
                   <p className="audit-print-cta-copy">
                     {primaryRoadmapStep(audit)
-                      ? `${primaryRoadmapStep(audit)?.cost} / ${primaryRoadmapStep(audit)?.timeline}. ${primaryRoadmapStep(audit)?.rationale}`
+                      ? `${roadmapRangeLabel(primaryRoadmapStep(audit)?.title ?? "")}: ${primaryRoadmapStep(audit)?.cost} / Timeline: ${primaryRoadmapStep(audit)?.timeline}. ${primaryRoadmapStep(audit)?.rationale} ${ROADMAP_ESTIMATE_DISCLAIMER}`
                       : "Walk through the score, validate the public-page evidence, and turn the top findings into a practical fix list."}
                   </p>
                 </div>
@@ -1479,76 +1562,107 @@ export default function EcommerceAuditScannerPage() {
                   This roadmap is the shared source of truth for the report,
                   assistant, admin view, and follow-up conversations.
                 </p>
-                <div className="mt-7 grid gap-4 lg:grid-cols-4">
-                  {roadmapStepsForAudit(audit).map((step, index) => (
-                    <div
-                      key={`${step.stepNumber}-${step.title}`}
-                      className="rounded-2xl border border-dark-border bg-dark-deep/75 p-5"
-                    >
-                      <div className="mb-5 flex items-center gap-3">
-                        <div className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-cyan/15 text-sm font-bold text-brand-cyan">
-                          {index + 1}
-                        </div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
-                          {actionPlanLabel(index)}
-                        </p>
-                      </div>
-                      <p className="text-lg font-semibold leading-snug text-primary">
-                        {step.title}
+                {(() => {
+                  const roadmapSteps = roadmapStepsForAudit(audit);
+                  const improvementEstimate = initialImprovementEstimate(roadmapSteps);
+
+                  return (
+                    <>
+                      <p className="mt-4 max-w-3xl rounded-2xl border border-brand-cyan/20 bg-brand-cyan/10 px-4 py-3 text-sm leading-6 text-secondary">
+                        {ROADMAP_ESTIMATE_DISCLAIMER}
                       </p>
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
-                          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted">
-                            Cost
-                          </p>
-                          <p className="mt-1 text-sm font-bold text-primary">
-                            {step.cost}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
-                          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted">
-                            Timeline
-                          </p>
-                          <p className="mt-1 text-sm font-bold text-primary">
-                            {step.timeline}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-5 space-y-4">
-                        {step.sourceFinding && (
+
+                      {improvementEstimate ? (
+                        <div className="mt-5 grid gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:grid-cols-[1fr_auto] sm:items-center">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                              Source
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                              Initial Improvement Range
                             </p>
-                            <p className="mt-1 text-sm leading-6 text-secondary">
-                              {sanitizeEvidenceText(step.sourceFinding)}
+                            <p className="mt-2 text-2xl font-bold text-primary">
+                              {improvementEstimate.range}
                             </p>
                           </div>
-                        )}
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                            Why
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-muted">
-                            {sanitizeEvidenceText(step.rationale, {
-                              maxLength: 180,
-                            })}
-                          </p>
+                          {improvementEstimate.timeline ? (
+                            <p className="text-sm font-semibold text-secondary">
+                              Estimated Timeline: {improvementEstimate.timeline}
+                            </p>
+                          ) : null}
                         </div>
-                        <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3.5">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
-                            Validate
-                          </p>
-                          <p className="mt-1 text-sm font-semibold leading-6 text-primary">
-                            {sanitizeEvidenceText(step.validationTarget, {
-                              maxLength: 180,
-                            })}
-                          </p>
-                        </div>
+                      ) : null}
+
+                      <div className="mt-7 grid gap-4 lg:grid-cols-4">
+                        {roadmapSteps.map((step, index) => (
+                          <div
+                            key={`${step.stepNumber}-${step.title}`}
+                            className="rounded-2xl border border-dark-border bg-dark-deep/75 p-5"
+                          >
+                            <div className="mb-5 flex items-center gap-3">
+                              <div className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-cyan/15 text-sm font-bold text-brand-cyan">
+                                {index + 1}
+                              </div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                                {actionPlanLabel(index)}
+                              </p>
+                            </div>
+                            <p className="text-lg font-semibold leading-snug text-primary">
+                              {step.title}
+                            </p>
+                            <div className="mt-4 grid grid-cols-2 gap-2">
+                              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                                  {roadmapRangeLabel(step.title)}
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-primary">
+                                  {step.cost}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                                  Timeline
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-primary">
+                                  {step.timeline}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-5 space-y-4">
+                              {step.sourceFinding && (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                                    Source
+                                  </p>
+                                  <p className="mt-1 text-sm leading-6 text-secondary">
+                                    {sanitizeEvidenceText(step.sourceFinding)}
+                                  </p>
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                                  Why
+                                </p>
+                                <p className="mt-1 text-sm leading-6 text-muted">
+                                  {sanitizeEvidenceText(step.rationale, {
+                                    maxLength: 180,
+                                  })}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-3.5">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
+                                  Validate
+                                </p>
+                                <p className="mt-1 text-sm font-semibold leading-6 text-primary">
+                                  {sanitizeEvidenceText(step.validationTarget, {
+                                    maxLength: 180,
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="card-elevated p-6 md:p-8">

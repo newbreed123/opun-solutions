@@ -36,7 +36,7 @@ export type AssistantKnowledgeEntry = {
 export const assistantKnowledgeFrameworks: AssistantKnowledgeEntry[] = [
   {
     intent: "cost_estimate",
-    title: "Cost Estimate",
+    title: "Planning Range",
     questionPatterns: [
       "how much",
       "cost",
@@ -49,7 +49,7 @@ export const assistantKnowledgeFrameworks: AssistantKnowledgeEntry[] = [
     ],
     answerFramework: [
       "Estimated project size",
-      "Cost range",
+      "Typical investment range",
       "Timeline",
       "Why this range",
       "Assumptions",
@@ -63,7 +63,7 @@ export const assistantKnowledgeFrameworks: AssistantKnowledgeEntry[] = [
       "scoringConfidence",
     ],
     fallbackAnswer:
-      "Based on this scan, I would estimate the work directionally before giving a fixed quote.",
+      "Based on this scan, I would give a directional planning range before treating anything as a final proposal.",
     ctaStyle: "manual_review",
   },
   {
@@ -83,8 +83,8 @@ export const assistantKnowledgeFrameworks: AssistantKnowledgeEntry[] = [
     answerFramework: [
       "Rebuild recommendation",
       "Why",
-      "Cost to improve existing site",
-      "Cost to rebuild",
+      "Improvement planning range",
+      "Rebuild planning range",
       "Lowest-risk recommendation",
       "Next step",
     ],

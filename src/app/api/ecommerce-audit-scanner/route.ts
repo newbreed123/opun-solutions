@@ -6347,7 +6347,7 @@ function buildRecommendationRoadmap({
 
   const roadmap: RecommendationRoadmap = {
     summary:
-      "A structured implementation roadmap for answering what comes next, how much it costs, how long it takes, and what the likely ROI is.",
+      "A structured recommendation roadmap for answering what comes next, the directional planning range, the expected timeline, and the likely ROI.",
     primaryRecommendation: steps[0]?.title ?? "Validate Primary Customer Path",
     source: {
       scanId,

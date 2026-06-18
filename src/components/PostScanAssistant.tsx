@@ -3235,6 +3235,18 @@ function roadmapActionPhrase(title: string) {
   return `review ${trimmed}`;
 }
 
+function roadmapRangeLabel(title: string) {
+  if (/\b(confirm|confirmation|validate|validation|discovery call|audit|consult)\b/i.test(title)) {
+    return "consulting range";
+  }
+
+  if (/\b(review|discovery|friction|improve|improvement|clarity|strengthen|fix)\b/i.test(title)) {
+    return "improvement range";
+  }
+
+  return "typical investment range";
+}
+
 function buildRecommendationThreadFollowUp(
   input: string,
   state: ConversationState,
@@ -3306,6 +3318,7 @@ function buildRecommendationThreadFollowUp(
         `${requestedStep.stepNumber === 1 ? "First" : requestedStep.stepNumber === 2 ? "Second" : requestedStep.stepNumber === 3 ? "Third" : requestedStep.stepNumber === 4 ? "Fourth" : requestedStep.stepNumber === 5 ? "Fifth" : requestedStep.stepNumber === 6 ? "Sixth" : requestedStep.stepNumber === 7 ? "Seventh" : `Step ${requestedStep.stepNumber}`}, I would ${roadmapActionPhrase(requestedStep.title)}.`,
         requestedStep.reason,
         `Expected impact: ${requestedStep.expectedImpact}`,
+        `${roadmapRangeLabel(requestedStep.title).replace(/^\w/, (letter) => letter.toUpperCase())}: ${requestedStep.estimatedCost}. This is a planning estimate, not a final proposal.`,
         `Estimated effort: ${requestedStep.estimatedTimeline}.`,
       ]
     : null;
@@ -3378,18 +3391,20 @@ function buildRecommendationThreadFollowUp(
       ],
     cost: [
       costStep
-        ? `If you mean ${costStep.title}, I would estimate ${costStep.estimatedCost}.`
-        : "For the recommendation we were discussing, I would estimate a focused project rather than a full redesign.",
+        ? `Based on this scan, the ${roadmapRangeLabel(costStep.title)} for ${costStep.title} is ${costStep.estimatedCost} with an estimated timeline of ${costStep.estimatedTimeline}.`
+        : "For the recommendation we were discussing, I would use a directional planning range for a focused project rather than treating it like a full redesign proposal.",
       costStep
-        ? `Timeline: ${costStep.estimatedTimeline}.`
-        : "The exact range depends on how much navigation, category, search, content, and testing work is included.",
-      "That is very different from a full enterprise redesign or platform rebuild, which can be much larger.",
+        ? "This is a planning estimate, not a final proposal."
+        : "The exact planning range depends on how much navigation, category, search, content, and testing work is included.",
+      "These are directional estimates based on public-page signals and common implementation ranges. Final scope may vary after a manual review.",
     ],
     timeline: [
       costStep
         ? `For ${costStep.title}, I would expect ${costStep.estimatedTimeline}.`
         : "For the recommendation we were discussing, I would expect a focused validation or implementation window rather than a full rebuild timeline.",
-      costStep ? `Cost range: ${costStep.estimatedCost}.` : "",
+      costStep
+        ? `${roadmapRangeLabel(costStep.title).replace(/^\w/, (letter) => letter.toUpperCase())}: ${costStep.estimatedCost}.`
+        : "",
       "The timing depends on access to analytics, templates, product/category structure, and how quickly changes can be tested.",
     ].filter(Boolean),
     more: [

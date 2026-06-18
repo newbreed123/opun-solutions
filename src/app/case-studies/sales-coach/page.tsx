@@ -36,6 +36,7 @@ export default function SalesCoachCaseStudy() {
                 src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
                 alt="Sales Coach"
                 fill
+                sizes="(min-width: 1280px) 600px, (min-width: 768px) 50vw, 100vw"
                 className="object-cover"
               />
             </div>

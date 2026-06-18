@@ -78,6 +78,8 @@ You should:
 - connect findings to conversion, trust, tracking, operations, or the customer journey
 - ask one helpful follow-up question when useful
 - recommend booking a free audit only when it is a natural next step
+- treat roadmap dollar ranges as directional planning estimates, not fixed prices or final proposals
+- use "typical investment range", "consulting range", "improvement range", "planning range", or "directional estimate" instead of "cost" when discussing roadmap budget ranges
 
 Avoid:
 - robotic phrasing such as "The strongest technical finding is Technical"
@@ -2013,8 +2015,8 @@ function estimateImplementationCost(
   ].filter(Boolean);
 
   const assumptions = [
-    "This is a directional public-scan estimate, not a fixed quote.",
-    "Final pricing depends on platform access, theme complexity, number of templates, content readiness, analytics needs, and stakeholder review cycles.",
+    "This is a directional public-scan estimate, not a final proposal.",
+    "Final scope depends on platform access, theme complexity, number of templates, content readiness, analytics needs, and stakeholder review cycles.",
     "The estimate assumes the work focuses on the scanned issues rather than a full brand, catalog, or platform rebuild unless the scan signals that scope.",
   ];
 
@@ -2026,7 +2028,7 @@ function estimateImplementationCost(
     confidence:
       findings.length > 0 || actionItems.length > 0
         ? "Medium - based on visible scan findings only"
-        : "Low - not enough prioritized scan findings to price confidently",
+        : "Low - not enough prioritized scan findings to estimate the range confidently",
     assumptions,
   };
 }
@@ -2049,6 +2051,25 @@ function hasCostIntent(normalized: string) {
     "bigger redesign",
     "redesign work",
   ]);
+}
+
+function roadmapRangeLabel(step: Record<string, unknown>) {
+  const title = asString(step.title);
+
+  if (/\b(confirm|confirmation|validate|validation|discovery call|audit|consult)\b/i.test(title)) {
+    return "consulting range";
+  }
+
+  if (/\b(review|discovery|friction|improve|improvement|clarity|strengthen|fix)\b/i.test(title)) {
+    return "improvement range";
+  }
+
+  return "typical investment range";
+}
+
+function capitalizedRoadmapRangeLabel(step: Record<string, unknown>) {
+  const label = roadmapRangeLabel(step);
+  return label.replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 function hasNewStoreIntent(normalized: string) {
@@ -2128,7 +2149,7 @@ function costEstimateAnswer(
         : estimate.reasoning.join(" "),
       businessMeaning: enterpriseContext
         ? "I would separate the work into two scopes: a smaller public-page UX validation/fix, and a much larger enterprise architecture scope only if internal systems, integrations, or platform constraints are confirmed."
-        : "I would separate quick wins from structural work before quoting. The lower-cost version handles the visible scanned issues; the higher-cost version assumes templates, navigation, tracking, or platform work.",
+        : "I would separate quick wins from structural work before a manual proposal. The lower investment range handles the visible scanned issues; the higher planning range assumes templates, navigation, tracking, or platform work.",
       suggestedFollowUp: "Would you like Opzix to review this manually?",
     };
   }
@@ -2141,10 +2162,10 @@ function costEstimateAnswer(
       matched: true,
       topic: "cost_estimate",
       directAnswer:
-        `Based on this scan, I would price the first roadmap step, ${asString(firstRoadmap.title)}, at ${asString(firstRoadmap.cost) || asString(firstRoadmap.estimatedCost)}, with an estimated timeline of ${asString(firstRoadmap.timeline) || asString(firstRoadmap.estimatedTimeline)}.`,
-      evidence: `Roadmap cost view: ${roadmapSummary}.`,
+        `Based on this scan, the ${roadmapRangeLabel(firstRoadmap)} for Step 1, ${asString(firstRoadmap.title)}, is ${asString(firstRoadmap.cost) || asString(firstRoadmap.estimatedCost)}, with an estimated timeline of ${asString(firstRoadmap.timeline) || asString(firstRoadmap.estimatedTimeline)}.`,
+      evidence: `Roadmap planning view: ${roadmapSummary}.`,
       businessMeaning:
-        "This keeps the estimate tied to a practical sequence instead of treating the scan as one vague project. The early steps validate ROI before larger redesign or platform work.",
+        "This is a planning estimate, not a final proposal. It keeps the range tied to a practical sequence instead of treating the scan as one vague project, and the early steps validate ROI before larger redesign or platform work.",
       suggestedFollowUp: "Would you like Opzix to review this manually?",
     };
   }
@@ -2152,10 +2173,10 @@ function costEstimateAnswer(
   return {
     matched: true,
     topic: "cost_estimate",
-    directAnswer: `Based on this scan, I would estimate a ${estimate.projectSize} implementation: ${estimate.estimatedRange}, with an estimated effort of ${estimate.estimatedEffort}.`,
+    directAnswer: `Based on this scan, I would use a ${estimate.projectSize.toLowerCase()} directional planning range: ${estimate.estimatedRange}, with an estimated effort of ${estimate.estimatedEffort}.`,
     evidence: estimate.reasoning.join(" "),
     businessMeaning:
-      `I would treat this as a directional estimate with ${confidenceLabel} confidence. Final pricing depends on platform, theme complexity, templates, content, analytics needs, and whether scope grows beyond the scanned issues.`,
+      `I would treat this as a directional estimate with ${confidenceLabel} confidence. Final scope depends on platform, theme complexity, templates, content, analytics needs, and whether the work grows beyond the scanned issues.`,
     suggestedFollowUp: "Would you like Opzix to review this manually?",
   };
 }
@@ -2193,12 +2214,12 @@ function newStoreCostAnswer(scanContext: Record<string, unknown>): ExactAnswer {
     topic: "new_store_cost",
     directAnswer: b2bContext
       ? "Based on this scan, I would not immediately rebuild the site. The visible issues look more like UX, product discovery, and information architecture problems than proof that the platform itself has to be replaced."
-      : "Based on this scan, I would price a new ecommerce build separately from fixing the current site. I would still validate whether the visible issues are cheaper UX and discovery fixes before recommending a full rebuild.",
+      : "Based on this scan, I would estimate a new ecommerce build separately from fixing the current site. I would still validate whether the visible issues are smaller UX and discovery fixes before recommending a full rebuild.",
     evidence:
       "New basic ecommerce store: $3,000-$8,000, usually 2-6 weeks. New professional B2B store: $8,000-$25,000, usually 1-3 months. Enterprise B2B commerce platform: $25,000-$100,000+, usually 3-12 months.",
     businessMeaning: b2bContext
-      ? `For this scan, the lower-cost path is likely a ${estimate.estimatedRange} UX improvement project before a rebuild. A professional B2B rebuild would make sense if you need custom UX, stronger category architecture, advanced search, quote-request workflows, account experience, tracking, or reporting.`
-      : `For this scan, the lower-cost path is likely a ${estimate.estimatedRange} targeted improvement project before a rebuild. A rebuild should only enter the conversation if platform limits, migration needs, integrations, or internal operating constraints are confirmed outside the public scan.`,
+      ? `For this scan, the smaller planning range is likely a ${estimate.estimatedRange} UX improvement project before a rebuild. A professional B2B rebuild would make sense if you need custom UX, stronger category architecture, advanced search, quote-request workflows, account experience, tracking, or reporting.`
+      : `For this scan, the smaller planning range is likely a ${estimate.estimatedRange} targeted improvement project before a rebuild. A rebuild should only enter the conversation if platform limits, migration needs, integrations, or internal operating constraints are confirmed outside the public scan.`,
     suggestedFollowUp: "Would you like Opzix to review this manually?",
   };
 }
@@ -2221,6 +2242,7 @@ function roiAnswer(
     const roiRationale =
       asString(firstRoadmap.roiRationale) ||
       "This is the highest-ROI starting point because it validates the customer path before larger work.";
+    const rangeLabel = capitalizedRoadmapRangeLabel(firstRoadmap);
 
     return {
       matched: true,
@@ -2228,7 +2250,7 @@ function roiAnswer(
       directAnswer: `The highest-ROI first move appears to be ${title}.`,
       evidence: roiRationale,
       businessMeaning:
-        `Effort: ${timeline || "directional timeline not set"}${cost ? `, ${cost}` : ""}. Likely impact: ${impact.replace(/[.]+$/g, "")}. Risk: this is still directional until validated with analytics, platform access, or manual journey review.`,
+        `Timeline: ${timeline || "directional timeline not set"}${cost ? `, ${rangeLabel}: ${cost}` : ""}. Likely impact: ${impact.replace(/[.]+$/g, "")}. Risk: this is still directional until validated with analytics, platform access, or manual journey review.`,
       suggestedFollowUp: "Would you like Opzix to review this manually?",
     };
   }
@@ -2335,7 +2357,10 @@ function roadmapStepLabel(step: Record<string, unknown>) {
   const title = asString(step.title) || "Roadmap step";
   const cost = asString(step.cost) || asString(step.estimatedCost);
   const timeline = asString(step.timeline) || asString(step.estimatedTimeline);
-  const suffix = [cost, timeline].filter(Boolean).join(", ");
+  const suffix = [
+    cost ? `${roadmapRangeLabel(step)} ${cost}` : "",
+    timeline ? `timeline ${timeline}` : "",
+  ].filter(Boolean).join(", ");
 
   return `${stepNumber ? `Step ${stepNumber}: ` : ""}${title}${suffix ? ` (${suffix})` : ""}`;
 }
@@ -2455,7 +2480,11 @@ function roadmapStepAnswer(
     topic: "implementation_plan",
     directAnswer: `Step ${stepNumber} is ${title}.`,
     evidence:
-      [cost ? `Cost: ${cost}.` : "", timeline ? `Timeline: ${timeline}.` : ""]
+      [
+        cost ? `${capitalizedRoadmapRangeLabel(step)}: ${cost}.` : "",
+        timeline ? `Timeline: ${timeline}.` : "",
+        cost ? "This is a planning estimate, not a final proposal." : "",
+      ]
         .filter(Boolean)
         .join(" ") ||
       "This comes from the structured recommendation roadmap.",
@@ -2534,7 +2563,7 @@ function buildHighestROIRecommendation(scanContext: Record<string, unknown>) {
         rationale,
         asString(firstStep.roiRationale),
         asString(firstStep.cost) || asString(firstStep.estimatedCost)
-          ? `Estimated cost: ${asString(firstStep.cost) || asString(firstStep.estimatedCost)}.`
+          ? `${capitalizedRoadmapRangeLabel(firstStep)}: ${asString(firstStep.cost) || asString(firstStep.estimatedCost)}. This is a planning estimate, not a final proposal.`
           : "",
         asString(firstStep.timeline) || asString(firstStep.estimatedTimeline)
           ? `Estimated timeline: ${asString(firstStep.timeline) || asString(firstStep.estimatedTimeline)}.`
@@ -2757,7 +2786,7 @@ function implementationPlanAnswer(scanContext: Record<string, unknown>): ExactAn
         `Based on this scan, I would use a structured recommendation roadmap starting with ${asString(firstStep.title)}.`,
       evidence: plan,
       businessMeaning:
-        "This roadmap separates validation, implementation, and follow-up work so cost, timeline, and ROI can be discussed step by step instead of as one oversized project.",
+        "This roadmap separates validation, implementation, and follow-up work so planning ranges, timeline, and ROI can be discussed step by step instead of as one oversized project.",
       suggestedFollowUp: "Would you like Opzix to review this manually?",
     };
   }

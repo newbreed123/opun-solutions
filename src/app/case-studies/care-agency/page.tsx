@@ -28,6 +28,7 @@ export default function CareAgencyCaseStudy() {
                 src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=400&fit=crop"
                 alt="Care Agency Client Acquisition"
                 fill
+                sizes="(min-width: 1280px) 600px, (min-width: 768px) 50vw, 100vw"
                 className="object-cover"
               />
             </div>

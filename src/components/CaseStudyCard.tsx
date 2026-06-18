@@ -26,6 +26,7 @@ export default function CaseStudyCard({
             src={image}
             alt={headline}
             fill
+            sizes="(min-width: 1280px) 384px, (min-width: 768px) 33vw, 100vw"
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
