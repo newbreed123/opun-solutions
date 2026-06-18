@@ -5,10 +5,9 @@ import OpzixAIAssistant from "@/components/OpzixAIAssistant";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title:
-    "Opzix Solutions - Websites, AI & Business Systems for Service Businesses",
+  title: "Opzix - Commerce Systems Consultancy",
   description:
-    "We build high-converting websites, smart AI assistants, and automation systems that help service businesses grow. Website design, ecommerce, chatbots, Google Ads, client portals & integrations.",
+    "Opzix audits customer journeys, conversion paths, tracking gaps, and operational bottlenecks, then builds the ecommerce systems, websites, AI assistants, and automations to solve them.",
   icons: {
     icon: [
       {
