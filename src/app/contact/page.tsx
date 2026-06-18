@@ -639,7 +639,7 @@ export default function Contact() {
                       Pick a time that works for you.
                     </p>
                     <Button
-                      href="https://calendly.com/adimdnewbreed/"
+                      href="https://calendly.com/hello-opzix"
                       target="_blank"
                       rel="noopener noreferrer"
                       variant="primary"
