@@ -24,7 +24,6 @@ import {
   ZoraBusinessType,
   ZoraChallenge,
   ZoraLeadProfile,
-  ZoraRevenueRange,
   ZoraResponse,
 } from "@/lib/zora-assistant";
 
@@ -35,16 +34,15 @@ const FREE_AUDIT_URL = "/tools/ecommerce-audit-scanner?source=zora";
 
 type GuidedStep =
   | "businessType"
-  | "revenueRange"
   | "challenge"
-  | "websiteUrl"
-  | "email";
+  | "explanation";
 
 type ZoraAction =
   | {
       kind: "start";
       label: string;
-      value: "diagnose" | "free_audit" | "strategy_call" | "ask_question" | "faq";
+      value: "diagnose" | "free_audit" | "strategy_call" | "faq";
+      tone?: "primary" | "secondary" | "text";
     }
   | {
       kind: "choice";
@@ -76,34 +74,40 @@ type ZoraApiResponse = ZoraResponse & {
 };
 
 const firstStepActions: ZoraAction[] = [
-  { kind: "start", label: "Diagnose my growth system", value: "diagnose" },
-  { kind: "start", label: "Run free audit", value: "free_audit" },
-  { kind: "start", label: "Book strategy call", value: "strategy_call" },
-  { kind: "start", label: "Ask a question", value: "ask_question" },
-  { kind: "start", label: "FAQ", value: "faq" },
+  {
+    kind: "start",
+    label: "Diagnose my growth system",
+    value: "diagnose",
+    tone: "primary",
+  },
+  {
+    kind: "start",
+    label: "Run free audit",
+    value: "free_audit",
+    tone: "secondary",
+  },
+  {
+    kind: "start",
+    label: "Book strategy call",
+    value: "strategy_call",
+    tone: "text",
+  },
+  { kind: "start", label: "FAQ", value: "faq", tone: "text" },
 ];
 
 const businessTypeChoices: Array<{ label: string; value: ZoraBusinessType }> = [
   { label: "Ecommerce", value: "Ecommerce" },
-  { label: "Service Business", value: "Service Business" },
-  { label: "Real Estate", value: "Real Estate" },
-  { label: "Care/Healthcare", value: "Care/Healthcare" },
+  { label: "Service", value: "Service Business" },
+  { label: "Local Business", value: "Service Business" },
   { label: "Other", value: "Other" },
-];
-
-const revenueChoices: Array<{ label: string; value: ZoraRevenueRange }> = [
-  { label: "Under $100k", value: "Under $100k" },
-  { label: "$100k-$1M", value: "$100k-$1M" },
-  { label: "$1M+", value: "$1M+" },
 ];
 
 const challengeChoices: Array<{ label: string; value: ZoraChallenge }> = [
   { label: "Traffic", value: "Traffic" },
   { label: "Conversion", value: "Conversion" },
+  { label: "Follow-up", value: "Follow-up" },
   { label: "Operations", value: "Operations" },
   { label: "Tracking", value: "Tracking" },
-  { label: "Follow-up", value: "Follow-up" },
-  { label: "Website", value: "Website" },
 ];
 
 function createId(prefix: string) {
@@ -153,13 +157,36 @@ function bookingAction(label = "Book Strategy Call"): ZoraAction {
 }
 
 function actionsFromRecommendation(actions: ZoraResponse["recommendedActions"]): ZoraAction[] {
-  return actions.map((action) =>
+  return actions.flatMap((action) =>
     action === "strategy_call"
-      ? bookingAction()
+      ? [bookingAction()]
       : action === "free_audit"
-        ? scannerAction()
-        : { kind: "start", label: "Diagnose my growth system", value: "diagnose" },
+        ? [scannerAction("Run Free Audit")]
+        : [],
   );
+}
+
+function actionTone(action: ZoraAction) {
+  if (action.kind === "start") return action.tone || "secondary";
+  if (action.kind === "link" && action.booking) return "primary";
+  if (action.kind === "link") return "secondary";
+  return "secondary";
+}
+
+function actionClassName(action: ZoraAction) {
+  const tone = actionTone(action);
+  const base =
+    "inline-flex min-h-8 items-center justify-center gap-2 rounded-full px-3 py-1.5 text-left text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/45";
+
+  if (tone === "primary") {
+    return `${base} border border-brand-cyan/70 bg-brand-cyan/20 text-primary shadow-[0_0_24px_rgba(6,182,212,0.12)] hover:bg-brand-cyan/28`;
+  }
+
+  if (tone === "text") {
+    return `${base} border border-transparent bg-transparent px-1.5 text-muted hover:text-primary`;
+  }
+
+  return `${base} border border-dark-border bg-white/[0.045] text-secondary hover:border-brand-cyan/50 hover:bg-brand-cyan/12 hover:text-primary`;
 }
 
 function questionForStep(step: GuidedStep): ChatMessage {
@@ -167,22 +194,8 @@ function questionForStep(step: GuidedStep): ChatMessage {
     return {
       id: createId("assistant"),
       role: "assistant",
-      text: "First, what type of business are we diagnosing?",
+      text: "What type of business do you run?",
       actions: businessTypeChoices.map((choice) => ({
-        kind: "choice",
-        label: choice.label,
-        step,
-        value: choice.value,
-      })),
-    };
-  }
-
-  if (step === "revenueRange") {
-    return {
-      id: createId("assistant"),
-      role: "assistant",
-      text: "What annual revenue range is closest? This helps me size the recommendation without treating it like a quote.",
-      actions: revenueChoices.map((choice) => ({
         kind: "choice",
         label: choice.label,
         step,
@@ -195,7 +208,7 @@ function questionForStep(step: GuidedStep): ChatMessage {
     return {
       id: createId("assistant"),
       role: "assistant",
-      text: "What feels like the biggest bottleneck right now?",
+      text: "What's the biggest challenge?",
       actions: challengeChoices.map((choice) => ({
         kind: "choice",
         label: choice.label,
@@ -205,51 +218,24 @@ function questionForStep(step: GuidedStep): ChatMessage {
     };
   }
 
-  if (step === "websiteUrl") {
-    return {
-      id: createId("assistant"),
-      role: "assistant",
-      text: "Do you have a website URL you want me to keep with this profile?",
-      actions: [
-        {
-          kind: "choice",
-          label: "Skip website",
-          step,
-          value: "",
-        },
-      ],
-    };
-  }
-
   return {
     id: createId("assistant"),
     role: "assistant",
-    text: "Want follow-up? Share your email, or skip it and use the audit or booking links.",
-    actions: [
-      {
-        kind: "choice",
-        label: "Skip follow-up",
-        step,
-        value: "",
-      },
-    ],
+    text: "Tell me what's happening in a sentence or two. I'll use that to give you a sharper first recommendation.",
   };
 }
 
 function nextGuidedStep(profile: ZoraLeadProfile): GuidedStep | null {
   if (!profile.businessType) return "businessType";
-  if (!profile.revenueRange) return "revenueRange";
   if (!profile.challenge) return "challenge";
-  if (profile.websiteUrl === undefined) return "websiteUrl";
-  if (profile.email === undefined) return "email";
-  return null;
+  return "explanation";
 }
 
 function guidedCompletionMessage(profile: ZoraLeadProfile): ChatMessage {
   return {
     id: createId("assistant"),
     role: "assistant",
-    text: `${buildZoraDiagnosis(profile)} I’ve prepared that context for the next step.`,
+    text: `${buildZoraDiagnosis(profile)} I've prepared that context for the next step.`,
     actions:
       profile.recommendedNextStep === "strategy_call"
         ? [bookingAction(), scannerAction()]
@@ -277,37 +263,11 @@ function matchGuidedText(step: GuidedStep, text: string) {
     )?.value;
   }
 
-  if (step === "revenueRange") {
-    if (/100k.*1m|100k.*million|\$100k.*\$1m/i.test(normalized)) {
-      return "$100k-$1M";
-    }
-
-    if (/under|less|<|below/.test(normalized)) return "Under $100k";
-    if (/1m|million|\$1m|\$1\s?million/.test(normalized)) return "$1M+";
-    if (/100k|300k|500k|750k|six figures|mid six/.test(normalized)) {
-      return "$100k-$1M";
-    }
-  }
-
   if (step === "challenge") {
     return challengeChoices.find((choice) =>
       normalized.includes(choice.value.toLowerCase()) ||
       normalized.includes(choice.label.toLowerCase()),
     )?.value;
-  }
-
-  if (step === "websiteUrl") {
-    if (/^(skip|no|none|not now)/.test(normalized)) return "";
-    if (/\bhttps?:\/\/[a-z0-9.-]+\.[a-z]{2,}|\b(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}/i.test(text)) {
-      return text.trim();
-    }
-  }
-
-  if (step === "email") {
-    if (/^(skip|no|none|not now)/.test(normalized)) return "";
-    if (/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(text)) {
-      return text.trim();
-    }
   }
 
   return null;
@@ -324,7 +284,7 @@ export default function OpzixAIAssistant() {
       id: "zora-intro",
       role: "assistant",
       text:
-        "Hi, I’m Zora — Opzix’s AI Growth Assistant. I help identify traffic, conversion, operations, tracking, and follow-up bottlenecks so you can choose the right next step.",
+        "Hi, I'm Zora, Opzix's AI Growth Assistant. I can help diagnose where traffic, conversion, follow-up, operations, or tracking is slowing growth.",
       actions: firstStepActions,
     },
   ]);
@@ -351,6 +311,14 @@ export default function OpzixAIAssistant() {
 
   function appendMessages(nextMessages: ChatMessage[]) {
     setMessages((current) => [...current, ...nextMessages]);
+  }
+
+  function clearIntroActions() {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === "zora-intro" ? { ...message, actions: undefined } : message,
+      ),
+    );
   }
 
   function closeChatbot({ persist = true } = {}) {
@@ -418,23 +386,6 @@ export default function OpzixAIAssistant() {
     ]);
   }
 
-  function showQuestionPrompt() {
-    setFlowStep(null);
-    appendMessages([
-      {
-        id: createId("user"),
-        role: "user",
-        text: "Ask a question",
-      },
-      {
-        id: createId("assistant"),
-        role: "assistant",
-        text:
-          "Ask me about websites, ecommerce systems, AI assistants, automation, tracking, dashboards, integrations, pricing ranges, timelines, or lead generation.",
-      },
-    ]);
-  }
-
   function showFaq() {
     setFlowStep(null);
     appendMessages([
@@ -446,7 +397,7 @@ export default function OpzixAIAssistant() {
       {
         id: createId("assistant"),
         role: "assistant",
-        text: "Pick a common question and I’ll keep the answer practical.",
+        text: "Pick a common question and I'll keep the answer practical.",
         actions: faqActions(),
       },
     ]);
@@ -476,13 +427,9 @@ export default function OpzixAIAssistant() {
     const patch: ZoraLeadProfile =
       step === "businessType"
         ? { businessType: value as ZoraBusinessType }
-        : step === "revenueRange"
-          ? { revenueRange: value as ZoraRevenueRange }
-          : step === "challenge"
-            ? { challenge: value as ZoraChallenge }
-            : step === "websiteUrl"
-              ? { websiteUrl: value || "" }
-              : { email: value || "" };
+        : step === "challenge"
+          ? { challenge: value as ZoraChallenge }
+          : {};
 
     const nextProfile = normalizeProfile({
       ...leadProfile,
@@ -504,6 +451,10 @@ export default function OpzixAIAssistant() {
   }
 
   function handleAction(action: ZoraAction) {
+    if (action.kind === "start") {
+      clearIntroActions();
+    }
+
     if (action.kind === "link") {
       routeToLink(action);
       return;
@@ -538,8 +489,6 @@ export default function OpzixAIAssistant() {
       showFaq();
       return;
     }
-
-    showQuestionPrompt();
   }
 
   async function submitFreeText(event: FormEvent<HTMLFormElement>) {
@@ -662,17 +611,17 @@ export default function OpzixAIAssistant() {
     <div className="opzix-ai-shell">
       {open && (
         <div className="opzix-ai-panel" role="dialog" aria-label="Zora AI Growth Assistant">
-          <div className="flex items-start justify-between gap-4 border-b border-dark-border pb-4">
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-dark-border pb-3">
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-brand-cyan">
                 <Sparkles className="h-3.5 w-3.5" />
                 Zora
               </p>
-              <h2 className="mt-2 text-lg font-bold leading-snug text-primary">
-                AI Growth Assistant
+              <h2 className="mt-1.5 text-lg font-bold leading-snug text-primary">
+                Growth Assistant
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-muted">
-                Diagnose the path from traffic to qualified customer.
+                A quick consultant for your growth bottleneck.
               </p>
             </div>
             <button
@@ -698,11 +647,11 @@ export default function OpzixAIAssistant() {
             </div>
           )}
 
-          <div className="mt-4 max-h-[23rem] space-y-3 overflow-y-auto pr-1">
+          <div className="opzix-ai-messages mt-3 space-y-2.5 pr-1">
             {messages.map((message) => (
               <div key={message.id} className={message.role === "user" ? "text-right" : ""}>
                 <div
-                  className={`inline-block max-w-[92%] rounded-2xl border px-3.5 py-3 text-left text-sm leading-relaxed ${
+                  className={`inline-block max-w-[92%] rounded-xl border px-3 py-2.5 text-left text-sm leading-relaxed ${
                     message.role === "user"
                       ? "border-brand-cyan/45 bg-brand-cyan/14 text-primary"
                       : "border-dark-border bg-white/[0.035] text-secondary"
@@ -712,17 +661,13 @@ export default function OpzixAIAssistant() {
                 </div>
 
                 {message.actions && message.actions.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="opzix-ai-actions mt-2 flex flex-wrap gap-1.5">
                     {message.actions.map((action) => (
                       <button
                         type="button"
                         key={`${message.id}-${action.label}`}
                         onClick={() => handleAction(action)}
-                        className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-2 text-left text-xs font-semibold transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/45 ${
-                          action.kind === "link" && action.booking
-                            ? "border-brand-cyan/55 bg-brand-cyan/18 text-primary hover:bg-brand-cyan/25"
-                            : "border-dark-border bg-white/[0.04] text-secondary hover:border-brand-cyan/50 hover:bg-brand-cyan/12 hover:text-primary"
-                        }`}
+                        className={actionClassName(action)}
                       >
                         {action.kind === "link" && action.booking ? (
                           <Check className="h-3.5 w-3.5" />
@@ -746,7 +691,7 @@ export default function OpzixAIAssistant() {
             <div ref={messagesEndRef} />
           </div>
 
-          <form onSubmit={submitFreeText} className="mt-4 flex gap-2 border-t border-dark-border pt-4">
+          <form onSubmit={submitFreeText} className="opzix-ai-form mt-3 flex shrink-0 gap-2 border-t border-dark-border pt-3">
             <input
               type="text"
               value={input}
@@ -767,16 +712,18 @@ export default function OpzixAIAssistant() {
         </div>
       )}
 
-      <button
-        type="button"
-        className="opzix-ai-button"
-        onClick={toggleChatbot}
-        aria-expanded={open}
-        aria-label="Open Zora AI Growth Assistant"
-      >
-        <MessageSquare className="h-4 w-4" />
-        Ask Zora
-      </button>
+      {!open && (
+        <button
+          type="button"
+          className="opzix-ai-button"
+          onClick={toggleChatbot}
+          aria-expanded={open}
+          aria-label="Open Zora AI Growth Assistant"
+        >
+          <MessageSquare className="h-4 w-4" />
+          Ask Zora
+        </button>
+      )}
     </div>
   );
 }

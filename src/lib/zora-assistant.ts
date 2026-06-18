@@ -59,6 +59,13 @@ export type ZoraLeadDestination =
   | "Unstructured"
   | "Unknown";
 
+export type ZoraNotificationChannel =
+  | "Email"
+  | "SMS/app"
+  | "Both"
+  | "None"
+  | "Unknown";
+
 export type ZoraIntent =
   | "diagnosis"
   | "capability"
@@ -88,6 +95,7 @@ export type ZoraLeadProfile = {
   shippingPricing?: ZoraShippingPricing;
   recommendationSetup?: ZoraRecommendationSetup;
   leadDestination?: ZoraLeadDestination;
+  notificationChannel?: ZoraNotificationChannel;
   desiredOutcome?: string;
   revenueRange?: ZoraRevenueRange;
   annualRevenueText?: string;
@@ -115,6 +123,7 @@ export type ZoraMessageAnalysis = {
   shippingPricing?: ZoraShippingPricing;
   recommendationSetup?: ZoraRecommendationSetup;
   leadDestination?: ZoraLeadDestination;
+  notificationChannel?: ZoraNotificationChannel;
   desiredOutcome?: string;
   revenueRange?: ZoraRevenueRange;
   annualRevenueText?: string;
@@ -404,7 +413,7 @@ function extractCartBuildSource(text: string): ZoraCartBuildSource | undefined {
 
   if (/\bsearch|site search\b/i.test(text)) return "Search";
   if (/\bcollections?|category|categories\b/i.test(text)) return "Collections";
-  if (/\brecommendations?|related products?|upsell|cross-sell|cross sell\b/i.test(text)) {
+  if (/\breco?mm?endations?|recomendations?|related products?|upsell|cross-sell|cross sell\b/i.test(text)) {
     return "Product recommendations";
   }
 
@@ -450,7 +459,7 @@ function extractLeadDestination(text: string): ZoraLeadDestination | undefined {
     return "CRM";
   }
 
-  if (/\b(email inbox|inbox|shared inbox|gmail|outlook)\b/i.test(text)) {
+  if (/\b(email|email inbox|inbox|shared inbox|gmail|outlook)\b/i.test(text)) {
     return "Email inbox";
   }
 
@@ -460,6 +469,30 @@ function extractLeadDestination(text: string): ZoraLeadDestination | undefined {
 
   if (/\b(nowhere|not structured|nothing structured|manual|text messages?|texts?|phone calls?|voicemail)\b/i.test(text)) {
     return "Unstructured";
+  }
+
+  if (/\bnot sure|not too sure|unsure|don't know|dont know|unknown\b/i.test(text)) {
+    return "Unknown";
+  }
+
+  return undefined;
+}
+
+function extractNotificationChannel(text: string): ZoraNotificationChannel | undefined {
+  if (/\b(both|sms and email|email and sms|app and email|email and app)\b/i.test(text)) {
+    return "Both";
+  }
+
+  if (/\b(sms|text|texts|text message|app|push|mobile notification|phone notification)\b/i.test(text)) {
+    return "SMS/app";
+  }
+
+  if (/\b(email|inbox|gmail|outlook)\b/i.test(text)) {
+    return "Email";
+  }
+
+  if (/\b(no notification|none|nothing|does not notify|doesn't notify|not notified)\b/i.test(text)) {
+    return "None";
   }
 
   if (/\bnot sure|not too sure|unsure|don't know|dont know|unknown\b/i.test(text)) {
@@ -508,6 +541,7 @@ function extractLeadSource(text: string) {
   if (/\breferrals?\b/i.test(text)) return "Referrals";
   if (/\borganic|seo|search\b/i.test(text)) return "Organic search";
   if (/\bsocial|instagram|facebook|tiktok|linkedin\b/i.test(text)) return "Social";
+  if (/\bhome\s?page|homepage|hompage\b/i.test(text)) return "Homepage";
   return undefined;
 }
 
@@ -580,6 +614,7 @@ function calculateConfidence(analysis: Omit<ZoraMessageAnalysis, "confidenceScor
   if (analysis.shippingPricing) score += 0.12;
   if (analysis.recommendationSetup) score += 0.12;
   if (analysis.leadDestination) score += 0.12;
+  if (analysis.notificationChannel) score += 0.12;
   if (analysis.email) score += 0.08;
   if (analysis.businessType && analysis.challenge) score += 0.08;
 
@@ -608,6 +643,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const shippingPricing = outOfScope ? undefined : extractShippingPricing(message);
   const recommendationSetup = outOfScope ? undefined : extractRecommendationSetup(message);
   const leadDestination = outOfScope ? undefined : extractLeadDestination(message);
+  const notificationChannel = outOfScope ? undefined : extractNotificationChannel(message);
   const desiredOutcome = outOfScope ? undefined : extractDesiredOutcome(message);
   const leadSource = outOfScope ? undefined : extractLeadSource(message);
   const intent: ZoraIntent = outOfScope
@@ -637,7 +673,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
                             cartBuildSource ||
                             shippingPricing ||
                             recommendationSetup ||
-                            leadDestination
+                            leadDestination ||
+                            notificationChannel
                           ? "diagnosis"
                         : "clarify";
   const analysisWithoutConfidence = {
@@ -656,6 +693,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     shippingPricing,
     recommendationSetup,
     leadDestination,
+    notificationChannel,
     desiredOutcome,
     challenge,
     websiteUrl,
@@ -795,6 +833,16 @@ function mergeLeadProfile(
     nextProfile.leadDestination = analysis.leadDestination;
   }
 
+  if (analysis.notificationChannel) {
+    addChange(
+      changes,
+      "notificationChannel",
+      nextProfile.notificationChannel,
+      analysis.notificationChannel,
+    );
+    nextProfile.notificationChannel = analysis.notificationChannel;
+  }
+
   if (analysis.desiredOutcome) {
     addChange(changes, "desiredOutcome", nextProfile.desiredOutcome, analysis.desiredOutcome);
     nextProfile.desiredOutcome = analysis.desiredOutcome;
@@ -850,6 +898,29 @@ function applyProfileContextToAnalysis(
   analysis: ZoraMessageAnalysis,
   currentProfile: ZoraLeadProfile,
 ): ZoraMessageAnalysis {
+  const crmNotificationAnswer =
+    currentProfile.businessType === "Service Business" &&
+    currentProfile.challenge === "Follow-up" &&
+    currentProfile.leadDestination === "CRM" &&
+    Boolean(analysis.notificationChannel) &&
+    !analysis.businessType &&
+    !analysis.funnelStage &&
+    !analysis.dropoffDetail &&
+    !analysis.productScope &&
+    !analysis.cartBuildSource &&
+    !analysis.shippingPricing &&
+    !analysis.recommendationSetup;
+
+  if (crmNotificationAnswer) {
+    const { confidenceScore, ...analysisWithoutConfidence } = analysis;
+    void confidenceScore;
+
+    return withRecalculatedConfidence({
+      ...analysisWithoutConfidence,
+      leadDestination: undefined,
+    });
+  }
+
   const genericUncertainty =
     analysis.cartBuildSource === "Unknown" &&
     currentProfile.cartBuildSource === "Product recommendations" &&
@@ -869,6 +940,8 @@ function applyProfileContextToAnalysis(
   return withRecalculatedConfidence({
     ...analysisWithoutConfidence,
     cartBuildSource: undefined,
+    leadDestination: undefined,
+    notificationChannel: undefined,
     recommendationSetup: analysis.recommendationSetup || "Unknown",
   });
 }
@@ -909,6 +982,7 @@ export function scoreZoraLeadQuality(profile: ZoraLeadProfile): ZoraLeadQuality 
   if (profile.shippingPricing) score += 1;
   if (profile.recommendationSetup) score += 1;
   if (profile.leadDestination) score += 1;
+  if (profile.notificationChannel) score += 1;
   if (profile.toolsMentioned?.length) score += 1;
   if (profile.revenueRange === "$100k-$1M") score += 2;
   if (profile.revenueRange === "$1M+") score += 3;
@@ -1358,6 +1432,31 @@ function buildLeadDestinationResponse(profile: ZoraLeadProfile) {
   }
 }
 
+function buildNotificationChannelResponse(profile: ZoraLeadProfile) {
+  if (
+    profile.businessType !== "Service Business" ||
+    profile.challenge !== "Follow-up" ||
+    profile.leadDestination !== "CRM"
+  ) {
+    return `${buildZoraDiagnosis(profile)} ${followUpQuestion(profile)}`;
+  }
+
+  switch (profile.notificationChannel) {
+    case "Email":
+      return "That is likely part of the slowdown. Email-only CRM alerts are easy to miss when the team is in the field, between jobs, or handling calls. I would check SMS/app alerts, lead-owner assignment, response-time rules, and missed-lead reminders. Quick question: does one person own each new lead, or does the whole team see the same notification?";
+    case "SMS/app":
+      return "That is better for speed-to-lead, so I would check whether ownership and reminders are clear after the alert fires. Fast notification helps, but dropped follow-up often comes from unclear assignment or no second reminder. Quick question: is every lead assigned to one person automatically?";
+    case "Both":
+      return "Having both email and SMS/app alerts is a good start. I would check whether the CRM tracks who responded, how fast they responded, and which leads are still untouched after a few minutes. Quick question: do you have a missed-lead or no-response alert?";
+    case "None":
+      return "That explains the bottleneck. If the CRM captures leads but does not notify anyone clearly, response speed will depend on someone checking manually. I would start with instant owner alerts, a backup alert, and a simple missed-lead rule. Quick question: who should own the first response: dispatcher, office admin, sales rep, or owner?";
+    case "Unknown":
+      return "That is worth checking first. In a follow-up bottleneck, the fastest diagnostic is confirming exactly who gets alerted, how they get alerted, and what happens if they do not respond. Quick question: can someone see a timestamp for when each lead arrived and when the first reply happened?";
+    default:
+      return `${buildZoraDiagnosis(profile)} ${followUpQuestion(profile)}`;
+  }
+}
+
 function actionsForIntent(
   intent: ZoraIntent,
   hasDiagnosis: boolean,
@@ -1395,6 +1494,7 @@ export function buildZoraResponse(
   const hasNewShippingPricing = Boolean(analysis.shippingPricing);
   const hasNewRecommendationSetup = Boolean(analysis.recommendationSetup);
   const hasNewLeadDestination = Boolean(analysis.leadDestination);
+  const hasNewNotificationChannel = Boolean(analysis.notificationChannel);
   const reply =
     analysis.intent === "out_of_scope"
       ? buildOutOfScopeResponse()
@@ -1426,6 +1526,8 @@ export function buildZoraResponse(
                             ? buildRecommendationSetupResponse(leadProfile)
                           : hasNewLeadDestination
                             ? buildLeadDestinationResponse(leadProfile)
+                          : hasNewNotificationChannel
+                            ? buildNotificationChannelResponse(leadProfile)
                           : hasNewProductScope
                             ? buildProductScopeResponse(leadProfile)
                           : hasNewFunnelStage

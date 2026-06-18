@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
         detectedChallenge: fallback.currentMessageAnalysis.challenge,
         detectedRecommendationSetup: fallback.currentMessageAnalysis.recommendationSetup,
         detectedLeadDestination: fallback.currentMessageAnalysis.leadDestination,
+        detectedNotificationChannel: fallback.currentMessageAnalysis.notificationChannel,
         confidenceScore: fallback.confidenceScore,
         leadProfileBefore: body.leadProfile || {},
         leadProfileAfter: fallback.leadProfile,
