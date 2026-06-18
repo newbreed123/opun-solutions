@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { MouseEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, MessageSquare, X } from "lucide-react";
 
@@ -32,9 +32,104 @@ const prompts = [
   },
 ];
 
+const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
+const BOOKING_LINK_DELAY_MS = 150;
+
+function isBookingUrl(href: string) {
+  const normalized = href.toLowerCase();
+
+  return (
+    normalized.includes("/contact") ||
+    normalized.includes("calendly.com") ||
+    normalized.includes("source=ai-chatbot") ||
+    normalized.includes("source=homepage") ||
+    normalized.includes("source=services") ||
+    normalized.includes("source=ecommerce-audit")
+  );
+}
+
 export default function OpzixAIAssistant() {
   const [open, setOpen] = useState(false);
   const [activePrompt, setActivePrompt] = useState(prompts[0]);
+
+  function persistChatbotState(nextState: "open" | "closed") {
+    try {
+      window.localStorage.setItem(CHATBOT_STATE_KEY, nextState);
+    } catch {
+      // Local storage can be unavailable in private browsing modes.
+    }
+  }
+
+  function closeChatbot({ persist = true } = {}) {
+    setOpen(false);
+    setActivePrompt(prompts[0]);
+
+    if (persist) {
+      persistChatbotState("closed");
+    }
+  }
+
+  function toggleChatbot() {
+    setOpen((current) => {
+      const nextOpen = !current;
+      persistChatbotState(nextOpen ? "open" : "closed");
+      return nextOpen;
+    });
+  }
+
+  function openBookingUrlAfterClose(href: string) {
+    closeChatbot();
+
+    window.setTimeout(() => {
+      window.location.assign(href);
+    }, BOOKING_LINK_DELAY_MS);
+  }
+
+  function handleBookingLinkClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented) {
+      return;
+    }
+
+    event.preventDefault();
+    openBookingUrlAfterClose(event.currentTarget.href);
+  }
+
+  useEffect(() => {
+    function handleDocumentClick(event: globalThis.MouseEvent) {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const link = target.closest<HTMLAnchorElement>("a[href]");
+
+      if (!link || !isBookingUrl(link.href)) {
+        return;
+      }
+
+      const isModifiedClick =
+        event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
+
+      if (isModifiedClick || link.hasAttribute("download")) {
+        closeChatbot();
+        return;
+      }
+
+      event.preventDefault();
+      openBookingUrlAfterClose(link.href);
+    }
+
+    document.addEventListener("click", handleDocumentClick, true);
+
+    return () => {
+      document.removeEventListener("click", handleDocumentClick, true);
+    };
+  }, []);
 
   return (
     <div className="opzix-ai-shell">
@@ -51,7 +146,7 @@ export default function OpzixAIAssistant() {
             </div>
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => closeChatbot()}
               className="rounded-full border border-dark-border bg-white/5 p-2 text-muted transition-colors hover:border-brand-cyan hover:text-primary"
               aria-label="Close Ask Opzix AI"
             >
@@ -87,6 +182,7 @@ export default function OpzixAIAssistant() {
 
           <Link
             href="/contact?source=ai-chatbot"
+            onClick={handleBookingLinkClick}
             className="btn btn-primary mt-5 w-full"
           >
             <Check className="mr-2 h-4 w-4" />
@@ -98,7 +194,7 @@ export default function OpzixAIAssistant() {
       <button
         type="button"
         className="opzix-ai-button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleChatbot}
         aria-expanded={open}
         aria-label="Open Ask Opzix AI"
       >
