@@ -261,7 +261,7 @@ button {
 }
 
 .opzix-ai-panel {
-  width: min(24rem, calc(100vw - 2rem));
+  width: min(27.5rem, calc(100vw - 2rem));
   max-height: min(38rem, calc(100vh - 7rem));
   overflow-y: auto;
   border: 1px solid rgba(59, 130, 246, 0.28);
