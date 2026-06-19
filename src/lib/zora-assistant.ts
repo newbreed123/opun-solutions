@@ -11,13 +11,31 @@ export type ZoraChallenge =
   | "Operations"
   | "Tracking"
   | "Follow-up"
-  | "Website";
+  | "Website"
+  | "Not Sure";
 
 export type ZoraRevenueRange = "Under $100k" | "$100k-$1M" | "$1M+";
 
 export type ZoraLeadQuality = "low" | "medium" | "high";
+export type ZoraLeadTemperature = "cold" | "warm" | "hot";
 
 export type ZoraNextStep = "free_audit" | "strategy_call" | "ask_question";
+
+export type ZoraRoadmapStep = {
+  title: string;
+  reason: string;
+  validation: string;
+  expectedImpact: string;
+  costRange: string;
+  timeline: string;
+};
+
+export type ZoraIndustryInference = {
+  inferredIndustry?: string;
+  inferredBusinessModel?: string;
+  inferredFunnelType?: string;
+  industryConfidence?: number;
+};
 
 export type ZoraFunnelStage =
   | "Before product pages"
@@ -75,6 +93,8 @@ export type ZoraIntent =
   | "pricing"
   | "audit_request"
   | "booking_request"
+  | "recommendation"
+  | "consultant"
   | "focus_request"
   | "next_step"
   | "out_of_scope"
@@ -101,10 +121,21 @@ export type ZoraLeadProfile = {
   annualRevenueText?: string;
   challenge?: ZoraChallenge;
   websiteUrl?: string;
+  inferredIndustry?: string;
+  inferredBusinessModel?: string;
+  inferredFunnelType?: string;
+  industryConfidence?: number;
+  needsBusinessTypeClarification?: boolean;
+  industryMismatchResolved?: boolean;
+  hasWebsiteOrLandingPage?: boolean;
+  hasNoWebsite?: boolean;
   email?: string;
   recommendedNextStep?: ZoraNextStep;
   recommendedFocusAreas?: string[];
+  recommendationRoadmap?: ZoraRoadmapStep[];
   leadQuality?: ZoraLeadQuality;
+  leadTemperature?: ZoraLeadTemperature;
+  leadScore?: number;
 };
 
 export type ZoraMessageAnalysis = {
@@ -129,6 +160,8 @@ export type ZoraMessageAnalysis = {
   annualRevenueText?: string;
   challenge?: ZoraChallenge;
   websiteUrl?: string;
+  hasWebsiteOrLandingPage?: boolean;
+  hasNoWebsite?: boolean;
   email?: string;
   confidenceScore: number;
   outOfScope: boolean;
@@ -141,7 +174,7 @@ export type ZoraResponse = {
   confidenceScore: number;
   profileChanges: string[];
   responseMode: ZoraIntent;
-  recommendedActions: Array<"free_audit" | "strategy_call" | "diagnose">;
+  recommendedActions: Array<"free_audit" | "strategy_call" | "diagnose" | "ask_question">;
 };
 
 const businessTypePatterns: Array<[ZoraBusinessType, RegExp]> = [
@@ -260,8 +293,19 @@ function firstMatch<T extends string>(text: string, patterns: Array<[T, RegExp]>
 }
 
 function isCapabilityQuestion(message: string) {
-  return /\b(how can you help|what can you do|what do you do|what does opzix do|tell me more about opzix|more about opzix|about opzix|who is opzix|what is opzix|how does this work|your services|services do you offer)\b/i.test(
-    message,
+  if (
+    /\b(how can you help|what can you do|what do you do|what does opzix do|tell me more about opzix|more about opzix|about opzix|who is opzix|what is opzix|your services|services do you offer|do you build|can you build|what do you build|build websites?)\b/i.test(
+      message,
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    /\b(websites?|ecommerce|ai\b|crm|automation|services)\b/i.test(message) &&
+    /\b(do you|can you|could you|will you|would you|does opzix|can opzix|what|build|offer|provide|services)\b/i.test(
+      message,
+    )
   );
 }
 
@@ -273,6 +317,12 @@ function isSmallTalkQuestion(message: string) {
 
 function isThanksMessage(message: string) {
   return /\b(thank you|thanks|thx|appreciate it|appreciate you|got it|okay thanks|ok thanks)\b/i.test(
+    message,
+  );
+}
+
+function isAffirmativeAnswer(message: string) {
+  return /^\s*(yes|yeah|yep|mostly|most are|they are|mobile yes)\s*[.!?]*\s*$/i.test(
     message,
   );
 }
@@ -289,6 +339,52 @@ function isPricingQuestion(message: string) {
   );
 }
 
+function isRecommendationQuestion(message: string) {
+  return /\b(what would you do|what would opzix do|where should i start|what comes first|what comes next|how would you fix|walk me through|talk through|what should i fix|what should i do first|what would you fix first|recommendation|recommend a plan|roadmap|fix path)\b/i.test(
+    message,
+  );
+}
+
+function isConsultantQuestion(message: string) {
+  const hasWebsiteBuildIntent = isWebsiteBuildOrRebuildQuestion(message);
+  const hasGeneralConsultantIntent =
+    /\b(explain|why|tell me about|process|strategy|cost analysis|roi|implementation|audit process|how it works|how does it work|ecommerce store cost|should i run ads|run ads|should i rebuild|rebuild|fix my site|fix the site|improve my site|replace my site)\b/i.test(
+      message,
+    );
+  const hasComparisonIntent =
+    (/\b(compare|comparison|versus|vs\.?|better|switch|migrate|rebuild|should i use|which platform|platform)\b/i.test(
+      message,
+    ) &&
+      /\b(shopify|bigcommerce|rebuild)\b/i.test(message)) ||
+    /\bshopify\b.+\bbigcommerce\b|\bbigcommerce\b.+\bshopify\b/i.test(message);
+
+  return hasWebsiteBuildIntent || hasGeneralConsultantIntent || hasComparisonIntent;
+}
+
+function isWebsiteBuildOrRebuildQuestion(message: string) {
+  return /\b(considering|thinking about|want to|need to|should i|can you|could you|looking at|planning to)?\s*(build(?:ing)?|rebuild(?:ing)?|replace|redesign|create|launch)\s+(?:a\s+)?(?:new\s+)?(?:website|site|landing page)\b|\bnew\s+(?:website|site)\b/i.test(
+    message,
+  );
+}
+
+function isRoadmapFollowUp(message: string) {
+  return /\b(why|what comes second|what comes third|second step|third step|how much|how long|timeline|cost|investment|range)\b/i.test(
+    message,
+  );
+}
+
+function isRoadmapSpecificFollowUp(message: string) {
+  return /\b(that|this|first step|second step|third step|roadmap|recommendation|plan|step)\b/i.test(
+    message,
+  );
+}
+
+function isResumeRecommendationThreadRequest(message: string) {
+  return /\b(back to|return to|resume|go back to|switch back to)\b.+\b(seller leads?|lead follow-?up|roadmap|recommendation|plan|that)\b/i.test(
+    message,
+  );
+}
+
 function isEcommerceBuildQuestion(message: string) {
   return /\b(ecommerce website|e-commerce website|online store|shopify store|storefront|commerce site)\b/i.test(
     message,
@@ -296,7 +392,7 @@ function isEcommerceBuildQuestion(message: string) {
 }
 
 function isAuditRequest(message: string) {
-  return /\b(audit my website|audit my site|run an audit|free audit|scan my website|scan my site|website audit|check (?:the )?site path|review (?:the )?site path|look at (?:the )?site path|check (?:my )?site|review (?:my )?site)\b/i.test(
+  return /\b(audit my website|audit my site|audit my store|run an audit|free audit|scan my website|scan my site|scan my store|website audit|check (?:the )?site path|review (?:the )?site path|look at (?:the )?site path|check (?:my )?site|review (?:my )?site|check my website|review my website)\b/i.test(
     message,
   );
 }
@@ -308,7 +404,7 @@ function isBookingRequest(message: string) {
 }
 
 function isNextStepRequest(message: string) {
-  return /\b(sounds good|what next|next step|next steps|help me|let's do it|lets do it|i'm ready|im ready|start there|do it)\b/i.test(
+  return /\b(sounds good|what next|next step|next steps|help me|let's do it|lets do it|i'm ready|im ready|start there|do it|high-level recommendation|high level recommendation|recommendation here|likely fix path)\b/i.test(
     message,
   );
 }
@@ -331,6 +427,18 @@ function isWebsiteCaptureMessage(message: string) {
   );
 }
 
+function hasNoWebsiteAnswer(message: string) {
+  return /\b(no website|have no website|i have no website|don't have (?:a )?(?:website|site)|dont have (?:a )?(?:website|site)|do not have (?:a )?(?:website|site)|not yet|no site)\b/i.test(
+    message,
+  );
+}
+
+function hasWebsiteOrLandingPageAnswer(message: string) {
+  return /\b(yes i do|i have (?:a )?(?:website|site|landing page)|we have (?:a )?(?:website|site|landing page)|have (?:a )?(?:website|site|landing page)|already have (?:a )?(?:website|site|landing page))\b/i.test(
+    message,
+  );
+}
+
 function extractWebsiteUrl(text: string) {
   const match = text.match(
     /\bhttps?:\/\/[a-z0-9.-]+\.[a-z]{2,}(?:\/[^\s<>()"]*)?|\b(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>()"]*)?/i,
@@ -344,6 +452,105 @@ function extractWebsiteUrl(text: string) {
   }
 
   return url.startsWith("http") ? url : `https://${url}`;
+}
+
+function normalizeDomainContext(url: string) {
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return `${parsed.hostname} ${parsed.pathname}`
+      .toLowerCase()
+      .replace(/^www\./, "")
+      .replace(/[^a-z0-9]+/g, " ");
+  } catch {
+    return url.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  }
+}
+
+export function inferIndustryFromUrl(url: string): ZoraIndustryInference {
+  const context = normalizeDomainContext(url);
+  const has = (pattern: RegExp) => pattern.test(context);
+
+  if (has(/\b(serhant|realty|realtor|homes|properties|brokerage|estate|listings)\b/)) {
+    return {
+      inferredIndustry: "Real Estate",
+      inferredBusinessModel: "Brokerage / Agent Brand",
+      inferredFunnelType: "Lead Generation / Appointment Booking",
+      industryConfidence: context.includes("serhant") ? 0.9 : 0.78,
+    };
+  }
+
+  if (has(/\b(maxx|supply|industrial|wholesale|parts|equipment|tools|distributor)\b/)) {
+    return {
+      inferredIndustry: "Industrial Supply",
+      inferredBusinessModel: "B2B Ecommerce / Distributor",
+      inferredFunnelType: "Quote + Purchase / Account-Based Ordering",
+      industryConfidence: context.includes("maxx") || context.includes("supply") ? 0.85 : 0.76,
+    };
+  }
+
+  if (has(/\b(allbirds|shop|store|apparel|clothing|shoes|beauty|skincare|products|cart|checkout)\b/)) {
+    return {
+      inferredIndustry: "Retail / Apparel",
+      inferredBusinessModel: "DTC Ecommerce",
+      inferredFunnelType: "Online Purchase",
+      industryConfidence: context.includes("allbirds") ? 0.95 : 0.74,
+    };
+  }
+
+  if (has(/\b(care|healthcare|homecare|therapy|disability|waiver|respite|residential|clinic|vintage solutions)\b/)) {
+    return {
+      inferredIndustry: "Healthcare / Care",
+      inferredBusinessModel: "Care Provider / Service Organization",
+      inferredFunnelType: "Intake / Referral / Appointment Request",
+      industryConfidence: 0.78,
+    };
+  }
+
+  if (has(/\b(plumbing|roofing|hvac|cleaning|landscaping|contractor|repair)\b/)) {
+    return {
+      inferredIndustry: "Local Service Business",
+      inferredBusinessModel: "Local Service Business",
+      inferredFunnelType: "Lead Form / Call / Appointment Booking",
+      industryConfidence: 0.74,
+    };
+  }
+
+  return {
+    industryConfidence: 0,
+  };
+}
+
+function businessTypeFromInference(inference: ZoraIndustryInference): ZoraBusinessType | undefined {
+  if (inference.inferredIndustry === "Real Estate") return "Real Estate";
+  if (inference.inferredIndustry === "Healthcare / Care") return "Care/Healthcare";
+  if (inference.inferredBusinessModel?.includes("Ecommerce")) return "Ecommerce";
+  if (inference.inferredIndustry === "Local Service Business") return "Service Business";
+  return undefined;
+}
+
+export function hasUrlBusinessTypeMismatch(
+  businessType: ZoraBusinessType | undefined,
+  inference: ZoraIndustryInference | undefined,
+) {
+  const inferredBusinessType = inference ? businessTypeFromInference(inference) : undefined;
+
+  return Boolean(
+    businessType &&
+      inferredBusinessType &&
+      inference?.industryConfidence &&
+      inference.industryConfidence >= 0.7 &&
+      businessType !== inferredBusinessType,
+  );
+}
+
+export function shouldUseIndustryInference(profile: ZoraLeadProfile) {
+  const inferredBusinessType = businessTypeFromInference(profile);
+
+  return Boolean(
+    profile.industryConfidence &&
+      profile.industryConfidence >= 0.7 &&
+      (!profile.businessType || !inferredBusinessType || profile.businessType === inferredBusinessType),
+  );
 }
 
 function extractEmail(text: string) {
@@ -363,7 +570,7 @@ function extractConversionRate(text: string) {
 }
 
 function extractFunnelStage(text: string): ZoraFunnelStage | undefined {
-  if (/\bbefore\s+(product|product pages?)|category pages?|collection pages?|landing page\b/i.test(text)) {
+  if (/\bbefore\s+(product|product pages?)|category pages?|collection pages?\b/i.test(text)) {
     return "Before product pages";
   }
 
@@ -383,7 +590,7 @@ function extractFunnelStage(text: string): ZoraFunnelStage | undefined {
 }
 
 function extractDropoffDetail(text: string): ZoraDropoffDetail | undefined {
-  if (/\bone product|single product|one item|1 product|1 item\b/i.test(text)) {
+  if (/\b(one product|single product|one item|1 product|1 item|adding one product|add(?:ing)? one item|after adding one|after add(?:ing)? one)\b/i.test(text)) {
     return "One product cart";
   }
 
@@ -537,7 +744,7 @@ function extractDesiredOutcome(text: string) {
 }
 
 function extractLeadSource(text: string) {
-  if (/\bads?|paid traffic|google ads|facebook ads|meta ads\b/i.test(text)) return "Ads";
+  if (/\b(?:ad|ads|paid traffic|google ads|facebook ads|meta ads)\b/i.test(text)) return "Ads";
   if (/\breferrals?\b/i.test(text)) return "Referrals";
   if (/\borganic|seo|search\b/i.test(text)) return "Organic search";
   if (/\bsocial|instagram|facebook|tiktok|linkedin\b/i.test(text)) return "Social";
@@ -607,6 +814,8 @@ function calculateConfidence(analysis: Omit<ZoraMessageAnalysis, "confidenceScor
   if (analysis.platform) score += 0.16;
   if (analysis.revenueRange) score += 0.14;
   if (analysis.websiteUrl) score += 0.12;
+  if (analysis.hasWebsiteOrLandingPage) score += 0.08;
+  if (analysis.hasNoWebsite) score += 0.08;
   if (analysis.funnelStage) score += 0.12;
   if (analysis.dropoffDetail) score += 0.12;
   if (analysis.productScope) score += 0.12;
@@ -628,10 +837,21 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const toolsMentioned = outOfScope ? undefined : extractToolsMentioned(message);
   const industry = outOfScope ? undefined : extractIndustry(message, businessType);
   const websiteUrl = outOfScope ? undefined : extractWebsiteUrl(message);
+  const hasNoWebsite = outOfScope ? undefined : hasNoWebsiteAnswer(message) || undefined;
+  const hasWebsiteOrLandingPage =
+    outOfScope || hasNoWebsite || websiteUrl
+      ? undefined
+      : hasWebsiteOrLandingPageAnswer(message) || undefined;
+  const leadSource = outOfScope ? undefined : extractLeadSource(message);
   const challenge =
     outOfScope || (websiteUrl && isWebsiteCaptureMessage(message))
       ? undefined
-      : firstMatch(message, challengePatterns);
+      : hasNoWebsite
+        ? leadSource
+          ? "Traffic"
+          : undefined
+        : firstMatch(message, challengePatterns) ||
+          (leadSource ? "Traffic" : undefined);
   const revenue = outOfScope ? {} : parseRevenue(message);
   const email = outOfScope ? undefined : extractEmail(message);
   const visitorName = extractVisitorName(message);
@@ -645,38 +865,47 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const leadDestination = outOfScope ? undefined : extractLeadDestination(message);
   const notificationChannel = outOfScope ? undefined : extractNotificationChannel(message);
   const desiredOutcome = outOfScope ? undefined : extractDesiredOutcome(message);
-  const leadSource = outOfScope ? undefined : extractLeadSource(message);
   const intent: ZoraIntent = outOfScope
     ? "out_of_scope"
     : isThanksMessage(message)
       ? "thanks"
       : isSmallTalkQuestion(message)
         ? "small_talk"
-        : isCapabilityQuestion(message)
-          ? "capability"
+        : isRecommendationQuestion(message)
+          ? "recommendation"
           : isAuditRequest(message)
             ? "audit_request"
             : isBookingRequest(message)
               ? "booking_request"
-              : isFocusRequest(message)
-                ? "focus_request"
-                : isNextStepRequest(message)
-                  ? "next_step"
-                  : isTimelineQuestion(message)
-                    ? "timeline"
-                    : isPricingQuestion(message)
-                      ? "pricing"
-                      : businessType || challenge || platform || revenue.revenueRange || websiteUrl || funnelStage
-                        ? "diagnosis"
-                        : dropoffDetail ||
-                            productScope ||
-                            cartBuildSource ||
-                            shippingPricing ||
-                            recommendationSetup ||
-                            leadDestination ||
-                            notificationChannel
-                          ? "diagnosis"
-                        : "clarify";
+              : isConsultantQuestion(message)
+                ? "consultant"
+                : isCapabilityQuestion(message)
+                  ? "capability"
+                  : isFocusRequest(message)
+                    ? "focus_request"
+                    : isNextStepRequest(message)
+                      ? "next_step"
+                      : isTimelineQuestion(message)
+                        ? "timeline"
+                        : isPricingQuestion(message)
+                          ? "pricing"
+                          : businessType ||
+                              challenge ||
+                              platform ||
+                              revenue.revenueRange ||
+                              websiteUrl ||
+                              hasNoWebsite ||
+                              funnelStage
+                            ? "diagnosis"
+                            : dropoffDetail ||
+                                productScope ||
+                                cartBuildSource ||
+                                shippingPricing ||
+                                recommendationSetup ||
+                                leadDestination ||
+                                notificationChannel
+                              ? "diagnosis"
+                            : "clarify";
   const analysisWithoutConfidence = {
     intent,
     visitorName,
@@ -697,6 +926,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     desiredOutcome,
     challenge,
     websiteUrl,
+    hasWebsiteOrLandingPage,
+    hasNoWebsite,
     email,
     outOfScope,
     ...revenue,
@@ -752,6 +983,11 @@ function mergeLeadProfile(
   if (analysis.businessType) {
     addChange(changes, "businessType", nextProfile.businessType, analysis.businessType);
     nextProfile.businessType = analysis.businessType;
+    if (nextProfile.needsBusinessTypeClarification) {
+      addChange(changes, "needsBusinessTypeClarification", true, false);
+      nextProfile.needsBusinessTypeClarification = false;
+      nextProfile.industryMismatchResolved = true;
+    }
   }
 
   if (analysis.platform) {
@@ -861,13 +1097,85 @@ function mergeLeadProfile(
   }
 
   if (analysis.challenge) {
-    addChange(changes, "challenge", nextProfile.challenge, analysis.challenge);
-    nextProfile.challenge = analysis.challenge;
+    const shouldKeepExistingChallenge =
+      analysis.challenge === "Website" &&
+      nextProfile.challenge &&
+      nextProfile.challenge !== "Website";
+
+    if (!shouldKeepExistingChallenge) {
+      addChange(changes, "challenge", nextProfile.challenge, analysis.challenge);
+      nextProfile.challenge = analysis.challenge;
+    }
   }
 
   if (analysis.websiteUrl) {
     addChange(changes, "websiteUrl", nextProfile.websiteUrl, analysis.websiteUrl);
     nextProfile.websiteUrl = analysis.websiteUrl;
+    const inference = inferIndustryFromUrl(analysis.websiteUrl);
+    if ((inference.industryConfidence ?? 0) > 0) {
+      addChange(changes, "inferredIndustry", nextProfile.inferredIndustry, inference.inferredIndustry);
+      addChange(
+        changes,
+        "inferredBusinessModel",
+        nextProfile.inferredBusinessModel,
+        inference.inferredBusinessModel,
+      );
+      addChange(
+        changes,
+        "inferredFunnelType",
+        nextProfile.inferredFunnelType,
+        inference.inferredFunnelType,
+      );
+      nextProfile.inferredIndustry = inference.inferredIndustry;
+      nextProfile.inferredBusinessModel = inference.inferredBusinessModel;
+      nextProfile.inferredFunnelType = inference.inferredFunnelType;
+      nextProfile.industryConfidence = inference.industryConfidence;
+    }
+    const mismatch =
+      !nextProfile.industryMismatchResolved &&
+      hasUrlBusinessTypeMismatch(nextProfile.businessType, inference);
+    if (mismatch) {
+      addChange(changes, "needsBusinessTypeClarification", false, true);
+      nextProfile.needsBusinessTypeClarification = true;
+    }
+    if (!nextProfile.hasWebsiteOrLandingPage) {
+      addChange(changes, "hasWebsiteOrLandingPage", nextProfile.hasWebsiteOrLandingPage, true);
+      nextProfile.hasWebsiteOrLandingPage = true;
+    }
+    if (nextProfile.hasNoWebsite) {
+      addChange(changes, "hasNoWebsite", nextProfile.hasNoWebsite, undefined);
+      delete nextProfile.hasNoWebsite;
+    }
+  }
+
+  if (analysis.hasWebsiteOrLandingPage) {
+    addChange(
+      changes,
+      "hasWebsiteOrLandingPage",
+      nextProfile.hasWebsiteOrLandingPage,
+      true,
+    );
+    nextProfile.hasWebsiteOrLandingPage = true;
+    if (nextProfile.hasNoWebsite) {
+      addChange(changes, "hasNoWebsite", nextProfile.hasNoWebsite, undefined);
+      delete nextProfile.hasNoWebsite;
+    }
+  }
+
+  if (analysis.hasNoWebsite) {
+    addChange(
+      changes,
+      "hasWebsiteOrLandingPage",
+      nextProfile.hasWebsiteOrLandingPage,
+      false,
+    );
+    nextProfile.hasWebsiteOrLandingPage = false;
+    addChange(changes, "hasNoWebsite", nextProfile.hasNoWebsite, true);
+    nextProfile.hasNoWebsite = true;
+    if (nextProfile.websiteUrl) {
+      addChange(changes, "websiteUrl", nextProfile.websiteUrl, undefined);
+      delete nextProfile.websiteUrl;
+    }
   }
 
   if (analysis.email) {
@@ -878,6 +1186,8 @@ function mergeLeadProfile(
   nextProfile.recommendedNextStep = recommendZoraNextStep(nextProfile);
   nextProfile.recommendedFocusAreas = focusAreas(nextProfile);
   nextProfile.leadQuality = scoreZoraLeadQuality(nextProfile);
+  nextProfile.leadScore = scoreZoraLead(nextProfile);
+  nextProfile.leadTemperature = scoreZoraLeadTemperature(nextProfile);
 
   return {
     leadProfile: nextProfile,
@@ -898,6 +1208,30 @@ function applyProfileContextToAnalysis(
   analysis: ZoraMessageAnalysis,
   currentProfile: ZoraLeadProfile,
 ): ZoraMessageAnalysis {
+  const ecommerceFunnelAnswer =
+    currentProfile.businessType === "Ecommerce" &&
+    currentProfile.challenge === "Conversion" &&
+    (!analysis.businessType || analysis.businessType === "Ecommerce") &&
+    Boolean(
+      analysis.funnelStage ||
+        analysis.dropoffDetail ||
+        analysis.productScope ||
+        analysis.cartBuildSource ||
+        analysis.shippingPricing ||
+        analysis.recommendationSetup,
+    );
+
+  if (ecommerceFunnelAnswer) {
+    const { confidenceScore, ...analysisWithoutConfidence } = analysis;
+    void confidenceScore;
+
+    return withRecalculatedConfidence({
+      ...analysisWithoutConfidence,
+      challenge: undefined,
+      leadSource: undefined,
+    });
+  }
+
   const crmNotificationAnswer =
     currentProfile.businessType === "Service Business" &&
     currentProfile.challenge === "Follow-up" &&
@@ -955,6 +1289,10 @@ export function inferZoraLeadProfile(
 }
 
 export function recommendZoraNextStep(profile: ZoraLeadProfile): ZoraNextStep {
+  if (profile.hasNoWebsite) {
+    return "strategy_call";
+  }
+
   if (profile.revenueRange === "$1M+" || profile.leadQuality === "high") {
     return "strategy_call";
   }
@@ -993,6 +1331,60 @@ export function scoreZoraLeadQuality(profile: ZoraLeadProfile): ZoraLeadQuality 
   return "low";
 }
 
+export function scoreZoraLead(profile: ZoraLeadProfile): number {
+  let score = 0;
+
+  if (profile.businessType) score += 10;
+  if (profile.challenge) score += 15;
+  if (profile.websiteUrl) score += 20;
+  if (profile.hasNoWebsite) score += 8;
+  if (profile.hasWebsiteOrLandingPage) score += 8;
+  if (profile.platform) score += 8;
+  if (profile.annualRevenueText || profile.revenueRange) score += 12;
+  if (profile.conversionRate) score += 10;
+  if (profile.funnelStage || profile.dropoffDetail || profile.productScope) score += 8;
+  if (profile.leadDestination || profile.notificationChannel) score += 8;
+  if (profile.email) score += 12;
+  if (profile.recommendedNextStep === "strategy_call") score += 8;
+
+  return Math.min(100, score);
+}
+
+export function scoreZoraLeadTemperature(
+  profile: ZoraLeadProfile,
+  eventType?: string,
+): ZoraLeadTemperature {
+  const highIntentEvent =
+    eventType === "audit_clicked" ||
+    eventType === "strategy_call_clicked" ||
+    eventType === "audit_requested" ||
+    eventType === "booking_requested" ||
+    eventType === "cost_or_fix_requested" ||
+    eventType === "recommendation_requested" ||
+    eventType === "consultant_question";
+
+  if (
+    highIntentEvent ||
+    (profile.websiteUrl &&
+      (profile.challenge === "Conversion" ||
+        profile.challenge === "Tracking" ||
+        profile.challenge === "Operations" ||
+        profile.challenge === "Follow-up"))
+  ) {
+    return "hot";
+  }
+
+  if (
+    (profile.businessType && profile.challenge) ||
+    profile.leadQuality === "medium" ||
+    profile.leadQuality === "high"
+  ) {
+    return "warm";
+  }
+
+  return "cold";
+}
+
 function focusAreas(profile: Pick<ZoraLeadProfile, "businessType" | "challenge">) {
   if (profile.businessType === "Ecommerce" && profile.challenge === "Traffic") {
     return [
@@ -1001,6 +1393,17 @@ function focusAreas(profile: Pick<ZoraLeadProfile, "businessType" | "challenge">
       "SEO/product category pages",
       "retargeting",
       "conversion readiness before ad scaling",
+    ];
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
+    return [
+      "order flow",
+      "fulfillment handoffs",
+      "inventory/product data",
+      "customer support routing",
+      "reporting visibility",
+      "automation opportunities",
     ];
   }
 
@@ -1137,23 +1540,272 @@ export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
   return `${opener}${contextText}, I would focus on ${areas}. ${challengeDiagnosis(profile)}`;
 }
 
+function buildRecommendationRoadmap(profile: ZoraLeadProfile): ZoraRoadmapStep[] {
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
+    if (profile.funnelStage === "Product pages" || profile.productScope === "All products") {
+      return [
+        {
+          title: "Mobile Product-Page Conversion Review",
+          reason:
+            "If product pages are leaking across the catalog, the shared template is probably creating uncertainty before add-to-cart.",
+          validation:
+            "Review mobile PDP hierarchy, images, variant selection, reviews, shipping/returns visibility, sticky add-to-cart, and product-view to add-to-cart data.",
+          expectedImpact:
+            "Reduce buying friction before checkout and make the first purchase decision clearer.",
+          costRange: "$1,500-$4,000",
+          timeline: "1-3 weeks",
+        },
+        {
+          title: "Checkout Confidence and Tracking Pass",
+          reason:
+            "Once product-page intent improves, checkout and tracking need to confirm where shoppers still hesitate.",
+          validation:
+            "Check cart clarity, shipping/tax visibility, payment options, checkout-start events, and abandonment by step.",
+          expectedImpact:
+            "Separate real checkout friction from analytics noise before investing in larger theme work.",
+          costRange: "$1,000-$3,000",
+          timeline: "1-2 weeks",
+        },
+      ];
+    }
+
+    return [
+      {
+        title: "Purchase Path Friction Review",
+        reason:
+          "A low conversion rate usually means the buying path needs to be separated from traffic quality before scaling acquisition.",
+        validation:
+          "Map product discovery, product pages, cart, checkout, trust signals, and event tracking.",
+        expectedImpact:
+          "Identify whether the first fix is UX, offer clarity, checkout confidence, or tracking.",
+        costRange: "$1,500-$4,500",
+        timeline: "1-3 weeks",
+      },
+      {
+        title: "Priority UX Improvement Sprint",
+        reason:
+          "The best next move is usually a focused fix to the highest-friction step, not a full rebuild by default.",
+        validation:
+          "Compare top landing/product paths against add-to-cart, checkout-start, and purchase data.",
+        expectedImpact:
+          "Improve conversion readiness before ad spend or major platform work.",
+        costRange: "$2,000-$6,000",
+        timeline: "2-4 weeks",
+      },
+    ];
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
+    return [
+      {
+        title: "Ecommerce Operations Flow Map",
+        reason:
+          "For ecommerce operations, the leak is often not the storefront itself; it is the handoff between order placed, fulfillment, customer communication, support, and reporting.",
+        validation:
+          "Map order flow, fulfillment handoffs, inventory/product data, support routing, exception handling, and reporting visibility.",
+        expectedImpact:
+          "Expose where work is manual, duplicated, delayed, or invisible before automating the wrong step.",
+        costRange: "$1,500-$4,000",
+        timeline: "1-3 weeks",
+      },
+      {
+        title: "Automation and Reporting Prioritization",
+        reason:
+          "After the operating flow is visible, the next move is to prioritize the automations and dashboards that remove the most friction.",
+        validation:
+          "Review order status updates, internal notifications, customer support triggers, inventory alerts, and team reporting needs.",
+        expectedImpact:
+          "Reduce manual handoffs and improve operational visibility without overbuilding.",
+        costRange: "$2,000-$7,000",
+        timeline: "2-4 weeks",
+      },
+    ];
+  }
+
+  if (profile.businessType === "Real Estate") {
+    return [
+      {
+        title: "Seller Lead Path Review",
+        reason:
+          "Real estate lead generation depends on a specific offer, local proof, and a clear capture path for sellers or buyers.",
+        validation:
+          "Review landing-page message, local trust proof, valuation/consultation offer, form friction, and booking path.",
+        expectedImpact:
+          "Increase qualified lead capture from the traffic you already have.",
+        costRange: "$1,000-$3,000",
+        timeline: "1-2 weeks",
+      },
+      {
+        title: "Follow-Up Speed and Source Tracking",
+        reason:
+          "Seller leads often lose value when response speed, ownership, or source tracking is unclear.",
+        validation:
+          "Check CRM routing, notifications, missed-lead alerts, and whether leads are tagged by source.",
+        expectedImpact:
+          "Improve response quality and show which channels are worth scaling.",
+        costRange: "$1,500-$4,000",
+        timeline: "1-3 weeks",
+      },
+    ];
+  }
+
+  if (profile.businessType === "Service Business" && profile.challenge === "Follow-up") {
+    return [
+      {
+        title: "Speed-to-Lead Workflow Review",
+        reason:
+          "When leads exist but follow-up is slow, more traffic will usually amplify the leak instead of solving it.",
+        validation:
+          "Map where leads land, who gets notified, response-time rules, CRM ownership, and missed-lead recovery.",
+        expectedImpact:
+          "Shorten response time and reduce lost opportunities from manual handoffs.",
+        costRange: "$1,000-$3,500",
+        timeline: "1-2 weeks",
+      },
+      {
+        title: "Booking and Nurture Automation",
+        reason:
+          "After routing is clear, automation can keep leads moving without depending on someone checking manually.",
+        validation:
+          "Review booking path, reminders, status changes, SMS/email follow-up, and no-response alerts.",
+        expectedImpact:
+          "Improve consistency from inquiry to booked conversation.",
+        costRange: "$2,000-$6,000",
+        timeline: "2-4 weeks",
+      },
+    ];
+  }
+
+  if (profile.challenge === "Tracking") {
+    return [
+      {
+        title: "Tracking and Attribution Review",
+        reason:
+          "If measurement is unclear, it is hard to know whether traffic, conversion, or follow-up is the real issue.",
+        validation:
+          "Check GA4 events, pixels, UTMs, conversion actions, source reporting, and dashboard visibility.",
+        expectedImpact:
+          "Create cleaner decision-making before spending more on ads or rebuild work.",
+        costRange: "$1,000-$3,000",
+        timeline: "1-2 weeks",
+      },
+      {
+        title: "Dashboard or Reporting Cleanup",
+        reason:
+          "Once events are trustworthy, the team needs a simple view of what is working.",
+        validation:
+          "Prioritize channel, lead, conversion, and follow-up metrics that connect to sales decisions.",
+        expectedImpact:
+          "Make the next improvement less dependent on guesswork.",
+        costRange: "$1,500-$4,500",
+        timeline: "1-3 weeks",
+      },
+    ];
+  }
+
+  return [
+    {
+      title: "Growth System Diagnosis",
+      reason:
+        "The safest first move is to separate traffic, conversion, follow-up, tracking, and operations before prescribing a build.",
+      validation:
+        "Review the website path, primary offer, lead capture, follow-up handoff, and tracking signals.",
+      expectedImpact:
+        "Identify the highest-leverage bottleneck without over-scoping the first project.",
+      costRange: "$1,000-$3,000",
+      timeline: "1-2 weeks",
+    },
+    {
+      title: "Focused Improvement Sprint",
+      reason:
+        "After the bottleneck is confirmed, a targeted improvement is usually smarter than a full rebuild.",
+      validation:
+        "Prioritize the one or two changes most likely to improve lead capture, conversion, or operational control.",
+      expectedImpact:
+        "Create measurable progress before deciding whether larger implementation is needed.",
+      costRange: "$2,000-$7,000",
+      timeline: "2-4 weeks",
+    },
+  ];
+}
+
+function formatRoadmapStep(step: ZoraRoadmapStep, index: number) {
+  return `${index + 1}. ${step.title}\nWhy: ${step.reason}\nValidate: ${step.validation}\nExpected impact: ${step.expectedImpact}\nTypical range: ${step.costRange}\nTimeline: ${step.timeline}`;
+}
+
+function buildRecommendationResponse(profile: ZoraLeadProfile) {
+  if (!hasProfileDiagnosisSignal(profile)) {
+    return "I can recommend a roadmap, but I need one business detail first: what type of business is this, and what feels stuck right now?";
+  }
+
+  const roadmap = profile.recommendationRoadmap?.length
+    ? profile.recommendationRoadmap
+    : buildRecommendationRoadmap(profile);
+  const first = roadmap[0];
+  const second = roadmap[1];
+
+  if (!first) {
+    return `${buildZoraDiagnosis(profile)} ${followUpQuestion(profile)}`;
+  }
+
+  return [
+    `What I would do first: ${first.title}.`,
+    `Why: ${first.reason}`,
+    `What I would validate: ${first.validation}`,
+    `Expected impact: ${first.expectedImpact}`,
+    second ? `What comes second: ${second.title}. ${second.reason}` : "",
+    `Typical range: ${first.costRange}`,
+    `Timeline: ${first.timeline}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildRoadmapFollowUpResponse(message: string, roadmap: ZoraRoadmapStep[]) {
+  const lower = message.toLowerCase();
+  const requestedStep = /\bthird|3rd\b/.test(lower) ? 2 : /\bsecond|2nd\b/.test(lower) ? 1 : 0;
+  const step = roadmap[requestedStep] || roadmap[0];
+
+  if (!step) {
+    return "I would start by diagnosing the growth system, then use that to decide whether the next move is a free audit, a focused improvement sprint, or a strategy call.";
+  }
+
+  if (/\bhow much|cost|investment|range|price|pricing\b/i.test(message)) {
+    return `For ${step.title}, I would treat ${step.costRange} as a directional planning range. The range depends on platform constraints, implementation depth, and business impact. It is not a final quote.`;
+  }
+
+  if (/\bhow long|timeline|weeks?|months?|take\b/i.test(message)) {
+    return `For ${step.title}, I would plan around ${step.timeline}. The timeline depends on access, content readiness, platform constraints, and how quickly validation data is available.`;
+  }
+
+  if (/\bwhy\b/i.test(message)) {
+    return `I put ${step.title} there because ${step.reason} I would validate it by checking: ${step.validation}`;
+  }
+
+  return formatRoadmapStep(step, requestedStep);
+}
+
 function greetingPrefix(profile: ZoraLeadProfile) {
   return profile.visitorName ? `Nice to meet you, ${profile.visitorName}. ` : "";
 }
 
 function buildCapabilityResponse(profile: ZoraLeadProfile) {
-  return `${greetingPrefix(profile)}Opzix builds growth systems for businesses that need their website, ecommerce, automation, tracking, follow-up, and operations to work together. That can include websites, ecommerce systems, AI assistants, dashboards, integrations, lead generation systems, and audit-based implementation roadmaps. Want me to diagnose your growth system or point you to the free audit?`;
+  return `${greetingPrefix(profile)}Yes. Opzix builds websites, ecommerce systems, AI assistants, CRM and booking flows, automation, dashboards, integrations, lead-generation systems, and audit-based implementation roadmaps. My role is to understand what kind of business you have, identify the likely bottleneck, explain what it means, and recommend whether the next move is a focused fix, free audit, or strategy call.`;
 }
 
 function buildSmallTalkResponse(profile: ZoraLeadProfile) {
-  return `${greetingPrefix(profile)}I'm doing well, thanks for asking. I'm here to help you spot growth bottlenecks across traffic, conversion, operations, tracking, follow-up, and your website. Want to diagnose your growth system, run the free audit, or ask me a specific question?`;
+  return `${greetingPrefix(profile)}I'm doing well, thanks for asking. I'm here to help diagnose growth bottlenecks across traffic, conversion, follow-up, tracking, operations, and your website. If you tell me what business you run and what feels stuck, I can give you a practical recommendation.`;
 }
 
 function buildThanksResponse(profile: ZoraLeadProfile) {
-  return `${profile.visitorName ? `You're welcome, ${profile.visitorName}.` : "You're welcome."} If you want to go deeper, I can help diagnose your growth system, point you to the free audit, or help you book a strategy call.`;
+  return `${profile.visitorName ? `You're welcome, ${profile.visitorName}.` : "You're welcome."} When you're ready, the next best step is either the free audit for a website-based diagnosis or a strategy call for planning the system.`;
 }
 
 function buildTimelineResponse(profile: ZoraLeadProfile, message: string) {
+  if (profile.recommendationRoadmap?.length && isRoadmapSpecificFollowUp(message)) {
+    return buildRoadmapFollowUpResponse(message, profile.recommendationRoadmap);
+  }
+
   if (isEcommerceBuildQuestion(message)) {
     return `${greetingPrefix(profile)}A focused ecommerce website can often launch in 3-6 weeks, while a more custom ecommerce system with product structure, integrations, tracking, automation, or migration work can take 6-12+ weeks. The real timeline depends on catalog complexity, content readiness, platform access, payment/shipping setup, and how much backend workflow needs to be connected. Want me to help scope the right path?`;
   }
@@ -1161,8 +1813,12 @@ function buildTimelineResponse(profile: ZoraLeadProfile, message: string) {
   return `${greetingPrefix(profile)}Focused improvements can often take 1-3 weeks. Larger websites, ecommerce systems, AI assistants, automation workflows, dashboards, or integrations can take several weeks or longer depending on scope, access, content, and testing. Want me to help scope the right path?`;
 }
 
-function buildPricingResponse(profile: ZoraLeadProfile) {
-  return `${greetingPrefix(profile)}Opzix uses directional planning ranges rather than fixed quotes inside chat. Focused improvements can start in the low thousands, while larger websites, ecommerce systems, AI assistants, automations, dashboards, and integrations depend on scope, platform access, and complexity. Want me to diagnose the likely scope?`;
+function buildPricingResponse(profile: ZoraLeadProfile, message: string) {
+  if (profile.recommendationRoadmap?.length && isRoadmapSpecificFollowUp(message)) {
+    return buildRoadmapFollowUpResponse(message, profile.recommendationRoadmap);
+  }
+
+  return `${greetingPrefix(profile)}I would look at cost in three layers: platform, implementation, and business impact. Platform affects what is easy or constrained. Implementation is the actual design, build, automation, integration, tracking, and testing work. Business impact determines whether the right move is a small fix or a larger system build. Opzix uses directional planning ranges in chat, not fixed quotes; focused improvements often start in the low thousands, while larger ecommerce systems, AI assistants, dashboards, automations, and integrations depend on scope.`;
 }
 
 function buildClarifyingResponse() {
@@ -1173,56 +1829,148 @@ function buildWebsiteCapturedResponse(analysis: ZoraMessageAnalysis) {
   return `Got it, I have ${analysis.websiteUrl}. What type of business is this for, and what feels stuck right now?`;
 }
 
+function inferredContextSummary(profile: ZoraLeadProfile) {
+  if (
+    !shouldUseIndustryInference(profile) ||
+    !profile.inferredBusinessModel ||
+    !profile.inferredFunnelType ||
+    !profile.industryConfidence ||
+    profile.industryConfidence < 0.7
+  ) {
+    return "";
+  }
+
+  const focus =
+    profile.inferredBusinessModel === "B2B Ecommerce / Distributor"
+      ? "product discovery, quote/request paths, account-based purchasing, follow-up after inquiry, and tracking visibility"
+      : profile.inferredBusinessModel === "DTC Ecommerce"
+        ? "product discovery, mobile buying experience, checkout confidence, retention, and tracking visibility"
+        : profile.inferredIndustry === "Real Estate"
+          ? "seller/buyer lead capture, local authority proof, appointment booking, and follow-up speed"
+          : profile.inferredBusinessModel === "Care Provider / Service Organization"
+            ? "intake flow, referral paths, trust proof, service clarity, and response process"
+            : "";
+
+  return focus
+    ? ` This appears to be a ${profile.inferredBusinessModel} with a ${profile.inferredFunnelType} funnel. Assuming that's correct, I'd look at ${focus} first.`
+    : "";
+}
+
 function buildWebsiteCapturedWithMemoryResponse(profile: ZoraLeadProfile) {
+  const inferredContext = inferredContextSummary(profile);
+
   if (profile.businessType && profile.challenge) {
-    return `Got it, I have ${profile.websiteUrl}. Since this is ${businessContextLabel(profile.businessType)} and the issue is ${profile.challenge.toLowerCase()}, the next useful step is to look at the actual site path before guessing further.`;
+    return `Got it, I have ${profile.websiteUrl}.${inferredContext || ` Using the business type you selected, the issue is ${profile.challenge.toLowerCase()}, so the next useful step is to look at the actual site path before guessing further.`}`;
   }
 
   if (profile.businessType) {
-    return `Got it, I have ${profile.websiteUrl}. What feels like the biggest bottleneck right now: traffic, conversion, operations, tracking, follow-up, or the website?`;
+    return `Got it, I have ${profile.websiteUrl}.${inferredContext} What feels like the biggest bottleneck right now: traffic, conversion, operations, tracking, follow-up, or the website?`;
   }
 
   return `Got it, I have ${profile.websiteUrl}. What type of business is this for, and what feels stuck right now?`;
 }
 
+function buildBusinessTypeMismatchResponse(profile: ZoraLeadProfile) {
+  const selected = profile.businessType || "the selected business type";
+  const inferred = profile.inferredIndustry || "another industry";
+
+  return `Quick check: you selected ${selected}, but the website looks like it may be ${inferred.toLowerCase()}-related. Should I diagnose this as ${selected.toLowerCase()} or a ${inferred.toLowerCase()} business?`;
+}
+
 function buildOutOfScopeResponse() {
-  return "I probably cannot help with that directly. Opzix focuses on websites, ecommerce, AI assistants, automation, tracking, follow-up, dashboards, integrations, and lead generation systems. If the issue is about your business website or customer journey, I can help diagnose that.";
+  return "I probably cannot help with that directly. Opzix focuses on websites, ecommerce, AI assistants, automation, tracking, follow-up, dashboards, integrations, and lead-generation systems. If the issue connects to your customer journey or business systems, I can help diagnose it.";
 }
 
 function buildAuditRequestResponse(profile: ZoraLeadProfile) {
+  if (profile.hasNoWebsite) {
+    return "Since there is no website to audit yet, the best next step is a strategy call to map the first version.";
+  }
+
+  if (!profile.websiteUrl) {
+    return "Yes. What website URL should I use?";
+  }
+
   if (profile.businessType || profile.challenge || profile.platform) {
     const focus = joinList(focusAreas(profile));
     const business = profile.businessType
       ? businessContextLabel(profile.businessType)
       : "your website";
 
-    return `Yes. Since the issue is tied to ${business}, the audit should focus on ${focus}. The scanner can review the actual site and generate a more detailed roadmap.`;
+    return `Yes. Since the issue is tied to ${business}, the audit should focus on ${focus}. The scanner can review ${profile.websiteUrl} and generate a more detailed roadmap.`;
   }
 
-  return "Yes. Zora does not run the full scanner inside chat, but the free audit scanner can review your actual website and generate a more detailed roadmap.";
+  return `Yes. Zora does not run the full scanner inside chat, but the free audit scanner can review ${profile.websiteUrl} and generate a more detailed roadmap.`;
 }
 
 function buildBookingRequestResponse(profile: ZoraLeadProfile) {
   return `${greetingPrefix(profile)}A strategy call is the best next step if you want help deciding what to fix first and what scope makes sense.`;
 }
 
-function followUpQuestion(profile: ZoraLeadProfile) {
-  if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
-    return "Are most visitors dropping before product pages, on product pages, or during checkout?";
+function buildNoWebsiteResponse() {
+  return "Since there is no site to audit yet, the best next step is a strategy call to map the landing page, offer, and follow-up system.";
+}
+
+function buildConsultantResponse(profile: ZoraLeadProfile, message: string) {
+  if (
+    profile.recommendationRoadmap?.length &&
+    isRoadmapFollowUp(message) &&
+    isRoadmapSpecificFollowUp(message)
+  ) {
+    return buildRoadmapFollowUpResponse(message, profile.recommendationRoadmap);
   }
 
+  if (/\bshopify\b.+\bbigcommerce\b|\bbigcommerce\b.+\bshopify\b/i.test(message)) {
+    return "Shopify is usually the cleaner path for DTC stores that need speed, app ecosystem, and simpler operations. BigCommerce can make sense for more complex catalogs, B2B pricing, multi-store needs, or tighter backend requirements. The right choice depends on catalog complexity, checkout rules, integrations, team workflow, and how much control you need over operations.";
+  }
+
+  if (/\b(should i run ads|run ads|ads|advertising|scale traffic)\b/i.test(message)) {
+    return "What this means: ads only help when the path after the click can convert and follow up. Traffic flows into conversion, then follow-up, then operations.\nWhat I would check: landing-page match, offer clarity, mobile path, tracking, and whether leads or carts are handled quickly.\nWhy it matters: more traffic will not solve conversion leaks; it usually makes the leak more expensive.\nRecommendation: if conversion is weak, fix the site path first. If conversion is strong, scale traffic. If leads exist but close rate is weak, fix follow-up and operations before buying more traffic.";
+  }
+
+  if (isWebsiteBuildOrRebuildQuestion(message)) {
+    if (profile.businessType === "Real Estate") {
+      return "For a real estate business, I would not start with a generic new website. I would scope the site around the lead path: seller or buyer offer, local proof, valuation or consultation CTA, fast follow-up, source tracking, and a page structure that supports ads, organic search, and referrals. The first decision is whether you need a focused landing path or a fuller brand/site rebuild. A strategy call is usually the better next step for scoping that before treating it like a fixed website project.";
+    }
+
+    return "What this means: I would compare cost to improve against cost to replace before recommending a rebuild.\nWhat I would check: platform limits, technical debt, page/template constraints, tracking gaps, integration needs, and whether the current site blocks growth.\nWhy it matters: a rebuild is only worth it when the architecture is limiting the business, not just because the site feels imperfect.\nRecommendation: default to a focused fix first. Consider rebuild only if platform limitations, severe technical debt, or architecture constraints are confirmed.";
+  }
+
+  if (/\b(audit process|how does the audit|free audit|audit work)\b/i.test(message)) {
+    return "What this means: the audit is a structured way to diagnose the visible growth system before scoping work.\nWhat I would check: conversion gaps, UX friction, tracking gaps, and operational bottlenecks such as lead capture, CRM handoff, booking flow, product discovery, and checkout confidence.\nWhy it matters: the goal is to prioritize the next useful improvement, not generate a generic score.\nRecommendation: run the free audit when you have a URL. If there is no site yet, start with a strategy call to map the first version.";
+  }
+
+  if (/\b(cost analysis|roi|return|worth it|business impact)\b/i.test(message)) {
+    return "What this means: I would evaluate the decision in layers: platform, implementation, and business impact.\nWhat I would check: what the current platform allows, what has to be designed or integrated, and which bottleneck affects revenue or lead quality the most.\nWhy it matters: the cheapest fix is not always the best one, but the biggest build is not automatically justified either.\nRecommendation: start with a directional planning range tied to the highest-value bottleneck, then validate scope before treating it like a proposal.";
+  }
+
+  if (/\b(implementation|process|strategy|how would this work)\b/i.test(message)) {
+    return "What this means: Opzix usually works through diagnose, prioritize, then build.\nWhat I would check: the customer journey, conversion friction, tracking, follow-up handoff, and any systems that need to connect.\nWhy it matters: implementation should follow the bottleneck, not a generic feature list.\nRecommendation: diagnose the visible path first, prioritize the highest-impact improvement, then build the website, ecommerce, AI assistant, automation, dashboard, integration, or workflow that solves that specific constraint.";
+  }
+
+  return `${buildZoraDiagnosis(profile)} Recommendation: I would diagnose the visible path first, prioritize the highest-impact bottleneck, then decide whether the next move is a focused fix, free audit, or strategy call.`;
+}
+
+function buildContextSwitchResponse(profile: ZoraLeadProfile) {
   if (profile.businessType === "Real Estate") {
-    return "Are you currently getting seller leads from ads, referrals, organic search, or social?";
+    return "Got it - I'll treat this as a real estate lead-generation site, not ecommerce. For real estate, I'd focus on seller/buyer landing pages, local proof, lead capture, follow-up speed, and booking flow. Do you want to run the free audit on the page, or map the seller-lead path first?";
   }
 
   if (profile.businessType === "Care/Healthcare") {
-    return "Are most inquiries coming from families, referral partners, or waiver-related searches?";
+    return "Got it - I'll treat this as a care or healthcare growth system. I would focus on trust proof, service clarity, intake friction, referral paths, and response process first. Do you want to run the free audit on the page, or map the intake path first?";
   }
 
-  if (profile.businessType === "Service Business" && profile.challenge === "Follow-up") {
-    return "Do leads currently go into a CRM, email inbox, spreadsheet, or nowhere structured?";
+  if (profile.businessType === "Service Business") {
+    return "Got it - I'll treat this as a service business. I would focus on lead capture, qualification, booking flow, follow-up speed, and operational handoff first. Do you want to map the lead path or book a strategy call?";
   }
 
+  if (profile.businessType === "Ecommerce") {
+    return "Got it - I'll treat this as ecommerce. I would focus on product discovery, mobile UX, checkout confidence, tracking, and follow-up first. Do you want to run the free audit on the store, or talk through the likely fix path first?";
+  }
+
+  return `${buildZoraDiagnosis(profile)} ${followUpQuestion(profile)}`;
+}
+
+function followUpQuestion(profile: ZoraLeadProfile) {
   if (!profile.businessType) {
     return "Quick question: what type of business is this for?";
   }
@@ -1231,7 +1979,51 @@ function followUpQuestion(profile: ZoraLeadProfile) {
     return "Quick question: what feels like the biggest bottleneck right now: traffic, conversion, operations, tracking, follow-up, or the website?";
   }
 
-  if (!profile.websiteUrl) {
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
+    if (profile.funnelStage) {
+      return "Quick question: do you want to run the free audit next, or talk through the likely fix path first?";
+    }
+
+    return "Are most visitors dropping before product pages, on product pages, or during checkout?";
+  }
+
+  if (profile.businessType === "Real Estate") {
+    if (profile.hasNoWebsite) {
+      return "Since there is no site to audit yet, the best next step is a strategy call to map the landing page, offer, and follow-up system.";
+    }
+
+    if (profile.hasWebsiteOrLandingPage && !profile.websiteUrl) {
+      return "Great - what is the URL, or would you rather talk through the strategy first?";
+    }
+
+    if (profile.leadSource) {
+      if (profile.websiteUrl || profile.hasNoWebsite) {
+        return "Quick question: do you want a strategy-call review or a high-level next-step recommendation here?";
+      }
+
+      return "Quick question: do you already have a website or landing page for those leads?";
+    }
+
+    return "Are you currently getting seller leads from ads, referrals, organic search, or social?";
+  }
+
+  if (profile.businessType === "Care/Healthcare") {
+    return "Are most inquiries coming from families, referral partners, or waiver-related searches?";
+  }
+
+  if (profile.businessType === "Service Business" && profile.challenge === "Follow-up") {
+    if (profile.leadDestination) {
+      return "Quick question: how does your team get notified when a new lead comes in?";
+    }
+
+    return "Do leads currently go into a CRM, email inbox, spreadsheet, or nowhere structured?";
+  }
+
+  if (!profile.websiteUrl && !profile.hasNoWebsite) {
+    if (profile.hasWebsiteOrLandingPage) {
+      return "Great - what is the URL, or would you rather talk through the strategy first?";
+    }
+
     return "Quick question: do you already have a website URL I should use as context?";
   }
 
@@ -1246,6 +2038,7 @@ function hasDiagnosisSignal(analysis: ZoraMessageAnalysis) {
     analysis.businessType ||
       analysis.platform ||
       analysis.revenueRange ||
+      analysis.hasWebsiteOrLandingPage ||
       nonGenericChallenge,
   );
 }
@@ -1256,7 +2049,9 @@ function hasProfileDiagnosisSignal(profile: ZoraLeadProfile) {
       (profile.challenge ||
         profile.desiredOutcome ||
         profile.conversionRate ||
-        profile.websiteUrl),
+        profile.websiteUrl ||
+        profile.hasWebsiteOrLandingPage ||
+        profile.hasNoWebsite),
   );
 }
 
@@ -1265,6 +2060,8 @@ function qualificationCount(profile: ZoraLeadProfile) {
     profile.businessType,
     profile.challenge,
     profile.websiteUrl,
+    profile.hasWebsiteOrLandingPage,
+    profile.hasNoWebsite,
     profile.revenueRange,
     profile.platform,
     profile.desiredOutcome,
@@ -1279,6 +2076,24 @@ function hasSufficientQualification(profile: ZoraLeadProfile) {
 }
 
 function buildNextStepResponse(profile: ZoraLeadProfile) {
+  if (profile.hasNoWebsite) {
+    return "Since there is no site to audit yet, the best next step is a strategy call to map the landing page, offer, and follow-up system.";
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
+    if (profile.funnelStage === "Product pages" && profile.productScope === "All products") {
+      return "Here's the likely fix path:\n1. Review the mobile product-page template first.\n2. Check image hierarchy, variant selection, reviews, shipping/returns visibility, and sticky add-to-cart behavior.\n3. Compare top product pages against add-to-cart and checkout-start data.\n4. Run the free audit to confirm where the friction is visible on the actual page.\n5. Then decide whether this is a quick UX cleanup or a theme/template improvement.";
+    }
+
+    if (profile.dropoffDetail === "One product cart") {
+      return "High-level recommendation: start with the first-product purchase path. I would check whether the product page and cart answer the first buyer objections before checkout: shipping cost and timing, return reassurance, reviews, price confidence, variant clarity, and whether the cart introduces a surprise. Then validate tracking from product view to add-to-cart to checkout-start so the team can see where intent drops.";
+    }
+
+    if (profile.funnelStage === "Checkout" || profile.funnelStage === "Cart") {
+      return "High-level recommendation: focus on checkout confidence before adding more traffic. I would review cart clarity, shipping/tax surprise, payment options, guest checkout friction, delivery/returns reassurance, and checkout-step tracking. The goal is to separate true checkout friction from tracking noise before deciding what to rebuild.";
+    }
+  }
+
   if (hasSufficientQualification(profile)) {
     const nextStep =
       profile.websiteUrl || profile.recommendedNextStep === "free_audit"
@@ -1352,6 +2167,10 @@ function buildProductScopeResponse(profile: ZoraLeadProfile) {
     default:
       return `${buildZoraDiagnosis(profile)} ${followUpQuestion(profile)}`;
   }
+}
+
+function buildMobileProductPageAffirmationResponse() {
+  return "That makes mobile product-page friction the priority. I would check sticky add-to-cart behavior, image hierarchy, variant selection, reviews, shipping/returns visibility, and whether the first buying objections are answered before the CTA. Quick question: do you want me to talk through the likely fix path?";
 }
 
 function buildCartBuildSourceResponse(profile: ZoraLeadProfile) {
@@ -1462,8 +2281,41 @@ function actionsForIntent(
   hasDiagnosis: boolean,
   profile: ZoraLeadProfile,
 ) {
-  if (intent === "audit_request") return ["free_audit"] as ZoraResponse["recommendedActions"];
+  if (profile.needsBusinessTypeClarification) {
+    return [] as ZoraResponse["recommendedActions"];
+  }
+
+  if (intent === "thanks") {
+    return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
+  }
+
+  if (profile.hasNoWebsite && intent !== "out_of_scope") {
+    return ["strategy_call"] as ZoraResponse["recommendedActions"];
+  }
+
+  if ((intent === "pricing" || intent === "timeline") && profile.recommendationRoadmap?.length) {
+    return [] as ZoraResponse["recommendedActions"];
+  }
+
+  if (intent === "audit_request") {
+    if (profile.hasNoWebsite) return ["strategy_call"] as ZoraResponse["recommendedActions"];
+    if (profile.websiteUrl) return ["free_audit"] as ZoraResponse["recommendedActions"];
+    return [] as ZoraResponse["recommendedActions"];
+  }
   if (intent === "booking_request") return ["strategy_call"] as ZoraResponse["recommendedActions"];
+  if (intent === "recommendation" && hasSufficientQualification(profile)) {
+    return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
+  }
+  if (intent === "consultant") {
+    if (profile.challenge === "Website") {
+      return ["strategy_call"] as ZoraResponse["recommendedActions"];
+    }
+
+    if (profile.websiteUrl && hasSufficientQualification(profile)) {
+      return ["free_audit"] as ZoraResponse["recommendedActions"];
+    }
+    return [] as ZoraResponse["recommendedActions"];
+  }
   if (intent === "next_step" && hasSufficientQualification(profile)) {
     return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
   }
@@ -1482,10 +2334,28 @@ export function buildZoraResponse(
     currentProfile,
   );
   const { leadProfile, profileChanges } = mergeLeadProfile(currentProfile, analysis);
+  const shouldResumeRecommendationThread = isResumeRecommendationThreadRequest(message);
+  if (
+    (analysis.intent === "recommendation" || shouldResumeRecommendationThread) &&
+    hasProfileDiagnosisSignal(leadProfile)
+  ) {
+    leadProfile.recommendationRoadmap = buildRecommendationRoadmap(leadProfile);
+  }
+  const effectiveIntent: ZoraIntent =
+    shouldResumeRecommendationThread && leadProfile.recommendationRoadmap?.length
+      ? "recommendation"
+      : analysis.intent;
   const effectiveDiagnosisProfile = leadProfile;
+  const businessTypeSwitched = Boolean(
+    currentProfile.businessType &&
+      analysis.businessType &&
+      currentProfile.businessType !== analysis.businessType,
+  );
   const hasDiagnosis =
     hasDiagnosisSignal(analysis) ||
-    ((analysis.intent === "clarify" || analysis.intent === "next_step") &&
+    ((analysis.intent === "diagnosis" ||
+      analysis.intent === "clarify" ||
+      analysis.intent === "next_step") &&
       hasProfileDiagnosisSignal(leadProfile));
   const hasNewFunnelStage = Boolean(analysis.funnelStage);
   const hasNewDropoffDetail = Boolean(analysis.dropoffDetail);
@@ -1495,26 +2365,42 @@ export function buildZoraResponse(
   const hasNewRecommendationSetup = Boolean(analysis.recommendationSetup);
   const hasNewLeadDestination = Boolean(analysis.leadDestination);
   const hasNewNotificationChannel = Boolean(analysis.notificationChannel);
+  const mobileProductPageAffirmation =
+    leadProfile.businessType === "Ecommerce" &&
+    leadProfile.challenge === "Conversion" &&
+    leadProfile.funnelStage === "Product pages" &&
+    leadProfile.productScope === "All products" &&
+    isAffirmativeAnswer(message);
   const reply =
-    analysis.intent === "out_of_scope"
+    effectiveIntent === "out_of_scope"
       ? buildOutOfScopeResponse()
-      : analysis.intent === "thanks"
+      : effectiveIntent === "thanks"
         ? buildThanksResponse(leadProfile)
-        : analysis.intent === "timeline"
+        : effectiveIntent === "timeline"
           ? buildTimelineResponse(leadProfile, message)
-          : analysis.intent === "pricing"
-            ? buildPricingResponse(leadProfile)
-            : analysis.intent === "capability"
+          : effectiveIntent === "pricing"
+            ? buildPricingResponse(leadProfile, message)
+            : effectiveIntent === "capability"
               ? buildCapabilityResponse(leadProfile)
-              : analysis.intent === "small_talk"
+              : effectiveIntent === "small_talk"
                 ? buildSmallTalkResponse(leadProfile)
-                : analysis.intent === "audit_request"
+                : effectiveIntent === "audit_request"
                   ? buildAuditRequestResponse(leadProfile)
-                  : analysis.intent === "booking_request"
+                  : effectiveIntent === "booking_request"
                     ? buildBookingRequestResponse(leadProfile)
-                    : analysis.intent === "next_step"
-                      ? buildNextStepResponse(leadProfile)
-                      : analysis.intent === "focus_request"
+                    : effectiveIntent === "recommendation"
+                      ? buildRecommendationResponse(leadProfile)
+                    : effectiveIntent === "consultant"
+                      ? buildConsultantResponse(leadProfile, message)
+                    : leadProfile.needsBusinessTypeClarification
+                      ? buildBusinessTypeMismatchResponse(leadProfile)
+                    : analysis.hasNoWebsite
+                      ? buildNoWebsiteResponse()
+                    : businessTypeSwitched
+                      ? buildContextSwitchResponse(leadProfile)
+                      : effectiveIntent === "next_step"
+                        ? buildNextStepResponse(leadProfile)
+                        : effectiveIntent === "focus_request"
                         ? buildFocusResponse(leadProfile)
                         : hasNewDropoffDetail
                             ? buildDropoffDetailResponse(leadProfile)
@@ -1532,6 +2418,8 @@ export function buildZoraResponse(
                             ? buildProductScopeResponse(leadProfile)
                           : hasNewFunnelStage
                             ? buildFunnelStageResponse(leadProfile)
+                          : mobileProductPageAffirmation
+                            ? buildMobileProductPageAffirmationResponse()
                           : hasDiagnosis
                             ? `${buildZoraDiagnosis(effectiveDiagnosisProfile)} ${followUpQuestion(effectiveDiagnosisProfile)}`
                             : analysis.websiteUrl
@@ -1544,7 +2432,7 @@ export function buildZoraResponse(
     currentMessageAnalysis: analysis,
     confidenceScore: analysis.confidenceScore,
     profileChanges,
-    responseMode: analysis.intent,
-    recommendedActions: actionsForIntent(analysis.intent, hasDiagnosis, leadProfile),
+    responseMode: effectiveIntent,
+    recommendedActions: actionsForIntent(effectiveIntent, hasDiagnosis, leadProfile),
   };
 }

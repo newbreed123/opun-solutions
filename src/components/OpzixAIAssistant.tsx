@@ -18,8 +18,11 @@ import {
 import {
   buildZoraDiagnosis,
   buildZoraResponse,
+  hasUrlBusinessTypeMismatch,
+  inferIndustryFromUrl,
   recommendZoraNextStep,
   scoreZoraLeadQuality,
+  shouldUseIndustryInference,
   zoraFaqItems,
   ZoraBusinessType,
   ZoraChallenge,
@@ -28,6 +31,7 @@ import {
 } from "@/lib/zora-assistant";
 
 const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
+const ZORA_SESSION_ID_KEY = "opzix-zora-session-id";
 const BOOKING_LINK_DELAY_MS = 150;
 const STRATEGY_CALL_URL = "https://calendly.com/hello-opzix";
 const FREE_AUDIT_URL = "/tools/ecommerce-audit-scanner?source=zora";
@@ -35,14 +39,16 @@ const FREE_AUDIT_URL = "/tools/ecommerce-audit-scanner?source=zora";
 type GuidedStep =
   | "businessType"
   | "challenge"
-  | "explanation";
+  | "websiteUrl";
+
+type ZoraActionTone = "primary" | "secondary" | "text";
 
 type ZoraAction =
   | {
       kind: "start";
       label: string;
-      value: "diagnose" | "free_audit" | "strategy_call" | "faq";
-      tone?: "primary" | "secondary" | "text";
+      value: "diagnose" | "free_audit" | "strategy_call" | "ask_question" | "faq";
+      tone?: ZoraActionTone;
     }
   | {
       kind: "choice";
@@ -60,6 +66,7 @@ type ZoraAction =
       label: string;
       href: string;
       booking?: boolean;
+      tone?: ZoraActionTone;
     };
 
 type ChatMessage = {
@@ -73,45 +80,33 @@ type ZoraApiResponse = ZoraResponse & {
   poweredBy?: "openai" | "local-diagnosis";
 };
 
-const firstStepActions: ZoraAction[] = [
-  {
-    kind: "start",
-    label: "Diagnose my growth system",
-    value: "diagnose",
-    tone: "primary",
-  },
-  {
-    kind: "start",
-    label: "Run free audit",
-    value: "free_audit",
-    tone: "secondary",
-  },
-  {
-    kind: "start",
-    label: "Book strategy call",
-    value: "strategy_call",
-    tone: "text",
-  },
-  { kind: "start", label: "FAQ", value: "faq", tone: "text" },
-];
-
 const businessTypeChoices: Array<{ label: string; value: ZoraBusinessType }> = [
   { label: "Ecommerce", value: "Ecommerce" },
-  { label: "Service", value: "Service Business" },
-  { label: "Local Business", value: "Service Business" },
+  { label: "Service Business", value: "Service Business" },
+  { label: "Real Estate", value: "Real Estate" },
+  { label: "Healthcare / Care", value: "Care/Healthcare" },
   { label: "Other", value: "Other" },
 ];
 
 const challengeChoices: Array<{ label: string; value: ZoraChallenge }> = [
-  { label: "Traffic", value: "Traffic" },
-  { label: "Conversion", value: "Conversion" },
-  { label: "Follow-up", value: "Follow-up" },
+  { label: "Getting Traffic", value: "Traffic" },
+  { label: "Converting Visitors", value: "Conversion" },
+  { label: "Lead Follow-up", value: "Follow-up" },
   { label: "Operations", value: "Operations" },
   { label: "Tracking", value: "Tracking" },
+  { label: "Not Sure", value: "Not Sure" },
 ];
 
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createSessionId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return createId("zora-session");
 }
 
 function isBookingUrl(href: string) {
@@ -139,38 +134,237 @@ function normalizeProfile(profile: ZoraLeadProfile): ZoraLeadProfile {
   };
 }
 
-function scannerAction(label = "Start Free Audit"): ZoraAction {
+function normalizeZoraWebsiteInput(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^www\./i, "")}`;
+}
+
+function isLikelyWebsiteUrl(value: string) {
+  try {
+    const url = new URL(normalizeZoraWebsiteInput(value));
+    return Boolean(
+      (url.protocol === "http:" || url.protocol === "https:") &&
+        url.hostname.includes(".") &&
+        !url.hostname.includes(" "),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isNoWebsiteAnswer(value: string) {
+  return /\b(not yet|no website|don't have|dont have|do not have|none|nope|not right now|skip)\b/i.test(
+    value,
+  );
+}
+
+function isHasWebsiteAnswer(value: string) {
+  return /\b(yes|yes i do|yep|yeah|i have (?:a )?(?:website|site|landing page)|we have (?:a )?(?:website|site|landing page)|have (?:a )?(?:website|site|landing page)|already have (?:a )?(?:website|site|landing page))\b/i.test(
+    value,
+  );
+}
+
+function auditHrefForProfile(profile?: ZoraLeadProfile) {
+  const normalizedWebsite = profile?.websiteUrl
+    ? normalizeZoraWebsiteInput(profile.websiteUrl)
+    : "";
+  const params = new URLSearchParams({ source: "zora" });
+
+  if (normalizedWebsite && isLikelyWebsiteUrl(normalizedWebsite)) {
+    params.set("url", normalizedWebsite);
+  }
+
+  return `${FREE_AUDIT_URL.split("?")[0]}?${params.toString()}`;
+}
+
+function scannerAction(
+  label = "Run Free Audit",
+  tone: ZoraActionTone = "secondary",
+  profile?: ZoraLeadProfile,
+): ZoraAction {
   return {
     kind: "link",
     label,
-    href: FREE_AUDIT_URL,
+    href: auditHrefForProfile(profile),
+    tone,
   };
 }
 
-function bookingAction(label = "Book Strategy Call"): ZoraAction {
+function bookingAction(
+  label = "Book Strategy Call",
+  tone: ZoraActionTone = "secondary",
+): ZoraAction {
   return {
     kind: "link",
     label,
     href: STRATEGY_CALL_URL,
     booking: true,
+    tone,
   };
 }
 
 function actionsFromRecommendation(actions: ZoraResponse["recommendedActions"]): ZoraAction[] {
   return actions.flatMap((action) =>
     action === "strategy_call"
-      ? [bookingAction()]
+      ? [bookingAction("Book Strategy Call", "primary")]
       : action === "free_audit"
-        ? [scannerAction("Run Free Audit")]
-        : [],
+        ? [scannerAction("Run Free Audit", "primary")]
+        : action === "diagnose"
+          ? [
+              {
+                kind: "start",
+                label: "Diagnose my growth system",
+                value: "diagnose",
+                tone: "primary",
+              },
+            ]
+          : action === "ask_question"
+            ? [
+                {
+                  kind: "start",
+                  label: "Ask a Question",
+                  value: "ask_question",
+                  tone: "text",
+                },
+              ]
+            : [],
   );
 }
 
 function actionTone(action: ZoraAction) {
   if (action.kind === "start") return action.tone || "secondary";
+  if (action.kind === "link" && action.tone) return action.tone;
   if (action.kind === "link" && action.booking) return "primary";
   if (action.kind === "link") return "secondary";
   return "secondary";
+}
+
+function phase1Diagnosis(profile: ZoraLeadProfile) {
+  const useInferredContext = shouldUseIndustryInference(profile);
+
+  if (useInferredContext && profile.inferredBusinessModel === "B2B Ecommerce / Distributor") {
+    if (profile.challenge === "Operations") {
+      return "This appears to be an industrial/B2B ecommerce business. Assuming that's correct, I'd look at order flow, fulfillment handoffs, inventory and product data, quote/request paths, account-based purchasing, customer support routing, reporting visibility, and automation opportunities first.";
+    }
+
+    return "This appears to be an industrial/B2B ecommerce business. Assuming that's correct, I'd look at product discovery, quote/request paths, account-based purchasing, follow-up after inquiry, and tracking visibility first.";
+  }
+
+  if (useInferredContext && profile.inferredBusinessModel === "DTC Ecommerce") {
+    return "This appears to be a DTC ecommerce brand. Assuming that's correct, I'd look at product discovery, mobile buying experience, checkout confidence, retention, and tracking visibility first.";
+  }
+
+  if (useInferredContext && profile.inferredIndustry === "Real Estate") {
+    return "This appears to be a real estate lead-generation business. Assuming that's correct, I'd look at seller/buyer lead capture, local authority proof, appointment booking, and follow-up speed first.";
+  }
+
+  if (useInferredContext && profile.inferredBusinessModel === "Care Provider / Service Organization") {
+    return "This appears to be a care provider or service organization. Assuming that's correct, I'd look at intake flow, referral paths, trust proof, service clarity, and response process first.";
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
+    return "Based on what you shared, I'd look at product discovery, mobile UX, checkout confidence, and tracking first. The best next step is to run a free audit so Opzix can review the actual customer journey.";
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
+    return "Using the business type you selected, I'd look at order flow, fulfillment handoffs, inventory/product data, customer support routing, reporting visibility, and automation opportunities first.";
+  }
+
+  if (profile.businessType === "Service Business" && profile.challenge === "Follow-up") {
+    return "Based on what you shared, I'd look at intake flow, response speed, CRM routing, and appointment booking first. The best next step is a strategy call or quick systems review.";
+  }
+
+  if (profile.businessType === "Real Estate" && profile.challenge === "Traffic") {
+    return "Based on what you shared, I'd look at seller and buyer lead capture, local landing pages, follow-up speed, and booking flow first.";
+  }
+
+  if (profile.businessType === "Care/Healthcare" && profile.challenge === "Operations") {
+    return "Based on what you shared, I'd look at intake forms, referral flow, trust signals, booking/contact flow, and internal routing first.";
+  }
+
+  if (profile.businessType === "Ecommerce") {
+    return "Based on what you shared, I'd look at product discovery, customer journey clarity, mobile UX, tracking, and checkout confidence first.";
+  }
+
+  if (profile.businessType === "Service Business") {
+    return "Based on what you shared, I'd look at lead capture, intake flow, response speed, booking, and follow-up handoff first.";
+  }
+
+  if (profile.businessType === "Real Estate") {
+    return "Based on what you shared, I'd look at lead capture, local proof, landing-page clarity, follow-up speed, and booking flow first.";
+  }
+
+  if (profile.businessType === "Care/Healthcare") {
+    return "Based on what you shared, I'd look at trust signals, intake flow, referral paths, response process, and internal routing first.";
+  }
+
+  return "Based on what you shared, I'd look at the customer journey, lead capture, follow-up, tracking, and operations flow first.";
+}
+
+function recommendedPhase1Step(profile: ZoraLeadProfile) {
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
+    return "strategy_call";
+  }
+
+  const callFirst =
+    !profile.websiteUrl ||
+    ((profile.businessType === "Service Business" ||
+      profile.businessType === "Real Estate" ||
+      profile.businessType === "Care/Healthcare") &&
+      (profile.challenge === "Follow-up" || profile.challenge === "Operations"));
+
+  if (profile.websiteUrl && profile.businessType === "Ecommerce") {
+    return "audit";
+  }
+
+  return callFirst ? "strategy_call" : "audit";
+}
+
+function phase1CtaActions(profile: ZoraLeadProfile): ZoraAction[] {
+  const auditFirst = recommendedPhase1Step(profile) === "audit";
+  const audit = scannerAction("Run Free Audit", auditFirst ? "primary" : "secondary", profile);
+  const call = bookingAction("Book Strategy Call", auditFirst ? "secondary" : "primary");
+  const ask: ZoraAction = {
+    kind: "start",
+    label: "Ask a Question",
+    value: "ask_question",
+    tone: "text",
+  };
+
+  return auditFirst ? [audit, call, ask] : [call, audit, ask];
+}
+
+function shouldShowPhase1Actions(profile: ZoraLeadProfile) {
+  if (profile.needsBusinessTypeClarification) {
+    return false;
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
+    return Boolean(profile.websiteUrl || profile.hasNoWebsite);
+  }
+
+  return Boolean(
+    profile.businessType &&
+      (profile.challenge ||
+        profile.websiteUrl ||
+        profile.hasNoWebsite ||
+        profile.platform ||
+        profile.desiredOutcome ||
+        profile.leadSource ||
+        profile.conversionRate),
+  );
+}
+
+function phase1DiagnosisMessage(profile: ZoraLeadProfile): ChatMessage {
+  return {
+    id: createId("assistant"),
+    role: "assistant",
+    text: phase1Diagnosis(profile),
+    actions: phase1CtaActions(profile),
+  };
 }
 
 function actionClassName(action: ZoraAction) {
@@ -221,25 +415,59 @@ function questionForStep(step: GuidedStep): ChatMessage {
   return {
     id: createId("assistant"),
     role: "assistant",
-    text: "Tell me what's happening in a sentence or two. I'll use that to give you a sharper first recommendation.",
+    text: "Do you already have a website URL I can use as context?",
   };
 }
 
 function nextGuidedStep(profile: ZoraLeadProfile): GuidedStep | null {
   if (!profile.businessType) return "businessType";
   if (!profile.challenge) return "challenge";
-  return "explanation";
+  if (profile.websiteUrl === undefined) return "websiteUrl";
+  return null;
 }
 
 function guidedCompletionMessage(profile: ZoraLeadProfile): ChatMessage {
+  return phase1DiagnosisMessage(profile);
+}
+
+function businessTypeClarificationMessage(profile: ZoraLeadProfile): ChatMessage {
+  const inferred = profile.inferredIndustry || "another industry";
+  const selected = profile.businessType || "the selected business type";
+  const inferredBusinessType =
+    inferred === "Real Estate"
+      ? "Real Estate"
+      : inferred === "Healthcare / Care"
+        ? "Care/Healthcare"
+        : profile.inferredBusinessModel?.includes("Ecommerce")
+          ? "Ecommerce"
+          : inferred === "Local Service Business"
+            ? "Service Business"
+            : "Other";
+
   return {
     id: createId("assistant"),
     role: "assistant",
-    text: `${buildZoraDiagnosis(profile)} I've prepared that context for the next step.`,
-    actions:
-      profile.recommendedNextStep === "strategy_call"
-        ? [bookingAction(), scannerAction()]
-        : [scannerAction(), bookingAction()],
+    text: `Quick check: you selected ${selected}, but this domain appears to be ${inferred.toLowerCase()}-related. Should I diagnose this as ${selected.toLowerCase()} or a ${inferred.toLowerCase()} business?`,
+    actions: [
+      {
+        kind: "choice",
+        label: selected,
+        step: "businessType",
+        value: selected,
+      },
+      {
+        kind: "choice",
+        label: inferredBusinessType === "Care/Healthcare" ? "Healthcare / Care" : inferredBusinessType,
+        step: "businessType",
+        value: inferredBusinessType,
+      },
+      {
+        kind: "choice",
+        label: "Other",
+        step: "businessType",
+        value: "Other",
+      },
+    ],
   };
 }
 
@@ -270,6 +498,11 @@ function matchGuidedText(step: GuidedStep, text: string) {
     )?.value;
   }
 
+  if (step === "websiteUrl") {
+    if (isNoWebsiteAnswer(text)) return "";
+    if (isLikelyWebsiteUrl(text)) return normalizeZoraWebsiteInput(text);
+  }
+
   return null;
 }
 
@@ -277,18 +510,24 @@ export default function OpzixAIAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
-  const [flowStep, setFlowStep] = useState<GuidedStep | null>(null);
+  const [flowStep, setFlowStep] = useState<GuidedStep | null>("businessType");
   const [leadProfile, setLeadProfile] = useState<ZoraLeadProfile>({});
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "zora-intro",
       role: "assistant",
       text:
-        "Hi, I'm Zora, Opzix's AI Growth Assistant. I can help diagnose where traffic, conversion, follow-up, operations, or tracking is slowing growth.",
-      actions: firstStepActions,
+        "Hi, I'm Zora, Opzix's AI Growth Consultant. I can help you understand your business, identify the likely bottleneck, and choose the next step.\n\nWhat type of business do you run?",
+      actions: businessTypeChoices.map((choice) => ({
+        kind: "choice",
+        label: choice.label,
+        step: "businessType",
+        value: choice.value,
+      })),
     },
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const sessionIdRef = useRef<string>("");
 
   const profileSummary = useMemo(
     () =>
@@ -297,7 +536,7 @@ export default function OpzixAIAssistant() {
         leadProfile.platform,
         leadProfile.revenueRange,
         leadProfile.challenge,
-      ].filter(Boolean),
+      ].filter((item): item is string => Boolean(item)),
     [leadProfile],
   );
 
@@ -319,6 +558,54 @@ export default function OpzixAIAssistant() {
         message.id === "zora-intro" ? { ...message, actions: undefined } : message,
       ),
     );
+  }
+
+  function zoraSessionId() {
+    if (sessionIdRef.current) {
+      return sessionIdRef.current;
+    }
+
+    try {
+      const existing = window.sessionStorage.getItem(ZORA_SESSION_ID_KEY);
+
+      if (existing) {
+        sessionIdRef.current = existing;
+        return existing;
+      }
+
+      const nextId = createSessionId();
+      window.sessionStorage.setItem(ZORA_SESSION_ID_KEY, nextId);
+      sessionIdRef.current = nextId;
+      return nextId;
+    } catch {
+      const nextId = createSessionId();
+      sessionIdRef.current = nextId;
+      return nextId;
+    }
+  }
+
+  function currentSourcePath() {
+    return `${window.location.pathname}${window.location.search}`;
+  }
+
+  function trackZoraEvent(eventType: string, profile = leadProfile) {
+    try {
+      void fetch("/api/zora-conversion", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventType,
+          sessionId: zoraSessionId(),
+          leadProfile: normalizeProfile(profile),
+          sourcePath: currentSourcePath(),
+        }),
+        keepalive: true,
+      }).catch(() => undefined);
+    } catch {
+      // Conversion tracking should never block chat navigation.
+    }
   }
 
   function closeChatbot({ persist = true } = {}) {
@@ -348,8 +635,13 @@ export default function OpzixAIAssistant() {
 
   function routeToLink(action: Extract<ZoraAction, { kind: "link" }>) {
     if (action.booking || isBookingUrl(action.href)) {
+      trackZoraEvent("strategy_call_clicked");
       openBookingUrlAfterClose(action.href);
       return;
+    }
+
+    if (action.href.includes("/tools/ecommerce-audit-scanner")) {
+      trackZoraEvent("audit_clicked");
     }
 
     closeChatbot();
@@ -370,6 +662,7 @@ export default function OpzixAIAssistant() {
   }
 
   function showScannerRoute() {
+    const nextProfile = normalizeProfile(leadProfile);
     appendMessages([
       {
         id: createId("user"),
@@ -381,13 +674,32 @@ export default function OpzixAIAssistant() {
         role: "assistant",
         text:
           "I can give you a quick recommendation here, but the free audit scanner can review your actual website and generate a more detailed roadmap.",
-        actions: [scannerAction(), bookingAction()],
+        actions: [scannerAction("Run Free Audit", "primary", nextProfile), bookingAction()],
+      },
+    ]);
+  }
+
+  function showQuestionPrompt() {
+    setFlowStep(null);
+    appendMessages([
+      {
+        id: createId("user"),
+        role: "user",
+        text: "Ask a Question",
+      },
+      {
+        id: createId("assistant"),
+        role: "assistant",
+        text:
+          "Ask me anything about websites, ecommerce systems, AI assistants, automation, tracking, lead generation, pricing ranges, or timelines.",
       },
     ]);
   }
 
   function showFaq() {
     setFlowStep(null);
+    clearIntroActions();
+    trackZoraEvent("faq_opened");
     appendMessages([
       {
         id: createId("user"),
@@ -418,27 +730,58 @@ export default function OpzixAIAssistant() {
         id: createId("assistant"),
         role: "assistant",
         text: item.answer,
-        actions: [scannerAction(), bookingAction()],
+        actions: [scannerAction("Run Free Audit", "secondary", leadProfile), bookingAction()],
       },
     ]);
   }
 
   function applyGuidedChoice(step: GuidedStep, value: string, label = value) {
-    const patch: ZoraLeadProfile =
-      step === "businessType"
-        ? { businessType: value as ZoraBusinessType }
-        : step === "challenge"
-          ? { challenge: value as ZoraChallenge }
-          : {};
+    let patch: ZoraLeadProfile;
+
+    if (step === "businessType") {
+      patch = {
+        businessType: value as ZoraBusinessType,
+        needsBusinessTypeClarification: false,
+        industryMismatchResolved: Boolean(leadProfile.needsBusinessTypeClarification),
+      };
+    } else if (step === "challenge") {
+      patch = { challenge: value as ZoraChallenge };
+    } else if (value) {
+      const inference = inferIndustryFromUrl(value);
+      const mismatch = hasUrlBusinessTypeMismatch(leadProfile.businessType, inference);
+      patch = {
+        websiteUrl: value,
+        hasNoWebsite: false,
+        hasWebsiteOrLandingPage: true,
+        inferredIndustry: inference.inferredIndustry,
+        inferredBusinessModel: inference.inferredBusinessModel,
+        inferredFunnelType: inference.inferredFunnelType,
+        industryConfidence: inference.industryConfidence,
+        needsBusinessTypeClarification: mismatch,
+        industryMismatchResolved: false,
+      };
+    } else {
+      patch = {
+        websiteUrl: "",
+        hasNoWebsite: true,
+        hasWebsiteOrLandingPage: false,
+        needsBusinessTypeClarification: false,
+      };
+    }
 
     const nextProfile = normalizeProfile({
       ...leadProfile,
       ...patch,
     });
-    const nextStep = nextGuidedStep(nextProfile);
+    const nextStep = nextProfile.needsBusinessTypeClarification
+      ? null
+      : nextGuidedStep(nextProfile);
 
     setLeadProfile(nextProfile);
     setFlowStep(nextStep);
+    if (!nextStep) {
+      trackZoraEvent("qualification_completed", nextProfile);
+    }
 
     appendMessages([
       {
@@ -446,12 +789,16 @@ export default function OpzixAIAssistant() {
         role: "user",
         text: label || "Skip",
       },
-      nextStep ? questionForStep(nextStep) : guidedCompletionMessage(nextProfile),
+      nextProfile.needsBusinessTypeClarification
+        ? businessTypeClarificationMessage(nextProfile)
+        : nextStep
+          ? questionForStep(nextStep)
+          : guidedCompletionMessage(nextProfile),
     ]);
   }
 
   function handleAction(action: ZoraAction) {
-    if (action.kind === "start") {
+    if (action.kind === "start" || action.kind === "choice") {
       clearIntroActions();
     }
 
@@ -476,12 +823,18 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.value === "free_audit") {
-      showScannerRoute();
+      routeToLink(scannerAction("Run Free Audit", "primary", normalizeProfile(leadProfile)) as Extract<ZoraAction, { kind: "link" }>);
       return;
     }
 
     if (action.value === "strategy_call") {
       openBookingUrlAfterClose(STRATEGY_CALL_URL);
+      return;
+    }
+
+    if (action.value === "ask_question") {
+      trackZoraEvent("ask_question_clicked");
+      showQuestionPrompt();
       return;
     }
 
@@ -507,10 +860,51 @@ export default function OpzixAIAssistant() {
         applyGuidedChoice(flowStep, matchedValue, message);
         return;
       }
+
+      if (flowStep === "websiteUrl") {
+        if (isHasWebsiteAnswer(message)) {
+          const nextProfile = normalizeProfile({
+            ...leadProfile,
+            hasWebsiteOrLandingPage: true,
+            hasNoWebsite: false,
+          });
+          setLeadProfile(nextProfile);
+          setFlowStep("websiteUrl");
+          appendMessages([
+            {
+              id: createId("user"),
+              role: "user",
+              text: message,
+            },
+            {
+              id: createId("assistant"),
+              role: "assistant",
+              text: "Great - what is the URL, or would you rather talk through the strategy first?",
+            },
+          ]);
+          return;
+        }
+
+        appendMessages([
+          {
+            id: createId("user"),
+            role: "user",
+            text: message,
+          },
+          {
+            id: createId("assistant"),
+            role: "assistant",
+            text:
+              "I can use a URL like example.com, https://example.com, or www.example.com. If you do not have one yet, say \"not yet\" and I'll continue.",
+          },
+        ]);
+        return;
+      }
     }
 
     setFlowStep(null);
     setIsThinking(true);
+    clearIntroActions();
 
     const localResponse = buildZoraResponse(message, leadProfile);
 
@@ -531,6 +925,8 @@ export default function OpzixAIAssistant() {
         body: JSON.stringify({
           message,
           leadProfile,
+          sessionId: zoraSessionId(),
+          sourcePath: currentSourcePath(),
         }),
       });
 
@@ -538,6 +934,13 @@ export default function OpzixAIAssistant() {
         ? ((await response.json()) as ZoraApiResponse)
         : localResponse;
       const nextProfile = normalizeProfile(payload.leadProfile || localResponse.leadProfile);
+      const responseMode = payload.responseMode || localResponse.responseMode;
+      const responseActions =
+        responseMode !== "thanks" && shouldShowPhase1Actions(nextProfile)
+          ? phase1CtaActions(nextProfile)
+          : actionsFromRecommendation(
+              payload.recommendedActions || localResponse.recommendedActions,
+            );
 
       setLeadProfile(nextProfile);
       appendMessages([
@@ -545,20 +948,22 @@ export default function OpzixAIAssistant() {
           id: createId("assistant"),
           role: "assistant",
           text: payload.reply || localResponse.reply,
-          actions: actionsFromRecommendation(
-            payload.recommendedActions || localResponse.recommendedActions,
-          ),
+          actions: responseActions,
         },
       ]);
     } catch {
       const nextProfile = normalizeProfile(localResponse.leadProfile);
+      const responseActions =
+        localResponse.responseMode !== "thanks" && shouldShowPhase1Actions(nextProfile)
+          ? phase1CtaActions(nextProfile)
+          : actionsFromRecommendation(localResponse.recommendedActions);
       setLeadProfile(nextProfile);
       appendMessages([
         {
           id: createId("assistant"),
           role: "assistant",
           text: localResponse.reply,
-          actions: actionsFromRecommendation(localResponse.recommendedActions),
+          actions: responseActions,
         },
       ]);
     } finally {
@@ -610,7 +1015,7 @@ export default function OpzixAIAssistant() {
   return (
     <div className="opzix-ai-shell">
       {open && (
-        <div className="opzix-ai-panel" role="dialog" aria-label="Zora AI Growth Assistant">
+        <div className="opzix-ai-panel" role="dialog" aria-label="Zora AI Growth Consultant">
           <div className="flex shrink-0 items-start justify-between gap-3 border-b border-dark-border pb-3">
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-brand-cyan">
@@ -618,20 +1023,29 @@ export default function OpzixAIAssistant() {
                 Zora
               </p>
               <h2 className="mt-1.5 text-lg font-bold leading-snug text-primary">
-                Growth Assistant
+                AI Growth Consultant
               </h2>
               <p className="mt-1 text-xs leading-relaxed text-muted">
-                A quick consultant for your growth bottleneck.
+                Diagnose, prioritize, and route the next move.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => closeChatbot()}
-              className="rounded-full border border-dark-border bg-white/5 p-2 text-muted transition-colors hover:border-brand-cyan hover:text-primary"
-              aria-label="Close Zora"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={showFaq}
+                className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold text-muted transition-colors hover:text-primary"
+              >
+                FAQ
+              </button>
+              <button
+                type="button"
+                onClick={() => closeChatbot()}
+                className="rounded-full border border-dark-border bg-white/5 p-2 text-muted transition-colors hover:border-brand-cyan hover:text-primary"
+                aria-label="Close Zora"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {profileSummary.length > 0 && (
@@ -657,7 +1071,7 @@ export default function OpzixAIAssistant() {
                       : "border-dark-border bg-white/[0.035] text-secondary"
                   }`}
                 >
-                  <p>{message.text}</p>
+                  <p className="whitespace-pre-line">{message.text}</p>
                 </div>
 
                 {message.actions && message.actions.length > 0 && (
@@ -696,7 +1110,7 @@ export default function OpzixAIAssistant() {
               type="text"
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Tell Zora what is happening..."
+              placeholder="Ask Zora what to fix next..."
               className="min-h-11 min-w-0 flex-1 rounded-xl border border-brand-cyan/25 bg-white/[0.055] px-3 text-sm text-primary outline-none placeholder:text-muted focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
             />
             <button
@@ -718,7 +1132,7 @@ export default function OpzixAIAssistant() {
           className="opzix-ai-button"
           onClick={toggleChatbot}
           aria-expanded={open}
-          aria-label="Open Zora AI Growth Assistant"
+          aria-label="Open Zora AI Growth Consultant"
         >
           <MessageSquare className="h-4 w-4" />
           Ask Zora

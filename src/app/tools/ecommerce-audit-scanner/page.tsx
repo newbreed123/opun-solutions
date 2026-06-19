@@ -859,6 +859,21 @@ export default function EcommerceAuditScannerPage() {
   } | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedWebsite = params.get("url") || params.get("website");
+
+    if (!requestedWebsite) {
+      return;
+    }
+
+    const normalizedWebsite = normalizeWebsiteInput(requestedWebsite);
+
+    if (isValidHttpUrl(normalizedWebsite)) {
+      setWebsite(normalizedWebsite);
+    }
+  }, []);
+
   function scrollToResults(behavior: ScrollBehavior = "smooth") {
     resultsRef.current?.scrollIntoView({ behavior, block: "start" });
   }

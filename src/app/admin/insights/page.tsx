@@ -6,6 +6,10 @@ import {
   listAssistantConversations,
   type AssistantConversationRow,
 } from "@/lib/assistant-conversation-log";
+import {
+  listZoraConversations,
+  type ZoraConversationRow,
+} from "@/lib/zora-conversation-log";
 import { ScoreStabilityCell } from "@/components/admin/ScoreStabilityCell";
 import {
   buildScoreStabilityByDomain,
@@ -60,6 +64,7 @@ type Insights = {
   conversionByBenchmarkGroup: ConversionGroupMetric[];
   conversionByRevenueRisk: ConversionGroupMetric[];
   assistantQuestionInsights: AssistantQuestionInsights;
+  zoraLeadInsights: ZoraLeadInsights;
   recentScans: RecentScanRow[];
 };
 
@@ -80,6 +85,16 @@ type AssistantQuestionInsights = {
   commonQuestions: GroupMetric[];
   questionsBySiteType: GroupMetric[];
   questionsByLeadStatus: GroupMetric[];
+};
+
+type ZoraLeadInsights = {
+  totalConversations: number;
+  qualificationCompleted: number;
+  auditClicks: number;
+  strategyCallClicks: number;
+  topBusinessTypes: GroupMetric[];
+  topChallenges: GroupMetric[];
+  recentQualifiedLeads: ZoraConversationRow[];
 };
 
 export default async function AdminInsightsPage({
@@ -111,11 +126,16 @@ export default async function AdminInsightsPage({
     );
   }
 
-  const [scans, assistantConversations] = await Promise.all([
+  const [scans, assistantConversations, zoraConversations] = await Promise.all([
     listAuditInsightScans(),
     listAssistantConversations(),
+    listZoraConversations(),
   ]);
-  const insights = buildInsights(scans.data, assistantConversations.data);
+  const insights = buildInsights(
+    scans.data,
+    assistantConversations.data,
+    zoraConversations.data,
+  );
 
   return (
     <DashboardShell>
@@ -314,6 +334,47 @@ export default async function AdminInsightsPage({
             </div>
           </AnalyticsPanel>
 
+          <AnalyticsPanel title="Zora Lead Insights">
+            {!zoraConversations.ok ? (
+              <p className="mb-4 text-sm text-muted">
+                Zora lead logging is not available yet: {zoraConversations.error}
+              </p>
+            ) : null}
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Zora conversations"
+                value={insights.zoraLeadInsights.totalConversations}
+              />
+              <MetricCard
+                label="Qualified"
+                value={insights.zoraLeadInsights.qualificationCompleted}
+              />
+              <MetricCard
+                label="Audit clicks"
+                value={insights.zoraLeadInsights.auditClicks}
+              />
+              <MetricCard
+                label="Strategy calls"
+                value={insights.zoraLeadInsights.strategyCallClicks}
+              />
+            </section>
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <MetricRows
+                rows={insights.zoraLeadInsights.topBusinessTypes}
+                emptyLabel="No Zora business-type data yet."
+              />
+              <MetricRows
+                rows={insights.zoraLeadInsights.topChallenges}
+                emptyLabel="No Zora challenge data yet."
+              />
+            </div>
+            <div className="mt-6">
+              <RecentZoraLeadsTable
+                conversations={insights.zoraLeadInsights.recentQualifiedLeads}
+              />
+            </div>
+          </AnalyticsPanel>
+
           <AnalyticsPanel title="Recent Scans">
             <RecentScansTable scans={insights.recentScans} />
           </AnalyticsPanel>
@@ -326,6 +387,7 @@ export default async function AdminInsightsPage({
 function buildInsights(
   scans: AuditScanRow[],
   assistantConversations: AssistantConversationRow[] = [],
+  zoraConversations: ZoraConversationRow[] = [],
 ): Insights {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -369,6 +431,7 @@ function buildInsights(
     assistantQuestionInsights: buildAssistantQuestionInsights(
       assistantConversations,
     ),
+    zoraLeadInsights: buildZoraLeadInsights(zoraConversations),
     recentScans: scans.slice(0, 12).map((scan) => ({
       ...scan,
       scoreStability: scoreStabilityByDomain.get(domainForScan(scan)),
@@ -405,6 +468,37 @@ function buildAssistantQuestionInsights(
     questionsByLeadStatus: groupAssistantByValue(conversations, (conversation) =>
       conversation.lead_submitted ? "Lead submitted" : "No lead submitted",
     ),
+  };
+}
+
+function buildZoraLeadInsights(
+  conversations: ZoraConversationRow[],
+): ZoraLeadInsights {
+  const qualified = conversations.filter((conversation) =>
+    Boolean(
+      conversation.business_type &&
+        (conversation.challenge ||
+          conversation.website_url ||
+          conversation.current_step === "qualification_completed"),
+    ),
+  );
+
+  return {
+    totalConversations: conversations.length,
+    qualificationCompleted: qualified.length,
+    auditClicks: conversations.filter((conversation) => conversation.audit_clicked).length,
+    strategyCallClicks: conversations.filter(
+      (conversation) => conversation.strategy_call_clicked,
+    ).length,
+    topBusinessTypes: groupZoraByValue(
+      conversations,
+      (conversation) => conversation.business_type,
+    ),
+    topChallenges: groupZoraByValue(
+      conversations,
+      (conversation) => conversation.challenge,
+    ),
+    recentQualifiedLeads: qualified.slice(0, 12),
   };
 }
 
@@ -509,6 +603,83 @@ function RecentAssistantQuestionsTable({
   );
 }
 
+function RecentZoraLeadsTable({
+  conversations,
+}: {
+  conversations: ZoraConversationRow[];
+}) {
+  if (conversations.length === 0) {
+    return <p className="text-sm text-muted">No Zora lead data yet.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+        <thead className="border-b border-dark-border text-xs uppercase tracking-[0.16em] text-muted">
+          <tr>
+            <th className="px-3 py-3">Date</th>
+            <th className="px-3 py-3">Business type</th>
+            <th className="px-3 py-3">Challenge</th>
+            <th className="px-3 py-3">Website URL</th>
+            <th className="px-3 py-3">Platform</th>
+            <th className="px-3 py-3">Recommended next step</th>
+            <th className="px-3 py-3">Audit clicked</th>
+            <th className="px-3 py-3">Strategy call clicked</th>
+            <th className="px-3 py-3">Lead temperature</th>
+          </tr>
+        </thead>
+        <tbody>
+          {conversations.map((conversation) => (
+            <tr
+              key={conversation.id}
+              className="border-b border-dark-border last:border-b-0"
+            >
+              <td className="px-3 py-4 text-secondary">
+                {formatDate(conversation.created_at)}
+              </td>
+              <td className="px-3 py-4 text-primary">
+                {cleanLabel(conversation.business_type)}
+              </td>
+              <td className="px-3 py-4 text-secondary">
+                {cleanLabel(conversation.challenge)}
+              </td>
+              <td className="max-w-xs px-3 py-4 text-secondary">
+                {conversation.website_url ? (
+                  <a
+                    className="break-all text-brand-cyan hover:text-primary"
+                    href={conversation.website_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {conversation.website_url}
+                  </a>
+                ) : (
+                  "unknown"
+                )}
+              </td>
+              <td className="px-3 py-4 text-secondary">
+                {cleanLabel(conversation.platform_hint)}
+              </td>
+              <td className="px-3 py-4 text-secondary">
+                {cleanLabel(conversation.recommended_next_step)}
+              </td>
+              <td className="px-3 py-4">
+                <ContactBadge contacted={conversation.audit_clicked} />
+              </td>
+              <td className="px-3 py-4">
+                <ContactBadge contacted={conversation.strategy_call_clicked} />
+              </td>
+              <td className="px-3 py-4 text-primary">
+                {cleanLabel(conversation.lead_temperature)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function countByIntent(
   conversations: AssistantConversationRow[],
   intents: string[],
@@ -521,6 +692,26 @@ function countByIntent(
 function groupAssistantByValue(
   conversations: AssistantConversationRow[],
   getValue: (conversation: AssistantConversationRow) => string | null | undefined,
+) {
+  const counts = new Map<string, number>();
+
+  conversations.forEach((conversation) => {
+    const label = cleanLabel(getValue(conversation));
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([label, count]) => ({
+      label,
+      count,
+      percentage: percentage(count, conversations.length),
+    }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+}
+
+function groupZoraByValue(
+  conversations: ZoraConversationRow[],
+  getValue: (conversation: ZoraConversationRow) => string | null | undefined,
 ) {
   const counts = new Map<string, number>();
 
