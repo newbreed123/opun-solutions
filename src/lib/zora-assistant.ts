@@ -21,6 +21,17 @@ export type ZoraLeadTemperature = "cold" | "warm" | "hot";
 
 export type ZoraNextStep = "free_audit" | "strategy_call" | "ask_question";
 
+export type ZoraTopic =
+  | "offer_clarity"
+  | "tracking_visibility"
+  | "follow_up_handoff"
+  | "landing_page"
+  | "booking_flow"
+  | "product_discovery"
+  | "checkout_confidence"
+  | "crm_routing"
+  | "lead_capture";
+
 export type ZoraRoadmapStep = {
   title: string;
   reason: string;
@@ -133,9 +144,12 @@ export type ZoraLeadProfile = {
   recommendedNextStep?: ZoraNextStep;
   recommendedFocusAreas?: string[];
   recommendationRoadmap?: ZoraRoadmapStep[];
+  currentTopic?: ZoraTopic;
+  currentTopicDepth?: number;
   leadQuality?: ZoraLeadQuality;
   leadTemperature?: ZoraLeadTemperature;
   leadScore?: number;
+  hasSeenSoftClose?: boolean;
 };
 
 export type ZoraMessageAnalysis = {
@@ -160,6 +174,7 @@ export type ZoraMessageAnalysis = {
   annualRevenueText?: string;
   challenge?: ZoraChallenge;
   websiteUrl?: string;
+  currentTopic?: ZoraTopic;
   hasWebsiteOrLandingPage?: boolean;
   hasNoWebsite?: boolean;
   email?: string;
@@ -292,6 +307,49 @@ function firstMatch<T extends string>(text: string, patterns: Array<[T, RegExp]>
   return patterns.find(([, pattern]) => pattern.test(text))?.[0];
 }
 
+const topicPatterns: Array<[ZoraTopic, RegExp]> = [
+  [
+    "offer_clarity",
+    /\b(the offer|offer|value prop|value proposition|positioning|message clarity|messaging|copy|promise|hook)\b/i,
+  ],
+  [
+    "tracking_visibility",
+    /\b(tracking|analytics|ga4|pixel|attribution|utm|reporting|dashboard|measure|measurement|source quality)\b/i,
+  ],
+  [
+    "follow_up_handoff",
+    /\b(follow[ -]?up|followup|handoff|response speed|speed to lead|nurture|missed lead|reply|respond)\b/i,
+  ],
+  ["landing_page", /\b(landing page|homepage|page path|site path|website path|page structure|landing path)\b/i],
+  ["booking_flow", /\b(booking|booked appointment|appointment|calendar|schedule|calendly|consultation|call flow)\b/i],
+  [
+    "product_discovery",
+    /\b(product discovery|search|collections?|category|catalog|navigation|filters?|merchandising|product pages?)\b/i,
+  ],
+  ["checkout_confidence", /\b(checkout|cart|payment|shipping|tax|trust cues?|returns?|delivery)\b/i],
+  ["crm_routing", /\b(crm|hubspot|salesforce|zoho|pipedrive|routing|assignment|lead owner|pipeline)\b/i],
+  ["lead_capture", /\b(lead capture|capture action|form|forms?|intake|quote request|contact form|call button)\b/i],
+];
+
+function topicFromChallenge(challenge: ZoraChallenge | undefined): ZoraTopic | undefined {
+  switch (challenge) {
+    case "Tracking":
+      return "tracking_visibility";
+    case "Follow-up":
+      return "follow_up_handoff";
+    case "Website":
+      return "landing_page";
+    case "Conversion":
+      return "lead_capture";
+    default:
+      return undefined;
+  }
+}
+
+function extractCurrentTopic(message: string, challenge?: ZoraChallenge) {
+  return firstMatch(message, topicPatterns) || topicFromChallenge(challenge);
+}
+
 function isCapabilityQuestion(message: string) {
   if (
     /\b(how can you help|what can you do|what do you do|what does opzix do|tell me more about opzix|more about opzix|about opzix|who is opzix|what is opzix|your services|services do you offer|do you build|can you build|what do you build|build websites?)\b/i.test(
@@ -316,8 +374,30 @@ function isSmallTalkQuestion(message: string) {
 }
 
 function isThanksMessage(message: string) {
+  if (isCasualAcknowledgmentMessage(message)) {
+    return true;
+  }
+
   return /\b(thank you|thanks|thx|appreciate it|appreciate you|got it|okay thanks|ok thanks)\b/i.test(
     message,
+  );
+}
+
+function isCasualAcknowledgmentMessage(message: string) {
+  return /^(ok|okay|nice|okay nice|ok nice|yes|yeah|yep|sure|sounds good|continue|keep going|go on|got it)[.!?]*$/i.test(
+    message.trim(),
+  );
+}
+
+function isMomentumAcknowledgmentMessage(message: string) {
+  return /^(ok|okay|yes|yeah|yep|sure|sounds good|continue|keep going|go on)[.!?]*$/i.test(
+    message.trim(),
+  );
+}
+
+function isTopicContinuationMessage(message: string) {
+  return /^(ok|okay|yes|yeah|yep|sure|sounds good|continue|keep going|go on|tell me more|more|why|interesting)[.!?]*$/i.test(
+    message.trim(),
   );
 }
 
@@ -852,6 +932,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
           : undefined
         : firstMatch(message, challengePatterns) ||
           (leadSource ? "Traffic" : undefined);
+  const currentTopic = outOfScope ? undefined : extractCurrentTopic(message, challenge);
   const revenue = outOfScope ? {} : parseRevenue(message);
   const email = outOfScope ? undefined : extractEmail(message);
   const visitorName = extractVisitorName(message);
@@ -926,6 +1007,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     desiredOutcome,
     challenge,
     websiteUrl,
+    currentTopic,
     hasWebsiteOrLandingPage,
     hasNoWebsite,
     email,
@@ -1106,6 +1188,15 @@ function mergeLeadProfile(
       addChange(changes, "challenge", nextProfile.challenge, analysis.challenge);
       nextProfile.challenge = analysis.challenge;
     }
+  }
+
+  if (analysis.currentTopic) {
+    addChange(changes, "currentTopic", nextProfile.currentTopic, analysis.currentTopic);
+    if (nextProfile.currentTopic !== analysis.currentTopic) {
+      addChange(changes, "currentTopicDepth", nextProfile.currentTopicDepth, 1);
+      nextProfile.currentTopicDepth = 1;
+    }
+    nextProfile.currentTopic = analysis.currentTopic;
   }
 
   if (analysis.websiteUrl) {
@@ -1797,7 +1888,17 @@ function buildSmallTalkResponse(profile: ZoraLeadProfile) {
   return `${greetingPrefix(profile)}I'm doing well, thanks for asking. I'm here to help diagnose growth bottlenecks across traffic, conversion, follow-up, tracking, operations, and your website. If you tell me what business you run and what feels stuck, I can give you a practical recommendation.`;
 }
 
-function buildThanksResponse(profile: ZoraLeadProfile) {
+function buildThanksResponse(profile: ZoraLeadProfile, repeatedSoftClose = false) {
+  if (repeatedSoftClose) {
+    return profile.hasNoWebsite
+      ? "Got it. I'll be here when you're ready to map the first version."
+      : "Got it. I'll be here when you want to run the audit, book a call, or ask a specific question.";
+  }
+
+  if (profile.hasNoWebsite) {
+    return `${profile.visitorName ? `You're welcome, ${profile.visitorName}.` : "You're welcome."} Since there is no site to audit yet, the best next step is a strategy call to map the first landing page, offer, and follow-up path.`;
+  }
+
   return `${profile.visitorName ? `You're welcome, ${profile.visitorName}.` : "You're welcome."} When you're ready, the next best step is either the free audit for a website-based diagnosis or a strategy call for planning the system.`;
 }
 
@@ -1965,6 +2066,276 @@ function buildContextSwitchResponse(profile: ZoraLeadProfile) {
 
   if (profile.businessType === "Ecommerce") {
     return "Got it - I'll treat this as ecommerce. I would focus on product discovery, mobile UX, checkout confidence, tracking, and follow-up first. Do you want to run the free audit on the store, or talk through the likely fix path first?";
+  }
+
+  return `${buildZoraDiagnosis(profile)} ${followUpQuestion(profile)}`;
+}
+
+function businessShortLabel(profile: ZoraLeadProfile) {
+  if (profile.businessType === "Care/Healthcare") return "care or healthcare";
+  if (profile.businessType === "Real Estate") return "real estate";
+  if (profile.businessType === "Service Business") return "service-business";
+  if (profile.businessType === "Ecommerce") return "ecommerce";
+  return "this business";
+}
+
+function topicLabel(topic: ZoraTopic) {
+  switch (topic) {
+    case "offer_clarity":
+      return "offer clarity";
+    case "tracking_visibility":
+      return "tracking visibility";
+    case "follow_up_handoff":
+      return "follow-up handoff";
+    case "landing_page":
+      return "landing page";
+    case "booking_flow":
+      return "booking flow";
+    case "product_discovery":
+      return "product discovery";
+    case "checkout_confidence":
+      return "checkout confidence";
+    case "crm_routing":
+      return "CRM routing";
+    case "lead_capture":
+      return "lead capture";
+  }
+}
+
+function topicResponseParts(profile: ZoraLeadProfile, topic: ZoraTopic) {
+  const business = businessShortLabel(profile);
+
+  switch (topic) {
+    case "offer_clarity":
+      return {
+        happening: `The offer may not be specific enough for the visitor to quickly understand why they should act now, especially in a ${business} context.`,
+        matters:
+          "Traffic and operations improvements only help if the first promise is clear. A vague offer makes good visitors hesitate, compare, or leave.",
+        validate:
+          "I would validate the headline, primary CTA, proof near the CTA, service or outcome specificity, and whether the page answers the visitor's first objection.",
+        good:
+          "A good offer says who it is for, what outcome it helps create, why it is credible, and what the next step is without forcing the visitor to infer it.",
+        next:
+          "I would review the landing page hero, CTA wording, proof blocks, and the first form or booking step.",
+      };
+    case "tracking_visibility":
+      return {
+        happening:
+          "The team may be making decisions from incomplete or mismatched data, so it is hard to know whether the real issue is traffic, conversion, or follow-up.",
+        matters:
+          "Without trustworthy tracking, the next investment can look reasonable but target the wrong bottleneck.",
+        validate:
+          "I would validate GA4 events, conversion actions, pixels, UTMs, call or form tracking, CRM source fields, and whether reports match actual leads or sales.",
+        good:
+          "Good tracking shows where visitors came from, what action they took, which leads were qualified, and where the handoff broke.",
+        next:
+          "I would review analytics, ad platform events, form or booking events, CRM source capture, and the simplest dashboard the team actually uses.",
+      };
+    case "follow_up_handoff":
+      return {
+        happening:
+          "Leads or customer intent may be captured, but the handoff after that point may depend too much on manual checking or unclear ownership.",
+        matters:
+          "Slow or inconsistent follow-up lowers close rate even when traffic and the website are doing their job.",
+        validate:
+          "I would validate where each inquiry lands, who gets notified, how fast they respond, what happens after no response, and whether status is visible.",
+        good:
+          "Good follow-up has one owner, instant alerts, a backup reminder, a clear next action, and a visible status for every lead.",
+        next:
+          "I would review form routing, CRM assignment, notification channels, reminders, and missed-lead recovery.",
+      };
+    case "landing_page":
+      return {
+        happening:
+          "The landing page may be trying to do too much, or it may not match the traffic source and visitor intent tightly enough.",
+        matters:
+          "A landing page is usually where offer, proof, lead capture, and tracking meet. If that page is unclear, every channel performs worse.",
+        validate:
+          "I would validate message match, above-the-fold clarity, CTA visibility, proof, mobile layout, form friction, and source-specific paths.",
+        good:
+          "A good landing page makes the visitor's next decision obvious and gives enough proof to act without overloading them.",
+        next:
+          "I would review the hero section, CTA path, proof blocks, mobile scroll path, form fields, and conversion events.",
+      };
+    case "booking_flow":
+      return {
+        happening:
+          "The visitor may be interested, but the booking step may introduce friction, uncertainty, or a weak handoff.",
+        matters:
+          "Booking friction turns qualified intent into delay, and delay gives people time to forget, compare, or choose someone else.",
+        validate:
+          "I would validate calendar visibility, available times, confirmation messaging, reminders, qualification questions, and CRM handoff.",
+        good:
+          "A good booking flow feels fast, confirms the value of the call, sets expectations, and sends the context to the right person.",
+        next:
+          "I would review the CTA into booking, scheduler settings, confirmation emails, reminders, and CRM notes.",
+      };
+    case "product_discovery":
+      return {
+        happening:
+          "Shoppers may want to buy but struggle to find the right product, compare options, or understand what fits their need.",
+        matters:
+          "Product discovery issues often look like traffic problems because visitors leave before they reach a confident product decision.",
+        validate:
+          "I would validate navigation, search quality, collection structure, filters, product cards, availability, and paths from landing pages to products.",
+        good:
+          "Good product discovery helps shoppers narrow options quickly without losing context or confidence.",
+        next:
+          "I would review search results, collections, merchandising, product cards, filters, and top landing paths.",
+      };
+    case "checkout_confidence":
+      return {
+        happening:
+          "Shoppers may have intent, but the cart or checkout may introduce surprise, uncertainty, or missing reassurance.",
+        matters:
+          "Checkout confidence is where trust, payment, shipping, tax, returns, and tracking all converge.",
+        validate:
+          "I would validate cart clarity, shipping and tax visibility, payment options, guest checkout, error states, delivery promises, and checkout events.",
+        good:
+          "A good checkout feels predictable, safe, fast, and consistent with what the shopper saw before checkout.",
+        next:
+          "I would review cart-to-checkout steps, shipping/payment screens, trust cues, failed payment data, and abandonment tracking.",
+      };
+    case "crm_routing":
+      return {
+        happening:
+          "The CRM may be capturing information, but routing, ownership, or status tracking may not be clear enough for consistent action.",
+        matters:
+          "A CRM only improves growth when it tells the right person what to do next at the right time.",
+        validate:
+          "I would validate source fields, lead owner assignment, pipeline stages, notifications, duplicate handling, and missed follow-up alerts.",
+        good:
+          "Good CRM routing makes every lead visible, assigned, timed, and recoverable if the first response does not happen.",
+        next:
+          "I would review form-to-CRM mapping, assignment rules, alerts, pipeline stages, and reporting views.",
+      };
+    case "lead_capture":
+      return {
+        happening:
+          "Interested visitors may not have a clear, low-friction way to raise their hand or explain what they need.",
+        matters:
+          "Lead capture is the bridge between website interest and sales follow-up. If it is vague or hard, qualified visitors disappear quietly.",
+        validate:
+          "I would validate CTA clarity, form length, field relevance, mobile usability, trust near the form, confirmation messaging, and source tracking.",
+        good:
+          "Good lead capture asks for only the context needed to route the next step and reassures the visitor that someone will follow up.",
+        next:
+          "I would review CTAs, forms, call buttons, intake questions, confirmation states, and CRM routing.",
+      };
+  }
+}
+
+function topicDepthInsight(topic: ZoraTopic, depth = 1) {
+  if (depth <= 1) return "";
+
+  const later = depth >= 3;
+
+  switch (topic) {
+    case "offer_clarity":
+      return later
+        ? "Deeper lens: I would compare the offer against the visitor's urgency. If the page says what you do but not why someone should act now, the offer is still underpowered."
+        : "Deeper lens: I would separate the offer from the service description. The service is what you provide; the offer is the reason a visitor believes this next step is worth taking now.";
+    case "tracking_visibility":
+      return later
+        ? "Deeper lens: I would check whether the same lead or sale tells the same story in analytics, ads, and the CRM. If those disagree, reporting will keep producing false confidence."
+        : "Deeper lens: I would separate event coverage from decision visibility. Having events fire is not enough if the team still cannot tell which channel produced qualified demand.";
+    case "follow_up_handoff":
+      return later
+        ? "Deeper lens: I would look for the first place ownership becomes ambiguous. Follow-up usually breaks where everyone can see the lead but no one clearly owns it."
+        : "Deeper lens: I would separate capture from response. A form submission is not a lead system until routing, reminders, and ownership are clear.";
+    case "landing_page":
+      return later
+        ? "Deeper lens: I would check whether the page is built for one visitor intent or several competing intents. Mixed intent pages usually dilute conversion."
+        : "Deeper lens: I would look at message match first. The page should continue the promise that brought the visitor there, not make them restart their decision.";
+    case "booking_flow":
+      return later
+        ? "Deeper lens: I would inspect the confirmation and reminder experience. The booking is not complete until the visitor knows what happens next and the team has useful context."
+        : "Deeper lens: I would treat booking as a conversion step, not an admin detail. The calendar needs to reinforce trust and reduce hesitation.";
+    case "product_discovery":
+      return later
+        ? "Deeper lens: I would compare search, category, and recommendation paths separately because each one reveals a different kind of buying intent."
+        : "Deeper lens: I would separate finding a product from choosing a product. Discovery has to support both navigation and confidence.";
+    case "checkout_confidence":
+      return later
+        ? "Deeper lens: I would look for late surprises. Shipping, tax, delivery, payment, or return uncertainty often appears after the shopper has already decided to buy."
+        : "Deeper lens: I would separate checkout mechanics from checkout confidence. A checkout can function technically while still making buyers hesitate.";
+    case "crm_routing":
+      return later
+        ? "Deeper lens: I would check whether CRM status mirrors reality. If the pipeline stage does not match what the team should do next, the CRM becomes passive storage."
+        : "Deeper lens: I would separate CRM capture from CRM routing. The CRM should assign, notify, and clarify next action, not just store the inquiry.";
+    case "lead_capture":
+      return later
+        ? "Deeper lens: I would check whether the form asks for enough context to route the lead without making the visitor feel interrogated."
+        : "Deeper lens: I would treat lead capture as a promise. The CTA and form should make it clear what the visitor gets after submitting.";
+  }
+}
+
+function buildTopicResponse(profile: ZoraLeadProfile, topic: ZoraTopic) {
+  const parts = topicResponseParts(profile, topic);
+  const label = topicLabel(topic);
+  const depthInsight = topicDepthInsight(topic, profile.currentTopicDepth);
+
+  return [
+    `Let's stay on ${label}.`,
+    `What I think is happening: ${parts.happening}`,
+    `Why it matters: ${parts.matters}`,
+    `What I would validate: ${parts.validate}`,
+    `What good looks like: ${parts.good}`,
+    depthInsight,
+    `What I'd review next: ${parts.next}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildMomentumResponse(profile: ZoraLeadProfile) {
+  if (profile.currentTopic) {
+    return buildTopicResponse(profile, profile.currentTopic);
+  }
+
+  const websiteContext = profile.websiteUrl
+    ? ` I can use ${profile.websiteUrl} as context, but I would still validate the actual path with the scanner or a manual review before treating this as confirmed.`
+    : "";
+
+  if (profile.recommendationRoadmap?.length) {
+    const first = profile.recommendationRoadmap[0];
+    return `Let's go one layer deeper on ${first.title}. I would validate ${first.validation.toLowerCase()}${websiteContext} Quick question: which part feels least clear right now: the offer, the page path, the tracking, or the follow-up handoff?`;
+  }
+
+  if (profile.businessType === "Real Estate" && profile.challenge === "Tracking") {
+    return `Good. For real estate tracking, I would go deeper on source attribution, form and booking events, call tracking, CRM handoff, and whether seller versus buyer leads are separated cleanly.${websiteContext} Quick question: are you mainly trying to track form fills, calls, booked appointments, or lead source quality?`;
+  }
+
+  if (profile.businessType === "Real Estate") {
+    return `Good. For real estate, I would separate the lead path into offer, local proof, capture action, response speed, and source tracking.${websiteContext} Quick question: are you focused more on seller leads, buyer leads, recruiting, or general brand visibility?`;
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
+    return `Good. For ecommerce conversion, I would go deeper on where intent is dropping: product discovery, product pages, cart, checkout, or post-purchase follow-up.${websiteContext} Quick question: are visitors mostly dropping before product pages, on product pages, or during checkout?`;
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Tracking") {
+    return `Good. For ecommerce tracking, I would check GA4 events, product-view to add-to-cart coverage, checkout-step events, purchase attribution, ad pixels, and whether reports match reality.${websiteContext} Quick question: is the biggest concern missing events, wrong revenue attribution, ad platform mismatch, or unclear reporting?`;
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
+    return `Good. For ecommerce operations, I would map the path from order placed to fulfillment, customer communication, support exceptions, inventory updates, and reporting.${websiteContext} Quick question: where does the team lose the most time right now: fulfillment, inventory, support, reporting, or manual updates?`;
+  }
+
+  if (profile.businessType === "Service Business" && profile.challenge === "Follow-up") {
+    return `Good. For service-business follow-up, I would look at speed-to-lead, where leads land, who owns the first response, CRM notifications, reminders, and booking handoff.${websiteContext} Quick question: do leads currently go into a CRM, email inbox, spreadsheet, or nowhere structured?`;
+  }
+
+  if (profile.businessType === "Service Business" && profile.hasNoWebsite) {
+    return "Good. Since there is no website yet, I would start by mapping the first landing page around the service, offer, proof, lead capture, and follow-up path. Quick question: what service are you trying to sell first, and who is the ideal customer?";
+  }
+
+  if (profile.businessType === "Service Business") {
+    return `Good. For a service business, I would separate traffic quality from offer clarity, trust proof, form friction, booking path, and follow-up speed.${websiteContext} Quick question: are you trying to get more calls, form leads, bookings, or qualified consultations?`;
+  }
+
+  if (profile.businessType === "Care/Healthcare") {
+    return `Good. For care or healthcare, I would go deeper on trust proof, service clarity, intake path, referral source, booking/contact flow, and response process.${websiteContext} Quick question: are most inquiries coming from families, patients, referral partners, or search traffic?`;
   }
 
   return `${buildZoraDiagnosis(profile)} ${followUpQuestion(profile)}`;
@@ -2280,17 +2651,22 @@ function actionsForIntent(
   intent: ZoraIntent,
   hasDiagnosis: boolean,
   profile: ZoraLeadProfile,
+  repeatedSoftClose = false,
 ) {
   if (profile.needsBusinessTypeClarification) {
     return [] as ZoraResponse["recommendedActions"];
   }
 
-  if (intent === "thanks") {
-    return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
-  }
-
   if (profile.hasNoWebsite && intent !== "out_of_scope") {
     return ["strategy_call"] as ZoraResponse["recommendedActions"];
+  }
+
+  if (intent === "thanks") {
+    if (repeatedSoftClose) {
+      return [] as ZoraResponse["recommendedActions"];
+    }
+
+    return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
   }
 
   if ((intent === "pricing" || intent === "timeline") && profile.recommendationRoadmap?.length) {
@@ -2341,8 +2717,20 @@ export function buildZoraResponse(
   ) {
     leadProfile.recommendationRoadmap = buildRecommendationRoadmap(leadProfile);
   }
+  const shouldContinueMomentum =
+    isMomentumAcknowledgmentMessage(message) &&
+    hasProfileDiagnosisSignal(leadProfile) &&
+    !leadProfile.needsBusinessTypeClarification;
+  const activeTopic = analysis.currentTopic || leadProfile.currentTopic;
+  const shouldContinueTopic =
+    Boolean(activeTopic) &&
+    hasProfileDiagnosisSignal(leadProfile) &&
+    (Boolean(analysis.currentTopic) || isTopicContinuationMessage(message)) &&
+    !leadProfile.needsBusinessTypeClarification;
   const effectiveIntent: ZoraIntent =
-    shouldResumeRecommendationThread && leadProfile.recommendationRoadmap?.length
+    shouldContinueTopic || shouldContinueMomentum
+      ? "diagnosis"
+      : shouldResumeRecommendationThread && leadProfile.recommendationRoadmap?.length
       ? "recommendation"
       : analysis.intent;
   const effectiveDiagnosisProfile = leadProfile;
@@ -2352,6 +2740,8 @@ export function buildZoraResponse(
       currentProfile.businessType !== analysis.businessType,
   );
   const hasDiagnosis =
+    shouldContinueTopic ||
+    shouldContinueMomentum ||
     hasDiagnosisSignal(analysis) ||
     ((analysis.intent === "diagnosis" ||
       analysis.intent === "clarify" ||
@@ -2371,11 +2761,23 @@ export function buildZoraResponse(
     leadProfile.funnelStage === "Product pages" &&
     leadProfile.productScope === "All products" &&
     isAffirmativeAnswer(message);
+  if (shouldContinueTopic && activeTopic && !analysis.currentTopic) {
+    const nextDepth =
+      currentProfile.currentTopic === activeTopic
+        ? (currentProfile.currentTopicDepth || 1) + 1
+        : 1;
+    addChange(profileChanges, "currentTopicDepth", leadProfile.currentTopicDepth, nextDepth);
+    leadProfile.currentTopic = activeTopic;
+    leadProfile.currentTopicDepth = nextDepth;
+  }
+  const repeatedSoftClose =
+    effectiveIntent === "thanks" &&
+    (Boolean(currentProfile.hasSeenSoftClose) || isCasualAcknowledgmentMessage(message));
   const reply =
     effectiveIntent === "out_of_scope"
       ? buildOutOfScopeResponse()
       : effectiveIntent === "thanks"
-        ? buildThanksResponse(leadProfile)
+        ? buildThanksResponse(leadProfile, repeatedSoftClose)
         : effectiveIntent === "timeline"
           ? buildTimelineResponse(leadProfile, message)
           : effectiveIntent === "pricing"
@@ -2392,6 +2794,10 @@ export function buildZoraResponse(
                       ? buildRecommendationResponse(leadProfile)
                     : effectiveIntent === "consultant"
                       ? buildConsultantResponse(leadProfile, message)
+                    : shouldContinueTopic && activeTopic
+                      ? buildTopicResponse(leadProfile, activeTopic)
+                    : shouldContinueMomentum
+                      ? buildMomentumResponse(leadProfile)
                     : leadProfile.needsBusinessTypeClarification
                       ? buildBusinessTypeMismatchResponse(leadProfile)
                     : analysis.hasNoWebsite
@@ -2426,6 +2832,11 @@ export function buildZoraResponse(
                               ? buildWebsiteCapturedWithMemoryResponse(leadProfile)
                               : buildClarifyingResponse();
 
+  if (effectiveIntent === "thanks" && !leadProfile.hasSeenSoftClose) {
+    profileChanges.push("hasSeenSoftClose: undefined -> true");
+    leadProfile.hasSeenSoftClose = true;
+  }
+
   return {
     reply,
     leadProfile,
@@ -2433,6 +2844,11 @@ export function buildZoraResponse(
     confidenceScore: analysis.confidenceScore,
     profileChanges,
     responseMode: effectiveIntent,
-    recommendedActions: actionsForIntent(effectiveIntent, hasDiagnosis, leadProfile),
+    recommendedActions: actionsForIntent(
+      effectiveIntent,
+      hasDiagnosis,
+      leadProfile,
+      repeatedSoftClose,
+    ),
   };
 }

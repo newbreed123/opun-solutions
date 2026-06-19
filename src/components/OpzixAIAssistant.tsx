@@ -156,7 +156,7 @@ function isLikelyWebsiteUrl(value: string) {
 }
 
 function isNoWebsiteAnswer(value: string) {
-  return /\b(not yet|no website|don't have|dont have|do not have|none|nope|not right now|skip)\b/i.test(
+  return /^\s*no\s*[.!?]*\s*$/i.test(value) || /\b(not yet|no website|don't have|dont have|do not have|none|nope|not right now|skip)\b/i.test(
     value,
   );
 }
@@ -245,6 +245,10 @@ function actionTone(action: ZoraAction) {
 function phase1Diagnosis(profile: ZoraLeadProfile) {
   const useInferredContext = shouldUseIndustryInference(profile);
 
+  if (profile.hasNoWebsite) {
+    return "Since there is no site to audit yet, I would start by mapping the landing page, offer, lead capture, and follow-up path. The best next step is a strategy call to scope the first version before spending on traffic.";
+  }
+
   if (useInferredContext && profile.inferredBusinessModel === "B2B Ecommerce / Distributor") {
     if (profile.challenge === "Operations") {
       return "This appears to be an industrial/B2B ecommerce business. Assuming that's correct, I'd look at order flow, fulfillment handoffs, inventory and product data, quote/request paths, account-based purchasing, customer support routing, reporting visibility, and automation opportunities first.";
@@ -271,6 +275,10 @@ function phase1Diagnosis(profile: ZoraLeadProfile) {
 
   if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
     return "Using the business type you selected, I'd look at order flow, fulfillment handoffs, inventory/product data, customer support routing, reporting visibility, and automation opportunities first.";
+  }
+
+  if (profile.businessType === "Ecommerce" && profile.challenge === "Tracking") {
+    return "Based on what you shared, I'd look at GA4/event coverage, checkout-step tracking, attribution, product discovery signals, ad platform pixels, and reporting visibility first.";
   }
 
   if (profile.businessType === "Service Business" && profile.challenge === "Follow-up") {
@@ -324,15 +332,20 @@ function recommendedPhase1Step(profile: ZoraLeadProfile) {
 }
 
 function phase1CtaActions(profile: ZoraLeadProfile): ZoraAction[] {
-  const auditFirst = recommendedPhase1Step(profile) === "audit";
-  const audit = scannerAction("Run Free Audit", auditFirst ? "primary" : "secondary", profile);
-  const call = bookingAction("Book Strategy Call", auditFirst ? "secondary" : "primary");
   const ask: ZoraAction = {
     kind: "start",
     label: "Ask a Question",
     value: "ask_question",
     tone: "text",
   };
+
+  if (profile.hasNoWebsite) {
+    return [bookingAction("Book Strategy Call", "primary"), ask];
+  }
+
+  const auditFirst = recommendedPhase1Step(profile) === "audit";
+  const audit = scannerAction("Run Free Audit", auditFirst ? "primary" : "secondary", profile);
+  const call = bookingAction("Book Strategy Call", auditFirst ? "secondary" : "primary");
 
   return auditFirst ? [audit, call, ask] : [call, audit, ask];
 }
@@ -663,6 +676,24 @@ export default function OpzixAIAssistant() {
 
   function showScannerRoute() {
     const nextProfile = normalizeProfile(leadProfile);
+    if (nextProfile.hasNoWebsite) {
+      appendMessages([
+        {
+          id: createId("user"),
+          role: "user",
+          text: "Run free audit",
+        },
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text:
+            "There is no website to scan yet. The better next step is a strategy call to map the first landing page, offer, and follow-up path.",
+          actions: [bookingAction("Book Strategy Call", "primary")],
+        },
+      ]);
+      return;
+    }
+
     appendMessages([
       {
         id: createId("user"),
@@ -823,6 +854,11 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.value === "free_audit") {
+      if (leadProfile.hasNoWebsite) {
+        showScannerRoute();
+        return;
+      }
+
       routeToLink(scannerAction("Run Free Audit", "primary", normalizeProfile(leadProfile)) as Extract<ZoraAction, { kind: "link" }>);
       return;
     }
