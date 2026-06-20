@@ -6,3 +6,10 @@ dist
 .env.local
 .vercel
 .DS_Store
+debug.log
+scan-output.json
+scan_output.json
+tsconfig.tsbuildinfo
+artifacts/
+tmp-zora-ux-screenshots/
+public/audit-screenshots/

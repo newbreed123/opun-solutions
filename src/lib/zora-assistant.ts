@@ -1,3 +1,9 @@
+import {
+  detectZoraIndustry,
+  type ZoraIndustry,
+  type ZoraIndustryProfile,
+} from "@/lib/zora-industry-awareness";
+
 export type ZoraBusinessType =
   | "Ecommerce"
   | "Service Business"
@@ -115,7 +121,11 @@ export type ZoraLeadProfile = {
   visitorName?: string;
   businessType?: ZoraBusinessType;
   platform?: string;
-  industry?: string;
+  industry?: ZoraIndustry | string;
+  industryProfile?: ZoraIndustryProfile;
+  industryEvidence?: string[];
+  buyerJourney?: string;
+  primaryBottlenecks?: string[];
   toolsMentioned?: string[];
   leadSource?: string;
   conversionRate?: string;
@@ -135,7 +145,7 @@ export type ZoraLeadProfile = {
   inferredIndustry?: string;
   inferredBusinessModel?: string;
   inferredFunnelType?: string;
-  industryConfidence?: number;
+  industryConfidence?: number | ZoraIndustryProfile["confidence"];
   needsBusinessTypeClarification?: boolean;
   industryMismatchResolved?: boolean;
   hasWebsiteOrLandingPage?: boolean;
@@ -154,6 +164,7 @@ export type ZoraLeadProfile = {
 
 export type ZoraMessageAnalysis = {
   intent: ZoraIntent;
+  rawMessage?: string;
   visitorName?: string;
   businessType?: ZoraBusinessType;
   platform?: string;
@@ -600,7 +611,91 @@ export function inferIndustryFromUrl(url: string): ZoraIndustryInference {
   };
 }
 
-function businessTypeFromInference(inference: ZoraIndustryInference): ZoraBusinessType | undefined {
+export function zoraIndustryConfidenceScore(
+  confidence: ZoraLeadProfile["industryConfidence"] | undefined,
+) {
+  if (typeof confidence === "number") return confidence;
+  if (confidence === "High") return 0.9;
+  if (confidence === "Moderate") return 0.7;
+  if (confidence === "Low") return 0.35;
+  return 0;
+}
+
+function businessTypeFromIndustry(industry?: ZoraIndustry): ZoraBusinessType | undefined {
+  if (industry === "real_estate") return "Real Estate";
+  if (industry === "healthcare_care") return "Care/Healthcare";
+  if (
+    industry === "ecommerce_dtc" ||
+    industry === "industrial_b2b_catalog" ||
+    industry === "marketplace_retail"
+  ) {
+    return "Ecommerce";
+  }
+  if (
+    industry === "service_business" ||
+    industry === "local_service" ||
+    industry === "education" ||
+    industry === "restaurant_hospitality"
+  ) {
+    return "Service Business";
+  }
+  return undefined;
+}
+
+function shouldReplaceIndustryProfile(
+  current: ZoraIndustryProfile | undefined,
+  next: ZoraIndustryProfile,
+) {
+  if (next.industry === "unknown") return false;
+  if (!current || current.industry === "unknown") return true;
+  if (current.industry === next.industry) return true;
+  if (next.confidence === "High") return true;
+  if (current.confidence === "High" && next.confidence === "Low") return false;
+  return next.confidence !== "Low";
+}
+
+function applyIndustryProfile(
+  profile: ZoraLeadProfile,
+  industryProfile: ZoraIndustryProfile,
+  changes: string[],
+) {
+  if (!shouldReplaceIndustryProfile(profile.industryProfile, industryProfile)) {
+    return;
+  }
+
+  addChange(
+    changes,
+    "industry",
+    profile.industry,
+    industryProfile.industry,
+  );
+  profile.industryProfile = industryProfile;
+  profile.industry = industryProfile.industry;
+  profile.industryConfidence = industryProfile.confidence;
+  profile.industryEvidence = industryProfile.evidence;
+  profile.buyerJourney = industryProfile.buyerJourney;
+  profile.primaryBottlenecks = industryProfile.primaryBottlenecks;
+  profile.recommendedFocusAreas = industryProfile.recommendedFocusAreas;
+
+  const inferredBusinessType = businessTypeFromIndustry(industryProfile.industry);
+  if (
+    inferredBusinessType &&
+    (!profile.businessType || industryProfile.confidence === "High")
+  ) {
+    addChange(changes, "businessType", profile.businessType, inferredBusinessType);
+    profile.businessType = inferredBusinessType;
+  }
+
+  if (industryProfile.industry !== "unknown") {
+    profile.inferredIndustry = industryProfile.industry;
+    profile.inferredBusinessModel = industryProfile.industry;
+    profile.inferredFunnelType = industryProfile.buyerJourney;
+  }
+}
+
+function businessTypeFromInference(
+  inference: Pick<ZoraLeadProfile, "inferredIndustry" | "inferredBusinessModel">,
+): ZoraBusinessType | undefined {
   if (inference.inferredIndustry === "Real Estate") return "Real Estate";
   if (inference.inferredIndustry === "Healthcare / Care") return "Care/Healthcare";
   if (inference.inferredBusinessModel?.includes("Ecommerce")) return "Ecommerce";
@@ -627,8 +722,7 @@ export function shouldUseIndustryInference(profile: ZoraLeadProfile) {
   const inferredBusinessType = businessTypeFromInference(profile);
 
   return Boolean(
-    profile.industryConfidence &&
-      profile.industryConfidence >= 0.7 &&
+    zoraIndustryConfidenceScore(profile.industryConfidence) >= 0.7 &&
       (!profile.businessType || !inferredBusinessType || profile.businessType === inferredBusinessType),
   );
 }
@@ -989,6 +1083,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
                             : "clarify";
   const analysisWithoutConfidence = {
     intent,
+    rawMessage: message,
     visitorName,
     businessType,
     platform,
@@ -1274,6 +1369,22 @@ function mergeLeadProfile(
     nextProfile.email = analysis.email;
   }
 
+  const industryProfile = detectZoraIndustry({
+    userMessage: [
+      analysis.rawMessage,
+      analysis.industry,
+      analysis.desiredOutcome,
+      analysis.leadSource,
+      analysis.websiteUrl ? normalizeDomainContext(analysis.websiteUrl) : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+    websiteUrl: analysis.websiteUrl ?? nextProfile.websiteUrl,
+    businessType: nextProfile.businessType,
+    platformHint: analysis.platform ?? nextProfile.platform,
+  });
+  applyIndustryProfile(nextProfile, industryProfile, changes);
+
   nextProfile.recommendedNextStep = recommendZoraNextStep(nextProfile);
   nextProfile.recommendedFocusAreas = focusAreas(nextProfile);
   nextProfile.leadQuality = scoreZoraLeadQuality(nextProfile);
@@ -1380,7 +1491,49 @@ export function inferZoraLeadProfile(
 }
 
 export function recommendZoraNextStep(profile: ZoraLeadProfile): ZoraNextStep {
+  const industry = profile.industryProfile?.industry;
+  const auditIndustries: Array<ZoraIndustry | undefined> = [
+    "ecommerce_dtc",
+    "industrial_b2b_catalog",
+    "marketplace_retail",
+  ];
+  const strategyIndustries: Array<ZoraIndustry | undefined> = [
+    "real_estate",
+    "healthcare_care",
+    "service_business",
+    "local_service",
+    "education",
+    "restaurant_hospitality",
+  ];
+  const auditChallenges: Array<ZoraChallenge | undefined> = [
+    "Conversion",
+    "Tracking",
+    "Website",
+  ];
+  const strategyChallenges: Array<ZoraChallenge | undefined> = [
+    "Operations",
+    "Follow-up",
+  ];
+
   if (profile.hasNoWebsite) {
+    return "strategy_call";
+  }
+
+  if (
+    profile.websiteUrl &&
+    auditIndustries.includes(industry) &&
+    (auditChallenges.includes(profile.challenge) ||
+      industry === "industrial_b2b_catalog" ||
+      industry === "marketplace_retail")
+  ) {
+    return "free_audit";
+  }
+
+  if (
+    !profile.websiteUrl ||
+    strategyIndustries.includes(industry) ||
+    strategyChallenges.includes(profile.challenge)
+  ) {
     return "strategy_call";
   }
 
@@ -1476,7 +1629,15 @@ export function scoreZoraLeadTemperature(
   return "cold";
 }
 
-function focusAreas(profile: Pick<ZoraLeadProfile, "businessType" | "challenge">) {
+function focusAreas(profile: ZoraLeadProfile) {
+  if (profile.industryProfile?.recommendedFocusAreas?.length) {
+    return profile.industryProfile.recommendedFocusAreas;
+  }
+
+  if (profile.primaryBottlenecks?.length) {
+    return profile.primaryBottlenecks.slice(0, 5);
+  }
+
   if (profile.businessType === "Ecommerce" && profile.challenge === "Traffic") {
     return [
       "offer positioning",
@@ -1608,12 +1769,33 @@ function businessContextLabel(businessType: ZoraBusinessType) {
 
 export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
   const areas = joinList(focusAreas(profile));
+  const industry = profile.industryProfile?.industry;
   const contextParts = [
     profile.platform ? `on ${profile.platform}` : "",
     profile.annualRevenueText ? `at about ${profile.annualRevenueText}` : "",
   ].filter(Boolean);
   const contextText =
     contextParts.length > 0 ? ` ${contextParts.join(" ")}` : "";
+
+  if (industry === "real_estate") {
+    return `Because this looks like a real estate business${contextText}, I would first look at ${areas}. For operations, the key path is inquiry -> agent assignment -> CRM follow-up -> booking -> source tracking.`;
+  }
+
+  if (industry === "industrial_b2b_catalog") {
+    return `Because this looks like a B2B catalog${contextText}, I would focus on ${areas}. The important path is whether buyers can search, filter, compare specs, and move from product/category pages into cart, quote, or account workflows.`;
+  }
+
+  if (industry === "healthcare_care") {
+    return `Because this looks like a care or healthcare services business${contextText}, I would focus on ${areas}. The critical path is service clarity, trust proof, intake requests, referral handoff, response time, and internal routing.`;
+  }
+
+  if (industry === "ecommerce_dtc") {
+    return `Because this looks like a DTC ecommerce store${contextText}, I would review ${areas}. The main path is mobile product discovery, product-page confidence, reviews, shipping/returns clarity, checkout trust, tracking, and email/SMS follow-up.`;
+  }
+
+  if (industry === "marketplace_retail") {
+    return `Because this looks like marketplace or enterprise retail${contextText}, I would review ${areas}. Public-page evidence may be directional, so I would validate search/departments, pickup/delivery, account/cart path, availability, and measurement confidence.`;
+  }
 
   const opener =
     profile.businessType === "Real Estate"
@@ -1936,7 +2118,7 @@ function inferredContextSummary(profile: ZoraLeadProfile) {
     !profile.inferredBusinessModel ||
     !profile.inferredFunnelType ||
     !profile.industryConfidence ||
-    profile.industryConfidence < 0.7
+    zoraIndustryConfidenceScore(profile.industryConfidence) < 0.7
   ) {
     return "";
   }
@@ -2104,6 +2286,67 @@ function topicLabel(topic: ZoraTopic) {
 
 function topicResponseParts(profile: ZoraLeadProfile, topic: ZoraTopic) {
   const business = businessShortLabel(profile);
+  const industry = profile.industryProfile?.industry;
+
+  if (industry === "real_estate" && topic === "offer_clarity") {
+    return {
+      happening:
+        "The page may not be separating buyer, seller, valuation, and agent-brand intent clearly enough for a visitor to know which path fits them.",
+      matters:
+        "Real estate visitors usually arrive with a specific intent. If the path is too general, qualified buyers or sellers hesitate before they ever become a lead.",
+      validate:
+        "I would validate buyer versus seller CTAs, valuation flow, local proof, listing authority, booking options, and how each inquiry enters the CRM.",
+      good:
+        "A good real estate path makes the visitor's role obvious, proves local credibility quickly, and routes the lead to the right follow-up owner.",
+      next:
+        "I would review the hero, buyer/seller segmentation, valuation CTA, agent or market proof, booking flow, and CRM/source tracking.",
+    };
+  }
+
+  if (industry === "healthcare_care" && topic === "lead_capture") {
+    return {
+      happening:
+        "Families, referral partners, or potential clients may not have a clear, reassuring way to ask for help or start intake.",
+      matters:
+        "In care and healthcare services, trust and response clarity matter as much as the form itself. Unclear intake can delay high-intent inquiries.",
+      validate:
+        "I would validate service eligibility, referral paths, intake questions, privacy-safe messaging, confirmation copy, response ownership, and follow-up timing.",
+      good:
+        "Good intake feels simple, respectful, and specific enough for the team to route the request without adding unnecessary friction.",
+      next:
+        "I would review service pages, request-care CTAs, referral forms, confirmation messages, routing rules, and missed-inquiry recovery.",
+    };
+  }
+
+  if (industry === "industrial_b2b_catalog" && topic === "product_discovery") {
+    return {
+      happening:
+        "Buyers may know the part, spec, or category they need, but the site may make them work too hard to find and compare it.",
+      matters:
+        "B2B catalog friction can look like low demand, but the real issue is often search, filtering, specs, or the path from product research into quote/cart/account workflows.",
+      validate:
+        "I would validate SKU search, category taxonomy, filters, specs, datasheets, product-card detail, availability, quote/cart path, and account purchasing flow.",
+      good:
+        "Good B2B discovery lets a buyer move from need to exact item quickly and gives enough detail to proceed without calling for basic clarification.",
+      next:
+        "I would review top categories, internal search, filters, product templates, spec visibility, and the quote/cart/account handoff.",
+    };
+  }
+
+  if (industry === "marketplace_retail" && topic === "tracking_visibility") {
+    return {
+      happening:
+        "The public experience may show only part of the journey, so measurement needs to separate search, availability, cart/account, pickup, delivery, and checkout signals.",
+      matters:
+        "Large retail paths contain many micro-decisions. If they are measured as one blended conversion path, teams can miss the actual bottleneck.",
+      validate:
+        "I would validate search and department events, availability interactions, pickup/delivery selection, account/cart transitions, checkout events, and reporting consistency.",
+      good:
+        "Good retail tracking shows where intent appears, where it slows down, and whether the issue is product availability, path clarity, account friction, or checkout.",
+      next:
+        "I would review event coverage by journey stage, not just final conversion reporting.",
+    };
+  }
 
   switch (topic) {
     case "offer_clarity":

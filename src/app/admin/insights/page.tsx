@@ -92,6 +92,7 @@ type ZoraLeadInsights = {
   qualificationCompleted: number;
   auditClicks: number;
   strategyCallClicks: number;
+  topIndustries: GroupMetric[];
   topBusinessTypes: GroupMetric[];
   topChallenges: GroupMetric[];
   recentQualifiedLeads: ZoraConversationRow[];
@@ -360,6 +361,10 @@ export default async function AdminInsightsPage({
             </section>
             <div className="mt-6 grid gap-6 lg:grid-cols-2">
               <MetricRows
+                rows={insights.zoraLeadInsights.topIndustries}
+                emptyLabel="No Zora industry data yet."
+              />
+              <MetricRows
                 rows={insights.zoraLeadInsights.topBusinessTypes}
                 emptyLabel="No Zora business-type data yet."
               />
@@ -490,6 +495,10 @@ function buildZoraLeadInsights(
     strategyCallClicks: conversations.filter(
       (conversation) => conversation.strategy_call_clicked,
     ).length,
+    topIndustries: groupZoraByValue(
+      conversations,
+      (conversation) => conversation.industry || conversation.inferred_industry,
+    ),
     topBusinessTypes: groupZoraByValue(
       conversations,
       (conversation) => conversation.business_type,
@@ -614,14 +623,17 @@ function RecentZoraLeadsTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[1380px] border-collapse text-left text-sm">
         <thead className="border-b border-dark-border text-xs uppercase tracking-[0.16em] text-muted">
           <tr>
             <th className="px-3 py-3">Date</th>
+            <th className="px-3 py-3">Industry</th>
+            <th className="px-3 py-3">Confidence</th>
             <th className="px-3 py-3">Business type</th>
             <th className="px-3 py-3">Challenge</th>
             <th className="px-3 py-3">Website URL</th>
             <th className="px-3 py-3">Platform</th>
+            <th className="px-3 py-3">Focus areas</th>
             <th className="px-3 py-3">Recommended next step</th>
             <th className="px-3 py-3">Audit clicked</th>
             <th className="px-3 py-3">Strategy call clicked</th>
@@ -636,6 +648,12 @@ function RecentZoraLeadsTable({
             >
               <td className="px-3 py-4 text-secondary">
                 {formatDate(conversation.created_at)}
+              </td>
+              <td className="px-3 py-4 text-primary">
+                {cleanLabel(conversation.industry || conversation.inferred_industry)}
+              </td>
+              <td className="px-3 py-4 text-secondary">
+                {cleanLabel(conversation.industry_confidence)}
               </td>
               <td className="px-3 py-4 text-primary">
                 {cleanLabel(conversation.business_type)}
@@ -659,6 +677,9 @@ function RecentZoraLeadsTable({
               </td>
               <td className="px-3 py-4 text-secondary">
                 {cleanLabel(conversation.platform_hint)}
+              </td>
+              <td className="max-w-xs px-3 py-4 text-secondary">
+                {formatArrayList(conversation.recommended_focus_areas)}
               </td>
               <td className="px-3 py-4 text-secondary">
                 {cleanLabel(conversation.recommended_next_step)}
@@ -1162,14 +1183,19 @@ function getParam(
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
-function cleanLabel(value: string | null | undefined) {
-  return value?.trim() || "unknown";
+function cleanLabel(value: string | number | null | undefined) {
+  return String(value ?? "").trim() || "unknown";
 }
 
 function normalizeUnknownList(value: unknown[] | undefined) {
   return (Array.isArray(value) ? value : [])
     .map((item) => (typeof item === "string" ? item.trim() : ""))
     .filter(Boolean);
+}
+
+function formatArrayList(value: string[] | null | undefined) {
+  const items = normalizeUnknownList(value ?? undefined);
+  return items.length ? items.slice(0, 4).join(", ") : "unknown";
 }
 
 function percentage(count: number, total: number) {

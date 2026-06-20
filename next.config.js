@@ -12,6 +12,16 @@ const nextConfig = {
     "/api/ecommerce-audit-scanner": ["./node_modules/@sparticuz/chromium/bin/**/*"],
     "/api/scanner-health": ["./node_modules/@sparticuz/chromium/bin/**/*"],
   },
+  outputFileTracingExcludes: {
+    "*": [
+      "./artifacts/**/*",
+      "./tmp-zora-ux-screenshots/**/*",
+      "./public/audit-screenshots/**/*",
+      "./debug.log",
+      "./scan-output.json",
+      "./scan_output.json",
+    ],
+  },
   turbopack: {
     root: __dirname,
   },

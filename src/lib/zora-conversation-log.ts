@@ -5,6 +5,7 @@ import {
 import {
   scoreZoraLead,
   scoreZoraLeadTemperature,
+  zoraIndustryConfidenceScore,
   type ZoraLeadProfile,
   type ZoraLeadTemperature,
 } from "@/lib/zora-assistant";
@@ -25,10 +26,16 @@ export type ZoraConversationRow = {
   challenge: string | null;
   website_url: string | null;
   platform_hint: string | null;
+  industry: string | null;
   inferred_industry: string | null;
   inferred_business_model: string | null;
   inferred_funnel_type: string | null;
-  industry_confidence: number | null;
+  industry_confidence: string | number | null;
+  industry_confidence_score: number | null;
+  industry_evidence: string[] | null;
+  buyer_journey: string | null;
+  primary_bottlenecks: string[] | null;
+  recommended_focus_areas: string[] | null;
   optional_revenue_mention: string | null;
   current_step: string | null;
   recommended_next_step: string | null;
@@ -66,13 +73,21 @@ export async function logZoraConversation(
         challenge: profile.challenge || null,
         website_url: profile.websiteUrl || null,
         platform_hint: profile.platform || null,
+        industry: profile.industryProfile?.industry || profile.industry || null,
         inferred_industry: profile.inferredIndustry || null,
         inferred_business_model: profile.inferredBusinessModel || null,
         inferred_funnel_type: profile.inferredFunnelType || null,
-        industry_confidence:
-          typeof profile.industryConfidence === "number"
-            ? profile.industryConfidence
-            : null,
+        industry_confidence: profile.industryProfile?.confidence || profile.industryConfidence || null,
+        industry_confidence_score: zoraIndustryConfidenceScore(profile.industryConfidence),
+        industry_evidence:
+          profile.industryProfile?.evidence || profile.industryEvidence || null,
+        buyer_journey: profile.industryProfile?.buyerJourney || profile.buyerJourney || null,
+        primary_bottlenecks:
+          profile.industryProfile?.primaryBottlenecks || profile.primaryBottlenecks || null,
+        recommended_focus_areas:
+          profile.industryProfile?.recommendedFocusAreas ||
+          profile.recommendedFocusAreas ||
+          null,
         optional_revenue_mention: profile.annualRevenueText || profile.revenueRange || null,
         current_step: metadata.currentStep || metadata.eventType || null,
         recommended_next_step: profile.recommendedNextStep || null,
@@ -187,7 +202,7 @@ export async function listZoraConversations(limit = 1000) {
       {
         query: {
           select:
-            "id,created_at,session_id,business_type,challenge,website_url,platform_hint,inferred_industry,inferred_business_model,inferred_funnel_type,industry_confidence,optional_revenue_mention,current_step,recommended_next_step,recommendation_roadmap,lead_score,lead_temperature,latest_user_message,latest_assistant_message,source_path,user_agent,audit_clicked,strategy_call_clicked,email_submitted",
+            "id,created_at,session_id,business_type,challenge,website_url,platform_hint,industry,inferred_industry,inferred_business_model,inferred_funnel_type,industry_confidence,industry_confidence_score,industry_evidence,buyer_journey,primary_bottlenecks,recommended_focus_areas,optional_revenue_mention,current_step,recommended_next_step,recommendation_roadmap,lead_score,lead_temperature,latest_user_message,latest_assistant_message,source_path,user_agent,audit_clicked,strategy_call_clicked,email_submitted",
           order: "created_at.desc",
           limit,
         },

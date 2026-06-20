@@ -6,10 +6,16 @@ create table if not exists zora_conversations (
   challenge text null,
   website_url text null,
   platform_hint text null,
+  industry text null,
   inferred_industry text null,
   inferred_business_model text null,
   inferred_funnel_type text null,
-  industry_confidence numeric null,
+  industry_confidence text null,
+  industry_confidence_score numeric null,
+  industry_evidence jsonb null,
+  buyer_journey text null,
+  primary_bottlenecks jsonb null,
+  recommended_focus_areas jsonb null,
   optional_revenue_mention text null,
   current_step text null,
   recommended_next_step text null,
@@ -41,6 +47,9 @@ alter table zora_conversations
   add column if not exists platform_hint text null;
 
 alter table zora_conversations
+  add column if not exists industry text null;
+
+alter table zora_conversations
   add column if not exists inferred_industry text null;
 
 alter table zora_conversations
@@ -50,7 +59,26 @@ alter table zora_conversations
   add column if not exists inferred_funnel_type text null;
 
 alter table zora_conversations
-  add column if not exists industry_confidence numeric null;
+  add column if not exists industry_confidence text null;
+
+alter table zora_conversations
+  alter column industry_confidence type text
+  using industry_confidence::text;
+
+alter table zora_conversations
+  add column if not exists industry_confidence_score numeric null;
+
+alter table zora_conversations
+  add column if not exists industry_evidence jsonb null;
+
+alter table zora_conversations
+  add column if not exists buyer_journey text null;
+
+alter table zora_conversations
+  add column if not exists primary_bottlenecks jsonb null;
+
+alter table zora_conversations
+  add column if not exists recommended_focus_areas jsonb null;
 
 alter table zora_conversations
   add column if not exists optional_revenue_mention text null;
@@ -102,6 +130,12 @@ create index if not exists zora_conversations_business_type_idx
 
 create index if not exists zora_conversations_challenge_idx
   on zora_conversations (challenge);
+
+create index if not exists zora_conversations_industry_idx
+  on zora_conversations (industry);
+
+create index if not exists zora_conversations_industry_confidence_idx
+  on zora_conversations (industry_confidence);
 
 create index if not exists zora_conversations_lead_temperature_idx
   on zora_conversations (lead_temperature);

@@ -29,6 +29,11 @@ import {
   ZoraLeadProfile,
   ZoraResponse,
 } from "@/lib/zora-assistant";
+import {
+  detectZoraIndustry,
+  type ZoraIndustry,
+  type ZoraIndustryProfile,
+} from "@/lib/zora-industry-awareness";
 
 const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
 const ZORA_SESSION_ID_KEY = "opzix-zora-session-id";
@@ -122,10 +127,98 @@ function isBookingUrl(href: string) {
   );
 }
 
+function businessTypeFromDetectedIndustry(
+  industry?: ZoraIndustry,
+): ZoraBusinessType | undefined {
+  if (industry === "real_estate") return "Real Estate";
+  if (industry === "healthcare_care") return "Care/Healthcare";
+  if (
+    industry === "ecommerce_dtc" ||
+    industry === "industrial_b2b_catalog" ||
+    industry === "marketplace_retail"
+  ) {
+    return "Ecommerce";
+  }
+  if (
+    industry === "service_business" ||
+    industry === "local_service" ||
+    industry === "education" ||
+    industry === "restaurant_hospitality"
+  ) {
+    return "Service Business";
+  }
+  return undefined;
+}
+
+function shouldUseDetectedIndustry(
+  current: ZoraIndustryProfile | undefined,
+  next: ZoraIndustryProfile,
+) {
+  if (next.industry === "unknown") return false;
+  if (!current || current.industry === "unknown") return true;
+  if (current.industry === next.industry) return true;
+  if (next.confidence === "High") return true;
+  if (current.confidence === "High" && next.confidence === "Low") return false;
+  return next.confidence !== "Low";
+}
+
 function normalizeProfile(profile: ZoraLeadProfile): ZoraLeadProfile {
+  const industryProfile = detectZoraIndustry({
+    userMessage: [
+      profile.industry,
+      profile.desiredOutcome,
+      profile.leadSource,
+      profile.websiteUrl,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    websiteUrl: profile.websiteUrl,
+    businessType: profile.businessType,
+    platformHint: profile.platform,
+  });
+  const useIndustryProfile = shouldUseDetectedIndustry(
+    profile.industryProfile,
+    industryProfile,
+  );
+  const detectedBusinessType = useIndustryProfile
+    ? businessTypeFromDetectedIndustry(industryProfile.industry)
+    : undefined;
+  const resolvedProfile = useIndustryProfile
+    ? {
+        ...profile,
+        businessType:
+          detectedBusinessType && industryProfile.confidence === "High"
+            ? detectedBusinessType
+            : profile.businessType,
+        industry: industryProfile.industry,
+        industryProfile,
+        industryEvidence: industryProfile.evidence,
+        buyerJourney: industryProfile.buyerJourney,
+        primaryBottlenecks: industryProfile.primaryBottlenecks,
+        recommendedFocusAreas: industryProfile.recommendedFocusAreas,
+        inferredIndustry: industryProfile.industry,
+        inferredBusinessModel: industryProfile.industry,
+        inferredFunnelType: industryProfile.buyerJourney,
+        industryConfidence: industryProfile.confidence,
+        needsBusinessTypeClarification:
+          industryProfile.confidence === "High" &&
+          detectedBusinessType &&
+          profile.businessType &&
+          profile.businessType !== detectedBusinessType
+            ? false
+            : profile.needsBusinessTypeClarification,
+        industryMismatchResolved:
+          industryProfile.confidence === "High" &&
+          detectedBusinessType &&
+          profile.businessType &&
+          profile.businessType !== detectedBusinessType
+            ? true
+            : profile.industryMismatchResolved,
+      }
+    : profile;
   const withRecommendedStep = {
-    ...profile,
-    recommendedNextStep: recommendZoraNextStep(profile),
+    ...resolvedProfile,
+    recommendedNextStep: recommendZoraNextStep(resolvedProfile),
   };
 
   return {
@@ -244,9 +337,35 @@ function actionTone(action: ZoraAction) {
 
 function phase1Diagnosis(profile: ZoraLeadProfile) {
   const useInferredContext = shouldUseIndustryInference(profile);
+  const industry = profile.industryProfile?.industry;
 
   if (profile.hasNoWebsite) {
     return "Since there is no site to audit yet, I would start by mapping the landing page, offer, lead capture, and follow-up path. The best next step is a strategy call to scope the first version before spending on traffic.";
+  }
+
+  if (industry === "real_estate") {
+    const correction =
+      profile.industryMismatchResolved
+        ? "That URL looks more like real estate than ecommerce. I'll treat this as a real estate lead-generation/operations site. "
+        : "Because this looks like a real estate business, ";
+
+    return `${correction}I would first look at lead routing, agent assignment, CRM follow-up, booking flow, local proof, and source tracking.`;
+  }
+
+  if (industry === "industrial_b2b_catalog") {
+    return "Because this looks like an industrial/B2B catalog, I would focus on catalog discovery, search, SKU/specs, category hierarchy, and the cart/quote/account path.";
+  }
+
+  if (industry === "healthcare_care") {
+    return "Because this looks like a care or healthcare services business, I would focus on service clarity, intake flow, referral handoff, trust proof, response time, and internal routing.";
+  }
+
+  if (industry === "ecommerce_dtc") {
+    return "Because this looks like a DTC ecommerce store, I would review mobile product discovery, product-page confidence, reviews, shipping/returns clarity, checkout trust, tracking, and email/SMS follow-up.";
+  }
+
+  if (industry === "marketplace_retail") {
+    return "Because this looks like marketplace or enterprise retail, I would review search/departments, pickup/delivery clarity, account/cart path, availability, and measurement confidence. Public-page evidence may be directional.";
   }
 
   if (useInferredContext && profile.inferredBusinessModel === "B2B Ecommerce / Distributor") {
@@ -313,6 +432,9 @@ function phase1Diagnosis(profile: ZoraLeadProfile) {
 }
 
 function recommendedPhase1Step(profile: ZoraLeadProfile) {
+  if (profile.recommendedNextStep === "strategy_call") return "strategy_call";
+  if (profile.recommendedNextStep === "free_audit") return "audit";
+
   if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
     return "strategy_call";
   }

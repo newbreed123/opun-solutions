@@ -605,13 +605,24 @@ type VisibilitySignal = {
   businessMeaning: string;
 };
 
-type AnswerSectionTone = "direct" | "evidence" | "meaning" | "question";
+type AnswerSectionTone =
+  | "direct"
+  | "evidence"
+  | "meaning"
+  | "impact"
+  | "validation"
+  | "good"
+  | "example"
+  | "implementation"
+  | "question";
 
 type AnswerSection = {
   label: string;
   body: string;
   tone: AnswerSectionTone;
 };
+
+type ExplanationLayer = "business" | "technical";
 
 type ScanContext = {
   scanId?: string;
@@ -678,21 +689,21 @@ type QuickReplyIntent =
   | "ask_seriousness";
 
 const quickReplies: { label: string; intent: QuickReplyIntent }[] = [
-  { label: "What should I fix first?", intent: "ask_priority" },
-  { label: "Why does this matter?", intent: "ask_clarification" },
-  { label: "Can Opzix help with this?", intent: "ask_opzix_help" },
-  { label: "How serious is this?", intent: "ask_seriousness" },
+  { label: "Business Explanation", intent: "ask_clarification" },
+  { label: "Technical Explanation", intent: "ask_clarification" },
+  { label: "Recommended Fix", intent: "ask_priority" },
+  { label: "How Opzix Would Approach It", intent: "ask_opzix_help" },
 ];
 
 const compactFollowUpReplies = [
-  "Compare with conversion",
-  "Explain business impact",
-  "What would Opzix fix first?",
-  "Review This Audit With Opzix",
+  "Business Explanation",
+  "Technical Explanation",
+  "Recommended Fix",
+  "Review With Opzix",
 ];
 
 const answerSectionPattern =
-  /^(Direct answer|Evidence from scan|Evidence|What it means|Business meaning|Next question):\s*(.+)$/i;
+  /^(Direct answer|Evidence from scan|Evidence|Business translation|What the finding means|What it means|Why it matters|Business impact|Business meaning|Practical example|Recommended implementation|What I would validate|What good looks like|Recommended next step|Next question):\s*(.+)$/i;
 
 const quickReplyIcons: Record<QuickReplyIntent, typeof Wrench> = {
   ask_priority: Wrench,
@@ -1834,16 +1845,8 @@ function buildLocalAssistantTurn(
     scanContext,
     conversationState,
   );
-  const switchedTopicTurn =
-    !directTurn &&
-    intent !== "unknown" &&
-    detectedTopic &&
-    detectedTopic !== conversationState.currentTopic
-      ? buildAssistantResponse(intent, audit, conversationState)
-      : null;
   const expansionTurn =
     !directTurn &&
-    !switchedTopicTurn &&
     shouldExpandCurrentTopic(question, conversationState)
       ? expandCurrentTopicResponse(
           question,
@@ -1852,17 +1855,25 @@ function buildLocalAssistantTurn(
           conversationState,
         )
       : null;
+  const switchedTopicTurn =
+    !directTurn &&
+    !expansionTurn &&
+    intent !== "unknown" &&
+    detectedTopic &&
+    detectedTopic !== conversationState.currentTopic
+      ? buildAssistantResponse(intent, audit, conversationState)
+      : null;
   const continuationTurn =
     !directTurn &&
-    !switchedTopicTurn &&
     !expansionTurn &&
+    !switchedTopicTurn &&
     isAffirmativeFollowUp(question)
       ? buildFollowUpContinuation(audit, scanContext, conversationState)
       : null;
   const turn =
     directTurn ??
-    switchedTopicTurn ??
     expansionTurn ??
+    switchedTopicTurn ??
     continuationTurn ??
     (intent !== "unknown"
       ? buildAssistantResponse(intent, audit, conversationState)
@@ -2648,7 +2659,7 @@ function buildCompetitiveContextResponse(context: ScanContext): ChatMessage {
       "A stronger comparable page usually makes the primary path obvious early, supports trust before commitment, and keeps discovery or contact actions easy to reach.",
     nextQuestion: weaknesses
       ? `The main gaps versus that context are: ${weaknesses}`
-      : "Do you want me to connect the benchmark gaps to the first fixes?",
+      : "Connect the benchmark gaps to the first fixes.",
   });
 }
 
@@ -2670,8 +2681,7 @@ function buildRevenueImpactResponse(context: ScanContext): ChatMessage {
     businessMeaning: topEstimate
       ? `${topEstimate.riskArea}: ${topEstimate.likelyImpact}`
       : "These findings matter because unclear paths, weak trust, incomplete tracking, or operational ambiguity can reduce conversion confidence, lead quality, attribution, or follow-up efficiency.",
-    nextQuestion:
-      "Do you want me to rank the findings by likely business impact?",
+    nextQuestion: "Rank the findings by likely business impact.",
   });
 }
 
@@ -3567,8 +3577,8 @@ function buildInitialMessage(audit: AssistantAudit): ChatMessage {
       `I reviewed your scan. The strongest signal is ${finding.title}, based on ${sentenceFragment(
         finding.evidenceSummary ?? getPrimaryConcernLabel(audit),
       )}.`,
-      "I can walk through the scan like an ecommerce review: UX, conversion, tracking, trust, operations, benchmark context, or the fix order.",
-      "Where would you like to start?",
+      "I will review it like a consultant: what the finding means, why it matters, business impact, what to validate, what good looks like, and the recommended next step.",
+      "Use the follow-up buttons to go deeper, see an example, show the recommended fix, or review the audit with Opzix.",
     ],
     topic: "priority",
   };
@@ -3599,15 +3609,50 @@ function normalizeAnswerSectionLabel(
 ): Omit<AnswerSection, "body"> {
   const normalized = label.toLowerCase();
 
-  if (normalized === "direct answer") {
-    return { label: "Direct Answer", tone: "direct" };
+  if (
+    normalized === "direct answer" ||
+    normalized === "what the finding means"
+  ) {
+    return { label: "What The Finding Means", tone: "direct" };
+  }
+
+  if (normalized === "business translation") {
+    return { label: "Business Translation", tone: "direct" };
   }
 
   if (normalized === "evidence" || normalized === "evidence from scan") {
     return { label: "Evidence", tone: "evidence" };
   }
 
-  if (normalized === "what it means" || normalized === "business meaning") {
+  if (normalized === "what it means" || normalized === "why it matters") {
+    return { label: "Why It Matters", tone: "meaning" };
+  }
+
+  if (normalized === "business impact" || normalized === "business meaning") {
+    return { label: "Business Impact", tone: "impact" };
+  }
+
+  if (normalized === "what i would validate") {
+    return { label: "What I Would Validate", tone: "validation" };
+  }
+
+  if (normalized === "practical example") {
+    return { label: "Practical Example", tone: "example" };
+  }
+
+  if (normalized === "recommended implementation") {
+    return { label: "Recommended Implementation", tone: "implementation" };
+  }
+
+  if (normalized === "what good looks like") {
+    return { label: "What Good Looks Like", tone: "good" };
+  }
+
+  if (normalized === "recommended next step") {
+    return { label: "Recommended Next Step", tone: "question" };
+  }
+
+  if (normalized === "direct answer") {
     return { label: "What It Means", tone: "meaning" };
   }
 
@@ -3670,6 +3715,18 @@ function sectionToneClassName(tone: AnswerSectionTone) {
 
   if (tone === "question") {
     return "border-emerald-300/25 bg-emerald-300/10 text-primary";
+  }
+
+  if (tone === "impact") {
+    return "border-amber-300/25 bg-amber-300/10 text-primary";
+  }
+
+  if (tone === "example" || tone === "implementation") {
+    return "border-brand-cyan/25 bg-brand-cyan/10 text-primary";
+  }
+
+  if (tone === "validation" || tone === "good") {
+    return "border-brand-cyan/20 bg-dark-deep/70 text-secondary";
   }
 
   return "border-white/10 bg-dark-deep/60 text-secondary";
@@ -3761,14 +3818,52 @@ function isAffirmativeFollowUp(input: string) {
   );
 }
 
+function explanationLayerForInput(input: string): ExplanationLayer {
+  const normalized = normalizeText(input).replace(/\s+/g, " ").trim();
+
+  if (
+    textIncludesAny(normalized, [
+      "technical explanation",
+      "technical detail",
+      "technical details",
+      "developer",
+      "dev detail",
+      "show the technical",
+      "more technical",
+      "raw detail",
+      "engineering detail",
+      "console",
+      "failed request",
+      "source asset",
+      "frontend",
+      "architecture",
+    ])
+  ) {
+    return "technical";
+  }
+
+  return "business";
+}
+
 function isExpansionIntent(input: string) {
   const normalized = normalizeText(input).trim();
 
   return (
-    /^(yes|yes please|yeah|yep|sure|please|continue|go on|tell me more|explain|explain more|go deeper|show me|do that|sounds good)$/.test(
+    /^(yes|yes please|yeah|yep|sure|please|continue|go on|tell me more|explain|explain more|go deeper|show me|do that|sounds good|business explanation|technical explanation|recommended fix)$/.test(
       normalized,
     ) ||
     textIncludesAny(normalized, [
+      "business explanation",
+      "plain english",
+      "in plain english",
+      "simple terms",
+      "simpler",
+      "non technical",
+      "non-technical",
+      "break that down",
+      "what does that mean",
+      "technical explanation",
+      "technical detail",
       "explain more",
       "yes please explain",
       "tell me more",
@@ -3780,6 +3875,12 @@ function isExpansionIntent(input: string) {
       "if not fixed",
       "give me an example",
       "example",
+      "show recommended fix",
+      "recommended fix",
+      "recommended implementation",
+      "how opzix",
+      "opzix would approach",
+      "opzix approach",
       "continue",
     ])
   );
@@ -3833,6 +3934,28 @@ function resolveExpansionTopic(
   input: string,
   state: ConversationState,
 ): ConversationTopic | null {
+  const normalized = normalizeText(input);
+
+  if (
+    textIncludesAny(normalized, [
+      "business explanation",
+      "technical explanation",
+      "plain english",
+      "simple terms",
+      "break that down",
+      "what does that mean",
+      "recommended fix",
+      "how opzix",
+      "opzix would approach",
+    ])
+  ) {
+    return (
+      state.currentTopic ??
+      topicFromFinding(state.lastFindingDiscussed) ??
+      topicFromText(input)
+    );
+  }
+
   return (
     topicFromText(input) ??
     topicFromFinding(state.lastFindingDiscussed) ??
@@ -3886,6 +4009,28 @@ function expansionDepthForQuestion(
 
   if (
     textIncludesAny(normalized, [
+      "recommended fix",
+      "show recommended fix",
+      "recommended implementation",
+      "implementation",
+    ])
+  ) {
+    return 4;
+  }
+
+  if (
+    textIncludesAny(normalized, [
+      "opzix would approach",
+      "how opzix",
+      "review with opzix",
+      "opzix approach",
+    ])
+  ) {
+    return 5;
+  }
+
+  if (
+    textIncludesAny(normalized, [
       "what should",
       "fix first",
       "next step",
@@ -3921,6 +4066,34 @@ function ecommerceExampleForTopic(topic: ConversationTopic) {
       "A practical example would be fixing visual polish first while the bigger issue is measurement, discovery, or checkout clarity, making it hard to know whether the work actually improved the buying path.",
     booking:
       "A practical example would be using the scan to focus a human audit on the few areas most likely to change decisions, instead of reviewing the whole storefront as a generic checklist.",
+  };
+
+  return examples[topic];
+}
+
+function businessExampleForTopic(topic: ConversationTopic) {
+  const examples: Record<ConversationTopic, string> = {
+    ux: "A visitor lands on the page, wants to understand the offer, but has to work too hard to find the next useful step.",
+    conversion:
+      "A visitor is interested, but the path to buy, inquire, or continue is not obvious enough, so they leave before acting.",
+    trust:
+      "A first-time visitor likes what they see, but cannot quickly find enough reassurance to feel comfortable moving forward.",
+    tracking:
+      "The team sees traffic coming in, but cannot confidently tell which visitors took meaningful actions.",
+    operations:
+      "A customer takes action, then needs extra help because expectations, follow-up, or next steps were not clear.",
+    technical:
+      "A page appears mostly fine, but small hidden issues may still make important moments feel slow, broken, or unreliable.",
+    metadata:
+      "Someone sees the business in search or a shared link, but the preview does not clearly explain what the page is for.",
+    benchmark:
+      "A competitor makes the next step clearer, so customers understand what to do faster even if the products are similar.",
+    platform:
+      "The business may sell through a different page, marketplace, form, or account flow than the submitted page shows.",
+    priority:
+      "The team could polish a visible page element while the bigger problem is that visitors still do not know how to act.",
+    booking:
+      "A human review turns the scan into a short action plan instead of leaving the team with a long list of observations.",
   };
 
   return examples[topic];
@@ -3997,7 +4170,7 @@ function businessAnglePhrase(angle: BusinessAngle, topic: ConversationTopic) {
   };
 
   if (topic === "tracking" && angle === "analytics_reliability") {
-    return "You’re reviewing this early because measurement reliability affects how confidently the business can interpret conversion behavior.";
+    return "You're reviewing this early because measurement reliability affects how confidently the business can interpret conversion behavior.";
   }
 
   return phrases[angle];
@@ -4012,7 +4185,7 @@ function findingAnchor(
   const title = finding.title;
 
   if (topic === "tracking") {
-    return `You’re still looking at ${title}: the tracking question is whether the business can trust what it is seeing before it optimizes. ${businessAnglePhrase(
+    return `You're still looking at ${title}: the tracking question is whether the business can trust what it is seeing before it optimizes. ${businessAnglePhrase(
       angle,
       topic,
     )}`;
@@ -4022,10 +4195,176 @@ function findingAnchor(
     return `The active priority is ${title}. ${businessAnglePhrase(angle, topic)}`;
   }
 
-  return `We’re talking about ${title} in ${topicName}. ${businessAnglePhrase(
+  return `We're talking about ${title} in ${topicName}. ${businessAnglePhrase(
     angle,
     topic,
   )}`;
+}
+
+function isUnconfirmedCommerceEntryContext(context: ScanContext) {
+  const siteType =
+    context.storefrontReviewContext?.siteType ??
+    context.siteType ??
+    context.narrativeProfile?.siteType;
+
+  return (
+    siteType === "non-ecommerce-or-unclear" ||
+    siteType === "lead-generation" ||
+    isLowEcommerceProbability(context.platform) ||
+    isUnclearEcommerceProbability(context.platform)
+  );
+}
+
+function commerceEntryFinding(context: ScanContext): RetrievedFinding {
+  const supportingSignals =
+    context.storefrontReviewContext?.supportingSignals
+      ?.slice(0, 2)
+      .join(" ") ?? "";
+  const reason =
+    context.siteTypeReason ??
+    context.storefrontReviewContext?.reason ??
+    "The public page does not expose enough product, cart, checkout, or purchase-flow evidence to classify it as a standard ecommerce storefront.";
+
+  return {
+    title: "Commerce entry point",
+    topic: "platform",
+    categoryLabel: "Site type",
+    severity: "High",
+    evidenceSummary: sanitizeEvidenceText(`${reason} ${supportingSignals}`),
+    explanation:
+      "The scan should first confirm whether this URL is meant to support buying, lead capture, browsing, or another customer path.",
+    recommendedFirstAction:
+      "Confirm the correct public buying entry point before treating platform, checkout, or conversion findings as implementation recommendations.",
+  };
+}
+
+function buildCommerceEntryFollowUpResponse(
+  audit: AssistantAudit,
+  context: ScanContext,
+  state: ConversationState,
+  input: string,
+): AssistantTurn {
+  const normalized = normalizeText(input);
+  const finding = commerceEntryFinding(context);
+  const layer = explanationLayerForInput(input);
+  const currentDepth = state.conversationDepthByTopic.platform ?? 1;
+  const wantsExample = textIncludesAny(normalized, ["example", "practical"]);
+  const wantsChecklist = textIncludesAny(normalized, [
+    "checklist",
+    "audit approach",
+    "validate",
+    "next step",
+    "what should",
+    "fix first",
+  ]);
+  const depth = wantsChecklist
+    ? 4
+    : wantsExample
+      ? 3
+      : Math.min(5, currentDepth + 1);
+  const firstPublicUrl = audit.website
+    ? `submitted URL (${audit.website})`
+    : "submitted URL";
+  const businessTranslation = businessTranslationForTopic("platform", finding);
+
+  if (layer === "technical") {
+    return {
+      message: buildMessage(
+        `assistant-commerce-entry-technical-${Date.now()}`,
+        consultingReviewParagraphs({
+          topic: "platform",
+          finding,
+          meaning:
+            "The submitted URL did not expose enough public ecommerce evidence to confirm the storefront path or implementation context.",
+          why:
+            "Platform-specific recommendations become less reliable when the detected storefront context is incomplete.",
+          impact:
+            "A team could pursue implementation-specific fixes before confirming where the commerce journey actually lives.",
+          validate: validationChecklistForTopic("platform", finding),
+          good: goodLooksLikeForTopic("platform"),
+          next: finding.recommendedFirstAction,
+          layer: "technical",
+        }),
+        { topic: "platform", finding },
+      ),
+      nextState: {
+        ...createNextState(
+          "platform",
+          "ask_clarification",
+          finding,
+          "Site type",
+          state.conversationStep,
+          "explain_platform",
+        ),
+        conversationDepthByTopic: {
+          ...state.conversationDepthByTopic,
+          platform: Math.max(2, currentDepth),
+        },
+        lastExplainedTopic: "platform",
+        lastExpansionDepth: Math.max(2, currentDepth),
+      },
+    };
+  }
+
+  const paragraphs =
+    depth <= 2
+      ? consultingReviewParagraphs({
+          topic: "platform",
+          finding,
+          meaning:
+            "This scan should be read as a public entry-point check, not a full ecommerce audit.",
+          why:
+            "The public page did not show enough product, cart, checkout, or purchase-flow evidence to confidently judge it like a standard storefront.",
+          impact:
+            "The team needs to know where the actual buying path starts before treating the rest of the findings as ecommerce implementation guidance.",
+          validate: validationChecklistForTopic("platform", finding),
+          good: goodLooksLikeForTopic("platform"),
+          next: finding.recommendedFirstAction,
+        })
+      : depth === 3
+        ? [
+            `A practical example: if the ${firstPublicUrl} is mainly a brand, content, or lead page, then a missing cart is not automatically a conversion problem.`,
+            `Business impact: ${businessTranslation.impact}`,
+            `What I would validate: ${businessTranslation.validate}`,
+            `Recommended next step: ${businessTranslation.next}`,
+          ]
+        : depth === 4
+          ? [
+              `Recommended implementation: ${businessTranslation.next}`,
+              "What I would validate: Whether customers start on this page, another page, a marketplace, a form, or a logged-in account flow.",
+              `What good looks like: ${businessTranslation.good}`,
+              `Recommended next step: ${businessTranslation.next}`,
+            ]
+          : [
+              "Recommended implementation: Opzix would turn that uncertainty into a clear customer-journey map before assigning fixes.",
+              "For this scan, I would start by confirming where customers actually start and complete the buying process.",
+              businessTranslation.next,
+              "Recommended next step: Review the audit with Opzix if you want that validation turned into a scoped implementation plan.",
+            ];
+
+  return {
+    message: buildMessage(
+      `assistant-commerce-entry-${Date.now()}`,
+      paragraphs,
+      { topic: "platform", finding, cta: depth >= 5 },
+    ),
+    nextState: {
+      ...createNextState(
+        "platform",
+        "ask_clarification",
+        finding,
+        "Site type",
+        state.conversationStep,
+        "explain_platform",
+      ),
+      conversationDepthByTopic: {
+        ...state.conversationDepthByTopic,
+        platform: depth,
+      },
+      lastExplainedTopic: "platform",
+      lastExpansionDepth: depth,
+    },
+  };
 }
 
 function businessContextForTopic(
@@ -4131,6 +4470,7 @@ function buildAnchoredExpansionParagraphs({
   audit,
   priority,
   anchor,
+  layer = "business",
 }: {
   _baseParagraphs: string[];
   depth: number;
@@ -4139,43 +4479,92 @@ function buildAnchoredExpansionParagraphs({
   audit: AssistantAudit;
   priority: ReturnType<typeof priorityTone>;
   anchor: string;
+  layer?: ExplanationLayer;
 }) {
-  if (depth <= 2) {
+  const businessTranslation = businessTranslationForTopic(topic, finding);
+
+  if (layer === "business") {
+    if (depth <= 2) {
+      return consultingReviewParagraphs({
+        topic,
+        finding,
+        meaning: anchor,
+        why: businessContextForTopic(topic, finding),
+        impact: `${priority.sentence} ${operationalConsequenceForTopic(topic)}`,
+        validate: validationChecklistForTopic(topic, finding),
+        good: goodLooksLikeForTopic(topic),
+        next: recommendedNextStepForTopic(topic, finding),
+        layer,
+      });
+    }
+
+    if (depth === 3) {
+      return [
+        `Business impact: ${businessTranslation.impact}`,
+        `Why it matters: ${businessTranslation.why}`,
+        `What I would validate: ${businessTranslation.validate}`,
+        `Recommended next step: ${businessTranslation.next}`,
+      ];
+    }
+
+    if (depth === 4) {
+      return [
+        `Practical example: ${businessExampleForTopic(topic)}`,
+        `Business impact: ${businessTranslation.impact}`,
+        `What I would validate: ${businessTranslation.validate}`,
+        `Recommended next step: ${businessTranslation.next}`,
+      ];
+    }
+
     return [
-      anchor,
-      businessContextForTopic(topic, finding),
-      `${priority.sentence} The first useful move is to understand the business meaning before jumping into fixes.`,
-      continueQuestion(topic),
+      `Recommended implementation: ${businessTranslation.next}`,
+      `What I would validate: ${businessTranslation.validate}`,
+      `What good looks like: ${businessTranslation.good}`,
+      topic === "booking"
+        ? "Recommended next step: Review the audit with Opzix and turn it into an implementation plan."
+        : "Recommended next step: Use Opzix to turn this into a clear fix order with validation before implementation.",
     ];
+  }
+
+  if (depth <= 2) {
+    return consultingReviewParagraphs({
+      topic,
+      finding,
+      meaning: anchor,
+      why: businessContextForTopic(topic, finding),
+      impact: `${priority.sentence} ${operationalConsequenceForTopic(topic)}`,
+      validate: validationChecklistForTopic(topic, finding),
+      good: goodLooksLikeForTopic(topic),
+      next: recommendedNextStepForTopic(topic, finding),
+      layer,
+    });
   }
 
   if (depth === 3) {
     return [
-      anchor,
-      `The operational consequence is this: ${operationalConsequenceForTopic(topic)}`,
-      `That is why I would keep ${finding.title} near the top of the review instead of treating it as a minor note.`,
-      "Do you want a practical example?",
+      `Business impact: ${operationalConsequenceForTopic(topic)}`,
+      `Why it matters: ${businessContextForTopic(topic, finding)}`,
+      `What I would validate: ${validationChecklistForTopic(topic, finding)}`,
+      `Recommended next step: ${recommendedNextStepForTopic(topic, finding)}`,
     ];
   }
 
   if (depth === 4) {
     return [
-      anchor,
-      ecommerceExampleForTopic(topic),
-      `For this scan, the example connects back to ${finding.title}: ${finding.explanation}`,
-      "The useful question is whether this issue shows up in the full storefront journey, not only in the public-page sample.",
-      "Do you want the recommended audit approach?",
+      `Practical example: ${ecommerceExampleForTopic(topic)}`,
+      `Business impact: For this scan, the example connects back to ${finding.title}: ${finding.explanation}`,
+      "What I would validate: Whether this issue shows up in the full storefront journey, not only in the public-page sample.",
+      `Recommended next step: ${recommendedNextStepForTopic(topic, finding)}`,
     ];
   }
 
   return [
-    anchor,
-    "The recommended audit approach is to validate the active issue first, then check the related journey signals around it.",
-    actionSequenceForTopic(topic, finding, audit),
-    "After that, I would compare the result with the related findings so the team does not fix one symptom while leaving the bigger journey issue untouched.",
+    "Recommended implementation: Validate the active issue first, then check the related journey signals around it.",
+    `What I would validate: ${actionSequenceForTopic(topic, finding, audit)}`,
+    "What good looks like: The team fixes the operating constraint instead of one visible symptom, and can measure whether the change improved the journey.",
     topic === "booking"
-      ? "Do you want to book a deeper audit?"
-      : "Do you want to see where Opzix would help with that approach?",
+      ? "Recommended next step: Book a deeper audit and turn the scan into an implementation plan."
+      : "Recommended next step: Use Opzix to turn this finding into a prioritized validation and implementation sequence.",
   ];
 }
 
@@ -4191,8 +4580,13 @@ function expandCurrentTopicResponse(
     return null;
   }
 
+  if (topic === "platform" && isUnconfirmedCommerceEntryContext(_context)) {
+    return buildCommerceEntryFollowUpResponse(audit, _context, state, input);
+  }
+
   const finding = state.lastFindingDiscussed ?? getFindingByTopic(audit, topic);
   const depth = expansionDepthForQuestion(input, state, topic);
+  const layer = explanationLayerForInput(input);
   const priority = priorityTone(finding.severity);
   const businessAngle = businessAngleForDepth(
     topic,
@@ -4203,32 +4597,34 @@ function expandCurrentTopicResponse(
   const paragraphs =
     depth <= 2
       ? [
-          "Here’s how I’d think about it.",
-          businessContextForTopic(topic, finding),
-          `${priority.sentence} The first useful move is to understand the business meaning before jumping into fixes.`,
-          continueQuestion(topic),
+          `What the finding means: ${findingAnchor(topic, finding, businessAngle)}`,
+          `Why it matters: ${businessContextForTopic(topic, finding)}`,
+          `Business impact: ${priority.sentence} ${operationalConsequenceForTopic(topic)}`,
+          `What I would validate: ${validationChecklistForTopic(topic, finding)}`,
+          `What good looks like: ${goodLooksLikeForTopic(topic)}`,
+          `Recommended next step: ${recommendedNextStepForTopic(topic, finding)}`,
         ]
       : depth === 3
         ? [
-            "The next layer is the operational consequence.",
-            operationalConsequenceForTopic(topic),
-            `That is why I would keep ${finding.title} near the top of the review instead of treating it as a minor note.`,
-            "Do you want a practical example?",
+            `Business impact: ${operationalConsequenceForTopic(topic)}`,
+            `Why it matters: ${businessContextForTopic(topic, finding)}`,
+            `What I would validate: ${validationChecklistForTopic(topic, finding)}`,
+            `Recommended next step: ${recommendedNextStepForTopic(topic, finding)}`,
           ]
         : depth === 4
           ? [
-              ecommerceExampleForTopic(topic),
-              `For this scan, the example connects back to ${finding.title}: ${finding.explanation}`,
-              "The useful question is whether this issue shows up in the full storefront journey, not only in the public-page sample.",
-              "Do you want the recommended action sequence?",
+              `Practical example: ${ecommerceExampleForTopic(topic)}`,
+              `Business impact: For this scan, the example connects back to ${finding.title}: ${finding.explanation}`,
+              "What I would validate: Whether the issue appears in the full storefront journey, not only the public-page sample.",
+              `Recommended next step: ${recommendedNextStepForTopic(topic, finding)}`,
             ]
           : [
-              "The action sequence I’d use is simple.",
-              actionSequenceForTopic(topic, finding, audit),
-              "After that, I would compare the result with the related findings so the team does not fix one symptom while leaving the bigger journey issue untouched.",
+              "Recommended implementation: Validate the active issue first, then check the related journey signals around it.",
+              `What I would validate: ${actionSequenceForTopic(topic, finding, audit)}`,
+              "What good looks like: The team fixes the operating constraint instead of one visible symptom, and can measure whether the change improved the journey.",
               topic === "booking"
-                ? "Do you want to book a deeper audit?"
-                : "Do you want to see where Opzix would help with that sequence?",
+                ? "Recommended next step: Book a deeper audit and turn the scan into an implementation plan."
+                : "Recommended next step: Use Opzix to turn this finding into a prioritized validation and implementation sequence.",
             ];
   const candidate = buildMessage(
     `assistant-expand-${topic}-${Date.now()}`,
@@ -4240,6 +4636,7 @@ function expandCurrentTopicResponse(
       audit,
       priority,
       anchor,
+      layer,
     }),
     { topic, finding, cta: topic === "booking" || depth >= 5 },
   );
@@ -4254,7 +4651,7 @@ function expandCurrentTopicResponse(
             ecommerceExampleForTopic(topic),
             actionSequenceForTopic(topic, finding, audit),
             "That gives the follow-up a different angle: not just what the scan found, but how I would validate it in the actual ecommerce workflow.",
-            continueQuestion(topic),
+            `Recommended next step: ${recommendedNextStepForTopic(topic, finding)}`,
           ],
           { topic, finding, cta: depth >= 5 },
         )
@@ -4284,6 +4681,502 @@ function expandCurrentTopicResponse(
   };
 }
 
+function validationChecklistForTopic(
+  topic: ConversationTopic,
+  finding?: RetrievedFinding | null,
+) {
+  const checklists: Record<ConversationTopic, string[]> = {
+    ux: [
+      "Mobile first screen clarity",
+      "Product discovery path",
+      "Navigation hierarchy",
+      "Primary action visibility",
+    ],
+    conversion: [
+      "CTA hierarchy",
+      "Product-to-cart path",
+      "Cart and checkout visibility",
+      "Lead or purchase handoff",
+    ],
+    trust: [
+      "Reviews or social proof",
+      "Shipping and returns reassurance",
+      "Payment or security cues",
+      "Support access near decisions",
+    ],
+    tracking: [
+      "GA4 or analytics events",
+      "Tag manager configuration",
+      "Product, cart, checkout, and form events",
+      "Attribution consistency",
+    ],
+    operations: [
+      "Support handoff",
+      "Shipping and returns expectations",
+      "Order communication",
+      "Post-purchase workload",
+    ],
+    technical: [
+      "Failed requests",
+      "Console errors",
+      "Frontend scripts",
+      "Platform and tracking dependencies",
+    ],
+    metadata: [
+      "Page title",
+      "Meta description",
+      "Open graph preview",
+      "Search-result clarity",
+    ],
+    benchmark: [
+      "Relevant comparison set",
+      "Expected journey patterns",
+      "Where the page underperforms",
+      "Which gaps affect action first",
+    ],
+    platform: [
+      "Platform ownership",
+      "Checkout ownership",
+      "Theme or template structure",
+      "Tracking implementation",
+    ],
+    priority: [
+      "Whether the top finding blocks action",
+      "Related journey signals",
+      "Effort versus impact",
+      "How success will be measured",
+    ],
+    booking: [
+      "Main audit objective",
+      "Access needed",
+      "Stakeholder questions",
+      "Implementation priority",
+    ],
+  };
+
+  const items = checklists[topic];
+  const firstAction = finding?.recommendedFirstAction;
+  const combined = firstAction ? [firstAction, ...items] : items;
+
+  return combined.slice(0, 4).join("; ");
+}
+
+function businessValidationChecklistForTopic(topic: ConversationTopic) {
+  const checklists: Record<ConversationTopic, string[]> = {
+    ux: [
+      "Can visitors understand the page quickly?",
+      "Can they find the product or next action?",
+      "Does the page feel easy to move through?",
+    ],
+    conversion: [
+      "Where does a visitor decide to act?",
+      "Is the next step obvious?",
+      "Where might someone hesitate or leave?",
+    ],
+    trust: [
+      "What reassurance appears before a decision?",
+      "Are shipping, returns, support, or proof easy to find?",
+      "Would a first-time visitor feel safe moving forward?",
+    ],
+    tracking: [
+      "Which customer actions matter most?",
+      "Can the team tell whether those actions happened?",
+      "Can results be trusted before making decisions?",
+    ],
+    operations: [
+      "What happens after someone takes action?",
+      "Are customer expectations clear?",
+      "Where could avoidable support questions appear?",
+    ],
+    technical: [
+      "Does the site behave consistently for visitors?",
+      "Do important actions work smoothly?",
+      "Could anything be creating hidden friction?",
+    ],
+    metadata: [
+      "Does the page make sense before someone clicks?",
+      "Is the business clearly described?",
+      "Is the expected customer action clear?",
+    ],
+    benchmark: [
+      "What would a stronger customer journey make clearer?",
+      "Which gap affects decisions first?",
+      "Which improvement would matter most to visitors?",
+    ],
+    platform: [
+      "Where do customers start buying?",
+      "Where do they complete the process?",
+      "Who owns each step of that journey?",
+    ],
+    priority: [
+      "What blocks customer action most?",
+      "What would improve confidence fastest?",
+      "How will the team know the fix worked?",
+    ],
+    booking: [
+      "What decision does the team need to make?",
+      "Which journey should be reviewed first?",
+      "What would turn the audit into an action plan?",
+    ],
+  };
+
+  return checklists[topic].join("; ");
+}
+
+function businessTranslationForTopic(
+  topic: ConversationTopic,
+  finding?: RetrievedFinding | null,
+) {
+  const findingText = [
+    finding?.title,
+    finding?.categoryLabel,
+    finding?.evidenceSummary,
+    finding?.explanation,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const looksLikeSiteBehaviorIssue = /console|failed|request|script|frontend|source|asset|error/.test(
+    findingText,
+  );
+  const looksLikeBuyingJourneyIssue = /platform|checkout ownership|architecture|storefront|ecommerce evidence|buying path|purchase-flow/.test(
+    findingText,
+  );
+
+  if (looksLikeBuyingJourneyIssue) {
+    return {
+      meaning:
+        "The scan could not confidently determine how customers buy from this business.",
+      why:
+        "If the buying journey is unclear, it becomes harder to identify where visitors are dropping off.",
+      impact:
+        "The team could spend time fixing the wrong part of the customer journey.",
+      validate: businessValidationChecklistForTopic("platform"),
+      good:
+        "The team knows exactly where customers start, where they decide, and where they complete the process.",
+      next:
+        "Confirm where customers actually start and complete the buying process.",
+    };
+  }
+
+  if (looksLikeSiteBehaviorIssue || topic === "technical") {
+    return {
+      meaning:
+        "Parts of the website may not be loading or behaving as expected.",
+      why:
+        "Small issues can create friction that reduces trust or conversions.",
+      impact: "Visitors may abandon the process before taking action.",
+      validate: businessValidationChecklistForTopic("technical"),
+      good:
+        "The site feels stable, important actions work smoothly, and visitors do not hit avoidable friction.",
+      next:
+        "Check the customer journey for broken, delayed, or confusing moments before assigning fixes.",
+    };
+  }
+
+  const translations: Record<
+    ConversationTopic,
+    {
+      meaning: string;
+      why: string;
+      impact: string;
+      validate: string;
+      good: string;
+      next: string;
+    }
+  > = {
+    ux: {
+      meaning:
+        "Visitors may need too much effort to understand where they are and what to do next.",
+      why:
+        "When the page is hard to interpret, interested visitors can lose momentum before they reach the buying path.",
+      impact:
+        "The business may be losing qualified visitors before they ever compare products, ask questions, or take action.",
+      validate: businessValidationChecklistForTopic("ux"),
+      good:
+        "A visitor can quickly understand the offer, find the next step, and keep moving without confusion.",
+      next:
+        "Review the first screen and main journey to find the first point where visitors may hesitate.",
+    },
+    conversion: {
+      meaning:
+        "The path from interest to action may not be clear enough.",
+      why:
+        "People can be interested and still leave if the next step takes too much thought.",
+      impact:
+        "More traffic may not turn into more leads or sales until the action path is easier to follow.",
+      validate: businessValidationChecklistForTopic("conversion"),
+      good:
+        "A visitor always knows the next useful action and can complete it without friction.",
+      next:
+        "Walk the journey from first interest to action and mark every point where a visitor could pause.",
+    },
+    trust: {
+      meaning:
+        "The page may not give enough reassurance before asking visitors to commit.",
+      why:
+        "First-time visitors often need proof, clarity, and support cues before they feel comfortable taking action.",
+      impact:
+        "Visitors may hesitate, comparison shop, or leave even if the offer is relevant.",
+      validate: businessValidationChecklistForTopic("trust"),
+      good:
+        "Reassurance appears close to the decision, so visitors feel safe continuing.",
+      next:
+        "Move the strongest reassurance closer to the point where visitors decide.",
+    },
+    tracking: {
+      meaning:
+        "The team may not have a clear view of what visitors are doing.",
+      why:
+        "If customer actions are not measured clearly, it is harder to know which fixes are working.",
+      impact:
+        "The business may make decisions from incomplete or misleading performance data.",
+      validate: businessValidationChecklistForTopic("tracking"),
+      good:
+        "The team can see the key customer actions and trust the results when prioritizing changes.",
+      next:
+        "Confirm which customer actions matter most and whether they are being measured clearly.",
+    },
+    operations: {
+      meaning:
+        "The customer handoff after interest or purchase may create extra work or confusion.",
+      why:
+        "Unclear expectations can turn normal customer questions into avoidable support load.",
+      impact:
+        "The business may spend more time handling preventable questions, delays, or follow-up gaps.",
+      validate: businessValidationChecklistForTopic("operations"),
+      good:
+        "Customers know what happens next, and the team has fewer avoidable handoff problems.",
+      next:
+        "Review what customers see before and after taking action.",
+    },
+    technical: {
+      meaning:
+        "Parts of the website may not be loading or behaving as expected.",
+      why:
+        "Small issues can create friction that reduces trust or conversions.",
+      impact: "Visitors may abandon the process before taking action.",
+      validate: businessValidationChecklistForTopic("technical"),
+      good:
+        "The site feels stable, important actions work smoothly, and visitors do not hit avoidable friction.",
+      next:
+        "Check the customer journey for broken, delayed, or confusing moments before assigning fixes.",
+    },
+    metadata: {
+      meaning:
+        "The business may not be clearly described before someone visits the page.",
+      why:
+        "People often decide whether a page is relevant before they click.",
+      impact:
+        "Potential visitors may skip the page or arrive with the wrong expectation.",
+      validate: businessValidationChecklistForTopic("metadata"),
+      good:
+        "People understand who the page is for and what action they can take before they arrive.",
+      next:
+        "Clarify how the page is described wherever customers first see it.",
+    },
+    benchmark: {
+      meaning:
+        "Compared with stronger customer journeys, this page may leave some decisions less clear.",
+      why:
+        "Benchmarks are useful when they show what customers expect to understand quickly.",
+      impact:
+        "The business may be competing against clearer journeys, not just better-looking pages.",
+      validate: businessValidationChecklistForTopic("benchmark"),
+      good:
+        "The comparison points to a practical fix order, not a generic redesign list.",
+      next:
+        "Use the comparison to choose the first customer-facing improvement.",
+    },
+    platform: {
+      meaning:
+        "The scan could not confidently determine how customers buy from this business.",
+      why:
+        "If the buying journey is unclear, it becomes harder to identify where visitors are dropping off.",
+      impact:
+        "The team could spend time fixing the wrong part of the customer journey.",
+      validate: businessValidationChecklistForTopic("platform"),
+      good:
+        "The team knows exactly where customers start, where they decide, and where they complete the process.",
+      next:
+        "Confirm where customers actually start and complete the buying process.",
+    },
+    priority: {
+      meaning:
+        "The audit is pointing to the area most likely to affect decisions first.",
+      why:
+        "A good fix order prevents the team from spending time on lower-value improvements.",
+      impact:
+        "Fixing the wrong thing first can make progress slower and harder to measure.",
+      validate: businessValidationChecklistForTopic("priority"),
+      good:
+        "The team knows what to fix first, why it matters, and how to measure whether it worked.",
+      next:
+        "Validate the first priority before moving into secondary improvements.",
+    },
+    booking: {
+      meaning:
+        "The scan can become a practical work plan instead of a list of observations.",
+      why:
+        "A human review can separate what matters now from what can wait.",
+      impact:
+        "The business gets a clearer path from audit findings to implementation.",
+      validate: businessValidationChecklistForTopic("booking"),
+      good:
+        "The audit turns into a scoped plan with priorities, owners, and next actions.",
+      next:
+        "Review the audit with Opzix and turn it into an implementation plan.",
+    },
+  };
+
+  return translations[topic];
+}
+
+function goodLooksLikeForTopic(topic: ConversationTopic) {
+  const outcomes: Record<ConversationTopic, string> = {
+    ux: "A visitor can understand the offer, find products or actions quickly, and continue without interpreting the layout.",
+    conversion:
+      "The next commercial action is obvious from landing page through product, cart, checkout, or lead handoff.",
+    trust:
+      "Trust cues appear close enough to the decision that first-time visitors do not need to hunt for reassurance.",
+    tracking:
+      "Customer actions are measured consistently enough that the team can judge whether fixes improved behavior.",
+    operations:
+      "Customers know what happens before and after purchase, reducing avoidable support and fulfillment confusion.",
+    technical:
+      "Frontend, platform, and tracking signals are clean enough that recommendations map to the real implementation.",
+    metadata:
+      "Search and shared previews clearly describe the page, brand, and expected customer action.",
+    benchmark:
+      "The comparison set clarifies which gaps matter operationally and which are only cosmetic differences.",
+    platform:
+      "The platform is confirmed and recommendations are mapped to the actual architecture.",
+    priority:
+      "The team knows the first fix, why it comes first, and how to validate whether it worked.",
+    booking:
+      "The audit becomes an implementation-ready plan instead of a list of disconnected observations.",
+  };
+
+  return outcomes[topic];
+}
+
+function recommendedNextStepForTopic(
+  topic: ConversationTopic,
+  finding?: RetrievedFinding | null,
+  fallback?: string,
+  layer: ExplanationLayer = "business",
+) {
+  if (layer === "business") {
+    const translation = businessTranslationForTopic(topic, finding);
+
+    return translation.next;
+  }
+
+  if (finding?.recommendedFirstAction) {
+    return finding.recommendedFirstAction;
+  }
+
+  const nextSteps: Record<ConversationTopic, string> = {
+    ux: "Walk the mobile and desktop journey from first impression to product discovery and identify the first point of hesitation.",
+    conversion:
+      "Validate the product, cart, checkout, or lead path before changing traffic or campaign strategy.",
+    trust:
+      "Move the strongest reassurance signals closer to the buying or inquiry decision.",
+    tracking:
+      "Confirm analytics and tag events before using conversion data to prioritize fixes.",
+    operations:
+      "Review support, shipping, returns, and follow-up expectations around the commercial action.",
+    technical:
+      "Validate failed requests, console errors, and platform dependencies before assigning implementation work.",
+    metadata:
+      "Rewrite or confirm metadata so the page context is clear in search, social previews, and internal reporting.",
+    benchmark:
+      "Use the benchmark gap to choose the first operational improvement, not a broad redesign list.",
+    platform:
+      "Validate platform ownership before prioritizing platform-specific improvements.",
+    priority:
+      "Start with the finding that most affects decision confidence, purchase momentum, or measurement quality.",
+    booking:
+      "Review the audit with Opzix and turn the findings into a scoped implementation plan.",
+  };
+
+  const cleanedFallback = fallback
+    ?.trim()
+    .replace(/^recommended next step:\s*/i, "");
+
+  if (
+    cleanedFallback &&
+    !/^(do|would|can|should)\b/i.test(cleanedFallback)
+  ) {
+    return cleanedFallback;
+  }
+
+  return nextSteps[topic];
+}
+
+function consultingReviewParagraphs({
+  topic,
+  finding,
+  meaning,
+  why,
+  impact,
+  validate,
+  good,
+  next,
+  layer = "business",
+}: {
+  topic: ConversationTopic;
+  finding?: RetrievedFinding | null;
+  meaning: string;
+  why?: string;
+  impact?: string;
+  validate?: string;
+  good?: string;
+  next?: string;
+  layer?: ExplanationLayer;
+}) {
+  if (layer === "business") {
+    const translation = businessTranslationForTopic(topic, finding);
+
+    return [
+      `Business translation: ${translation.meaning}`,
+      `Why it matters: ${translation.why}`,
+      `Business impact: ${translation.impact}`,
+      `What I would validate: ${translation.validate}`,
+      `What good looks like: ${translation.good}`,
+      `Recommended next step: ${recommendedNextStepForTopic(
+        topic,
+        finding,
+        next ?? translation.next,
+        "business",
+      )}`,
+    ];
+  }
+
+  return [
+    `What the finding means: ${meaning}`,
+    `Why it matters: ${
+      why ??
+      "This finding changes how confidently the team can prioritize the next customer-journey improvement."
+    }`,
+    `Business impact: ${
+      impact ??
+      finding?.explanation ??
+      "The team may spend time on visible symptoms while the real operating constraint remains unresolved."
+    }`,
+    `What I would validate: ${
+      validate ?? validationChecklistForTopic(topic, finding)
+    }`,
+    `What good looks like: ${good ?? goodLooksLikeForTopic(topic)}`,
+    `Recommended next step: ${recommendedNextStepForTopic(
+      topic,
+      finding,
+      next,
+      "technical",
+    )}`,
+  ];
+}
+
 function buildScanAnswer({
   id,
   topic,
@@ -4305,12 +5198,14 @@ function buildScanAnswer({
 }): ChatMessage {
   return buildMessage(
     id,
-    [
-      `Direct answer: ${directAnswer}`,
-      `Evidence: ${evidence}`,
-      `Business meaning: ${businessMeaning}`,
-      nextQuestion,
-    ],
+    consultingReviewParagraphs({
+      topic,
+      finding,
+      meaning: directAnswer,
+      why: evidence,
+      impact: businessMeaning,
+      next: nextQuestion,
+    }),
     { topic, finding, cta },
   );
 }
@@ -4353,7 +5248,7 @@ function buildFindingListAnswer(
       businessMeaning:
         "That usually means this area was not the strongest public-page signal, but it may still be worth checking in a manual storefront review.",
       nextQuestion:
-        "Do you want me to look at conversion, tracking, trust, operations, platform visibility, or what to fix first?",
+        "Review the nearest related topic: conversion, tracking, trust, operations, platform visibility, or fix priority.",
     });
   }
 
@@ -4361,21 +5256,24 @@ function buildFindingListAnswer(
 
   return buildMessage(
     `assistant-direct-${topic}-${Date.now()}`,
-    [
-      `Direct answer: What stands out to me in ${label.toLowerCase()} is ${humanFindingTitle(
+    consultingReviewParagraphs({
+      topic,
+      finding: topFinding,
+      meaning: `What stands out in ${label.toLowerCase()} is ${humanFindingTitle(
         topFinding,
         topic,
       )}. The scan found ${findings.length} relevant finding${
         findings.length === 1 ? "" : "s"
       } in this area, and this ${priority.phrase}.`,
-      `Evidence: ${
+      why:
         topFinding.evidenceSummary ??
         topFinding.explanation ??
-        "The scan surfaced this through the current report findings."
-      }`,
-      `Business meaning: ${priority.sentence} This usually matters because ${topFinding.explanation}`,
-      continueQuestion(topic),
-    ],
+        "The scan surfaced this through the current report findings.",
+      impact: `${priority.sentence} ${topFinding.explanation}`,
+      validate: validationChecklistForTopic(topic, topFinding),
+      good: goodLooksLikeForTopic(topic),
+      next: topFinding.recommendedFirstAction,
+    }),
     {
       topic,
       finding: topFinding,
@@ -4420,7 +5318,7 @@ function buildMetadataAnswer(input: string, context: ScanContext): ChatMessage {
         finding.evidenceSummary ?? "The scan checked the loaded page metadata.",
       businessMeaning:
         "The title tag shapes browser-tab clarity, search-result relevance, and the first cue people see before opening the page.",
-      nextQuestion: "Do you want me to check the meta description too?",
+      nextQuestion: "Check the meta description and search-preview clarity next.",
     });
   }
 
@@ -4435,7 +5333,7 @@ function buildMetadataAnswer(input: string, context: ScanContext): ChatMessage {
         finding.evidenceSummary ?? "The scan checked the loaded page metadata.",
       businessMeaning:
         "The meta description helps set expectations in search results and shared previews; if it is missing or vague, the page can feel less clear before someone even lands on it.",
-      nextQuestion: "Do you want me to connect this to the technical findings?",
+      nextQuestion: "Connect this to the technical findings next.",
     });
   }
 
@@ -4453,7 +5351,7 @@ function buildMetadataAnswer(input: string, context: ScanContext): ChatMessage {
     businessMeaning:
       "Metadata matters because it controls the page's first impression in search results, browser tabs, and shared links. I would make sure it clearly describes the page and the expected customer action.",
     nextQuestion:
-      "Do you want me to compare metadata with the technical findings?",
+      "Compare metadata with the technical findings.",
   });
 }
 
@@ -4563,6 +5461,15 @@ function answerDirectQuestion(
     const ecommerceProbability = context.platform.ecommerceProbability;
     const lowProbability = isLowEcommerceProbability(context.platform);
     const unclearProbability = isUnclearEcommerceProbability(context.platform);
+    const isUnconfirmedCommerce =
+      lowProbability ||
+      unclearProbability ||
+      isNonEcommerce ||
+      isLeadGeneration;
+
+    if (isUnconfirmedCommerce) {
+      finding = commerceEntryFinding(context);
+    }
 
     message = buildScanAnswer({
       id: `assistant-direct-site-type-${Date.now()}`,
@@ -4604,7 +5511,8 @@ function answerDirectQuestion(
               ? "Cart, checkout, and platform details may be intentionally abstracted, so the scan should stay conservative until a manual review confirms the actual journey."
               : "The site type changes how I would read the findings: a catalog, lead-gen, or education journey should not be judged exactly like a retail checkout flow.",
       nextQuestion:
-        "Do you want me to explain what this means for the scan priorities?",
+        "Use this site-type read to set the scan priorities before choosing fixes.",
+      finding,
     });
   } else if (
     asksVisible &&
@@ -4617,7 +5525,7 @@ function answerDirectQuestion(
     message = answerVisibilityQuestion(
       context.commerceSignals.productNavigation,
       "ux",
-      "Would you like me to compare that with the conversion findings?",
+      "Compare product navigation with the conversion findings.",
       `Collection/product links were ${boolLabel(collection.visible)}.`,
     );
     topic = "ux";
@@ -4628,28 +5536,28 @@ function answerDirectQuestion(
     message = answerVisibilityQuestion(
       context.commerceSignals.collectionLinks,
       "ux",
-      "Would you like me to explain how that affects product discovery?",
+      "Review how collection links affect product discovery.",
     );
     topic = "ux";
   } else if (asksVisible && normalized.includes("search")) {
     message = answerVisibilityQuestion(
       context.commerceSignals.search,
       "ux",
-      "Would you like me to compare that with the conversion findings?",
+      "Compare search visibility with the conversion findings.",
     );
     topic = "ux";
   } else if (asksVisible && normalized.includes("cart")) {
     message = answerVisibilityQuestion(
       context.commerceSignals.cart,
       "conversion",
-      "Would you like me to connect that to the checkout findings?",
+      "Connect cart visibility to the checkout findings.",
     );
     topic = "conversion";
   } else if (asksVisible && normalized.includes("checkout")) {
     message = answerVisibilityQuestion(
       context.commerceSignals.checkout,
       "conversion",
-      "Would you like me to show what Opzix would fix first?",
+      "Use checkout visibility to choose the recommended fix order.",
     );
     topic = "conversion";
   } else if (
@@ -4684,7 +5592,7 @@ function answerDirectQuestion(
           ? "The scan should treat this URL as a possible lead-generation or informational entry point until a human confirms where the commerce journey actually starts."
           : "Platform detection is useful context for the review, but it should still be confirmed before making platform-specific recommendations.",
       nextQuestion:
-        "Do you want me to connect the platform signal to the technical findings?",
+        "Connect platform visibility with the technical findings.",
     });
   } else if (
     asksVisible &&
@@ -4693,14 +5601,14 @@ function answerDirectQuestion(
     message = answerVisibilityQuestion(
       context.commerceSignals.cta,
       "conversion",
-      "Would you like me to compare that with the trust findings?",
+      "Compare CTA clarity with trust near the purchase decision.",
     );
     topic = "conversion";
   } else if (asksVisible && /\bform\b/.test(normalized)) {
     message = answerVisibilityQuestion(
       context.commerceSignals.form,
       "operations",
-      "Would you like me to separate quick wins from deeper operational fixes?",
+      "Separate quick wins from deeper operational fixes.",
     );
     topic = "operations";
   } else if (
@@ -4725,7 +5633,7 @@ function answerDirectQuestion(
       businessMeaning:
         "Tracking visibility affects how confidently you can interpret campaigns, conversion events, and funnel performance.",
       nextQuestion:
-        "Do you want me to explain how this affects conversion measurement?",
+        "Validate how tracking visibility affects conversion measurement.",
     });
   } else if (
     normalized.includes("does this scan the full page") ||
@@ -4798,9 +5706,10 @@ function answerDirectQuestion(
       message = buildMessage(
         `assistant-direct-visual-ux-unavailable-${Date.now()}`,
         [
-          visualUxUnavailableAnswer(context),
-          "Visual UX should not add a positive or negative scoring signal when the underlying visual metrics are missing.",
-          "Do you want me to explain which navigation, commerce, tracking, operations, and DOM signals drove the score instead?",
+          `What the finding means: ${visualUxUnavailableAnswer(context)}`,
+          "Why it matters: Visual UX should not add a positive or negative scoring signal when the underlying visual metrics are missing.",
+          "What I would validate: Navigation signals; commerce signals; tracking signals; operations signals; DOM evidence.",
+          "Recommended next step: Use the non-visual scan evidence to decide what deserves manual review first.",
         ],
         { topic },
       );
@@ -4827,8 +5736,7 @@ function answerDirectQuestion(
           businessMeaning:
             finding.explanation ??
             "Layout, spacing, hierarchy, and product placement affect how quickly visitors understand where to browse or act.",
-          nextQuestion:
-            "Do you want me to compare this with conversion or product discovery?",
+          nextQuestion: "Compare this with conversion and product discovery.",
           finding,
         })
       : buildFindingListAnswer(topic, context);
@@ -4928,7 +5836,7 @@ function buildFollowUpContinuation(
           conversion.evidenceSummary ??
           "The scan ties conversion quality to CTA clarity, cart or checkout visibility, and trust near purchase decisions.",
         businessMeaning: `${previous.title} affects how easily shoppers understand the page; ${conversion.title} affects whether that understanding turns into a clear buying step.`,
-        nextQuestion: "Do you want me to show what Opzix would fix first?",
+        nextQuestion: "Use this comparison to choose what Opzix would fix first.",
         finding: conversion,
       }),
       nextState: createNextState(
@@ -4976,6 +5884,10 @@ function buildFollowUpContinuation(
   }
 
   if (state.pendingFollowUp === "explain_platform") {
+    if (isUnconfirmedCommerceEntryContext(context)) {
+      return buildCommerceEntryFollowUpResponse(audit, context, state, "yes");
+    }
+
     const turn = buildPlatformResponse(audit);
     return {
       ...turn,
@@ -5013,22 +5925,27 @@ function buildFollowUpContinuation(
 
 function continueQuestion(topic: ConversationTopic) {
   const questions: Record<ConversationTopic, string> = {
-    ux: "Do you want me to compare this with the conversion findings?",
-    conversion: "Do you want me to show what Opzix would fix first?",
-    trust: "Do you want me to connect this to the purchase path?",
+    ux: "Recommended next step: Compare this with conversion so the team knows whether discovery friction is also blocking action.",
+    conversion:
+      "Recommended next step: Validate the commercial action path before changing traffic or campaign strategy.",
+    trust:
+      "Recommended next step: Move reassurance closer to the purchase or inquiry decision.",
     tracking:
-      "Do you want me to explain how this affects conversion measurement?",
+      "Recommended next step: Confirm measurement quality before using conversion data to prioritize fixes.",
     operations:
-      "Do you want me to separate quick wins from deeper operational fixes?",
+      "Recommended next step: Separate quick wins from deeper operational fixes so support and fulfillment issues do not absorb attention.",
     technical:
-      "Do you want me to compare this with the tracking visibility findings?",
-    metadata: "Do you want me to compare this with the technical findings?",
+      "Recommended next step: Compare the technical signal with tracking visibility before assigning implementation work.",
+    metadata:
+      "Recommended next step: Compare metadata clarity with the technical findings and search-preview expectations.",
     benchmark:
-      "Do you want me to turn that benchmark context into a fix order?",
+      "Recommended next step: Turn the benchmark context into a practical fix order.",
     platform:
-      "Do you want me to connect the platform signal to the technical findings?",
-    priority: "Do you want me to explain why that should come first?",
-    booking: "Do you want to book a deeper audit?",
+      "Recommended next step: Validate platform ownership before prioritizing platform-specific improvements.",
+    priority:
+      "Recommended next step: Validate the first priority before moving to secondary fixes.",
+    booking:
+      "Recommended next step: Review the audit with Opzix and turn it into an implementation plan.",
   };
 
   return questions[topic];
@@ -5043,26 +5960,24 @@ function buildTopicResponse(
   }
 
   const finding = getFindingByTopic(audit, topic);
-  const related = getRelatedFindings(audit, finding);
   const label = topicLabel(topic);
   const title = humanFindingTitle(finding, topic);
   const topicName = humanTopicName(topic);
   const priority = priorityTone(finding.severity);
   const frame = archetypeFrame(audit.currentNarrativeArchetype);
 
-  const paragraphs = [
-    `What stands out to me in ${topicName} is ${title}. Based on the report priority, this ${priority.phrase}.`,
-    finding.evidenceSummary
-      ? `If I were reviewing this manually, I would use this as the first clue: ${finding.evidenceSummary}`
-      : `The scan is pointing to this pattern: ${finding.explanation}`,
-    `${frame ? `${frame} ` : ""}${priority.sentence} The bigger concern is that ${finding.explanation} I would start here: ${
-      finding.recommendedFirstAction ?? "Review the related storefront flow."
-    }`,
-    related.length > 0
-      ? `I would keep ${related.map((item) => item.title).join(" and ")} nearby, because these issues often show up together in the customer journey.`
-      : "I would keep this connected to the broader customer journey rather than treating it as an isolated issue.",
-    continueQuestion(topic),
-  ];
+  const paragraphs = consultingReviewParagraphs({
+    topic,
+    finding,
+    meaning: `What stands out in ${topicName} is ${title}. Based on the report priority, this ${priority.phrase}.`,
+    why:
+      finding.evidenceSummary ??
+      `The scan is pointing to this pattern: ${finding.explanation}`,
+    impact: `${frame ? `${frame} ` : ""}${priority.sentence} ${finding.explanation}`,
+    validate: validationChecklistForTopic(topic, finding),
+    good: goodLooksLikeForTopic(topic),
+    next: finding.recommendedFirstAction,
+  });
 
   return {
     message: buildMessage(`assistant-${topic}-${Date.now()}`, paragraphs, {
@@ -5088,14 +6003,22 @@ function buildTechnicalResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-technical-${Date.now()}`,
-      [
-        `The main technical concern is ${title}. What stands out technically is that ${summary}.`,
-        `${frame ? `${frame} ` : ""}I would not treat this as proof the store is broken, but I would still treat it as ${priority.label === "High Priority" ? "a high-priority review item" : `something that ${priority.phrase}`} because technical uncertainty can affect checkout, tracking, and storefront-structure recommendations.`,
-        finding.evidenceSummary
-          ? `The useful clue from the report is: ${finding.evidenceSummary}`
-          : "If I were reviewing this manually, I would check the failed requests, platform signal, page templates, and tracking scripts in the browser first.",
-        continueQuestion("technical"),
-      ],
+      consultingReviewParagraphs({
+        topic: "technical",
+        finding,
+        meaning: `The main technical concern is ${title}. What stands out technically is that ${summary}.`,
+        why:
+          finding.evidenceSummary ??
+          "Technical findings can affect scripts, tracking, storefront consistency, or checkout confidence without making the page visibly broken.",
+        impact: `${frame ? `${frame} ` : ""}I would treat this as ${
+          priority.label === "High Priority"
+            ? "a high-priority review item"
+            : `something that ${priority.phrase}`
+        } because technical uncertainty can affect checkout, tracking, and storefront-structure recommendations.`,
+        validate: validationChecklistForTopic("technical", finding),
+        good: goodLooksLikeForTopic("technical"),
+        next: finding.recommendedFirstAction,
+      }),
       { topic: "technical", finding },
     ),
     nextState: createNextState(
@@ -5128,8 +6051,10 @@ function buildPriorityResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-priority-${Date.now()}`,
-      [
-        isGroceryNarrativeProfile(profile)
+      consultingReviewParagraphs({
+        topic: "priority",
+        finding,
+        meaning: isGroceryNarrativeProfile(profile)
           ? groceryRetailAnswer()
           : visualFirst?.source === "visual"
             ? visualUxDirectAnswer(
@@ -5137,20 +6062,19 @@ function buildPriorityResponse(audit: AssistantAudit): AssistantTurn {
                 context.visualUxDiagnostics?.score,
                 visualUxMetricPhrase(context),
               )
-          : profile?.narrativeMode
-            ? `I would start with the ${profile.narrativeMode.toLowerCase()} journey: ${firstAction}`
-            : `I would start with ${finding.title}, because it is the clearest operational signal in this scan and it ${priority.phrase}.`,
-        profile?.businessContext
-          ? `That matters because this scan is framed around ${profile.businessContext}.`
-          : `${frame ? `${frame} ` : ""}${priority.sentence}`,
-        finding.evidenceSummary
-          ? `The practical clue is: ${finding.evidenceSummary}`
-          : "The scan is pointing to this as the first area to validate before changing campaigns or tooling.",
-        firstAction
-          ? `If I were reviewing this manually, I would start by doing this: ${firstAction}`
-          : "The first practical action is to review the customer journey around this finding and confirm whether it shows up in the full storefront flow.",
-        continueQuestion("priority"),
-      ],
+            : profile?.narrativeMode
+              ? `I would start with the ${profile.narrativeMode.toLowerCase()} journey: ${firstAction}`
+              : `I would start with ${finding.title}, because it is the clearest operational signal in this scan and it ${priority.phrase}.`,
+        why:
+          finding.evidenceSummary ??
+          "The scan is pointing to this as the first area to validate before changing campaigns or tooling.",
+        impact: profile?.businessContext
+          ? `This scan is framed around ${profile.businessContext}. ${finding.explanation}`
+          : `${frame ? `${frame} ` : ""}${priority.sentence} ${finding.explanation}`,
+        validate: validationChecklistForTopic("priority", finding),
+        good: goodLooksLikeForTopic("priority"),
+        next: firstAction,
+      }),
       {
         topic: "priority",
         finding,
@@ -5183,17 +6107,18 @@ function buildClarificationResponse(
     return {
       message: buildMessage(
         `assistant-clarify-${Date.now()}`,
-        [
-          `Here’s how I’d think about ${finding.title}. It ${priority.phrase}.`,
-          `${priority.sentence} The business reason is that ${finding.explanation}`,
-          finding.evidenceSummary
-            ? `The useful scan clue is: ${finding.evidenceSummary}`
-            : "The scan did not expose every internal detail, so I would treat this as a public-page signal to verify in a deeper review.",
-          finding.recommendedFirstAction
-            ? `The next thing I’d check is: ${finding.recommendedFirstAction}`
-            : "The next sensible action is to inspect this part of the customer journey manually.",
-          continueQuestion(topic),
-        ],
+        consultingReviewParagraphs({
+          topic,
+          finding,
+          meaning: `${finding.title} ${priority.phrase}.`,
+          why:
+            finding.evidenceSummary ??
+            "The scan did not expose every internal detail, so I would treat this as a public-page signal to verify in a deeper review.",
+          impact: `${priority.sentence} ${finding.explanation}`,
+          validate: validationChecklistForTopic(topic, finding),
+          good: goodLooksLikeForTopic(topic),
+          next: finding.recommendedFirstAction,
+        }),
         { topic, finding },
       ),
       nextState: createNextState(
@@ -5208,8 +6133,8 @@ function buildClarificationResponse(
 
   return {
     message: buildMessage(`assistant-clarify-${Date.now()}`, [
-      "I can walk through the scan like a human review: UX, conversion, tracking, trust, operations, or what I would fix first.",
-      "Where should we start?",
+      "What the finding means: I can review the scan like a consultant across UX, conversion, tracking, trust, operations, and fix priority.",
+      "Recommended next step: Start with the top finding or choose one of the follow-up prompts below.",
     ]),
     nextState: createNextState(
       null,
@@ -5232,15 +6157,18 @@ function buildSeriousnessResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-serious-${Date.now()}`,
-      [
-        `I would treat this as ${priority.label.toLowerCase()} based on the scan score of ${audit.overallScore}/100 and status of ${audit.overallStatus}.`,
-        `The main finding behind that read is ${finding.title}.`,
-        finding.evidenceSummary
-          ? `The clue I would pay attention to is: ${finding.evidenceSummary}`
-          : "The scan found enough public evidence to justify a closer human review.",
-        priority.sentence,
-        continueQuestion("priority"),
-      ],
+      consultingReviewParagraphs({
+        topic: "priority",
+        finding,
+        meaning: `I would treat this as ${priority.label.toLowerCase()} based on the scan score of ${audit.overallScore}/100 and status of ${audit.overallStatus}.`,
+        why:
+          finding.evidenceSummary ??
+          "The scan found enough public evidence to justify a closer human review.",
+        impact: `${priority.sentence} The main finding behind that read is ${finding.title}.`,
+        validate: validationChecklistForTopic("priority", finding),
+        good: goodLooksLikeForTopic("priority"),
+        next: finding.recommendedFirstAction,
+      }),
       { topic: "priority", finding, cta: true },
     ),
     nextState: createNextState(
@@ -5258,12 +6186,18 @@ function buildOpzixHelpResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-help-${Date.now()}`,
-      [
-        "Yes. Opzix can use this scan as the starting point for a practical ecommerce review, especially across UX, conversion flow, tracking visibility, operational handoffs, and trust cues.",
-        `For this scan, I would validate ${finding.title} first, then check whether the related findings show up across the full storefront and checkout path.`,
-        "The goal would be to separate quick wins from deeper fixes, not turn the report into a long generic checklist.",
-        continueQuestion("booking"),
-      ],
+      consultingReviewParagraphs({
+        topic: "booking",
+        finding,
+        meaning:
+          "Opzix can use this scan as the starting point for a practical ecommerce review across UX, conversion flow, tracking visibility, operational handoffs, and trust cues.",
+        why: `For this scan, I would validate ${finding.title} first, then check whether the related findings show up across the full storefront and checkout path.`,
+        impact:
+          "The goal is to separate quick wins from deeper fixes, not turn the report into a long generic checklist.",
+        validate: validationChecklistForTopic("booking", finding),
+        good: goodLooksLikeForTopic("booking"),
+        next: "Review the audit with Opzix and turn it into a scoped implementation plan.",
+      }),
       { topic: "booking", finding, cta: true },
     ),
     nextState: createNextState(
@@ -5281,11 +6215,19 @@ function buildBookingResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-book-${Date.now()}`,
-      [
-        `A Free Ecommerce Audit is a sensible next step if you want a human review of ${finding.title} and the other scan findings.`,
-        "Opzix can use the scan as a starting point, then review the storefront flow, tracking visibility, trust signals, and operational handoffs in more detail.",
-        "Do you want to book a deeper audit?",
-      ],
+      consultingReviewParagraphs({
+        topic: "booking",
+        finding,
+        meaning: `A Free Ecommerce Audit is a sensible next step if you want a human review of ${finding.title} and the other scan findings.`,
+        why:
+          "The scan is directional; a human review can confirm which findings show up in the actual storefront journey.",
+        impact:
+          "That keeps the team from spending time on low-value fixes while the main customer-path constraint remains unresolved.",
+        validate:
+          "Storefront flow; tracking visibility; trust signals; operational handoffs; implementation effort.",
+        good: goodLooksLikeForTopic("booking"),
+        next: "Review the audit with Opzix and turn it into a scoped implementation plan.",
+      }),
       { topic: "booking", finding, cta: true },
     ),
     nextState: createNextState(
@@ -5303,11 +6245,18 @@ function buildPlatformResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-platform-${Date.now()}`,
-      [
-        getPlatformSummary(audit),
-        "I would treat platform detection as context, not a final diagnosis. It helps frame which storefront patterns, checkout signals, and technical checks are most relevant.",
-        `${getTrackingSummary(audit)} ${continueQuestion("platform")}`,
-      ],
+      consultingReviewParagraphs({
+        topic: "platform",
+        finding,
+        meaning: getPlatformSummary(audit),
+        why:
+          "Platform detection is context, not a final diagnosis. It helps frame which storefront patterns, checkout signals, and technical checks are most relevant.",
+        impact:
+          "If the platform is misidentified, the team can waste time pursuing fixes that do not match the real architecture.",
+        validate: validationChecklistForTopic("platform", finding),
+        good: goodLooksLikeForTopic("platform"),
+        next: finding.recommendedFirstAction,
+      }),
       { topic: "platform", finding },
     ),
     nextState: createNextState("platform", "ask_platform", finding, "Platform"),
@@ -5333,8 +6282,7 @@ function buildMetadataResponse(audit: AssistantAudit): AssistantTurn {
         finding.evidenceSummary ?? "The scan checked the loaded page metadata.",
       businessMeaning:
         "Metadata matters because it shapes search snippets, browser tabs, and shared-link previews before someone reaches the page.",
-      nextQuestion:
-        "Do you want me to connect metadata with the technical findings?",
+      nextQuestion: "Connect metadata with the technical findings.",
     }),
     nextState: createNextState("metadata", "ask_metadata", finding, "Metadata"),
   };
@@ -5347,14 +6295,18 @@ function buildTrackingResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-tracking-${Date.now()}`,
-      [
-        trackingSummary,
-        `What stands out on tracking is ${humanFindingTitle(finding, "tracking")}.`,
-        finding.evidenceSummary
-          ? `The useful clue is: ${finding.evidenceSummary}`
-          : "The scan only sees public signals, so hidden server-side tracking may still exist.",
-        `The bigger concern is measurement confidence: ${finding.explanation} ${continueQuestion("tracking")}`,
-      ],
+      consultingReviewParagraphs({
+        topic: "tracking",
+        finding,
+        meaning: `${trackingSummary} What stands out on tracking is ${humanFindingTitle(finding, "tracking")}.`,
+        why:
+          finding.evidenceSummary ??
+          "The scan only sees public signals, so hidden server-side tracking may still exist.",
+        impact: `The bigger concern is measurement confidence: ${finding.explanation}`,
+        validate: validationChecklistForTopic("tracking", finding),
+        good: goodLooksLikeForTopic("tracking"),
+        next: finding.recommendedFirstAction,
+      }),
       { topic: "tracking", finding },
     ),
     nextState: createNextState(
@@ -5372,11 +6324,16 @@ function buildBenchmarkResponse(audit: AssistantAudit): AssistantTurn {
   return {
     message: buildMessage(
       `assistant-benchmark-${Date.now()}`,
-      [
-        getBenchmarkSummary(audit),
-        `I would connect that benchmark context back to ${finding.title}, because benchmarks are most useful when they clarify what to inspect first.`,
-        continueQuestion("benchmark"),
-      ],
+      consultingReviewParagraphs({
+        topic: "benchmark",
+        finding,
+        meaning: getBenchmarkSummary(audit),
+        why: `I would connect that benchmark context back to ${finding.title}, because benchmarks are most useful when they clarify what to inspect first.`,
+        impact: finding.explanation,
+        validate: validationChecklistForTopic("benchmark", finding),
+        good: goodLooksLikeForTopic("benchmark"),
+        next: finding.recommendedFirstAction,
+      }),
       { topic: "benchmark", finding },
     ),
     nextState: createNextState(
@@ -5391,7 +6348,8 @@ function buildBenchmarkResponse(audit: AssistantAudit): AssistantTurn {
 function buildFallbackResponse(state: ConversationState): AssistantTurn {
   return {
     message: buildMessage(`assistant-fallback-${Date.now()}`, [
-      "I may not have enough from this scan to answer that exact question, but I can walk through UX, conversion, tracking, trust, operations, or what I would fix first.",
+      "What the finding means: I may not have enough from this scan to answer that exact question with confidence.",
+      "Recommended next step: Choose UX, conversion, tracking, trust, operations, or fix priority and I will review it like a consultant.",
     ]),
     nextState: createNextState(
       state.currentTopic,
@@ -5877,10 +6835,11 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
       sourceArea: "assistant",
     });
 
-    const turn = attachConversationProgression(
-      buildAssistantResponse(intent, audit, conversationState),
-      conversationState,
+    const turn = buildLocalAssistantTurn(
       label,
+      audit,
+      scanContext,
+      conversationState,
     );
 
     queueMessageAutoScroll({ force: true });
@@ -6153,7 +7112,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
   const compactSuggestedReplies = useMemo(() => {
     const seen = new Set<string>();
 
-    return [...aiSuggestedReplies, ...compactFollowUpReplies]
+    return [...compactFollowUpReplies, ...aiSuggestedReplies]
       .map((reply) => reply.trim())
       .filter((reply) => {
         const key = reply.toLowerCase();
@@ -6358,7 +7317,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
             </p>
             <div className="flex flex-wrap gap-2">
               {compactSuggestedReplies.map((reply) => {
-                const isBooking = /review this audit/i.test(reply);
+                const isBooking = /review (this audit )?with opzix|review this audit/i.test(reply);
 
                 if (isBooking) {
                   return (
@@ -6448,7 +7407,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
 
               return (
                 <button
-                  key={reply.intent}
+                  key={reply.label}
                   type="button"
                   onClick={() => handleQuickReply(reply.label, reply.intent)}
                   disabled={isAssistantLoading}
