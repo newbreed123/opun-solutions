@@ -4,6 +4,13 @@ import {
   ZoraLeadProfile,
   ZoraResponse,
 } from "@/lib/zora-assistant";
+import {
+  buildZoraContext,
+  contextInputFromProfile,
+  zoraContextPromptBlock,
+  type ZoraContextEngineInput,
+  type ZoraContextMessage,
+} from "@/lib/zora/context-engine";
 import { logZoraConversation } from "@/lib/zora-conversation-log";
 import {
   actionsForZoraPlaybook,
@@ -14,8 +21,19 @@ import {
 
 type ZoraChatRequest = {
   message?: unknown;
+  messages?: ZoraContextMessage[];
   leadProfile?: ZoraLeadProfile;
   hasWebsite?: unknown;
+  websiteUrl?: unknown;
+  businessType?: unknown;
+  challenge?: unknown;
+  industry?: unknown;
+  confirmedIndustry?: unknown;
+  currentStep?: unknown;
+  conversationStage?: unknown;
+  currentTopic?: unknown;
+  currentSubtopic?: unknown;
+  recentTalkingPoints?: unknown;
   sessionId?: unknown;
   sourcePath?: unknown;
 };
@@ -29,6 +47,16 @@ type OpenAiChatResponse = {
 };
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function stringArrayValue(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    : undefined;
+}
 
 function sanitizeAssistantReply(reply: string) {
   return reply
@@ -79,6 +107,7 @@ function shouldUseConsultantGeneration(message: string, fallback: ZoraResponse) 
 async function buildGptReply(
   message: string,
   fallback: ZoraResponse,
+  context: ReturnType<typeof buildZoraContext>,
 ): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
 
@@ -108,6 +137,8 @@ async function buildGptReply(
             "Answer direct pricing/free-audit questions in the first sentence. Do not include button-speak, do not force a CTA, and do not route users from text.",
             "Treat recentTalkingPoints as topics to avoid repeating. Do not reuse stale facts unless present in accumulatedLeadProfile.",
             "Do not claim you reviewed a website unless a scanner payload exists. Do not promise results or mention private lead scoring.",
+            "",
+            zoraContextPromptBlock(context),
             "",
             "[CRITICAL: BACK-TO-BACK REPETITION BAN]",
             "- Look at the last assistant message implied by the current thread and fallback context. You are strictly forbidden from reusing the same sentences, sentence order, or bulleted lists back-to-back.",
@@ -171,6 +202,7 @@ async function buildGptReply(
             },
             leadProfileChanges: fallback.profileChanges,
             fallbackReply: fallback.reply,
+            contextEngine: context,
           }),
         },
       ],
@@ -198,6 +230,8 @@ export async function POST(request: NextRequest) {
     const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : "";
     const sourcePath = typeof body.sourcePath === "string" ? body.sourcePath.trim() : "";
     const hasWebsite = typeof body.hasWebsite === "boolean" ? body.hasWebsite : undefined;
+    const structuredMessages = Array.isArray(body.messages) ? body.messages : undefined;
+    const structuredRecentTalkingPoints = stringArrayValue(body.recentTalkingPoints);
 
     if (!message) {
       return NextResponse.json(
@@ -210,6 +244,17 @@ export async function POST(request: NextRequest) {
 
     const incomingLeadProfile: ZoraLeadProfile = {
       ...(body.leadProfile || {}),
+      ...(stringValue(body.websiteUrl) ? { websiteUrl: stringValue(body.websiteUrl) } : {}),
+      ...(stringValue(body.businessType) ? { businessType: stringValue(body.businessType) as ZoraLeadProfile["businessType"] } : {}),
+      ...(stringValue(body.challenge) ? { challenge: stringValue(body.challenge) as ZoraLeadProfile["challenge"] } : {}),
+      ...(stringValue(body.industry) ? { industry: stringValue(body.industry) } : {}),
+      ...(stringValue(body.confirmedIndustry) ? { confirmedIndustry: stringValue(body.confirmedIndustry) } : {}),
+      ...(stringValue(body.conversationStage)
+        ? { conversationStage: stringValue(body.conversationStage) as ZoraLeadProfile["conversationStage"] }
+        : {}),
+      ...(stringValue(body.currentTopic) ? { currentTopic: stringValue(body.currentTopic) as ZoraLeadProfile["currentTopic"] } : {}),
+      ...(stringValue(body.currentSubtopic) ? { currentSubtopic: stringValue(body.currentSubtopic) } : {}),
+      ...(structuredRecentTalkingPoints ? { recentTalkingPoints: structuredRecentTalkingPoints as ZoraLeadProfile["recentTalkingPoints"] } : {}),
       ...(hasWebsite === false
         ? {
             hasNoWebsite: true,
@@ -224,6 +269,24 @@ export async function POST(request: NextRequest) {
           : {}),
     };
     const fallback = buildZoraResponse(message, incomingLeadProfile);
+    const contextInput: ZoraContextEngineInput = contextInputFromProfile(fallback.leadProfile, {
+      messages: structuredMessages || [message],
+      hasWebsite:
+        hasWebsite ??
+        (fallback.leadProfile.hasNoWebsite
+          ? false
+          : fallback.leadProfile.hasWebsiteOrLandingPage || fallback.leadProfile.websiteUrl
+            ? true
+            : null),
+      currentStep: stringValue(body.currentStep),
+      conversationStage: stringValue(body.conversationStage) || fallback.leadProfile.conversationStage,
+      currentTopic: stringValue(body.currentTopic) || fallback.leadProfile.currentTopic,
+      currentSubtopic: stringValue(body.currentSubtopic) || fallback.leadProfile.currentSubtopic,
+      confirmedIndustry: stringValue(body.confirmedIndustry) || fallback.leadProfile.confirmedIndustry,
+      inferredIndustry: stringValue(body.industry) || fallback.leadProfile.inferredIndustry || String(fallback.leadProfile.industry || ""),
+      recentTalkingPoints: structuredRecentTalkingPoints || fallback.leadProfile.recentTalkingPoints,
+    });
+    const contextEngine = buildZoraContext(contextInput);
     if (process.env.NODE_ENV !== "production") {
       console.info("Zora qualification decision:", {
         currentMessage: message,
@@ -238,6 +301,7 @@ export async function POST(request: NextRequest) {
         leadProfileAfter: fallback.leadProfile,
         leadProfileChanges: fallback.profileChanges,
         selectedResponseStrategy: fallback.responseMode,
+        contextEngine,
       });
     }
 
@@ -251,7 +315,7 @@ export async function POST(request: NextRequest) {
 
     const gptReply =
       !playbookReply && shouldUseConsultantGeneration(message, fallback)
-        ? await buildGptReply(message, fallback).catch((error) => {
+        ? await buildGptReply(message, fallback, contextEngine).catch((error) => {
             console.warn("Zora GPT reply failed:", error);
             return null;
           })
@@ -270,17 +334,19 @@ export async function POST(request: NextRequest) {
       sessionId,
       sourcePath,
       userAgent: request.headers.get("user-agent"),
-      currentStep: fallback.responseMode,
+      currentStep: stringValue(body.currentStep) || fallback.responseMode,
       intent: learningIntent,
       conversationStage: fallback.leadProfile.conversationStage,
       currentTopic: fallback.leadProfile.currentTopic,
       currentSubtopic:
-        fallback.responseMode === "company_background"
+        fallback.leadProfile.currentSubtopic ||
+        (fallback.responseMode === "company_background"
           ? fallback.currentMessageAnalysis.companyBackgroundSubtype
-          : fallback.recentTalkingPoint,
+          : fallback.recentTalkingPoint),
       profileBefore: incomingLeadProfile,
       action: fallback.action,
       recommendedActions: finalRecommendedActions,
+      contextEngine,
       eventType:
         fallback.responseMode === "audit_request"
           ? "audit_requested"
@@ -304,6 +370,7 @@ export async function POST(request: NextRequest) {
         ...fallback,
         reply: finalReply,
         recommendedActions: finalRecommendedActions,
+        contextEngine,
         playbookId: playbook?.id,
         poweredBy: gptReply ? "openai" : "local-diagnosis",
       },

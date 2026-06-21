@@ -186,6 +186,7 @@ export type ZoraLeadProfile = {
   trafficIntentText?: string;
   adContext?: ZoraAdContext;
   industry?: ZoraIndustry | string;
+  confirmedIndustry?: string;
   industryProfile?: ZoraIndustryProfile;
   industryEvidence?: string[];
   buyerJourney?: string;
@@ -221,6 +222,7 @@ export type ZoraLeadProfile = {
   recommendationRoadmap?: ZoraRoadmapStep[];
   conversationStage?: ZoraConversationStage;
   currentTopic?: ZoraTopic;
+  currentSubtopic?: string;
   currentTopicDepth?: number;
   recentTalkingPoints?: ZoraTalkingPoint[];
   leadQuality?: ZoraLeadQuality;
@@ -1663,6 +1665,10 @@ function mergeLeadProfile(
   if (analysis.businessType) {
     addChange(changes, "businessType", nextProfile.businessType, analysis.businessType);
     nextProfile.businessType = analysis.businessType;
+    if (businessTypeConflict) {
+      addChange(changes, "confirmedIndustry", nextProfile.confirmedIndustry, analysis.businessType);
+      nextProfile.confirmedIndustry = analysis.businessType;
+    }
     if (nextProfile.needsBusinessTypeClarification) {
       addChange(changes, "needsBusinessTypeClarification", true, false);
       nextProfile.needsBusinessTypeClarification = false;
@@ -1711,6 +1717,13 @@ function mergeLeadProfile(
         "B2B Supply Platform",
       );
       nextProfile.inferredIndustry = "B2B Supply Platform";
+      addChange(
+        changes,
+        "confirmedIndustry",
+        nextProfile.confirmedIndustry,
+        "B2B Supply Platform",
+      );
+      nextProfile.confirmedIndustry = "B2B Supply Platform";
       addChange(
         changes,
         "inferredFunnelType",
@@ -3811,7 +3824,6 @@ function deepeningFrameworkForProfile(profile: ZoraLeadProfile) {
 
   if (
     profile.businessType === "Service Business" ||
-    profile.businessType === "Other" ||
     industry === "industrial_b2b_catalog" ||
     /\b(b2b|saas|consulting|logistics|commercial|agency|professional services?)\b/i.test(text)
   ) {

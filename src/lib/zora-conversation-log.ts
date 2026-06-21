@@ -37,6 +37,7 @@ export type ZoraConversationMetadata = {
   previousAssistantMessages?: string[];
   action?: ZoraResponse["action"] | null;
   recommendedActions?: ZoraResponse["recommendedActions"];
+  contextEngine?: unknown;
 };
 
 export type ZoraConversationRow = {

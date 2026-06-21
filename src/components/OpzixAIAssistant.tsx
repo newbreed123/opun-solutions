@@ -1339,8 +1339,28 @@ export default function OpzixAIAssistant() {
         },
         body: JSON.stringify({
           message,
+          messages: [
+            ...messages.map((item) => ({
+              role: item.role,
+              text: item.text,
+            })),
+            {
+              role: "user",
+              text: message,
+            },
+          ],
           leadProfile,
           hasWebsite: hasWebsiteState(leadProfile),
+          websiteUrl: leadProfile.websiteUrl,
+          businessType: leadProfile.businessType,
+          challenge: leadProfile.challenge,
+          industry: leadProfile.industry || leadProfile.inferredIndustry,
+          confirmedIndustry: leadProfile.confirmedIndustry,
+          currentStep: flowStep,
+          conversationStage: leadProfile.conversationStage,
+          currentTopic: leadProfile.currentTopic,
+          currentSubtopic: leadProfile.currentSubtopic,
+          recentTalkingPoints: leadProfile.recentTalkingPoints,
           sessionId: zoraSessionId(),
           sourcePath: currentSourcePath(),
         }),
