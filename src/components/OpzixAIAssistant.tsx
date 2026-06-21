@@ -382,7 +382,9 @@ function actionsFromRecommendation(
     action === "strategy_call"
       ? [bookingAction("Book Strategy Call", "primary")]
       : action === "free_audit"
-        ? [scannerAction("Run Free Audit", "primary", profile)]
+        ? profile?.hasNoWebsite || profile?.scannerBlocked
+          ? []
+          : [scannerAction("Run Free Audit", "primary", profile)]
         : action === "diagnose"
           ? [
               {
@@ -405,14 +407,37 @@ function actionsFromRecommendation(
   );
 }
 
-function isTextAuditCommand(value: string) {
-  return /^(run it|start it|scan it|run audit|run the audit|start audit|start the audit|start the scan|run scan|run the scan|scan my site|scan my website|scan my store|audit my site|audit my website|audit my store)[.!?]*$/i.test(
-    value.trim(),
+function normalizeCommandText(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[’']/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isAuditInformationIntent(value: string) {
+  const text = normalizeCommandText(value);
+
+  return /^(what is the audit|how much is the audit|is the audit free|is it free audit|is the free audit actually free|explain the audit|what does the scanner do|should i run the audit)$/.test(
+    text,
+  );
+}
+
+function isAuditExecutionIntent(value: string) {
+  const text = normalizeCommandText(value);
+
+  if (!text || isAuditInformationIntent(text)) return false;
+
+  return /^(run (the )?(free )?audit|start (the )?(free )?audit|start (the )?scan|scan (my )?(site|website|store)|scan it|audit (my )?(site|website|store)|audit it|diagnose (my )?(site|website|store)|diagnose it|lets run it|run it|ok run it|okay run it|yes run it|go ahead and run it|launch the audit|begin the audit)$/.test(
+    text,
   );
 }
 
 function isTextDiagnoseCommand(value: string) {
-  return /^diagnose my growth system[.!?]*$/i.test(value.trim());
+  const text = normalizeCommandText(value);
+  return text === "diagnose my growth system";
 }
 
 function actionTone(action: ZoraAction) {
@@ -914,7 +939,31 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.href.includes("/tools/ecommerce-audit-scanner")) {
-      trackZoraEvent("audit_clicked");
+      const scannerUrl = new URL(action.href, window.location.origin).searchParams.get("url");
+      const nextProfile = normalizeProfile(leadProfile);
+
+      if (nextProfile.scannerBlocked) {
+        showScannerBlockedStrategy();
+        return;
+      }
+
+      if (scannerUrl) {
+        routeToScannerHref(action.href);
+        return;
+      }
+
+      if (nextProfile.websiteUrl && !nextProfile.hasNoWebsite) {
+        routeToScannerHref(auditHrefForProfile(nextProfile));
+        return;
+      }
+
+      if (nextProfile.hasNoWebsite) {
+        showNoWebsiteAuditStrategy();
+        return;
+      }
+
+      askForAuditUrl();
+      return;
     }
 
     closeChatbot();
@@ -941,6 +990,82 @@ export default function OpzixAIAssistant() {
       trackZoraEvent("strategy_call_clicked");
       openBookingUrlAfterClose(STRATEGY_CALL_URL);
     }
+  }
+
+  function askForAuditUrl(userText?: string) {
+    setFlowStep("websiteUrl");
+    appendMessages([
+      ...(userText
+        ? [
+            {
+              id: createId("user"),
+              role: "user" as const,
+              text: userText,
+            },
+          ]
+        : []),
+      {
+        id: createId("assistant"),
+        role: "assistant",
+        text: "What website should I scan?",
+      },
+    ]);
+  }
+
+  function showNoWebsiteAuditStrategy(userText?: string) {
+    appendMessages([
+      ...(userText
+        ? [
+            {
+              id: createId("user"),
+              role: "user" as const,
+              text: userText,
+            },
+          ]
+        : []),
+      {
+        id: createId("assistant"),
+        role: "assistant",
+        text: "There is no live site to scan yet. The right next step is a strategy call to map the launch blueprint.",
+        actions: [
+          bookingAction("Book Strategy Call", "primary"),
+          {
+            kind: "start",
+            label: "Ask a Question",
+            value: "ask_question",
+            tone: "text",
+          },
+        ],
+      },
+    ]);
+  }
+
+  function showScannerBlockedStrategy(userText?: string) {
+    appendMessages([
+      ...(userText
+        ? [
+            {
+              id: createId("user"),
+              role: "user" as const,
+              text: userText,
+            },
+          ]
+        : []),
+      {
+        id: createId("assistant"),
+        role: "assistant",
+        text: "That domain is blocking automated scans, so I would not keep pushing the free audit here. The right next step is a manual strategy review on a call.",
+        actions: [
+          bookingAction("Book Strategy Call", "primary"),
+          {
+            kind: "start",
+            label: "Ask a Question",
+            value: "ask_question",
+            tone: "text",
+          },
+        ],
+      },
+    ]);
   }
 
   function startGuidedFlow() {
@@ -1181,13 +1306,7 @@ export default function OpzixAIAssistant() {
       const nextProfile = normalizeProfile(leadProfile);
 
       if (nextProfile.websiteUrl && !nextProfile.hasNoWebsite) {
-        routeToLink(
-          scannerAction(
-            "Run Free Audit",
-            "primary",
-            nextProfile,
-          ) as Extract<ZoraAction, { kind: "link" }>,
-        );
+        routeToScannerHref(auditHrefForProfile(nextProfile));
         return;
       }
 
@@ -1196,12 +1315,23 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.value === "free_audit") {
-      if (leadProfile.hasNoWebsite) {
-        showScannerRoute();
+      if (leadProfile.scannerBlocked) {
+        showScannerBlockedStrategy();
         return;
       }
 
-      routeToLink(scannerAction("Run Free Audit", "primary", normalizeProfile(leadProfile)) as Extract<ZoraAction, { kind: "link" }>);
+      if (leadProfile.hasNoWebsite) {
+        showNoWebsiteAuditStrategy();
+        return;
+      }
+
+      routeToLink(
+        scannerAction(
+          "Run Free Audit",
+          "primary",
+          normalizeProfile(leadProfile),
+        ) as Extract<ZoraAction, { kind: "link" }>,
+      );
       return;
     }
 
@@ -1232,38 +1362,30 @@ export default function OpzixAIAssistant() {
 
     setInput("");
 
-    if (isTextAuditCommand(message) || isTextDiagnoseCommand(message)) {
+    if (isAuditExecutionIntent(message)) {
       const nextProfile = normalizeProfile(leadProfile);
 
       if (nextProfile.websiteUrl && !nextProfile.hasNoWebsite) {
-        routeToLink(
-          scannerAction(
-            "Run Free Audit",
-            "primary",
-            nextProfile,
-          ) as Extract<ZoraAction, { kind: "link" }>,
-        );
+        if (nextProfile.scannerBlocked) {
+          showScannerBlockedStrategy(message);
+          return;
+        }
+
+        routeToScannerHref(auditHrefForProfile(nextProfile));
         return;
       }
 
-      if (isTextDiagnoseCommand(message)) {
-        startGuidedFlow();
+      if (nextProfile.hasNoWebsite) {
+        showNoWebsiteAuditStrategy(message);
         return;
       }
 
-      setFlowStep("websiteUrl");
-      appendMessages([
-        {
-          id: createId("user"),
-          role: "user",
-          text: message,
-        },
-        {
-          id: createId("assistant"),
-          role: "assistant",
-          text: "I can run the audit once I have the website URL. What site should I scan?",
-        },
-      ]);
+      askForAuditUrl(message);
+      return;
+    }
+
+    if (isTextDiagnoseCommand(message)) {
+      startGuidedFlow();
       return;
     }
 

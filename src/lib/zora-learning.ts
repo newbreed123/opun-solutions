@@ -38,6 +38,8 @@ export type ZoraFailureReason =
   | "user_requested_human_not_routed"
   | "pricing_question_failed"
   | "audit_request_not_routed"
+  | "audit_execution_not_routed"
+  | "post_recommendation_loop"
   | "context_reset"
   | "out_of_scope_mishandled";
 
@@ -162,12 +164,18 @@ export function normalizeZoraLearningIntent(
   if (isPricingQuestion(message)) return "pricing_question";
   if (isHumanRequest(message)) return "live_agent_request";
   if (responseMode === "review_request") return "review_request";
-  if (responseMode === "audit_request" || responseMode === "scanner_execute") {
+  if (
+    responseMode === "audit_request" ||
+    responseMode === "scanner_execute" ||
+    responseMode === "scanner_failure"
+  ) {
     return "audit_request";
   }
   if (responseMode === "out_of_scope") return "out_of_scope";
   if (responseMode === "recommendation") return "recommendation_request";
-  if (responseMode === "consultant") return "consultant_question";
+  if (responseMode === "consultant" || responseMode === "trust_skepticism") {
+    return "consultant_question";
+  }
   if (responseMode === "diagnosis") return "diagnosis";
   if (responseMode === "next_step" || responseMode === "handoff") return "next_step";
   if (responseMode === "acknowledgement") return "acknowledgement";
@@ -333,7 +341,11 @@ export function detectZoraFailureReasons(input: {
     reasons.add("repeated_response");
   }
 
-  if (isPricingQuestion(userMessage) && !hasDirectPricingAnswer(assistantResponse)) {
+  if (
+    isPricingQuestion(userMessage) &&
+    !isAuditExecutionRequest(userMessage) &&
+    !hasDirectPricingAnswer(assistantResponse)
+  ) {
     reasons.add("direct_question_not_answered");
     reasons.add("pricing_question_failed");
   }
@@ -344,6 +356,14 @@ export function detectZoraFailureReasons(input: {
 
   if (isAuditExecutionRequest(userMessage) && !routesToAudit(input)) {
     reasons.add("audit_request_not_routed");
+  }
+
+  if (isAuditExecutionRequest(userMessage) && !handlesAuditExecution(input)) {
+    reasons.add("audit_execution_not_routed");
+  }
+
+  if (isPostRecommendationAcknowledgement(userMessage, input.profileBefore) && repeatsRecommendationAfterAck(assistantResponse)) {
+    reasons.add("post_recommendation_loop");
   }
 
   if (
@@ -475,9 +495,31 @@ function isHumanRequest(message: string) {
   );
 }
 
+function normalizeCommandText(message: string) {
+  return message
+    .toLowerCase()
+    .trim()
+    .replace(/[’']/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isAuditInformationIntent(message: string) {
+  const text = normalizeCommandText(message);
+
+  return /^(what is the audit|how much is the audit|is the audit free|is it free audit|is the free audit actually free|explain the audit|what does the scanner do|should i run the audit)$/.test(
+    text,
+  );
+}
+
 function isAuditExecutionRequest(message: string) {
-  return /\b(run it|start audit|run the audit|scan my site|scan my website|audit my site|audit my website)\b/i.test(
-    message,
+  const text = normalizeCommandText(message);
+
+  if (!text || isAuditInformationIntent(text)) return false;
+
+  return /^(run (the )?(free )?audit|start (the )?(free )?audit|start (the )?scan|scan (my )?(site|website|store)|scan it|audit (my )?(site|website|store)|audit it|diagnose (my )?(site|website|store)|diagnose it|lets run it|run it|ok run it|okay run it|yes run it|go ahead and run it|launch the audit|begin the audit)$/.test(
+    text,
   );
 }
 
@@ -508,6 +550,40 @@ function routesToAudit(input: {
     input.action?.type === "start_audit" ||
       input.recommendedActions?.includes("free_audit") ||
       /free audit|scanner|scan/i.test(input.assistantResponse),
+  );
+}
+
+function handlesAuditExecution(input: {
+  action?: ZoraResponse["action"];
+  assistantResponse: string;
+}) {
+  return Boolean(
+    input.action?.type === "start_audit" ||
+      /what website should i scan|what website url|which website/i.test(input.assistantResponse) ||
+      /no live site|strategy call|launch blueprint/i.test(input.assistantResponse),
+  );
+}
+
+function isPostRecommendationAcknowledgement(
+  message: string,
+  profileBefore?: ZoraLeadProfile,
+) {
+  return Boolean(
+    /^(ok|okay|cool|sounds good|nice|makes sense|that makes sense|got it)[.!?]*$/i.test(
+      message.trim(),
+    ) &&
+      (profileBefore?.lastAssistantMode === "high_level_recommendation" ||
+        (profileBefore?.lastAssistantMode === "cta_prompt" &&
+          Boolean(profileBefore?.postRecommendationAckCount))),
+  );
+}
+
+function repeatsRecommendationAfterAck(response: string) {
+  return (
+    response.length > 240 &&
+    /\b(what i would validate|what good looks like|what i think is happening|why it matters|expected impact|typical range|timeline|let's stay on|i would focus on)\b/i.test(
+      response,
+    )
   );
 }
 

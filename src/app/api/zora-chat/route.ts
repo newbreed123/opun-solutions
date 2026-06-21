@@ -164,6 +164,17 @@ async function buildGptReply(
             "- You are strictly forbidden from repeating the B2B platform checklist or asking where visitors are dropping off in response to those commands.",
             "- Your only allowed response text for scanner execution is: 'Initiating the technical architecture scan for your domain now. Standby for the roadmap.'",
             "",
+            "[CRITICAL INSTRUCTION: USER CALL-OUTS & SKEPTICISM]",
+            "- If the user asks whether your reply is copy-and-paste, generic, canned, scripted, templated, or not tailored, stop all script templates immediately.",
+            "- Be candid that any prior recommendation was a high-level structural framework unless a completed scanner payload or internal analytics are present.",
+            "- Then make the response specific to the provided URL and business context. For Dick's Sporting Goods, reference enterprise retail details such as sporting category navigation, mobile size filtering, local in-store pickup availability, rewards/account login friction, checkout flow, and tracking visibility.",
+            "- Do not repeat the prior Growth System Diagnosis block after a skepticism call-out.",
+            "",
+            "[ANTI-BOT / SCRAPER PROTECTION ERROR HANDLING]",
+            "- If the user mentions anti-bot protection, bot protection, blocked pages, CAPTCHA, Cloudflare, Akamai, firewall, access denied, 403, or forbidden, assume the automated scanner cannot read that domain cleanly.",
+            "- You are strictly forbidden from offering Run Free Audit or saying the scanner can check the live page for that domain in the same conversation.",
+            "- Shift to manual expert review and make Book Strategy Call the primary next step.",
+            "",
             "[STRICT CONTEXT RESPONSIVENESS OVERRIDE]",
             "- If a user writes a detailed message explaining how they get traffic, which tools they use, or what system they want to build, you are strictly forbidden from outputting generic capabilities lists or saying 'My role is to understand...'.",
             "- You must read their exact words, apply the matching industry matrix, and explain how you would architect that specific system before suggesting the next step.",
@@ -178,6 +189,11 @@ async function buildGptReply(
             "[STRICT CHOICE STATE TRACKING]",
             "- If you ask a binary question such as 'Would you like to run the audit or review the strategy manually?' and the user selects 'manually', 'manual review', 'recommendation', or 'review strategy', immediately render that exact path.",
             "- You are strictly forbidden from repeating the binary question or repeating the preceding paragraph. Acknowledge their choice, provide the requested information, and move the conversation to the next logical step.",
+            "",
+            "[POST-RECOMMENDATION ACKNOWLEDGEMENT GUARDRAIL]",
+            "- If the user has already received a multi-point recommendation and responds with 'okay', 'ok', 'cool', 'sounds good', 'nice', 'makes sense', or 'got it', do not repeat the recommendation.",
+            "- Move to the next action in no more than 2 sentences.",
+            "- Do not use a repeated checklist and do not add a new diagnosis unless the user explicitly asks for deeper explanation.",
             "",
             "[CRITICAL NO-WEBSITE STATE]",
             `- User Has Website: ${fallback.leadProfile.hasNoWebsite ? "FALSE (the user explicitly said they do not have a live website yet)" : fallback.leadProfile.hasWebsiteOrLandingPage || fallback.leadProfile.websiteUrl ? "TRUE" : "UNKNOWN"}.`,
@@ -306,9 +322,12 @@ export async function POST(request: NextRequest) {
     }
 
     const playbook = fallback.leadProfile.hasNoWebsite ||
+      fallback.leadProfile.scannerBlocked ||
       fallback.action ||
       fallback.navigationHref ||
-      fallback.responseMode === "scanner_execute"
+      fallback.responseMode === "scanner_execute" ||
+      fallback.responseMode === "scanner_failure" ||
+      fallback.responseMode === "trust_skepticism"
       ? undefined
       : selectZoraPlaybook(message, fallback);
     const playbookReply = adaptZoraPlaybookResponse(playbook, fallback);
@@ -323,7 +342,9 @@ export async function POST(request: NextRequest) {
 
     const rawFinalReply = playbookReply || gptReply || fallback.reply;
     const finalReply =
-      fallback.leadProfile.hasNoWebsite && fallback.responseMode !== "company_background"
+      fallback.leadProfile.hasNoWebsite &&
+      fallback.responseMode !== "company_background" &&
+      fallback.responseMode !== "scanner_execute"
       ? sanitizeNoWebsiteReply(rawFinalReply)
       : rawFinalReply;
     const learningIntent = normalizeZoraLearningIntent(message, fallback.responseMode);

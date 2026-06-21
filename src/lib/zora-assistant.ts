@@ -167,6 +167,8 @@ export type ZoraIntent =
   | "timeline"
   | "pricing"
   | "scanner_execute"
+  | "scanner_failure"
+  | "trust_skepticism"
   | "handoff"
   | "audit_request"
   | "review_request"
@@ -177,6 +179,14 @@ export type ZoraIntent =
   | "next_step"
   | "out_of_scope"
   | "clarify";
+
+export type ZoraAssistantMode =
+  | "high_level_recommendation"
+  | "diagnosis"
+  | "cta_prompt"
+  | "scanner_execution"
+  | "company_background"
+  | "other";
 
 export type ZoraLeadProfile = {
   visitorName?: string;
@@ -216,6 +226,8 @@ export type ZoraLeadProfile = {
   businessModelCorrection?: string;
   hasWebsiteOrLandingPage?: boolean;
   hasNoWebsite?: boolean;
+  scannerBlocked?: boolean;
+  scannerBlockedReason?: string;
   email?: string;
   recommendedNextStep?: ZoraNextStep;
   recommendedFocusAreas?: string[];
@@ -231,8 +243,10 @@ export type ZoraLeadProfile = {
   hasSeenSoftClose?: boolean;
   lastUserCommand?: string;
   lastAssistantIntent?: ZoraIntent;
+  lastAssistantMode?: ZoraAssistantMode;
   lastAssistantMessageSummary?: string;
   duplicateCommandCount?: number;
+  postRecommendationAckCount?: number;
 };
 
 export type ZoraMessageAnalysis = {
@@ -265,6 +279,8 @@ export type ZoraMessageAnalysis = {
   currentTopic?: ZoraTopic;
   hasWebsiteOrLandingPage?: boolean;
   hasNoWebsite?: boolean;
+  scannerBlocked?: boolean;
+  scannerBlockedReason?: string;
   email?: string;
   confidenceScore: number;
   outOfScope: boolean;
@@ -666,19 +682,25 @@ function isThanksMessage(message: string) {
 }
 
 function isCasualAcknowledgmentMessage(message: string) {
-  return /^(ok|okay|nice|okay nice|ok nice|yes|yeah|yep|sure|sounds good|continue|keep going|go on|got it)[.!?]*$/i.test(
+  return /^(ok|okay|nice|okay nice|ok nice|yes|yeah|yep|sure|sounds good|continue|keep going|go on|got it|yea i see|yeah i see|i see)[.!?]*$/i.test(
     message.trim(),
   );
 }
 
 function isMomentumAcknowledgmentMessage(message: string) {
-  return /^(ok|okay|yes|yeah|yep|sure|sounds good|continue|keep going|go on|tell me more|more|why)[.!?]*$/i.test(
+  return /^(ok|okay|yes|yeah|yep|sure|sounds good|continue|keep going|go on|tell me more|more|why|yea i see|yeah i see|i see)[.!?]*$/i.test(
+    message.trim(),
+  );
+}
+
+function isPostRecommendationAcknowledgementMessage(message: string) {
+  return /^(ok|okay|cool|sounds good|nice|makes sense|that makes sense|got it|yea i see|yeah i see|i see)[.!?]*$/i.test(
     message.trim(),
   );
 }
 
 function isTopicContinuationMessage(message: string) {
-  return /^(ok|okay|yes|yeah|yep|sure|sounds good|continue|keep going|go on|tell me more|more|why|interesting)[.!?]*$/i.test(
+  return /^(ok|okay|yes|yeah|yep|sure|sounds good|continue|keep going|go on|tell me more|more|why|interesting|yea i see|yeah i see|i see)[.!?]*$/i.test(
     message.trim(),
   );
 }
@@ -709,14 +731,56 @@ function isFreeAuditPricingQuestion(message: string) {
   );
 }
 
+function normalizeCommandText(message: string) {
+  return message
+    .toLowerCase()
+    .trim()
+    .replace(/[’']/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isAuditInformationIntent(message: string) {
+  const text = normalizeCommandText(message);
+
+  return /^(what is the audit|how much is the audit|is the audit free|is it free audit|is the free audit actually free|explain the audit|what does the scanner do|should i run the audit)$/.test(
+    text,
+  );
+}
+
 function isScannerExecutionRequest(message: string) {
-  return /^(run it|start it|scan it|run audit|run the audit|start audit|start the audit|start the scan|run scan|run the scan|scan my site|scan my website|scan my store|audit my site|audit my website|audit my store)[.!?]*$/i.test(
-    message.trim(),
+  const text = normalizeCommandText(message);
+
+  if (!text || isAuditInformationIntent(text)) return false;
+
+  return /^(run (the )?(free )?audit|start (the )?(free )?audit|start (the )?scan|scan (my )?(site|website|store)|scan it|audit (my )?(site|website|store)|audit it|diagnose (my )?(site|website|store)|diagnose it|lets run it|run it|ok run it|okay run it|yes run it|go ahead and run it|launch the audit|begin the audit)$/.test(
+    text,
   );
 }
 
 function isDiagnoseExecutionRequest(message: string) {
-  return /^diagnose my growth system[.!?]*$/i.test(message.trim());
+  return normalizeCommandText(message) === "diagnose my growth system";
+}
+
+function isScannerFailureMessage(message: string) {
+  return /\b(anti[-\s]?bot|bot protection|blocked by|page blocked|blocked|captcha|cloudflare|akamai|firewall|access denied|403|forbidden)\b/i.test(
+    message,
+  );
+}
+
+function scannerBlockedReason(message: string) {
+  if (/\b(cloudflare)\b/i.test(message)) return "Cloudflare protection";
+  if (/\b(akamai)\b/i.test(message)) return "Akamai protection";
+  if (/\b(captcha)\b/i.test(message)) return "CAPTCHA protection";
+  if (/\b(403|forbidden|access denied)\b/i.test(message)) return "access restriction";
+  return "anti-bot protection";
+}
+
+function isTrustSkepticismMessage(message: string) {
+  return /\b(copy and paste|copy-paste|copy paste|generic|template|script|canned|boilerplate|not tailored|tailored to my website|tailored to my site|actual website|my website or|just.*reply|same reply)\b/i.test(
+    message,
+  );
 }
 
 function isReviewRequest(message: string) {
@@ -802,8 +866,11 @@ function isEcommerceBuildQuestion(message: string) {
 }
 
 function isAuditRequest(message: string) {
-  return /\b(audit my website|audit my site|audit my store|run an audit|free audit|scan my website|scan my site|scan my store|website audit|check (?:the )?site path|review (?:the )?site path|look at (?:the )?site path|check (?:my )?site|review (?:my )?site|check my website|review my website)\b/i.test(
-    message,
+  return (
+    isAuditInformationIntent(message) ||
+    /\b(audit my website|audit my site|audit my store|run an audit|free audit|scan my website|scan my site|scan my store|website audit|check (?:the )?site path|review (?:the )?site path|look at (?:the )?site path|check (?:my )?site|review (?:my )?site|check my website|review my website)\b/i.test(
+      message,
+    )
   );
 }
 
@@ -1531,10 +1598,14 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
       ? "business_model_correction"
     : founderFollowup.isFounderFollowup || companyBackground.isCompanyBackgroundQuestion
       ? "company_background"
-    : isFreeAuditPricingQuestion(message) || isPricingQuestion(message)
-      ? "pricing"
+    : isScannerFailureMessage(message)
+      ? "scanner_failure"
+    : isTrustSkepticismMessage(message)
+      ? "trust_skepticism"
     : isScannerExecutionRequest(message) || isDiagnoseExecutionRequest(message)
       ? "scanner_execute"
+    : isFreeAuditPricingQuestion(message) || isPricingQuestion(message)
+      ? "pricing"
     : isThanksMessage(message)
       ? "thanks"
       : isCasualAcknowledgmentMessage(message)
@@ -1610,6 +1681,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     currentTopic,
     hasWebsiteOrLandingPage,
     hasNoWebsite,
+    scannerBlocked: isScannerFailureMessage(message) ? true : undefined,
+    scannerBlockedReason: isScannerFailureMessage(message) ? scannerBlockedReason(message) : undefined,
     email,
     outOfScope,
     ...revenue,
@@ -1961,6 +2034,21 @@ function mergeLeadProfile(
       addChange(changes, "websiteUrl", nextProfile.websiteUrl, undefined);
       delete nextProfile.websiteUrl;
     }
+  }
+
+  if (analysis.scannerBlocked) {
+    addChange(changes, "scannerBlocked", nextProfile.scannerBlocked, true);
+    nextProfile.scannerBlocked = true;
+  }
+
+  if (analysis.scannerBlockedReason) {
+    addChange(
+      changes,
+      "scannerBlockedReason",
+      nextProfile.scannerBlockedReason,
+      analysis.scannerBlockedReason,
+    );
+    nextProfile.scannerBlockedReason = analysis.scannerBlockedReason;
   }
 
   if (analysis.email) {
@@ -2493,6 +2581,34 @@ function businessContextLabel(businessType: ZoraBusinessType) {
   }
 }
 
+function websiteHostLabel(profile: ZoraLeadProfile) {
+  const raw = profile.websiteUrl || "";
+  const host = raw
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .split(/[/?#]/)[0];
+
+  if (/dickssportinggoods\.com/i.test(host)) return "Dick's Sporting Goods";
+  if (!host) return "this website";
+  return host;
+}
+
+function isDicksSportingGoods(profile: ZoraLeadProfile) {
+  return /dickssportinggoods\.com/i.test(profile.websiteUrl || "");
+}
+
+function enterpriseRetailSpecifics(profile: ZoraLeadProfile) {
+  if (isDicksSportingGoods(profile)) {
+    return "For Dick's Sporting Goods specifically, I would not frame this as a basic landing-page issue. I would look at complex retail flows: mobile category navigation across sporting departments, size and availability filtering, local Pick Up In Store clarity, rewards/account login friction, and checkout behavior across a very large catalog.";
+  }
+
+  if (profile.industryProfile?.industry === "marketplace_retail") {
+    return "For a large retail or marketplace site, I would not frame this as a basic landing-page issue. I would look at search/departments, mobile filtering, local availability, pickup or delivery clarity, account flow, and checkout behavior across a large catalog.";
+  }
+
+  return `For ${websiteHostLabel(profile)}, I would make the review specific by checking the actual visitor path, offer clarity, conversion friction, tracking visibility, and follow-up or checkout handoff instead of treating the earlier framework as a confirmed audit.`;
+}
+
 export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
   const areas = joinList(focusAreas(profile));
   const industry = profile.industryProfile?.industry;
@@ -2987,6 +3103,10 @@ function buildThanksResponse(profile: ZoraLeadProfile, repeatedSoftClose = false
 }
 
 function buildAcknowledgementResponse(profile: ZoraLeadProfile) {
+  if (profile.scannerBlocked) {
+    return "Exactly. Since the automated scan is blocked here, the useful next step is a manual strategy review instead of repeating the same audit path.";
+  }
+
   if (profile.currentTopic) {
     const label = topicLabel(profile.currentTopic);
     const depth = Math.max(profile.currentTopicDepth || 1, 2);
@@ -3011,6 +3131,27 @@ function buildAcknowledgementResponse(profile: ZoraLeadProfile) {
   }
 
   return "Glad that makes sense. The next useful step is to anchor this to a live URL if one exists, or map the business system first if the site is not ready yet.";
+}
+
+function buildPostRecommendationAcknowledgementResponse(
+  profile: ZoraLeadProfile,
+  acknowledgementCount: number,
+) {
+  if (profile.scannerBlocked) {
+    return acknowledgementCount > 1
+      ? "Would you like to book a strategy call so we can review the site manually?"
+      : "Glad that makes sense. Since the automated scanner is blocked for this domain, the next step is a manual strategy review rather than another audit attempt.";
+  }
+
+  if (profile.hasNoWebsite) {
+    return acknowledgementCount > 1
+      ? "Would you like to book a strategy call to map the launch blueprint?"
+      : "Glad that makes sense. Since there is no live site to audit yet, the next step is to map the implementation plan on a strategy call.";
+  }
+
+  return acknowledgementCount > 1
+    ? "Would you like to run the audit now or book a strategy call?"
+    : "Glad that makes sense. The next step is either to validate it with the free audit or map the implementation plan on a strategy call.";
 }
 
 function buildTimelineResponse(profile: ZoraLeadProfile, message: string) {
@@ -3117,7 +3258,44 @@ function buildOutOfScopeResponse() {
   return "I probably cannot help with that directly. Opzix focuses on websites, ecommerce, AI assistants, automation, tracking, follow-up, dashboards, integrations, and lead-generation systems. If the issue connects to your customer journey or business systems, I can help diagnose it.";
 }
 
-function buildAuditRequestResponse(profile: ZoraLeadProfile) {
+function buildScannerFailureResponse(profile: ZoraLeadProfile) {
+  const site = websiteHostLabel(profile);
+  const reason = profile.scannerBlockedReason || "anti-bot protection";
+
+  return [
+    `That makes sense. ${site === "this website" ? "This domain" : site} appears to be blocking automated access with ${reason}, so I would not keep pushing the free audit for this domain.`,
+    `${enterpriseRetailSpecifics(profile)} Because the automated scanner cannot read the page cleanly, the better path is a manual strategy review where we inspect the key flows directly.`,
+  ].join(" ");
+}
+
+function buildTrustSkepticismResponse(profile: ZoraLeadProfile) {
+  const scannerContext = profile.scannerBlocked
+    ? " The automated scan is also blocked on this domain, so I should not pretend that framework came from a completed scanner run."
+    : " I do not have your internal analytics or a completed scanner result in this chat, so I should keep the recommendation directional until we validate it.";
+
+  return [
+    "You're right to call that out.",
+    `That was a high-level structural framework, not a fully tailored website-specific audit.${scannerContext}`,
+    enterpriseRetailSpecifics(profile),
+    profile.scannerBlocked
+      ? "The honest next step is a manual strategy review, not another generic checklist or another scanner CTA."
+      : "The honest next step is to validate those assumptions against the actual page path before treating them as findings.",
+  ].join(" ");
+}
+
+function buildAuditRequestResponse(profile: ZoraLeadProfile, message = "") {
+  if (profile.scannerBlocked) {
+    return buildScannerFailureResponse(profile);
+  }
+
+  if (isAuditInformationIntent(message)) {
+    if (profile.hasNoWebsite) {
+      return "The audit is for live websites, so it is not the right tool before the site exists. For now, the better path is mapping the launch blueprint: offer, page path, lead capture, follow-up, and tracking.";
+    }
+
+    return "The free audit reviews public website signals like page clarity, conversion friction, tracking visibility, technical reliability, and customer-journey gaps. It is meant to turn assumptions into a practical improvement roadmap before you spend money on redesigns, ads, or automation.";
+  }
+
   if (profile.hasNoWebsite) {
     return "Since there is no live site yet, the best next step is a strategy call to map the first version, core offer, landing page path, and follow-up plan.";
   }
@@ -3284,12 +3462,16 @@ function scannerHrefForProfile(profile: ZoraLeadProfile) {
 }
 
 function buildScannerExecutionResponse(profile: ZoraLeadProfile) {
+  if (profile.scannerBlocked) {
+    return buildScannerFailureResponse(profile);
+  }
+
   if (profile.hasNoWebsite) {
-    return "There is no live site yet, so the right move is a strategy call to map the landing page architecture, core offer, lead capture, follow-up, and launch tracking.";
+    return "There is no live site to scan yet. The right next step is a strategy call to map the launch blueprint.";
   }
 
   if (!profile.websiteUrl) {
-    return "What website URL should I run the scan on?";
+    return "What website should I scan?";
   }
 
   return "Initiating the technical architecture scan for your domain now. Standby for the roadmap.";
@@ -4114,6 +4296,10 @@ function hasSufficientQualification(profile: ZoraLeadProfile) {
 }
 
 function buildNextStepResponse(profile: ZoraLeadProfile) {
+  if (profile.scannerBlocked) {
+    return "Since automated scanning is blocked for this domain, the clean next step is a manual strategy review focused on the real customer paths: navigation, availability, account flow, checkout, and tracking visibility.";
+  }
+
   if (profile.hasNoWebsite) {
     return "Since there is no live site yet, the best next step is a strategy call to map the landing page, offer, follow-up system, tracking, and launch timeline.";
   }
@@ -4369,13 +4555,19 @@ function nextConversationStage(
   shouldContinueTopic: boolean,
   shouldContinueMomentum: boolean,
 ): ZoraConversationStage {
-  if (intent === "handoff" || intent === "scanner_execute" || intent === "booking_request") {
+  if (
+    intent === "handoff" ||
+    intent === "scanner_execute" ||
+    intent === "scanner_failure" ||
+    intent === "booking_request"
+  ) {
     return "handoff";
   }
 
   if (intent === "recommendation") return "recommendation";
   if (intent === "company_background") return previousStage || "qualification";
   if (intent === "business_model_correction") return "deep_dive";
+  if (intent === "trust_skepticism") return "deep_dive";
   if (intent === "review_request") return "deep_dive";
   if (intent === "next_step" || intent === "audit_request") return "next_step";
   if (shouldContinueTopic || shouldContinueMomentum || intent === "focus_request") return "deep_dive";
@@ -4465,6 +4657,10 @@ function actionsForIntent(
 
   if (profile.hasNoWebsite && intent !== "out_of_scope") {
     return ["strategy_call"] as ZoraResponse["recommendedActions"];
+  }
+
+  if (profile.scannerBlocked && intent !== "out_of_scope") {
+    return ["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"];
   }
 
   if (intent === "thanks") {
@@ -4654,7 +4850,19 @@ export function buildZoraResponse(
   const { leadProfile, profileChanges } = mergeLeadProfile(currentProfile, analysis);
   const previousStage = inferConversationStage(currentProfile);
   const topicChanged = hasConversationTopicChanged(analysis, currentProfile);
+  const isPostRecommendationAck =
+    isPostRecommendationAcknowledgementMessage(message) &&
+    (currentProfile.lastAssistantMode === "high_level_recommendation" ||
+      (currentProfile.lastAssistantMode === "cta_prompt" &&
+        Boolean(currentProfile.postRecommendationAckCount)));
+  const postRecommendationAckCount = isPostRecommendationAck
+    ? (currentProfile.postRecommendationAckCount || 0) + 1
+    : 0;
+  const isScannerBlockedAcknowledgement =
+    leadProfile.scannerBlocked && isCasualAcknowledgmentMessage(message);
   const shouldAdvanceToHandoff =
+    !isPostRecommendationAck &&
+    !isScannerBlockedAcknowledgement &&
     isProgressionAgreementMessage(message) &&
     previousStage !== "handoff" &&
     hasDeliveredProgressionStage(previousStage) &&
@@ -4669,6 +4877,8 @@ export function buildZoraResponse(
     leadProfile.recommendationRoadmap = buildRecommendationRoadmap(leadProfile);
   }
   const shouldContinueMomentum =
+    !isPostRecommendationAck &&
+    !isScannerBlockedAcknowledgement &&
     !shouldAdvanceToHandoff &&
     previousStage !== "handoff" &&
     (analysis.intent === "acknowledgement" || analysis.intent === "clarify") &&
@@ -4677,6 +4887,8 @@ export function buildZoraResponse(
     !leadProfile.needsBusinessTypeClarification;
   const activeTopic = analysis.currentTopic || leadProfile.currentTopic;
   const shouldContinueTopic =
+    !isPostRecommendationAck &&
+    !isScannerBlockedAcknowledgement &&
     !shouldAdvanceToHandoff &&
     previousStage !== "handoff" &&
     Boolean(activeTopic) &&
@@ -4689,6 +4901,10 @@ export function buildZoraResponse(
   const effectiveIntent: ZoraIntent =
     shouldAdvanceToHandoff
       ? "handoff"
+      : isPostRecommendationAck
+      ? "next_step"
+      : isScannerBlockedAcknowledgement
+      ? "next_step"
       : shouldContinueTopic || shouldContinueMomentum
       ? "diagnosis"
       : shouldResumeRecommendationThread && leadProfile.recommendationRoadmap?.length
@@ -4752,13 +4968,18 @@ export function buildZoraResponse(
     effectiveIntent === "thanks" &&
     (Boolean(currentProfile.hasSeenSoftClose) || isCasualAcknowledgmentMessage(message));
   const duplicateReply =
+    !isPostRecommendationAck &&
     duplicateCommandCount > 0 &&
     effectiveIntent !== "company_background" &&
     effectiveIntent !== "out_of_scope"
       ? buildDuplicateCommandResponse(currentUserCommand, leadProfile, effectiveIntent)
       : "";
+  const postRecommendationReply = isPostRecommendationAck
+    ? buildPostRecommendationAcknowledgementResponse(leadProfile, postRecommendationAckCount)
+    : "";
   const reply =
     duplicateReply ||
+    postRecommendationReply ||
     (effectiveIntent === "out_of_scope"
       ? buildOutOfScopeResponse()
       : effectiveIntent === "business_model_correction"
@@ -4769,6 +4990,10 @@ export function buildZoraResponse(
             analysis.companyBackgroundSubtype,
             analysis.founderFollowupSubtype,
           )
+      : effectiveIntent === "scanner_failure"
+        ? buildScannerFailureResponse(leadProfile)
+      : effectiveIntent === "trust_skepticism"
+        ? buildTrustSkepticismResponse(leadProfile)
       : effectiveIntent === "thanks"
         ? buildThanksResponse(leadProfile, repeatedSoftClose)
         : effectiveIntent === "acknowledgement"
@@ -4786,7 +5011,7 @@ export function buildZoraResponse(
               : effectiveIntent === "small_talk"
                 ? buildSmallTalkResponse(leadProfile)
                   : effectiveIntent === "audit_request"
-                    ? buildAuditRequestResponse(leadProfile)
+                    ? buildAuditRequestResponse(leadProfile, message)
                   : effectiveIntent === "review_request"
                     ? buildReviewRequestResponse(leadProfile, message)
                   : effectiveIntent === "booking_request"
@@ -4862,7 +5087,10 @@ export function buildZoraResponse(
   const finalReply = shouldPrependTrafficIntentAnchor
     ? `${zoraTrafficIntentAnchor(leadProfile)}\n\n${reply}`
     : reply;
-  const guardedFinalReply = leadProfile.hasNoWebsite && effectiveIntent !== "company_background"
+  const guardedFinalReply =
+    leadProfile.hasNoWebsite &&
+    effectiveIntent !== "company_background" &&
+    effectiveIntent !== "scanner_execute"
     ? enforceNoWebsiteGuardrail(finalReply)
     : finalReply;
 
@@ -4876,9 +5104,43 @@ export function buildZoraResponse(
     duplicateCommandCount,
   );
   addChange(profileChanges, "lastAssistantIntent", leadProfile.lastAssistantIntent, effectiveIntent);
+  const nextLastAssistantMode: ZoraAssistantMode = isPostRecommendationAck
+    ? "cta_prompt"
+    : effectiveIntent === "recommendation"
+      ? "high_level_recommendation"
+      : effectiveIntent === "scanner_execute"
+        ? "scanner_execution"
+        : effectiveIntent === "company_background"
+          ? "company_background"
+          : hasDiagnosis
+            ? "diagnosis"
+            : effectiveIntent === "acknowledgement" ||
+                effectiveIntent === "handoff" ||
+                effectiveIntent === "next_step"
+              ? "cta_prompt"
+              : "other";
+  const nextPostRecommendationAckCount = isPostRecommendationAck
+    ? postRecommendationAckCount
+    : effectiveIntent === "recommendation"
+      ? 0
+      : currentProfile.postRecommendationAckCount;
+  addChange(
+    profileChanges,
+    "lastAssistantMode",
+    leadProfile.lastAssistantMode,
+    nextLastAssistantMode,
+  );
+  addChange(
+    profileChanges,
+    "postRecommendationAckCount",
+    leadProfile.postRecommendationAckCount,
+    nextPostRecommendationAckCount,
+  );
   leadProfile.lastUserCommand = currentUserCommand;
   leadProfile.duplicateCommandCount = duplicateCommandCount;
   leadProfile.lastAssistantIntent = effectiveIntent;
+  leadProfile.lastAssistantMode = nextLastAssistantMode;
+  leadProfile.postRecommendationAckCount = nextPostRecommendationAckCount;
   leadProfile.lastAssistantMessageSummary = summarizeAssistantMessage(
     effectiveIntent,
     guardedFinalReply,
@@ -4901,8 +5163,10 @@ export function buildZoraResponse(
     : (currentProfile.recentTalkingPoints || []).slice(0, 5);
 
   const action =
-    effectiveIntent === "scanner_execute" ||
+    !leadProfile.scannerBlocked &&
+    (effectiveIntent === "scanner_execute" ||
     (effectiveIntent === "handoff" && isHandoffExecutionMessage(message))
+    )
       ? leadProfile.websiteUrl
         ? ({ type: "start_audit", url: leadProfile.websiteUrl } as const)
         : undefined
@@ -4913,6 +5177,24 @@ export function buildZoraResponse(
     action?.type === "start_audit"
       ? scannerHrefForProfile({ ...leadProfile, websiteUrl: action.url })
       : undefined;
+  const recommendedActions = isPostRecommendationAck
+    ? leadProfile.scannerBlocked
+      ? (["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"])
+      : leadProfile.hasNoWebsite
+      ? (["strategy_call"] as ZoraResponse["recommendedActions"])
+      : postRecommendationAckCount > 1
+        ? (["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"])
+        : ([
+            "free_audit",
+            "strategy_call",
+            "ask_question",
+          ] as ZoraResponse["recommendedActions"])
+    : actionsForIntent(
+        effectiveIntent,
+        hasDiagnosis,
+        leadProfile,
+        repeatedSoftClose,
+      );
 
   return {
     reply: guardedFinalReply,
@@ -4924,11 +5206,6 @@ export function buildZoraResponse(
     action,
     navigationHref,
     recentTalkingPoint,
-    recommendedActions: actionsForIntent(
-      effectiveIntent,
-      hasDiagnosis,
-      leadProfile,
-      repeatedSoftClose,
-    ),
+    recommendedActions,
   };
 }
