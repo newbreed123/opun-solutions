@@ -42,6 +42,7 @@ export type ZoraFailureReason =
   | "out_of_scope_mishandled";
 
 export type ZoraLearningIntent =
+  | "company_background"
   | "pricing_question"
   | "live_agent_request"
   | "review_request"
@@ -157,6 +158,7 @@ export function normalizeZoraLearningIntent(
   message: string,
   responseMode?: string,
 ): ZoraLearningIntent {
+  if (responseMode === "company_background") return "company_background";
   if (isPricingQuestion(message)) return "pricing_question";
   if (isHumanRequest(message)) return "live_agent_request";
   if (responseMode === "review_request") return "review_request";

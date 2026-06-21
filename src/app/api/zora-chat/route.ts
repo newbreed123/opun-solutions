@@ -233,7 +233,8 @@ export async function POST(request: NextRequest) {
         : null;
 
     const rawFinalReply = playbookReply || gptReply || fallback.reply;
-    const finalReply = fallback.leadProfile.hasNoWebsite
+    const finalReply =
+      fallback.leadProfile.hasNoWebsite && fallback.responseMode !== "company_background"
       ? sanitizeNoWebsiteReply(rawFinalReply)
       : rawFinalReply;
     const learningIntent = normalizeZoraLearningIntent(message, fallback.responseMode);
@@ -248,13 +249,18 @@ export async function POST(request: NextRequest) {
       intent: learningIntent,
       conversationStage: fallback.leadProfile.conversationStage,
       currentTopic: fallback.leadProfile.currentTopic,
-      currentSubtopic: fallback.recentTalkingPoint,
+      currentSubtopic:
+        fallback.responseMode === "company_background"
+          ? fallback.currentMessageAnalysis.companyBackgroundSubtype
+          : fallback.recentTalkingPoint,
       profileBefore: incomingLeadProfile,
       action: fallback.action,
       recommendedActions: finalRecommendedActions,
       eventType:
         fallback.responseMode === "audit_request"
           ? "audit_requested"
+          : fallback.responseMode === "company_background"
+            ? "company_background"
           : fallback.responseMode === "booking_request"
             ? "booking_requested"
             : fallback.responseMode === "recommendation"

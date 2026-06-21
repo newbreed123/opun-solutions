@@ -3,6 +3,7 @@ import {
   type ZoraIndustry,
   type ZoraIndustryProfile,
 } from "@/lib/zora-industry-awareness";
+import { OPZIX_COMPANY_PROFILE } from "@/lib/opzix-company-profile";
 
 export type ZoraBusinessType =
   | "Ecommerce"
@@ -131,8 +132,24 @@ export type ZoraNotificationChannel =
   | "None"
   | "Unknown";
 
+export type ZoraCompanyBackgroundSubtype =
+  | "owner"
+  | "ceo"
+  | "founder"
+  | "legitimacy"
+  | "what_is_opzix"
+  | "who_are_you"
+  | "general_company";
+
+export type ZoraCompanyBackgroundIntent = {
+  isCompanyBackgroundQuestion: boolean;
+  subtype: ZoraCompanyBackgroundSubtype;
+  confidence: "High" | "Moderate" | "Low";
+};
+
 export type ZoraIntent =
   | "diagnosis"
+  | "company_background"
   | "capability"
   | "small_talk"
   | "thanks"
@@ -204,6 +221,7 @@ export type ZoraLeadProfile = {
 export type ZoraMessageAnalysis = {
   intent: ZoraIntent;
   rawMessage?: string;
+  companyBackgroundSubtype?: ZoraCompanyBackgroundSubtype;
   visitorName?: string;
   businessType?: ZoraBusinessType;
   platform?: string;
@@ -470,6 +488,72 @@ function extractCurrentTopic(message: string, challenge?: ZoraChallenge) {
   return firstMatch(message, topicPatterns) || topicFromChallenge(challenge);
 }
 
+export function detectCompanyBackgroundIntent(
+  message: string,
+): ZoraCompanyBackgroundIntent {
+  const text = message.trim();
+
+  if (
+    /\b(who owns|who owns this company|who owns this|who owns it|who is the owner|owner of opzix)\b/i.test(text)
+  ) {
+    return { isCompanyBackgroundQuestion: true, subtype: "owner", confidence: "High" };
+  }
+
+  if (/\b(who is the ceo|who's the ceo|ceo of opzix)\b/i.test(text)) {
+    return { isCompanyBackgroundQuestion: true, subtype: "ceo", confidence: "High" };
+  }
+
+  if (
+    /\b(who is the founder|who's the founder|who started|who founded|who created|who built)\b/i.test(
+      text,
+    )
+  ) {
+    return { isCompanyBackgroundQuestion: true, subtype: "founder", confidence: "High" };
+  }
+
+  if (/\b(who runs|who runs this|who runs opzix)\b/i.test(text)) {
+    return { isCompanyBackgroundQuestion: true, subtype: "owner", confidence: "High" };
+  }
+
+  if (/\b(is this legit|is opzix legit|is this real|is opzix real|is this a scam|scam)\b/i.test(text)) {
+    return {
+      isCompanyBackgroundQuestion: true,
+      subtype: "legitimacy",
+      confidence: "High",
+    };
+  }
+
+  if (/\b(what is opzix|who is opzix)\b/i.test(text)) {
+    return {
+      isCompanyBackgroundQuestion: true,
+      subtype: "what_is_opzix",
+      confidence: "High",
+    };
+  }
+
+  if (/\b(who are you|who am i talking to|who is this|what company is this)\b/i.test(text)) {
+    return {
+      isCompanyBackgroundQuestion: true,
+      subtype: "who_are_you",
+      confidence: "High",
+    };
+  }
+
+  if (/\b(opzix)\b/i.test(text) && /\b(company|background|team|real|legit|owned|runs)\b/i.test(text)) {
+    return {
+      isCompanyBackgroundQuestion: true,
+      subtype: "general_company",
+      confidence: "Moderate",
+    };
+  }
+
+  return {
+    isCompanyBackgroundQuestion: false,
+    subtype: "general_company",
+    confidence: "Low",
+  };
+}
+
 function isCapabilityQuestion(message: string) {
   if (
     /\b(how can you help|what can you do|what do you do|what does opzix do|tell me more about opzix|more about opzix|about opzix|who is opzix|what is opzix|your services|services do you offer|do you build|can you build|what do you build|build websites?)\b/i.test(
@@ -597,6 +681,12 @@ function isConsultantQuestion(message: string) {
 
 function isWebsiteBuildOrRebuildQuestion(message: string) {
   return /\b(considering|thinking about|want to|need to|should i|can you|could you|looking at|planning to)?\s*(build(?:ing)?|rebuild(?:ing)?|replace|redesign|create|launch)\s+(?:a\s+)?(?:new\s+)?(?:website|site|landing page)\b|\bnew\s+(?:website|site)\b/i.test(
+    message,
+  );
+}
+
+function isPreLaunchWebsiteBuildRequest(message: string) {
+  return /\b(i want to|want to|i need|need to|planning to|ready to|looking to)\s+(?:build|create|launch|make)\s+(?:a\s+)?(?:new\s+)?(?:website|site|landing page)\b|\bneed a new (?:website|site|landing page)\b|\bwant a new (?:website|site|landing page)\b/i.test(
     message,
   );
 }
@@ -1163,12 +1253,21 @@ function calculateConfidence(analysis: Omit<ZoraMessageAnalysis, "confidenceScor
 
 export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const outOfScope = isOutOfScopeQuestion(message);
+  const companyBackground = outOfScope
+    ? {
+        isCompanyBackgroundQuestion: false,
+        subtype: "general_company" as const,
+        confidence: "Low" as const,
+      }
+    : detectCompanyBackgroundIntent(message);
   const businessType = outOfScope ? undefined : firstMatch(message, businessTypePatterns);
   const platform = outOfScope ? undefined : firstMatch(message, platformPatterns);
   const toolsMentioned = outOfScope ? undefined : extractToolsMentioned(message);
   const industry = outOfScope ? undefined : extractIndustry(message, businessType);
   const websiteUrl = outOfScope ? undefined : extractWebsiteUrl(message);
-  const hasNoWebsite = outOfScope ? undefined : hasNoWebsiteAnswer(message) || undefined;
+  const hasNoWebsite = outOfScope
+    ? undefined
+    : hasNoWebsiteAnswer(message) || isPreLaunchWebsiteBuildRequest(message) || undefined;
   const hasWebsiteOrLandingPage =
     outOfScope || hasNoWebsite || websiteUrl
       ? undefined
@@ -1202,6 +1301,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const desiredOutcome = outOfScope ? undefined : extractDesiredOutcome(message);
   const intent: ZoraIntent = outOfScope
     ? "out_of_scope"
+    : companyBackground.isCompanyBackgroundQuestion
+      ? "company_background"
     : isFreeAuditPricingQuestion(message) || isPricingQuestion(message)
       ? "pricing"
     : isScannerExecutionRequest(message)
@@ -1250,6 +1351,9 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const analysisWithoutConfidence = {
     intent,
     rawMessage: message,
+    companyBackgroundSubtype: companyBackground.isCompanyBackgroundQuestion
+      ? companyBackground.subtype
+      : undefined,
     visitorName,
     businessType,
     platform,
@@ -1577,6 +1681,25 @@ function applyProfileContextToAnalysis(
   analysis: ZoraMessageAnalysis,
   currentProfile: ZoraLeadProfile,
 ): ZoraMessageAnalysis {
+  const contextualPreLaunchBuild =
+    currentProfile.hasNoWebsite &&
+    /\b(?:want to|need to|ready to|planning to|looking to)?\s*(?:build|create|launch|make)\s+(?:one|it)\b/i.test(
+      analysis.rawMessage || "",
+    );
+
+  if (contextualPreLaunchBuild && analysis.intent !== "company_background") {
+    const { confidenceScore, ...analysisWithoutConfidence } = analysis;
+    void confidenceScore;
+
+    return withRecalculatedConfidence({
+      ...analysisWithoutConfidence,
+      intent: "consultant",
+      hasNoWebsite: true,
+      hasWebsiteOrLandingPage: false,
+      challenge: analysis.challenge || "Website",
+    });
+  }
+
   const nonEcommerceLeadSourceAnswer =
     currentProfile.businessType &&
     currentProfile.businessType !== "Ecommerce" &&
@@ -1804,6 +1927,14 @@ export function scoreZoraLeadTemperature(
     eventType === "cost_or_fix_requested" ||
     eventType === "recommendation_requested" ||
     eventType === "consultant_question";
+  const hasBusinessContext = Boolean(
+    profile.businessType ||
+      profile.challenge ||
+      profile.websiteUrl ||
+      profile.hasNoWebsite ||
+      profile.hasWebsiteOrLandingPage ||
+      profile.industryProfile,
+  );
 
   if (
     highIntentEvent ||
@@ -1814,6 +1945,10 @@ export function scoreZoraLeadTemperature(
         profile.challenge === "Follow-up"))
   ) {
     return "hot";
+  }
+
+  if (eventType === "company_background" && hasBusinessContext) {
+    return "warm";
   }
 
   if (
@@ -2031,6 +2166,44 @@ export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
 }
 
 function buildRecommendationRoadmap(profile: ZoraLeadProfile): ZoraRoadmapStep[] {
+  if (profile.hasNoWebsite) {
+    const isRealEstate = profile.businessType === "Real Estate";
+    return [
+      {
+        title: isRealEstate
+          ? "Seller/Buyer Offer Architecture"
+          : "Pre-Launch Offer Architecture",
+        reason: isRealEstate
+          ? "A real estate site should start with a clear seller or buyer promise before design starts."
+          : "The first version should be shaped around a clear offer and audience before design starts.",
+        validation: isRealEstate
+          ? "Map seller versus buyer audience, local proof, valuation or consultation offer, first landing page sections, and the primary CTA."
+          : "Map target audience, core offer, first landing page sections, proof needs, and the primary CTA.",
+        expectedImpact: isRealEstate
+          ? "Give traffic a clear path into a seller or buyer inquiry from day one."
+          : "Give launch traffic a clear path instead of sending visitors into a vague first version.",
+        costRange: "Scope after strategy review",
+        timeline: "1-2 weeks",
+      },
+      {
+        title: isRealEstate
+          ? "Booking, CRM, and Source Tracking Plan"
+          : "Lead Capture and Follow-Up Plan",
+        reason: isRealEstate
+          ? "Buyer and seller inquiries need immediate routing, booking clarity, and source tracking from launch."
+          : "New inquiries need a clear owner, confirmation path, and follow-up process from the first campaign.",
+        validation: isRealEstate
+          ? "Define form fields, booking path, CRM routing, source tags, response ownership, and first-response notifications."
+          : "Define form fields, booking or intake flow, CRM/email routing, tracking events, response ownership, and launch reporting.",
+        expectedImpact: isRealEstate
+          ? "Make the first version measurable and ready for seller or buyer traffic."
+          : "Make the first version measurable and easier to improve after launch.",
+        costRange: "Scope after strategy review",
+        timeline: "1-2 weeks",
+      },
+    ];
+  }
+
   if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
     if (profile.funnelStage === "Product pages" || profile.productScope === "All products") {
       return [
@@ -2307,7 +2480,9 @@ function buildRecommendationResponse(profile: ZoraLeadProfile) {
     `What I would validate: ${first.validation}`,
     `Expected impact: ${first.expectedImpact}`,
     second ? `What comes second: ${second.title}. ${second.reason}` : "",
-    "The next step should be based on evidence from the live path, not a guessed scope.",
+    profile.hasNoWebsite
+      ? "The next step should be based on a clear launch roadmap, not a guessed scope."
+      : "The next step should be based on evidence from the live path, not a guessed scope.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -2343,6 +2518,55 @@ function greetingPrefix(profile: ZoraLeadProfile) {
 
 function buildCapabilityResponse(profile: ZoraLeadProfile) {
   return `${greetingPrefix(profile)}Yes. Opzix builds websites, ecommerce systems, AI assistants, CRM and booking flows, automation, dashboards, integrations, lead-generation systems, and audit-based implementation roadmaps. My role is to understand what kind of business you have, identify the likely bottleneck, explain what it means, and recommend whether the next move is a focused fix, free audit, or strategy call.`;
+}
+
+function companyBackgroundContextReturn(profile: ZoraLeadProfile) {
+  if (profile.hasNoWebsite) {
+    return "Back to your situation: since you do not have a live site yet, I would stay on pre-launch architecture: offer clarity, target audience, first landing page structure, lead capture, booking or intake flow, tracking from day one, and CRM/email follow-up.";
+  }
+
+  if (hasProfileDiagnosisSignal(profile)) {
+    return `Back to your situation: based on what you've shared, I would stay focused on ${joinList(
+      focusAreas(profile),
+    )}.`;
+  }
+
+  return "What kind of business are you building or improving?";
+}
+
+function buildCompanyBackgroundResponse(
+  profile: ZoraLeadProfile,
+  subtype: ZoraCompanyBackgroundSubtype = "general_company",
+) {
+  const company = OPZIX_COMPANY_PROFILE;
+  let answer: string;
+
+  switch (subtype) {
+    case "owner":
+      answer = `${company.ownershipStatement} ${company.whatOpzixDoes}`;
+      break;
+    case "ceo":
+      answer = `${company.companyName} is led by ${company.founderName}, the ${company.founderRole.toLowerCase()} behind the platform. ${company.companyName} is currently focused on helping businesses diagnose growth bottlenecks and build connected systems to fix them.`;
+      break;
+    case "founder":
+      answer = `${company.companyName} was started by ${company.founderName}, the ${company.founderRole.toLowerCase()}. ${company.ownershipStatement}`;
+      break;
+    case "legitimacy":
+      answer = `Yes, ${company.companyName} is a real independent company, and ${company.launchStage} You can find it at ${company.domain}. ${company.philosophy}`;
+      break;
+    case "what_is_opzix":
+      answer = `${company.companyName} is an ${company.positioning}. ${company.whatOpzixDoes}`;
+      break;
+    case "who_are_you":
+      answer = `You're talking to Zora, ${company.companyName}'s AI Growth Consultant. ${company.companyName} is an ${company.positioning} at ${company.domain}.`;
+      break;
+    case "general_company":
+    default:
+      answer = `${company.companyName} is an ${company.positioning}. ${company.ownershipStatement}`;
+      break;
+  }
+
+  return `${answer}\n\n${companyBackgroundContextReturn(profile)}`;
 }
 
 function buildSmallTalkResponse(profile: ZoraLeadProfile) {
@@ -2721,15 +2945,32 @@ function buildConsultantResponse(profile: ZoraLeadProfile, message: string) {
     return buildRoadmapFollowUpResponse(message, profile.recommendationRoadmap);
   }
 
+  if (
+    profile.hasNoWebsite &&
+    /\b(build|create|launch|make)\s+(?:one|it|a\s+website|a\s+site|a\s+landing page|new website|new site|new landing page)\b/i.test(
+      message,
+    )
+  ) {
+    return "Since you do not have a website yet, I would treat this as pre-launch architecture, not a redesign. The first step is mapping the offer, target audience, first landing page structure, lead capture, booking or intake flow, tracking from day one, and CRM/email follow-up before design starts.";
+  }
+
   if (/\bshopify\b.+\bbigcommerce\b|\bbigcommerce\b.+\bshopify\b/i.test(message)) {
     return "Shopify is usually the cleaner path for DTC stores that need speed, app ecosystem, and simpler operations. BigCommerce can make sense for more complex catalogs, B2B pricing, multi-store needs, or tighter backend requirements. The right choice depends on catalog complexity, checkout rules, integrations, team workflow, and how much control you need over operations.";
   }
 
   if (/\b(should i run ads|run ads|ads|advertising|scale traffic)\b/i.test(message)) {
+    if (profile.hasNoWebsite) {
+      return "Since there is no live site yet, I would not start with ads. I would first map the offer, target audience, landing page structure, lead capture, tracking from day one, and follow-up path so traffic has somewhere clear to go.";
+    }
+
     return "What this means: ads only help when the path after the click can convert and follow up. Traffic flows into conversion, then follow-up, then operations.\nWhat I would check: landing-page match, offer clarity, mobile path, tracking, and whether leads or carts are handled quickly.\nWhy it matters: more traffic will not solve conversion leaks; it usually makes the leak more expensive.\nRecommendation: if conversion is weak, fix the site path first. If conversion is strong, scale traffic. If leads exist but close rate is weak, fix follow-up and operations before buying more traffic.";
   }
 
   if (isWebsiteBuildOrRebuildQuestion(message)) {
+    if (profile.hasNoWebsite) {
+      return "Since you do not have a website yet, I would treat this as pre-launch architecture, not a redesign. The first step is mapping the offer, target audience, first landing page structure, lead capture, booking or intake flow, tracking from day one, and CRM/email follow-up before design starts.";
+    }
+
     if (profile.businessType === "Real Estate") {
       return "For a real estate business, I would not start with a generic new website. I would scope the site around the lead path: seller or buyer offer, local proof, valuation or consultation CTA, fast follow-up, source tracking, and a page structure that supports ads, organic search, and referrals. The first decision is whether you need a focused landing path or a fuller brand/site rebuild. A strategy call is usually the better next step for scoping that before treating it like a fixed website project.";
     }
@@ -3689,6 +3930,7 @@ function hasConversationTopicChanged(
       analysis.intent === "audit_request" ||
       analysis.intent === "review_request" ||
       analysis.intent === "scanner_execute" ||
+      analysis.intent === "company_background" ||
       analysis.intent === "capability" ||
       analysis.intent === "small_talk" ||
       analysis.intent === "out_of_scope",
@@ -3707,6 +3949,7 @@ function nextConversationStage(
   }
 
   if (intent === "recommendation") return "recommendation";
+  if (intent === "company_background") return previousStage || "qualification";
   if (intent === "review_request") return "deep_dive";
   if (intent === "next_step" || intent === "audit_request") return "next_step";
   if (shouldContinueTopic || shouldContinueMomentum || intent === "focus_request") return "deep_dive";
@@ -3778,6 +4021,10 @@ function actionsForIntent(
   repeatedSoftClose = false,
 ) {
   if (profile.needsBusinessTypeClarification) {
+    return [] as ZoraResponse["recommendedActions"];
+  }
+
+  if (intent === "company_background") {
     return [] as ZoraResponse["recommendedActions"];
   }
 
@@ -3977,6 +4224,11 @@ export function buildZoraResponse(
   const reply =
     effectiveIntent === "out_of_scope"
       ? buildOutOfScopeResponse()
+      : effectiveIntent === "company_background"
+        ? buildCompanyBackgroundResponse(
+            leadProfile,
+            analysis.companyBackgroundSubtype,
+          )
       : effectiveIntent === "thanks"
         ? buildThanksResponse(leadProfile, repeatedSoftClose)
         : effectiveIntent === "acknowledgement"
@@ -4070,7 +4322,7 @@ export function buildZoraResponse(
   const finalReply = shouldPrependTrafficIntentAnchor
     ? `${zoraTrafficIntentAnchor(leadProfile)}\n\n${reply}`
     : reply;
-  const guardedFinalReply = leadProfile.hasNoWebsite
+  const guardedFinalReply = leadProfile.hasNoWebsite && effectiveIntent !== "company_background"
     ? enforceNoWebsiteGuardrail(finalReply)
     : finalReply;
 
