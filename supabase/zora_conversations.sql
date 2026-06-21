@@ -18,8 +18,14 @@ create table if not exists zora_conversations (
   recommended_focus_areas jsonb null,
   optional_revenue_mention text null,
   current_step text null,
+  intent text null,
+  conversation_stage text null,
+  current_topic text null,
+  current_subtopic text null,
   recommended_next_step text null,
   recommendation_roadmap jsonb null,
+  cta_clicked text null,
+  conversation_outcome text null,
   lead_score integer null,
   lead_temperature text null,
   latest_user_message text null,
@@ -28,6 +34,10 @@ create table if not exists zora_conversations (
   user_agent text null,
   audit_clicked boolean not null default false,
   strategy_call_clicked boolean not null default false,
+  ask_question_clicked boolean not null default false,
+  faq_opened boolean not null default false,
+  contact_requested boolean not null default false,
+  live_agent_requested boolean not null default false,
   email_submitted boolean not null default false
 );
 
@@ -87,10 +97,28 @@ alter table zora_conversations
   add column if not exists current_step text null;
 
 alter table zora_conversations
+  add column if not exists intent text null;
+
+alter table zora_conversations
+  add column if not exists conversation_stage text null;
+
+alter table zora_conversations
+  add column if not exists current_topic text null;
+
+alter table zora_conversations
+  add column if not exists current_subtopic text null;
+
+alter table zora_conversations
   add column if not exists recommended_next_step text null;
 
 alter table zora_conversations
   add column if not exists recommendation_roadmap jsonb null;
+
+alter table zora_conversations
+  add column if not exists cta_clicked text null;
+
+alter table zora_conversations
+  add column if not exists conversation_outcome text null;
 
 alter table zora_conversations
   add column if not exists lead_score integer null;
@@ -115,6 +143,18 @@ alter table zora_conversations
 
 alter table zora_conversations
   add column if not exists strategy_call_clicked boolean not null default false;
+
+alter table zora_conversations
+  add column if not exists ask_question_clicked boolean not null default false;
+
+alter table zora_conversations
+  add column if not exists faq_opened boolean not null default false;
+
+alter table zora_conversations
+  add column if not exists contact_requested boolean not null default false;
+
+alter table zora_conversations
+  add column if not exists live_agent_requested boolean not null default false;
 
 alter table zora_conversations
   add column if not exists email_submitted boolean not null default false;
@@ -145,3 +185,18 @@ create index if not exists zora_conversations_audit_clicked_idx
 
 create index if not exists zora_conversations_strategy_call_clicked_idx
   on zora_conversations (strategy_call_clicked);
+
+create index if not exists zora_conversations_intent_idx
+  on zora_conversations (intent);
+
+create index if not exists zora_conversations_conversation_stage_idx
+  on zora_conversations (conversation_stage);
+
+create index if not exists zora_conversations_current_topic_idx
+  on zora_conversations (current_topic);
+
+create index if not exists zora_conversations_cta_clicked_idx
+  on zora_conversations (cta_clicked);
+
+create index if not exists zora_conversations_conversation_outcome_idx
+  on zora_conversations (conversation_outcome);

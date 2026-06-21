@@ -14,6 +14,8 @@ const allowedEvents = new Set([
   "strategy_call_clicked",
   "ask_question_clicked",
   "faq_opened",
+  "contact_requested",
+  "live_agent_requested",
   "qualification_completed",
   "email_submitted",
 ]);

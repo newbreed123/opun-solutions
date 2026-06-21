@@ -4,6 +4,7 @@ export type ZoraIndustry =
   | "marketplace_retail"
   | "real_estate"
   | "healthcare_care"
+  | "nonprofit_faith_community"
   | "service_business"
   | "local_service"
   | "education"
@@ -50,9 +51,53 @@ const knownDomainHints: Record<string, ZoraIndustry> = {
   "uline.com": "industrial_b2b_catalog",
   "mcmaster.com": "industrial_b2b_catalog",
   "fastenal.com": "industrial_b2b_catalog",
+  "elevationchurch.org": "nonprofit_faith_community",
 };
 
 const rules: IndustryRule[] = [
+  {
+    industry: "nonprofit_faith_community",
+    keywords: [
+      /\bchurch\b/i,
+      /\bministry\b/i,
+      /\bministries\b/i,
+      /\bfaith[-\s]?based\b/i,
+      /\bnon[-\s]?profit\b/i,
+      /\bnonprofit\b/i,
+      /\bcommunity organization\b/i,
+      /\bcongregation\b/i,
+      /\bcampus\b/i,
+      /\bsermons?\b/i,
+      /\bworship\b/i,
+      /\bsmall groups?\b/i,
+      /\bvolunteer\b/i,
+      /\bserve\b/i,
+      /\bdonate\b/i,
+      /\bgiving\b/i,
+      /\belevation church\b/i,
+      /\belevationchurch\b/i,
+    ],
+    buyerJourney:
+      "online visitor -> sermon or campus discovery -> connection form -> local group, serving, or campus follow-up",
+    primaryBottlenecks: [
+      "digital-to-physical pathing",
+      "campus discovery",
+      "service time clarity",
+      "sermon-to-community connection",
+      "small group sign-up",
+      "volunteer routing",
+      "localized follow-up",
+    ],
+    recommendedFocusAreas: [
+      "campus discovery",
+      "service time clarity",
+      "connection forms",
+      "small group path",
+      "volunteer routing",
+      "localized follow-up",
+    ],
+    preferredNextStep: "strategy_call",
+  },
   {
     industry: "real_estate",
     keywords: [

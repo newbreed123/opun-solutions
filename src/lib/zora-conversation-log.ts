@@ -8,7 +8,18 @@ import {
   zoraIndustryConfidenceScore,
   type ZoraLeadProfile,
   type ZoraLeadTemperature,
+  type ZoraResponse,
 } from "@/lib/zora-assistant";
+import {
+  conversationOutcomeForEvent,
+  conversationOutcomeForIntent,
+  ctaClickedForEvent,
+  detectZoraFailureReasons,
+  logZoraFailure,
+  logZoraLearningExample,
+  normalizeZoraLearningIntent,
+  type ZoraConversationOutcome,
+} from "@/lib/zora-learning";
 
 export type ZoraConversationMetadata = {
   sessionId?: string | null;
@@ -16,6 +27,16 @@ export type ZoraConversationMetadata = {
   sourcePath?: string | null;
   userAgent?: string | null;
   eventType?: string | null;
+  intent?: string | null;
+  conversationStage?: string | null;
+  currentTopic?: string | null;
+  currentSubtopic?: string | null;
+  ctaClicked?: string | null;
+  conversationOutcome?: ZoraConversationOutcome | string | null;
+  profileBefore?: ZoraLeadProfile | null;
+  previousAssistantMessages?: string[];
+  action?: ZoraResponse["action"] | null;
+  recommendedActions?: ZoraResponse["recommendedActions"];
 };
 
 export type ZoraConversationRow = {
@@ -38,8 +59,14 @@ export type ZoraConversationRow = {
   recommended_focus_areas: string[] | null;
   optional_revenue_mention: string | null;
   current_step: string | null;
+  intent: string | null;
+  conversation_stage: string | null;
+  current_topic: string | null;
+  current_subtopic: string | null;
   recommended_next_step: string | null;
   recommendation_roadmap: unknown | null;
+  cta_clicked: string | null;
+  conversation_outcome: string | null;
   lead_score: number | null;
   lead_temperature: ZoraLeadTemperature | null;
   latest_user_message: string | null;
@@ -48,6 +75,10 @@ export type ZoraConversationRow = {
   user_agent: string | null;
   audit_clicked: boolean;
   strategy_call_clicked: boolean;
+  ask_question_clicked: boolean;
+  faq_opened: boolean;
+  contact_requested: boolean;
+  live_agent_requested: boolean;
   email_submitted: boolean;
 };
 
@@ -65,6 +96,25 @@ export async function logZoraConversation(
   }
 
   try {
+    const detectedIntent = normalizeZoraLearningIntent(
+      userMessage,
+      metadata.intent || metadata.currentStep || metadata.eventType || undefined,
+    );
+    const ctaClicked = metadata.ctaClicked || ctaClickedForEvent(metadata.eventType || undefined);
+    const conversationOutcome =
+      metadata.conversationOutcome ||
+      conversationOutcomeForEvent(metadata.eventType || undefined) ||
+      conversationOutcomeForIntent(detectedIntent) ||
+      null;
+    const previousAssistantMessages =
+      metadata.previousAssistantMessages ||
+      (metadata.sessionId
+        ? await recentZoraAssistantMessages(metadata.sessionId)
+        : []);
+    const leadTemperature = scoreZoraLeadTemperature(
+      profile,
+      metadata.eventType || undefined,
+    );
     const result = await supabaseAdminFetch<null>("zora_conversations", {
       method: "POST",
       body: {
@@ -90,14 +140,25 @@ export async function logZoraConversation(
           null,
         optional_revenue_mention: profile.annualRevenueText || profile.revenueRange || null,
         current_step: metadata.currentStep || metadata.eventType || null,
+        intent: detectedIntent,
+        conversation_stage:
+          metadata.conversationStage || profile.conversationStage || null,
+        current_topic: metadata.currentTopic || profile.currentTopic || null,
+        current_subtopic: metadata.currentSubtopic || null,
         recommended_next_step: profile.recommendedNextStep || null,
         recommendation_roadmap: profile.recommendationRoadmap || null,
+        cta_clicked: ctaClicked || null,
+        conversation_outcome: conversationOutcome,
         lead_score: scoreZoraLead(profile),
-        lead_temperature: scoreZoraLeadTemperature(profile, metadata.eventType || undefined),
+        lead_temperature: leadTemperature,
         latest_user_message: userMessage.slice(0, 1000),
         latest_assistant_message: assistantMessage.slice(0, 1200),
         source_path: metadata.sourcePath || null,
         user_agent: metadata.userAgent || null,
+        ask_question_clicked: metadata.eventType === "ask_question_clicked",
+        faq_opened: metadata.eventType === "faq_opened",
+        contact_requested: metadata.eventType === "contact_requested",
+        live_agent_requested: metadata.eventType === "live_agent_requested",
         email_submitted: Boolean(profile.email),
       },
       prefer: "returning=minimal",
@@ -107,6 +168,40 @@ export async function logZoraConversation(
       warnInDevelopment("Zora lead logging failed:", result.error);
       return { ok: false as const, skipped: false, error: result.error };
     }
+
+    void logZoraLearningExample({
+      intent: detectedIntent,
+      profile,
+      userMessage,
+      assistantResponse: assistantMessage,
+      ctaClicked,
+      conversionOutcome: conversationOutcome || undefined,
+    }).catch((error) => warnInDevelopment("Zora learning logging failed:", error));
+
+    const failureReasons = detectZoraFailureReasons({
+      userMessage,
+      assistantResponse: assistantMessage,
+      detectedIntent,
+      profileBefore: metadata.profileBefore || undefined,
+      profileAfter: profile,
+      previousAssistantMessages,
+      action: metadata.action as never,
+      recommendedActions: metadata.recommendedActions,
+    });
+
+    failureReasons.forEach((failureReason) => {
+      void logZoraFailure({
+        sessionId: metadata.sessionId,
+        profile: {
+          ...profile,
+          leadTemperature,
+        },
+        userMessage,
+        assistantResponse: assistantMessage,
+        detectedIntent,
+        failureReason,
+      }).catch((error) => warnInDevelopment("Zora failure logging failed:", error));
+    });
 
     return { ok: true as const, skipped: false, error: "" };
   } catch (error) {
@@ -138,9 +233,27 @@ export async function updateZoraConversion(
 
   const patch =
     eventType === "audit_clicked"
-      ? { audit_clicked: true }
+      ? {
+          audit_clicked: true,
+          cta_clicked: "audit_clicked",
+          conversation_outcome: "audit_started",
+        }
       : eventType === "strategy_call_clicked"
-        ? { strategy_call_clicked: true }
+        ? {
+            strategy_call_clicked: true,
+            cta_clicked: "strategy_call_clicked",
+            conversation_outcome: "strategy_call_clicked",
+          }
+        : eventType === "ask_question_clicked"
+          ? { ask_question_clicked: true, cta_clicked: "ask_question_clicked" }
+        : eventType === "faq_opened"
+          ? { faq_opened: true, cta_clicked: "faq_opened" }
+        : eventType === "contact_requested"
+          ? { contact_requested: true, cta_clicked: "contact_requested" }
+        : eventType === "live_agent_requested"
+          ? { live_agent_requested: true, cta_clicked: "live_agent_requested" }
+        : eventType === "qualification_completed"
+          ? { conversation_outcome: "qualified" }
         : eventType === "email_submitted"
           ? { email_submitted: true }
           : null;
@@ -156,6 +269,8 @@ export async function updateZoraConversion(
           ...patch,
           lead_temperature: scoreZoraLeadTemperature(profile, eventType),
           current_step: eventType,
+          conversation_stage: profile.conversationStage || null,
+          current_topic: profile.currentTopic || null,
         },
         prefer: "returning=minimal",
       });
@@ -175,6 +290,8 @@ export async function updateZoraConversion(
         sessionId,
         eventType,
         currentStep: eventType,
+        ctaClicked: ctaClickedForEvent(eventType),
+        conversationOutcome: conversationOutcomeForEvent(eventType),
       },
     );
   } catch (error) {
@@ -202,7 +319,7 @@ export async function listZoraConversations(limit = 1000) {
       {
         query: {
           select:
-            "id,created_at,session_id,business_type,challenge,website_url,platform_hint,industry,inferred_industry,inferred_business_model,inferred_funnel_type,industry_confidence,industry_confidence_score,industry_evidence,buyer_journey,primary_bottlenecks,recommended_focus_areas,optional_revenue_mention,current_step,recommended_next_step,recommendation_roadmap,lead_score,lead_temperature,latest_user_message,latest_assistant_message,source_path,user_agent,audit_clicked,strategy_call_clicked,email_submitted",
+            "id,created_at,session_id,business_type,challenge,website_url,platform_hint,industry,inferred_industry,inferred_business_model,inferred_funnel_type,industry_confidence,industry_confidence_score,industry_evidence,buyer_journey,primary_bottlenecks,recommended_focus_areas,optional_revenue_mention,current_step,intent,conversation_stage,current_topic,current_subtopic,recommended_next_step,recommendation_roadmap,cta_clicked,conversation_outcome,lead_score,lead_temperature,latest_user_message,latest_assistant_message,source_path,user_agent,audit_clicked,strategy_call_clicked,ask_question_clicked,faq_opened,contact_requested,live_agent_requested,email_submitted",
           order: "created_at.desc",
           limit,
         },
@@ -232,6 +349,26 @@ export async function listZoraConversations(limit = 1000) {
           : "Could not reach Zora conversation storage.",
     };
   }
+}
+
+async function recentZoraAssistantMessages(sessionId: string) {
+  const result = await supabaseAdminFetch<Array<{ latest_assistant_message: string | null }>>(
+    "zora_conversations",
+    {
+      query: {
+        select: "latest_assistant_message",
+        session_id: `eq.${sessionId}`,
+        order: "created_at.desc",
+        limit: 5,
+      },
+    },
+  );
+
+  if (!result.ok) return [];
+
+  return (result.data || [])
+    .map((row) => row.latest_assistant_message)
+    .filter((value): value is string => Boolean(value));
 }
 
 function warnInDevelopment(...args: unknown[]) {

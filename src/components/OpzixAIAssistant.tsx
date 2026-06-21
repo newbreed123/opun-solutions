@@ -18,11 +18,13 @@ import {
 import {
   buildZoraDiagnosis,
   buildZoraResponse,
+  detectZoraTrafficIntent,
   hasUrlBusinessTypeMismatch,
   inferIndustryFromUrl,
   recommendZoraNextStep,
   scoreZoraLeadQuality,
   shouldUseIndustryInference,
+  zoraTrafficIntentAnchor,
   zoraFaqItems,
   ZoraBusinessType,
   ZoraChallenge,
@@ -37,6 +39,7 @@ import {
 
 const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
 const ZORA_SESSION_ID_KEY = "opzix-zora-session-id";
+const ZORA_TRAFFIC_INTENT_KEY = "opzix-zora-traffic-intent";
 const BOOKING_LINK_DELAY_MS = 150;
 const STRATEGY_CALL_URL = "https://calendly.com/hello-opzix";
 const FREE_AUDIT_URL = "/tools/ecommerce-audit-scanner?source=zora";
@@ -85,6 +88,11 @@ type ZoraApiResponse = ZoraResponse & {
   poweredBy?: "openai" | "local-diagnosis";
 };
 
+type StoredTrafficIntent = Pick<
+  ZoraLeadProfile,
+  "trafficIntentCategory" | "trafficIntentText" | "adContext"
+>;
+
 const businessTypeChoices: Array<{ label: string; value: ZoraBusinessType }> = [
   { label: "Ecommerce", value: "Ecommerce" },
   { label: "Service Business", value: "Service Business" },
@@ -114,6 +122,70 @@ function createSessionId() {
   return createId("zora-session");
 }
 
+function introTextForProfile(profile?: ZoraLeadProfile) {
+  const anchor = profile ? zoraTrafficIntentAnchor(profile) : "";
+
+  return [
+    "Hi, I'm Zora, Opzix's AI Growth Consultant.",
+    anchor,
+    "I can help you understand your business, identify the likely bottleneck, and choose the next step.",
+    "What type of business do you run?",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function trafficIntentFromSearch(search: string): StoredTrafficIntent | undefined {
+  const params = new URLSearchParams(search);
+  const adContext = {
+    utm_campaign: params.get("utm_campaign") || undefined,
+    utm_term: params.get("utm_term") || undefined,
+    utm_content: params.get("utm_content") || undefined,
+    gclid: params.get("gclid") || undefined,
+  };
+  const values = [
+    "zora_intent",
+    "intent",
+    "keyword",
+    "ad_keyword",
+    "utm_term",
+    "utm_campaign",
+    "utm_content",
+    "campaign",
+    "adgroup",
+    "gclid",
+  ]
+    .map((key) => params.get(key))
+    .filter((value): value is string => Boolean(value));
+  const detected = detectZoraTrafficIntent(values.join(" "));
+
+  if (!detected && !Object.values(adContext).some(Boolean)) return undefined;
+
+  return {
+    trafficIntentCategory: detected?.category,
+    trafficIntentText: detected?.text || values.join(" ") || undefined,
+    adContext,
+  };
+}
+
+function storedTrafficIntent(): StoredTrafficIntent | undefined {
+  try {
+    const fromUrl = trafficIntentFromSearch(window.location.search);
+
+    if (fromUrl) {
+      window.sessionStorage.setItem(ZORA_TRAFFIC_INTENT_KEY, JSON.stringify(fromUrl));
+      return fromUrl;
+    }
+
+    const raw = window.sessionStorage.getItem(ZORA_TRAFFIC_INTENT_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as StoredTrafficIntent;
+    return parsed.trafficIntentCategory || parsed.adContext ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isBookingUrl(href: string) {
   const normalized = href.toLowerCase();
 
@@ -132,6 +204,7 @@ function businessTypeFromDetectedIndustry(
 ): ZoraBusinessType | undefined {
   if (industry === "real_estate") return "Real Estate";
   if (industry === "healthcare_care") return "Care/Healthcare";
+  if (industry === "nonprofit_faith_community") return "Other";
   if (
     industry === "ecommerce_dtc" ||
     industry === "industrial_b2b_catalog" ||
@@ -168,6 +241,7 @@ function normalizeProfile(profile: ZoraLeadProfile): ZoraLeadProfile {
       profile.industry,
       profile.desiredOutcome,
       profile.leadSource,
+      profile.trafficIntentText,
       profile.websiteUrl,
     ]
       .filter(Boolean)
@@ -335,12 +409,17 @@ function actionTone(action: ZoraAction) {
   return "secondary";
 }
 
+function withTrafficIntentAnchor(profile: ZoraLeadProfile, text: string) {
+  const anchor = zoraTrafficIntentAnchor(profile);
+  return anchor ? `${anchor}\n\n${text}` : text;
+}
+
 function phase1Diagnosis(profile: ZoraLeadProfile) {
   const useInferredContext = shouldUseIndustryInference(profile);
   const industry = profile.industryProfile?.industry;
 
   if (profile.hasNoWebsite) {
-    return "Since there is no site to audit yet, I would start by mapping the landing page, offer, lead capture, and follow-up path. The best next step is a strategy call to scope the first version before spending on traffic.";
+    return withTrafficIntentAnchor(profile, "Since there is no live site yet, I would start by mapping the landing page architecture, core offer, lead capture, follow-up path, and launch tracking. The best next step is a strategy call to scope the first version before spending on traffic.");
   }
 
   if (industry === "real_estate") {
@@ -349,86 +428,94 @@ function phase1Diagnosis(profile: ZoraLeadProfile) {
         ? "That URL looks more like real estate than ecommerce. I'll treat this as a real estate lead-generation/operations site. "
         : "Because this looks like a real estate business, ";
 
-    return `${correction}I would first look at lead routing, agent assignment, CRM follow-up, booking flow, local proof, and source tracking.`;
+    return withTrafficIntentAnchor(profile, `${correction}I would first look at lead routing, agent assignment, CRM follow-up, booking flow, local proof, and source tracking.`);
   }
 
   if (industry === "industrial_b2b_catalog") {
-    return "Because this looks like an industrial/B2B catalog, I would focus on catalog discovery, search, SKU/specs, category hierarchy, and the cart/quote/account path.";
+    return withTrafficIntentAnchor(profile, "Because this looks like an industrial/B2B catalog, I would focus on catalog discovery, search, SKU/specs, category hierarchy, and the cart/quote/account path.");
   }
 
   if (industry === "healthcare_care") {
-    return "Because this looks like a care or healthcare services business, I would focus on service clarity, intake flow, referral handoff, trust proof, response time, and internal routing.";
+    return withTrafficIntentAnchor(profile, "Because this looks like a care or healthcare services business, I would focus on service clarity, intake flow, referral handoff, trust proof, response time, and internal routing.");
+  }
+
+  if (industry === "nonprofit_faith_community") {
+    return withTrafficIntentAnchor(profile, "Because this looks like a faith-based or community organization, I would focus on campus discovery, service time clarity, connection forms, small group paths, volunteer routing, and localized follow-up.");
   }
 
   if (industry === "ecommerce_dtc") {
-    return "Because this looks like a DTC ecommerce store, I would review mobile product discovery, product-page confidence, reviews, shipping/returns clarity, checkout trust, tracking, and email/SMS follow-up.";
+    return withTrafficIntentAnchor(profile, "Because this looks like a DTC ecommerce store, I would review mobile product discovery, product-page confidence, reviews, shipping/returns clarity, checkout trust, tracking, and email/SMS follow-up.");
   }
 
   if (industry === "marketplace_retail") {
-    return "Because this looks like marketplace or enterprise retail, I would review search/departments, pickup/delivery clarity, account/cart path, availability, and measurement confidence. Public-page evidence may be directional.";
+    return withTrafficIntentAnchor(profile, "Because this looks like marketplace or enterprise retail, I would review search/departments, pickup/delivery clarity, account/cart path, availability, and measurement confidence. Public-page evidence may be directional.");
   }
 
   if (useInferredContext && profile.inferredBusinessModel === "B2B Ecommerce / Distributor") {
     if (profile.challenge === "Operations") {
-      return "This appears to be an industrial/B2B ecommerce business. Assuming that's correct, I'd look at order flow, fulfillment handoffs, inventory and product data, quote/request paths, account-based purchasing, customer support routing, reporting visibility, and automation opportunities first.";
+      return withTrafficIntentAnchor(profile, "This appears to be an industrial/B2B ecommerce business. Assuming that's correct, I'd look at order flow, fulfillment handoffs, inventory and product data, quote/request paths, account-based purchasing, customer support routing, reporting visibility, and automation opportunities first.");
     }
 
-    return "This appears to be an industrial/B2B ecommerce business. Assuming that's correct, I'd look at product discovery, quote/request paths, account-based purchasing, follow-up after inquiry, and tracking visibility first.";
+    return withTrafficIntentAnchor(profile, "This appears to be an industrial/B2B ecommerce business. Assuming that's correct, I'd look at product discovery, quote/request paths, account-based purchasing, follow-up after inquiry, and tracking visibility first.");
   }
 
   if (useInferredContext && profile.inferredBusinessModel === "DTC Ecommerce") {
-    return "This appears to be a DTC ecommerce brand. Assuming that's correct, I'd look at product discovery, mobile buying experience, checkout confidence, retention, and tracking visibility first.";
+    return withTrafficIntentAnchor(profile, "This appears to be a DTC ecommerce brand. Assuming that's correct, I'd look at product discovery, mobile buying experience, checkout confidence, retention, and tracking visibility first.");
   }
 
   if (useInferredContext && profile.inferredIndustry === "Real Estate") {
-    return "This appears to be a real estate lead-generation business. Assuming that's correct, I'd look at seller/buyer lead capture, local authority proof, appointment booking, and follow-up speed first.";
+    return withTrafficIntentAnchor(profile, "This appears to be a real estate lead-generation business. Assuming that's correct, I'd look at seller/buyer lead capture, local authority proof, appointment booking, and follow-up speed first.");
   }
 
   if (useInferredContext && profile.inferredBusinessModel === "Care Provider / Service Organization") {
-    return "This appears to be a care provider or service organization. Assuming that's correct, I'd look at intake flow, referral paths, trust proof, service clarity, and response process first.";
+    return withTrafficIntentAnchor(profile, "This appears to be a care provider or service organization. Assuming that's correct, I'd look at intake flow, referral paths, trust proof, service clarity, and response process first.");
+  }
+
+  if (useInferredContext && profile.inferredBusinessModel === "Faith-Based / Community Organization") {
+    return withTrafficIntentAnchor(profile, "This appears to be a faith-based or community organization. Assuming that's correct, I'd look at campus discovery, service times, connection forms, small group paths, volunteer routing, and localized follow-up first.");
   }
 
   if (profile.businessType === "Ecommerce" && profile.challenge === "Conversion") {
-    return "Based on what you shared, I'd look at product discovery, mobile UX, checkout confidence, and tracking first. The best next step is to run a free audit so Opzix can review the actual customer journey.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at product discovery, mobile UX, checkout confidence, and tracking first. The best next step is to run a free audit so Opzix can review the actual customer journey.");
   }
 
   if (profile.businessType === "Ecommerce" && profile.challenge === "Operations") {
-    return "Using the business type you selected, I'd look at order flow, fulfillment handoffs, inventory/product data, customer support routing, reporting visibility, and automation opportunities first.";
+    return withTrafficIntentAnchor(profile, "Using the business type you selected, I'd look at order flow, fulfillment handoffs, inventory/product data, customer support routing, reporting visibility, and automation opportunities first.");
   }
 
   if (profile.businessType === "Ecommerce" && profile.challenge === "Tracking") {
-    return "Based on what you shared, I'd look at GA4/event coverage, checkout-step tracking, attribution, product discovery signals, ad platform pixels, and reporting visibility first.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at GA4/event coverage, checkout-step tracking, attribution, product discovery signals, ad platform pixels, and reporting visibility first.");
   }
 
   if (profile.businessType === "Service Business" && profile.challenge === "Follow-up") {
-    return "Based on what you shared, I'd look at intake flow, response speed, CRM routing, and appointment booking first. The best next step is a strategy call or quick systems review.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at intake flow, response speed, CRM routing, and appointment booking first. The best next step is a strategy call or quick systems review.");
   }
 
   if (profile.businessType === "Real Estate" && profile.challenge === "Traffic") {
-    return "Based on what you shared, I'd look at seller and buyer lead capture, local landing pages, follow-up speed, and booking flow first.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at seller and buyer lead capture, local landing pages, follow-up speed, and booking flow first.");
   }
 
   if (profile.businessType === "Care/Healthcare" && profile.challenge === "Operations") {
-    return "Based on what you shared, I'd look at intake forms, referral flow, trust signals, booking/contact flow, and internal routing first.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at intake forms, referral flow, trust signals, booking/contact flow, and internal routing first.");
   }
 
   if (profile.businessType === "Ecommerce") {
-    return "Based on what you shared, I'd look at product discovery, customer journey clarity, mobile UX, tracking, and checkout confidence first.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at product discovery, customer journey clarity, mobile UX, tracking, and checkout confidence first.");
   }
 
   if (profile.businessType === "Service Business") {
-    return "Based on what you shared, I'd look at lead capture, intake flow, response speed, booking, and follow-up handoff first.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at lead capture, intake flow, response speed, booking, and follow-up handoff first.");
   }
 
   if (profile.businessType === "Real Estate") {
-    return "Based on what you shared, I'd look at lead capture, local proof, landing-page clarity, follow-up speed, and booking flow first.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at lead capture, local proof, landing-page clarity, follow-up speed, and booking flow first.");
   }
 
   if (profile.businessType === "Care/Healthcare") {
-    return "Based on what you shared, I'd look at trust signals, intake flow, referral paths, response process, and internal routing first.";
+    return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at trust signals, intake flow, referral paths, response process, and internal routing first.");
   }
 
-  return "Based on what you shared, I'd look at the customer journey, lead capture, follow-up, tracking, and operations flow first.";
+  return withTrafficIntentAnchor(profile, "Based on what you shared, I'd look at the customer journey, lead capture, follow-up, tracking, and operations flow first.");
 }
 
 function recommendedPhase1Step(profile: ZoraLeadProfile) {
@@ -470,6 +557,12 @@ function phase1CtaActions(profile: ZoraLeadProfile): ZoraAction[] {
   const call = bookingAction("Book Strategy Call", auditFirst ? "secondary" : "primary");
 
   return auditFirst ? [audit, call, ask] : [call, audit, ask];
+}
+
+function hasWebsiteState(profile: ZoraLeadProfile) {
+  if (profile.hasNoWebsite) return false;
+  if (profile.hasWebsiteOrLandingPage || profile.websiteUrl) return true;
+  return undefined;
 }
 
 function shouldShowPhase1Actions(profile: ZoraLeadProfile) {
@@ -651,8 +744,7 @@ export default function OpzixAIAssistant() {
     {
       id: "zora-intro",
       role: "assistant",
-      text:
-        "Hi, I'm Zora, Opzix's AI Growth Consultant. I can help you understand your business, identify the likely bottleneck, and choose the next step.\n\nWhat type of business do you run?",
+      text: introTextForProfile(),
       actions: businessTypeChoices.map((choice) => ({
         kind: "choice",
         label: choice.label,
@@ -663,6 +755,34 @@ export default function OpzixAIAssistant() {
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string>("");
+
+  useEffect(() => {
+    const trafficIntent = storedTrafficIntent();
+
+    if (!trafficIntent) return;
+
+    setLeadProfile((current) => {
+      if (current.trafficIntentCategory === trafficIntent.trafficIntentCategory) {
+        return current;
+      }
+
+      return normalizeProfile({
+        ...current,
+        ...trafficIntent,
+        desiredOutcome: current.desiredOutcome || trafficIntent.trafficIntentText,
+      });
+    });
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === "zora-intro"
+          ? {
+              ...message,
+              text: introTextForProfile(trafficIntent),
+            }
+          : message,
+      ),
+    );
+  }, []);
 
   const profileSummary = useMemo(
     () =>
@@ -783,16 +903,62 @@ export default function OpzixAIAssistant() {
     window.location.assign(action.href);
   }
 
+  function routeToScannerHref(href: string) {
+    trackZoraEvent("audit_clicked");
+    closeChatbot();
+    window.setTimeout(() => {
+      window.location.assign(href);
+    }, BOOKING_LINK_DELAY_MS);
+  }
+
+  function handleStructuredAction(action: ZoraResponse["action"] | undefined) {
+    if (!action) return;
+
+    if (action.type === "start_audit") {
+      routeToScannerHref(auditHrefForProfile({ websiteUrl: action.url }));
+      return;
+    }
+
+    if (action.type === "book_strategy_call") {
+      trackZoraEvent("strategy_call_clicked");
+      openBookingUrlAfterClose(STRATEGY_CALL_URL);
+    }
+  }
+
   function startGuidedFlow() {
-    const firstMissingStep = nextGuidedStep(leadProfile) || "businessType";
-    setFlowStep(firstMissingStep);
+    const nextProfile = normalizeProfile(leadProfile);
+    const hasExistingContext = Boolean(
+      nextProfile.businessType ||
+        nextProfile.challenge ||
+        nextProfile.websiteUrl ||
+        nextProfile.hasNoWebsite ||
+        nextProfile.industryProfile,
+    );
+    const firstMissingStep = nextGuidedStep(nextProfile);
+
+    if (hasExistingContext && (nextProfile.businessType || nextProfile.websiteUrl || nextProfile.challenge)) {
+      setFlowStep(null);
+      setLeadProfile(nextProfile);
+      appendMessages([
+        {
+          id: createId("user"),
+          role: "user",
+          text: "Diagnose my growth system",
+        },
+        phase1DiagnosisMessage(nextProfile),
+      ]);
+      return;
+    }
+
+    const firstStep = firstMissingStep || "businessType";
+    setFlowStep(firstStep);
     appendMessages([
       {
         id: createId("user"),
         role: "user",
         text: "Diagnose my growth system",
       },
-      questionForStep(firstMissingStep),
+      questionForStep(firstStep),
     ]);
   }
 
@@ -809,7 +975,7 @@ export default function OpzixAIAssistant() {
           id: createId("assistant"),
           role: "assistant",
           text:
-            "There is no website to scan yet. The better next step is a strategy call to map the first landing page, offer, and follow-up path.",
+            "There is no live site yet. The better next step is a strategy call to map the first landing page, offer, follow-up path, tracking, and launch timeline.",
           actions: [bookingAction("Book Strategy Call", "primary")],
         },
       ]);
@@ -883,7 +1049,9 @@ export default function OpzixAIAssistant() {
         id: createId("assistant"),
         role: "assistant",
         text: item.answer,
-        actions: [scannerAction("Run Free Audit", "secondary", leadProfile), bookingAction()],
+        actions: leadProfile.hasNoWebsite
+          ? [bookingAction("Book Strategy Call", "primary")]
+          : [scannerAction("Run Free Audit", "secondary", leadProfile), bookingAction()],
       },
     ]);
   }
@@ -986,6 +1154,7 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.value === "strategy_call") {
+      trackZoraEvent("strategy_call_clicked");
       openBookingUrlAfterClose(STRATEGY_CALL_URL);
       return;
     }
@@ -1083,6 +1252,7 @@ export default function OpzixAIAssistant() {
         body: JSON.stringify({
           message,
           leadProfile,
+          hasWebsite: hasWebsiteState(leadProfile),
           sessionId: zoraSessionId(),
           sourcePath: currentSourcePath(),
         }),
@@ -1094,7 +1264,8 @@ export default function OpzixAIAssistant() {
       const nextProfile = normalizeProfile(payload.leadProfile || localResponse.leadProfile);
       const responseMode = payload.responseMode || localResponse.responseMode;
       const responseActions =
-        responseMode !== "thanks" && shouldShowPhase1Actions(nextProfile)
+        responseMode === "diagnosis" &&
+        shouldShowPhase1Actions(nextProfile)
           ? phase1CtaActions(nextProfile)
           : actionsFromRecommendation(
               payload.recommendedActions || localResponse.recommendedActions,
@@ -1109,10 +1280,12 @@ export default function OpzixAIAssistant() {
           actions: responseActions,
         },
       ]);
+      handleStructuredAction(payload.action || localResponse.action);
     } catch {
       const nextProfile = normalizeProfile(localResponse.leadProfile);
       const responseActions =
-        localResponse.responseMode !== "thanks" && shouldShowPhase1Actions(nextProfile)
+        localResponse.responseMode === "diagnosis" &&
+        shouldShowPhase1Actions(nextProfile)
           ? phase1CtaActions(nextProfile)
           : actionsFromRecommendation(localResponse.recommendedActions);
       setLeadProfile(nextProfile);
@@ -1124,6 +1297,7 @@ export default function OpzixAIAssistant() {
           actions: responseActions,
         },
       ]);
+      handleStructuredAction(localResponse.action);
     } finally {
       setIsThinking(false);
     }
