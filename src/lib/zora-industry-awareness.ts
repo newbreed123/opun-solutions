@@ -1,5 +1,6 @@
 export type ZoraIndustry =
   | "ecommerce_dtc"
+  | "b2b_supply_platform"
   | "industrial_b2b_catalog"
   | "marketplace_retail"
   | "real_estate"
@@ -42,6 +43,7 @@ const knownDomainHints: Record<string, ZoraIndustry> = {
   "maxx-supply.com": "industrial_b2b_catalog",
   "pvcpipesupplies.com": "industrial_b2b_catalog",
   "allbirds.com": "ecommerce_dtc",
+  "sellvia.com": "b2b_supply_platform",
   "amazon.com": "marketplace_retail",
   "walmart.com": "marketplace_retail",
   "target.com": "marketplace_retail",
@@ -173,6 +175,49 @@ const rules: IndustryRule[] = [
       "response routing",
     ],
     preferredNextStep: "strategy_call",
+  },
+  {
+    industry: "b2b_supply_platform",
+    keywords: [
+      /\bsellvia\b/i,
+      /\bdrop ?ship(?:ping)?\b/i,
+      /\bdropshippers?\b/i,
+      /\bturnkey\b/i,
+      /\becommerce platform\b/i,
+      /\be-?commerce platform\b/i,
+      /\bsupplier platform\b/i,
+      /\bsupply network\b/i,
+      /\bmerchant onboarding\b/i,
+      /\bmerchant acquisition\b/i,
+      /\bvendor dashboard\b/i,
+      /\bapi\b/i,
+      /\bplugin\b/i,
+      /\bintegration(?:s)?\b/i,
+      /\bstore owners?\b/i,
+      /\bstore setup\b/i,
+      /\becosystem\b/i,
+    ],
+    buyerJourney:
+      "merchant -> platform value proof -> sign-up -> store/inventory integration -> activation and retention",
+    primaryBottlenecks: [
+      "merchant acquisition",
+      "onboarding friction",
+      "integration clarity",
+      "supplier logistics visibility",
+      "vendor dashboard clarity",
+      "API/plugin stability",
+      "enterprise lead capture",
+    ],
+    recommendedFocusAreas: [
+      "merchant acquisition path",
+      "onboarding speed",
+      "integration clarity",
+      "vendor dashboard clarity",
+      "supplier logistics visibility",
+      "API/plugin stability",
+      "enterprise lead capture",
+    ],
+    preferredNextStep: "audit",
   },
   {
     industry: "industrial_b2b_catalog",

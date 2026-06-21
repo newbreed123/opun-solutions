@@ -66,6 +66,7 @@ export type ZoraTalkingPoint =
   | "follow_up_handoff"
   | "booking_flow"
   | "crm_routing"
+  | "lead_capture"
   | "ecommerce_cost_analysis"
   | "audit_process";
 
@@ -147,8 +148,17 @@ export type ZoraCompanyBackgroundIntent = {
   confidence: "High" | "Moderate" | "Low";
 };
 
+export type ZoraFounderFollowupSubtype = "identity" | "background" | "experience" | "role";
+
+export type ZoraFounderFollowupIntent = {
+  isFounderFollowup: boolean;
+  subtype: ZoraFounderFollowupSubtype;
+  confidence: "High" | "Moderate" | "Low";
+};
+
 export type ZoraIntent =
   | "diagnosis"
+  | "business_model_correction"
   | "company_background"
   | "capability"
   | "small_talk"
@@ -202,6 +212,7 @@ export type ZoraLeadProfile = {
   industryConfidence?: number | ZoraIndustryProfile["confidence"];
   needsBusinessTypeClarification?: boolean;
   industryMismatchResolved?: boolean;
+  businessModelCorrection?: string;
   hasWebsiteOrLandingPage?: boolean;
   hasNoWebsite?: boolean;
   email?: string;
@@ -216,16 +227,23 @@ export type ZoraLeadProfile = {
   leadTemperature?: ZoraLeadTemperature;
   leadScore?: number;
   hasSeenSoftClose?: boolean;
+  lastUserCommand?: string;
+  lastAssistantIntent?: ZoraIntent;
+  lastAssistantMessageSummary?: string;
+  duplicateCommandCount?: number;
 };
 
 export type ZoraMessageAnalysis = {
   intent: ZoraIntent;
   rawMessage?: string;
   companyBackgroundSubtype?: ZoraCompanyBackgroundSubtype;
+  founderFollowupSubtype?: ZoraFounderFollowupSubtype;
   visitorName?: string;
   businessType?: ZoraBusinessType;
   platform?: string;
   industry?: string;
+  correctedIndustry?: ZoraIndustry;
+  correctedBusinessModel?: string;
   toolsMentioned?: string[];
   leadSource?: string;
   conversionRate?: string;
@@ -554,6 +572,51 @@ export function detectCompanyBackgroundIntent(
   };
 }
 
+export function detectFounderFollowupIntent(
+  message: string,
+  conversationState: Pick<
+    ZoraLeadProfile,
+    "lastAssistantIntent" | "lastAssistantMessageSummary"
+  > = {},
+): ZoraFounderFollowupIntent {
+  const text = message.trim();
+  const previousFounderContext =
+    conversationState.lastAssistantIntent === "company_background" &&
+    /\b(adim|odumefune|max|founder|owner|ceo)\b/i.test(
+      conversationState.lastAssistantMessageSummary || "",
+    );
+
+  if (/\b(adim odumefune|adim|max)\b/i.test(text)) {
+    return {
+      isFounderFollowup: true,
+      subtype: /\b(background|experience|senior|engineer|developer|does he do)\b/i.test(text)
+        ? "background"
+        : "identity",
+      confidence: "High",
+    };
+  }
+
+  if (/\b(who is the founder|who's the founder|who is the ceo|who's the ceo)\b/i.test(text)) {
+    return { isFounderFollowup: true, subtype: "role", confidence: "High" };
+  }
+
+  if (previousFounderContext) {
+    if (/\b(what is his background|what's his background|what experience|what does he do|what has he built)\b/i.test(text)) {
+      return { isFounderFollowup: true, subtype: "background", confidence: "High" };
+    }
+
+    if (/\b(who is he|who's he|who is that|who's that|tell me about him|him|he)\b/i.test(text)) {
+      return { isFounderFollowup: true, subtype: "identity", confidence: "High" };
+    }
+  }
+
+  if (/\b(founder|owner|ceo)\b/i.test(text) && /\b(background|experience|role|does)\b/i.test(text)) {
+    return { isFounderFollowup: true, subtype: "experience", confidence: "Moderate" };
+  }
+
+  return { isFounderFollowup: false, subtype: "identity", confidence: "Low" };
+}
+
 function isCapabilityQuestion(message: string) {
   if (
     /\b(how can you help|what can you do|what do you do|what does opzix do|tell me more about opzix|more about opzix|about opzix|who is opzix|what is opzix|your services|services do you offer|do you build|can you build|what do you build|build websites?)\b/i.test(
@@ -794,6 +857,15 @@ export function inferIndustryFromUrl(url: string): ZoraIndustryInference {
   const context = normalizeDomainContext(url);
   const has = (pattern: RegExp) => pattern.test(context);
 
+  if (has(/\b(sellvia|dropship|dropshipping|turnkey|supplier|supply network|merchant|vendor|ecosystem)\b/)) {
+    return {
+      inferredIndustry: "B2B Supply Platform",
+      inferredBusinessModel: "B2B Supply / Ecommerce Infrastructure Platform",
+      inferredFunnelType: "Merchant Acquisition / Platform Onboarding",
+      industryConfidence: context.includes("sellvia") ? 0.92 : 0.78,
+    };
+  }
+
   if (has(/\b(serhant|realty|realtor|homes|properties|brokerage|estate|listings)\b/)) {
     return {
       inferredIndustry: "Real Estate",
@@ -853,6 +925,70 @@ export function inferIndustryFromUrl(url: string): ZoraIndustryInference {
   };
 }
 
+function detectsB2BSupplyPlatformContext(text: string) {
+  return /\b(sellvia|dropship|dropshipping|supplier platform|supply network|turnkey|merchant onboarding|merchant acquisition|vendor dashboard|api|plugin|integration|store owners?|ecommerce infrastructure|e-commerce infrastructure|ecosystem|platform model|b2b|b2b ecommerce|wholesale)\b/i.test(
+    text,
+  );
+}
+
+function detectsDtcCorrection(message: string) {
+  return (
+    /\b(it'?s|it is|we'?re|we are|this is|that is|they'?re|they are)\s+not\s+(?:a\s+)?(?:dtc|direct[-\s]?to[-\s]?consumer|retail store|traditional store|storefront|consumer brand|brand)\b/i.test(
+      message,
+    ) ||
+    /\bnot\s+(?:a\s+)?(?:dtc|direct[-\s]?to[-\s]?consumer|retail store|traditional store|storefront|consumer brand|brand)\b/i.test(
+      message,
+    ) ||
+    /\b(no|actually|correction|wrong|incorrect)\b.*\b(?:dtc|direct[-\s]?to[-\s]?consumer|retail store|traditional store|storefront|consumer brand|brand)\b/i.test(
+      message,
+    )
+  );
+}
+
+function detectBusinessModelCorrection(
+  message: string,
+  currentProfile: Pick<
+    ZoraLeadProfile,
+    | "websiteUrl"
+    | "industryProfile"
+    | "inferredBusinessModel"
+    | "inferredIndustry"
+    | "lastAssistantMessageSummary"
+  > = {},
+): Pick<ZoraMessageAnalysis, "correctedIndustry" | "correctedBusinessModel"> {
+  const context = [
+    message,
+    currentProfile.websiteUrl ? normalizeDomainContext(currentProfile.websiteUrl) : "",
+    currentProfile.inferredBusinessModel,
+    currentProfile.inferredIndustry,
+    currentProfile.lastAssistantMessageSummary,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const correctsDtc = detectsDtcCorrection(message);
+  const saysDifferentModel =
+    /\b(no|actually|correction|wrong|incorrect|not quite|not really)\b/i.test(message) &&
+    /\b(company|business|model|store|platform|site|brand|dtc|direct[-\s]?to[-\s]?consumer)\b/i.test(message);
+
+  if (
+    detectsB2BSupplyPlatformContext(context) &&
+    (correctsDtc || saysDifferentModel || /\b(we are|we'?re|it'?s|it is|this is)\b/i.test(message))
+  ) {
+    return {
+      correctedIndustry: "b2b_supply_platform",
+      correctedBusinessModel: "B2B Supply / Ecommerce Infrastructure Platform",
+    };
+  }
+
+  if (correctsDtc || saysDifferentModel) {
+    return {
+      correctedBusinessModel: "User corrected the previous business model assumption",
+    };
+  }
+
+  return {};
+}
+
 export function zoraIndustryConfidenceScore(
   confidence: ZoraLeadProfile["industryConfidence"] | undefined,
 ) {
@@ -868,6 +1004,7 @@ function businessTypeFromIndustry(industry?: ZoraIndustry): ZoraBusinessType | u
   if (industry === "healthcare_care") return "Care/Healthcare";
   if (industry === "nonprofit_faith_community") return "Other";
   if (
+    industry === "b2b_supply_platform" ||
     industry === "ecommerce_dtc" ||
     industry === "industrial_b2b_catalog" ||
     industry === "marketplace_retail"
@@ -930,10 +1067,52 @@ function applyIndustryProfile(
   }
 
   if (industryProfile.industry !== "unknown") {
-    profile.inferredIndustry = industryProfile.industry;
-    profile.inferredBusinessModel = industryProfile.industry;
+    profile.inferredIndustry =
+      industryProfile.industry === "b2b_supply_platform"
+        ? "B2B Supply Platform"
+        : industryProfile.industry;
+    profile.inferredBusinessModel =
+      industryProfile.industry === "b2b_supply_platform"
+        ? "B2B Supply / Ecommerce Infrastructure Platform"
+        : industryProfile.industry;
     profile.inferredFunnelType = industryProfile.buyerJourney;
   }
+}
+
+function correctedIndustryProfile(
+  industry: ZoraIndustry,
+  evidence: string[] = [],
+): ZoraIndustryProfile | undefined {
+  if (industry === "b2b_supply_platform") {
+    return {
+      industry,
+      confidence: "High",
+      evidence: evidence.length ? evidence : ["user correction"],
+      buyerJourney:
+        "merchant -> platform value proof -> sign-up -> store/inventory integration -> activation and retention",
+      primaryBottlenecks: [
+        "merchant acquisition",
+        "onboarding friction",
+        "integration clarity",
+        "supplier logistics visibility",
+        "vendor dashboard clarity",
+        "API/plugin stability",
+        "enterprise lead capture",
+      ],
+      recommendedFocusAreas: [
+        "merchant acquisition path",
+        "onboarding speed",
+        "integration clarity",
+        "vendor dashboard clarity",
+        "supplier logistics visibility",
+        "API/plugin stability",
+        "enterprise lead capture",
+      ],
+      preferredNextStep: "audit",
+    };
+  }
+
+  return undefined;
 }
 
 function businessTypeFromInference(
@@ -1260,6 +1439,16 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
         confidence: "Low" as const,
       }
     : detectCompanyBackgroundIntent(message);
+  const founderFollowup = outOfScope
+    ? {
+        isFounderFollowup: false,
+        subtype: "identity" as const,
+        confidence: "Low" as const,
+      }
+    : detectFounderFollowupIntent(message);
+  const businessModelCorrection = outOfScope
+    ? {}
+    : detectBusinessModelCorrection(message);
   const businessType = outOfScope ? undefined : firstMatch(message, businessTypePatterns);
   const platform = outOfScope ? undefined : firstMatch(message, platformPatterns);
   const toolsMentioned = outOfScope ? undefined : extractToolsMentioned(message);
@@ -1301,7 +1490,9 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const desiredOutcome = outOfScope ? undefined : extractDesiredOutcome(message);
   const intent: ZoraIntent = outOfScope
     ? "out_of_scope"
-    : companyBackground.isCompanyBackgroundQuestion
+    : businessModelCorrection.correctedIndustry || businessModelCorrection.correctedBusinessModel
+      ? "business_model_correction"
+    : founderFollowup.isFounderFollowup || companyBackground.isCompanyBackgroundQuestion
       ? "company_background"
     : isFreeAuditPricingQuestion(message) || isPricingQuestion(message)
       ? "pricing"
@@ -1351,9 +1542,16 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const analysisWithoutConfidence = {
     intent,
     rawMessage: message,
-    companyBackgroundSubtype: companyBackground.isCompanyBackgroundQuestion
-      ? companyBackground.subtype
+    companyBackgroundSubtype: founderFollowup.isFounderFollowup
+      ? "founder"
+      : companyBackground.isCompanyBackgroundQuestion
+        ? companyBackground.subtype
+        : undefined,
+    founderFollowupSubtype: founderFollowup.isFounderFollowup
+      ? founderFollowup.subtype
       : undefined,
+    correctedIndustry: businessModelCorrection.correctedIndustry,
+    correctedBusinessModel: businessModelCorrection.correctedBusinessModel,
     visitorName,
     businessType,
     platform,
@@ -1448,6 +1646,89 @@ function mergeLeadProfile(
   if (analysis.industry) {
     addChange(changes, "industry", nextProfile.industry, analysis.industry);
     nextProfile.industry = analysis.industry;
+  }
+
+  if (analysis.correctedIndustry) {
+    const correctedProfile = correctedIndustryProfile(analysis.correctedIndustry, [
+      `user correction: ${analysis.rawMessage || "business model correction"}`,
+    ]);
+
+    if (correctedProfile) {
+      applyIndustryProfile(nextProfile, correctedProfile, changes);
+      addChange(
+        changes,
+        "businessModelCorrection",
+        nextProfile.businessModelCorrection,
+        analysis.correctedBusinessModel,
+      );
+      nextProfile.businessModelCorrection = analysis.correctedBusinessModel;
+      addChange(
+        changes,
+        "inferredBusinessModel",
+        nextProfile.inferredBusinessModel,
+        analysis.correctedBusinessModel,
+      );
+      nextProfile.inferredBusinessModel = analysis.correctedBusinessModel;
+      addChange(
+        changes,
+        "inferredIndustry",
+        nextProfile.inferredIndustry,
+        "B2B Supply Platform",
+      );
+      nextProfile.inferredIndustry = "B2B Supply Platform";
+      addChange(
+        changes,
+        "inferredFunnelType",
+        nextProfile.inferredFunnelType,
+        correctedProfile.buyerJourney,
+      );
+      nextProfile.inferredFunnelType = correctedProfile.buyerJourney;
+      addChange(changes, "needsBusinessTypeClarification", nextProfile.needsBusinessTypeClarification, false);
+      nextProfile.needsBusinessTypeClarification = false;
+      addChange(changes, "industryMismatchResolved", nextProfile.industryMismatchResolved, true);
+      nextProfile.industryMismatchResolved = true;
+      addChange(changes, "currentTopic", nextProfile.currentTopic, "lead_capture");
+      nextProfile.currentTopic = "lead_capture";
+      addChange(changes, "currentTopicDepth", nextProfile.currentTopicDepth, 1);
+      nextProfile.currentTopicDepth = 1;
+    }
+  } else if (analysis.intent === "business_model_correction") {
+    addChange(
+      changes,
+      "businessModelCorrection",
+      nextProfile.businessModelCorrection,
+      analysis.correctedBusinessModel,
+    );
+    nextProfile.businessModelCorrection = analysis.correctedBusinessModel;
+
+    if (nextProfile.industryProfile) {
+      addChange(changes, "industryProfile", nextProfile.industryProfile.industry, undefined);
+      delete nextProfile.industryProfile;
+    }
+    if (nextProfile.industry) {
+      addChange(changes, "industry", nextProfile.industry, undefined);
+      delete nextProfile.industry;
+    }
+    if (nextProfile.inferredIndustry) {
+      addChange(changes, "inferredIndustry", nextProfile.inferredIndustry, undefined);
+      delete nextProfile.inferredIndustry;
+    }
+    if (nextProfile.inferredBusinessModel) {
+      addChange(changes, "inferredBusinessModel", nextProfile.inferredBusinessModel, undefined);
+      delete nextProfile.inferredBusinessModel;
+    }
+    if (nextProfile.inferredFunnelType) {
+      addChange(changes, "inferredFunnelType", nextProfile.inferredFunnelType, undefined);
+      delete nextProfile.inferredFunnelType;
+    }
+    if (nextProfile.recommendedFocusAreas) {
+      addChange(changes, "recommendedFocusAreas", nextProfile.recommendedFocusAreas.join(", "), undefined);
+      delete nextProfile.recommendedFocusAreas;
+    }
+    addChange(changes, "needsBusinessTypeClarification", nextProfile.needsBusinessTypeClarification, false);
+    nextProfile.needsBusinessTypeClarification = false;
+    addChange(changes, "industryMismatchResolved", nextProfile.industryMismatchResolved, true);
+    nextProfile.industryMismatchResolved = true;
   }
 
   if (analysis.toolsMentioned?.length) {
@@ -1639,7 +1920,9 @@ function mergeLeadProfile(
     nextProfile.email = analysis.email;
   }
 
-  const industryProfile = detectZoraIndustry({
+  const industryProfile = analysis.intent === "business_model_correction"
+    ? undefined
+    : detectZoraIndustry({
     userMessage: [
       analysis.rawMessage,
       analysis.industry,
@@ -1654,7 +1937,9 @@ function mergeLeadProfile(
     businessType: nextProfile.businessType,
     platformHint: analysis.platform ?? nextProfile.platform,
   });
-  applyIndustryProfile(nextProfile, industryProfile, changes);
+  if (industryProfile) {
+    applyIndustryProfile(nextProfile, industryProfile, changes);
+  }
 
   nextProfile.recommendedNextStep = recommendZoraNextStep(nextProfile);
   nextProfile.recommendedFocusAreas = focusAreas(nextProfile);
@@ -1681,6 +1966,49 @@ function applyProfileContextToAnalysis(
   analysis: ZoraMessageAnalysis,
   currentProfile: ZoraLeadProfile,
 ): ZoraMessageAnalysis {
+  const contextualBusinessCorrection = detectBusinessModelCorrection(
+    analysis.rawMessage || "",
+    currentProfile,
+  );
+
+  if (
+    (contextualBusinessCorrection.correctedIndustry ||
+      contextualBusinessCorrection.correctedBusinessModel) &&
+    analysis.intent !== "out_of_scope"
+  ) {
+    const { confidenceScore, ...analysisWithoutConfidence } = analysis;
+    void confidenceScore;
+
+    return withRecalculatedConfidence({
+      ...analysisWithoutConfidence,
+      intent: "business_model_correction",
+      correctedIndustry: contextualBusinessCorrection.correctedIndustry,
+      correctedBusinessModel: contextualBusinessCorrection.correctedBusinessModel,
+      businessType: analysis.businessType || currentProfile.businessType,
+      currentTopic: "lead_capture",
+    });
+  }
+
+  const contextualFounderFollowup = detectFounderFollowupIntent(
+    analysis.rawMessage || "",
+    currentProfile,
+  );
+
+  if (
+    contextualFounderFollowup.isFounderFollowup &&
+    analysis.intent !== "out_of_scope"
+  ) {
+    const { confidenceScore, ...analysisWithoutConfidence } = analysis;
+    void confidenceScore;
+
+    return withRecalculatedConfidence({
+      ...analysisWithoutConfidence,
+      intent: "company_background",
+      companyBackgroundSubtype: "founder",
+      founderFollowupSubtype: contextualFounderFollowup.subtype,
+    });
+  }
+
   const contextualPreLaunchBuild =
     currentProfile.hasNoWebsite &&
     /\b(?:want to|need to|ready to|planning to|looking to)?\s*(?:build|create|launch|make)\s+(?:one|it)\b/i.test(
@@ -1814,6 +2142,7 @@ export function recommendZoraNextStep(profile: ZoraLeadProfile): ZoraNextStep {
   const industry = profile.industryProfile?.industry;
   const auditIndustries: Array<ZoraIndustry | undefined> = [
     "ecommerce_dtc",
+    "b2b_supply_platform",
     "industrial_b2b_catalog",
     "marketplace_retail",
   ];
@@ -1845,6 +2174,7 @@ export function recommendZoraNextStep(profile: ZoraLeadProfile): ZoraNextStep {
     auditIndustries.includes(industry) &&
     (auditChallenges.includes(profile.challenge) ||
       industry === "industrial_b2b_catalog" ||
+      industry === "b2b_supply_platform" ||
       industry === "marketplace_retail")
   ) {
     return "free_audit";
@@ -2133,6 +2463,10 @@ export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
     return `Because this looks like a B2B catalog${contextText}, I would focus on ${areas}. The important path is whether buyers can search, filter, compare specs, and move from product/category pages into cart, quote, or account workflows.`;
   }
 
+  if (industry === "b2b_supply_platform") {
+    return `Because this looks like a B2B supply or ecommerce infrastructure platform${contextText}, I would focus on ${areas}. The important path is whether merchants understand the supply network, trust the setup path, connect inventory or tools cleanly, and see enough logistics visibility to keep using the ecosystem.`;
+  }
+
   if (industry === "healthcare_care") {
     return `Because this looks like a care or healthcare services business${contextText}, I would focus on ${areas}. The critical path is service clarity, trust proof, intake requests, referral handoff, response time, and internal routing.`;
   }
@@ -2163,6 +2497,14 @@ export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
               : "Based on what you shared";
 
   return `${opener}${contextText}, I would focus on ${areas}. ${challengeDiagnosis(profile)}`;
+}
+
+function buildBusinessModelCorrectionResponse(profile: ZoraLeadProfile) {
+  if (profile.industryProfile?.industry === "b2b_supply_platform") {
+    return "My mistake. I completely misread the architecture. If you are running a B2B supply, dropshipping, or turnkey ecosystem platform rather than a traditional DTC storefront, the strategy changes entirely.\n\nInstead of standard retail product pages, the conversion bottleneck usually lives in merchant acquisition, onboarding friction, integration clarity, supplier logistics visibility, and whether store owners quickly understand how the ecosystem helps them operate.\n\nLet's pivot there. Since this is a platform model, do you lose more people during the initial sign-up workflow, or further down when they try to connect products, inventory, or tools?";
+  }
+
+  return "My mistake. I should adjust to your business model instead of repeating my earlier assumption. I will treat your correction as the source of truth and reframe the diagnosis from there.\n\nWhat model should I use instead: B2B platform, marketplace, wholesale/supplier, service business, healthcare/care, nonprofit/community, or something else?";
 }
 
 function buildRecommendationRoadmap(profile: ZoraLeadProfile): ZoraRoadmapStep[] {
@@ -2541,8 +2883,10 @@ function companyBackgroundContextReturn(profile: ZoraLeadProfile) {
 function buildCompanyBackgroundResponse(
   profile: ZoraLeadProfile,
   subtype: ZoraCompanyBackgroundSubtype = "general_company",
+  founderSubtype?: ZoraFounderFollowupSubtype,
 ) {
   const company = OPZIX_COMPANY_PROFILE;
+  const founder = company.founder;
   let answer: string;
 
   switch (subtype) {
@@ -2550,10 +2894,13 @@ function buildCompanyBackgroundResponse(
       answer = `${company.ownershipStatement} ${company.whatOpzixDoes}`;
       break;
     case "ceo":
-      answer = `${company.companyName} is led by ${company.founderName}, the ${company.founderRole.toLowerCase()} behind the platform. ${company.companyName} is currently focused on helping businesses diagnose growth bottlenecks and build connected systems to fix them.`;
+      answer = `${company.companyName} is led by ${founder.name}, also known as Max, the ${founder.title} behind the platform. ${founder.founderStatement}`;
       break;
     case "founder":
-      answer = `${company.founderName} is the ${company.founderRole.toLowerCase()} behind ${company.companyName}. ${company.ownershipStatement}`;
+      answer =
+        founderSubtype === "background" || founderSubtype === "experience"
+          ? `${founder.name}, also known as Max, is the ${founder.title} of ${company.companyName}. He is a ${founder.background} focused on ${joinList(founder.expertise)}.`
+          : `${founder.name}, also known as Max, is the ${founder.title} of ${company.companyName}. He is a ${founder.background}.`;
       break;
     case "legitimacy":
       answer = `Yes, ${company.companyName} is a real independent company, and ${company.launchStage} You can find it at ${company.domain}. ${company.philosophy}`;
@@ -3939,6 +4286,7 @@ function hasConversationTopicChanged(
       analysis.intent === "review_request" ||
       analysis.intent === "scanner_execute" ||
       analysis.intent === "company_background" ||
+      analysis.intent === "business_model_correction" ||
       analysis.intent === "capability" ||
       analysis.intent === "small_talk" ||
       analysis.intent === "out_of_scope",
@@ -3958,6 +4306,7 @@ function nextConversationStage(
 
   if (intent === "recommendation") return "recommendation";
   if (intent === "company_background") return previousStage || "qualification";
+  if (intent === "business_model_correction") return "deep_dive";
   if (intent === "review_request") return "deep_dive";
   if (intent === "next_step" || intent === "audit_request") return "next_step";
   if (shouldContinueTopic || shouldContinueMomentum || intent === "focus_request") return "deep_dive";
@@ -3975,7 +4324,8 @@ function toTrackedTalkingPoint(value?: string): ZoraTalkingPoint | undefined {
     value === "tracking_visibility" ||
     value === "follow_up_handoff" ||
     value === "booking_flow" ||
-    value === "crm_routing"
+    value === "crm_routing" ||
+    value === "lead_capture"
   ) {
     return value;
   }
@@ -4033,6 +4383,10 @@ function actionsForIntent(
   }
 
   if (intent === "company_background") {
+    return [] as ZoraResponse["recommendedActions"];
+  }
+
+  if (intent === "business_model_correction") {
     return [] as ZoraResponse["recommendedActions"];
   }
 
@@ -4115,6 +4469,96 @@ function actionsForIntent(
   return ["diagnose"] as ZoraResponse["recommendedActions"];
 }
 
+function normalizeTrackedUserCommand(message: string) {
+  const text = message.trim().toLowerCase();
+
+  if (/^diagnose my growth system[.!?]*$/i.test(message)) return "diagnose_my_growth_system";
+  if (/^run free audit[.!?]*$/i.test(message) || isScannerExecutionRequest(message)) {
+    return "run_free_audit";
+  }
+  if (/^book strategy call[.!?]*$/i.test(message) || isBookingRequest(message)) {
+    return "book_strategy_call";
+  }
+  if (/^ask a question[.!?]*$/i.test(message)) return "ask_question";
+  if (/^faq[.!?]*$/i.test(message)) return "faq";
+  if (/\b(high-level recommendation|high level recommendation|recommendation here)\b/i.test(message)) {
+    return "high_level_recommendation";
+  }
+  if (/^(tell me more|more|why)[.!?]*$/i.test(text)) return "tell_me_more";
+  if (/^(ok|okay|got it|interesting|nice)[.!?]*$/i.test(text)) return text.replace(/\W+/g, "_");
+
+  return undefined;
+}
+
+function summarizeAssistantMessage(
+  intent: ZoraIntent,
+  reply: string,
+  profile: ZoraLeadProfile,
+) {
+  const founderContext =
+    intent === "company_background"
+      ? "company background founder owner CEO Adim Odumefune Max"
+      : "";
+  const topicContext = [profile.businessType, profile.challenge, profile.currentTopic]
+    .filter(Boolean)
+    .join(" ");
+
+  return [intent, founderContext, topicContext, reply.slice(0, 180)]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 300);
+}
+
+function buildDuplicateCommandResponse(
+  command: string | undefined,
+  profile: ZoraLeadProfile,
+  fallbackIntent: ZoraIntent,
+) {
+  if (command === "diagnose_my_growth_system" && hasProfileDiagnosisSignal(profile)) {
+    if (profile.businessType === "Ecommerce") {
+      return "Let's go one layer deeper. For an ecommerce store, product discovery and page confidence matter because most cold visitors decide whether to continue before they ever reach checkout. I would first check whether users can find the right product, understand the offer, trust the page, and see a clear next step on mobile.";
+    }
+
+    if (profile.businessType === "Real Estate") {
+      return "Let's go one layer deeper. For real estate, the diagnosis should separate seller intent, buyer intent, local proof, capture path, booking flow, and CRM follow-up. The question is not just whether the page exists, but whether the right inquiry reaches the right person quickly.";
+    }
+
+    if (profile.hasNoWebsite) {
+      return "Let's go one layer deeper. Since there is no live site yet, the diagnosis should become a launch blueprint: offer clarity, target audience, first landing page structure, lead capture, booking or intake flow, tracking from day one, and follow-up ownership.";
+    }
+
+    return `Let's go one layer deeper. I would focus on ${joinList(
+      focusAreas(profile),
+    )} because that is where the first useful bottleneck is most likely to show up.`;
+  }
+
+  if (
+    command === "tell_me_more" ||
+    command === "okay" ||
+    command === "ok" ||
+    command === "nice" ||
+    command === "got_it" ||
+    command === "interesting"
+  ) {
+    if (profile.currentTopic) {
+      return buildTopicResponse(profile, profile.currentTopic);
+    }
+
+    if (profile.lastAssistantIntent || fallbackIntent) {
+      return buildMomentumResponse(profile);
+    }
+  }
+
+  if (command === "high_level_recommendation" && hasProfileDiagnosisSignal(profile)) {
+    return buildRecommendationResponse({
+      ...profile,
+      recommendationRoadmap: profile.recommendationRoadmap || buildRecommendationRoadmap(profile),
+    });
+  }
+
+  return "";
+}
+
 function enforceNoWebsiteGuardrail(reply: string) {
   return reply
     .replace(/\bwebsite URL\b/gi, "live link")
@@ -4129,6 +4573,11 @@ export function buildZoraResponse(
   message: string,
   currentProfile: ZoraLeadProfile = {},
 ): ZoraResponse {
+  const currentUserCommand = normalizeTrackedUserCommand(message);
+  const duplicateCommandCount =
+    currentUserCommand && currentProfile.lastUserCommand === currentUserCommand
+      ? (currentProfile.duplicateCommandCount || 0) + 1
+      : 0;
   const analysis = applyProfileContextToAnalysis(
     analyzeZoraMessage(message),
     currentProfile,
@@ -4233,13 +4682,23 @@ export function buildZoraResponse(
   const repeatedSoftClose =
     effectiveIntent === "thanks" &&
     (Boolean(currentProfile.hasSeenSoftClose) || isCasualAcknowledgmentMessage(message));
+  const duplicateReply =
+    duplicateCommandCount > 0 &&
+    effectiveIntent !== "company_background" &&
+    effectiveIntent !== "out_of_scope"
+      ? buildDuplicateCommandResponse(currentUserCommand, leadProfile, effectiveIntent)
+      : "";
   const reply =
-    effectiveIntent === "out_of_scope"
+    duplicateReply ||
+    (effectiveIntent === "out_of_scope"
       ? buildOutOfScopeResponse()
+      : effectiveIntent === "business_model_correction"
+        ? buildBusinessModelCorrectionResponse(leadProfile)
       : effectiveIntent === "company_background"
         ? buildCompanyBackgroundResponse(
             leadProfile,
             analysis.companyBackgroundSubtype,
+            analysis.founderFollowupSubtype,
           )
       : effectiveIntent === "thanks"
         ? buildThanksResponse(leadProfile, repeatedSoftClose)
@@ -4305,7 +4764,7 @@ export function buildZoraResponse(
                             ? `${buildZoraDiagnosis(effectiveDiagnosisProfile)} ${followUpQuestion(effectiveDiagnosisProfile)}`
                             : analysis.websiteUrl
                               ? buildWebsiteCapturedWithMemoryResponse(leadProfile)
-                              : buildClarifyingResponse(leadProfile);
+                              : buildClarifyingResponse(leadProfile));
 
   if (effectiveIntent === "thanks" && !leadProfile.hasSeenSoftClose) {
     profileChanges.push("hasSeenSoftClose: undefined -> true");
@@ -4337,6 +4796,25 @@ export function buildZoraResponse(
   const guardedFinalReply = leadProfile.hasNoWebsite && effectiveIntent !== "company_background"
     ? enforceNoWebsiteGuardrail(finalReply)
     : finalReply;
+
+  if (currentUserCommand !== leadProfile.lastUserCommand) {
+    addChange(profileChanges, "lastUserCommand", leadProfile.lastUserCommand, currentUserCommand);
+  }
+  addChange(
+    profileChanges,
+    "duplicateCommandCount",
+    leadProfile.duplicateCommandCount,
+    duplicateCommandCount,
+  );
+  addChange(profileChanges, "lastAssistantIntent", leadProfile.lastAssistantIntent, effectiveIntent);
+  leadProfile.lastUserCommand = currentUserCommand;
+  leadProfile.duplicateCommandCount = duplicateCommandCount;
+  leadProfile.lastAssistantIntent = effectiveIntent;
+  leadProfile.lastAssistantMessageSummary = summarizeAssistantMessage(
+    effectiveIntent,
+    guardedFinalReply,
+    leadProfile,
+  );
 
   const recentTalkingPoint = talkingPointForResponse(
     effectiveIntent,

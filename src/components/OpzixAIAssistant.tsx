@@ -206,6 +206,7 @@ function businessTypeFromDetectedIndustry(
   if (industry === "healthcare_care") return "Care/Healthcare";
   if (industry === "nonprofit_faith_community") return "Other";
   if (
+    industry === "b2b_supply_platform" ||
     industry === "ecommerce_dtc" ||
     industry === "industrial_b2b_catalog" ||
     industry === "marketplace_retail"
@@ -433,6 +434,10 @@ function phase1Diagnosis(profile: ZoraLeadProfile) {
 
   if (industry === "industrial_b2b_catalog") {
     return withTrafficIntentAnchor(profile, "Because this looks like an industrial/B2B catalog, I would focus on catalog discovery, search, SKU/specs, category hierarchy, and the cart/quote/account path.");
+  }
+
+  if (industry === "b2b_supply_platform") {
+    return withTrafficIntentAnchor(profile, "Because this looks like a B2B supply or ecommerce infrastructure platform, I would focus on merchant acquisition, onboarding speed, integration clarity, vendor dashboard clarity, supplier logistics visibility, API/plugin stability, and enterprise lead capture.");
   }
 
   if (industry === "healthcare_care") {
@@ -944,15 +949,29 @@ export default function OpzixAIAssistant() {
         nextProfile.challenge ||
         nextProfile.hasNoWebsite)
     ) {
+      const localResponse = buildZoraResponse("Diagnose my growth system", nextProfile);
+      const responseProfile = normalizeProfile(localResponse.leadProfile);
+      const responseActions =
+        responseProfile.duplicateCommandCount && responseProfile.duplicateCommandCount > 0
+          ? []
+          : localResponse.responseMode === "diagnosis" && shouldShowPhase1Actions(responseProfile)
+            ? phase1CtaActions(responseProfile)
+            : actionsFromRecommendation(localResponse.recommendedActions);
+
       setFlowStep(null);
-      setLeadProfile(nextProfile);
+      setLeadProfile(responseProfile);
       appendMessages([
         {
           id: createId("user"),
           role: "user",
           text: "Diagnose my growth system",
         },
-        phase1DiagnosisMessage(nextProfile),
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text: localResponse.reply,
+          actions: responseActions,
+        },
       ]);
       return;
     }
