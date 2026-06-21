@@ -650,7 +650,7 @@ function questionForStep(step: GuidedStep): ChatMessage {
 function nextGuidedStep(profile: ZoraLeadProfile): GuidedStep | null {
   if (!profile.businessType) return "businessType";
   if (!profile.challenge) return "challenge";
-  if (profile.websiteUrl === undefined) return "websiteUrl";
+  if (profile.websiteUrl === undefined && !profile.hasNoWebsite) return "websiteUrl";
   return null;
 }
 
@@ -936,7 +936,14 @@ export default function OpzixAIAssistant() {
     );
     const firstMissingStep = nextGuidedStep(nextProfile);
 
-    if (hasExistingContext && (nextProfile.businessType || nextProfile.websiteUrl || nextProfile.challenge)) {
+    if (
+      hasExistingContext &&
+      !firstMissingStep &&
+      (nextProfile.businessType ||
+        nextProfile.websiteUrl ||
+        nextProfile.challenge ||
+        nextProfile.hasNoWebsite)
+    ) {
       setFlowStep(null);
       setLeadProfile(nextProfile);
       appendMessages([
@@ -1229,6 +1236,7 @@ export default function OpzixAIAssistant() {
       }
     }
 
+    const pendingGuidedStep = flowStep;
     setFlowStep(null);
     setIsThinking(true);
     clearIntroActions();
@@ -1263,15 +1271,25 @@ export default function OpzixAIAssistant() {
         : localResponse;
       const nextProfile = normalizeProfile(payload.leadProfile || localResponse.leadProfile);
       const responseMode = payload.responseMode || localResponse.responseMode;
+      const shouldResumeGuidedStep =
+        responseMode === "company_background" && Boolean(pendingGuidedStep);
+      const resumedGuidedQuestion =
+        shouldResumeGuidedStep && pendingGuidedStep
+          ? questionForStep(pendingGuidedStep)
+          : null;
       const responseActions =
-        responseMode === "diagnosis" &&
-        shouldShowPhase1Actions(nextProfile)
-          ? phase1CtaActions(nextProfile)
-          : actionsFromRecommendation(
-              payload.recommendedActions || localResponse.recommendedActions,
-            );
+        resumedGuidedQuestion
+          ? resumedGuidedQuestion.actions || []
+          : responseMode === "diagnosis" && shouldShowPhase1Actions(nextProfile)
+            ? phase1CtaActions(nextProfile)
+            : actionsFromRecommendation(
+                payload.recommendedActions || localResponse.recommendedActions,
+              );
 
       setLeadProfile(nextProfile);
+      if (shouldResumeGuidedStep) {
+        setFlowStep(pendingGuidedStep);
+      }
       appendMessages([
         {
           id: createId("assistant"),
@@ -1283,12 +1301,22 @@ export default function OpzixAIAssistant() {
       handleStructuredAction(payload.action || localResponse.action);
     } catch {
       const nextProfile = normalizeProfile(localResponse.leadProfile);
+      const shouldResumeGuidedStep =
+        localResponse.responseMode === "company_background" && Boolean(pendingGuidedStep);
+      const resumedGuidedQuestion =
+        shouldResumeGuidedStep && pendingGuidedStep
+          ? questionForStep(pendingGuidedStep)
+          : null;
       const responseActions =
-        localResponse.responseMode === "diagnosis" &&
-        shouldShowPhase1Actions(nextProfile)
-          ? phase1CtaActions(nextProfile)
-          : actionsFromRecommendation(localResponse.recommendedActions);
+        resumedGuidedQuestion
+          ? resumedGuidedQuestion.actions || []
+          : localResponse.responseMode === "diagnosis" && shouldShowPhase1Actions(nextProfile)
+            ? phase1CtaActions(nextProfile)
+            : actionsFromRecommendation(localResponse.recommendedActions);
       setLeadProfile(nextProfile);
+      if (shouldResumeGuidedStep) {
+        setFlowStep(pendingGuidedStep);
+      }
       appendMessages([
         {
           id: createId("assistant"),

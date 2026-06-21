@@ -504,7 +504,7 @@ export function detectCompanyBackgroundIntent(
   }
 
   if (
-    /\b(who is the founder|who's the founder|who started|who founded|who created|who built)\b/i.test(
+    /\b(who is the founder|who's the founder|who started|who founded|who created|who built|who is adim odumefune|who's adim odumefune|who is adim|who's adim)\b/i.test(
       text,
     )
   ) {
@@ -2525,6 +2525,10 @@ function companyBackgroundContextReturn(profile: ZoraLeadProfile) {
     return "Back to your situation: since you do not have a live site yet, I would stay on pre-launch architecture: offer clarity, target audience, first landing page structure, lead capture, booking or intake flow, tracking from day one, and CRM/email follow-up.";
   }
 
+  if (profile.businessType && !profile.challenge) {
+    return `Back to your situation: you selected ${profile.businessType}. The next useful question is what feels most stuck: traffic, conversion, follow-up, operations, tracking, or not sure.`;
+  }
+
   if (hasProfileDiagnosisSignal(profile)) {
     return `Back to your situation: based on what you've shared, I would stay focused on ${joinList(
       focusAreas(profile),
@@ -2549,7 +2553,7 @@ function buildCompanyBackgroundResponse(
       answer = `${company.companyName} is led by ${company.founderName}, the ${company.founderRole.toLowerCase()} behind the platform. ${company.companyName} is currently focused on helping businesses diagnose growth bottlenecks and build connected systems to fix them.`;
       break;
     case "founder":
-      answer = `${company.companyName} was started by ${company.founderName}, the ${company.founderRole.toLowerCase()}. ${company.ownershipStatement}`;
+      answer = `${company.founderName} is the ${company.founderRole.toLowerCase()} behind ${company.companyName}. ${company.ownershipStatement}`;
       break;
     case "legitimacy":
       answer = `Yes, ${company.companyName} is a real independent company, and ${company.launchStage} You can find it at ${company.domain}. ${company.philosophy}`;
@@ -2654,7 +2658,11 @@ function buildPricingResponse(profile: ZoraLeadProfile, message: string) {
   return `${greetingPrefix(profile)}For paid work, I would not give a serious price before understanding the platform, implementation depth, and business impact. The free audit is the best first step when there is a live URL; a strategy call is better when the question is broader than the visible website.`;
 }
 
-function buildClarifyingResponse() {
+function buildClarifyingResponse(profile: ZoraLeadProfile = {}) {
+  if (profile.businessType && !profile.challenge) {
+    return `You selected ${profile.businessType}. What's the biggest challenge right now: getting traffic, converting visitors, lead follow-up, operations, tracking, or not sure?`;
+  }
+
   return "I can help with that. To give a useful recommendation, tell me what kind of business you run and what feels stuck: traffic, conversion, operations, tracking, follow-up, or the website itself.";
 }
 
@@ -4028,6 +4036,10 @@ function actionsForIntent(
     return [] as ZoraResponse["recommendedActions"];
   }
 
+  if (intent === "clarify" && profile.businessType && !profile.challenge) {
+    return [] as ZoraResponse["recommendedActions"];
+  }
+
   if (profile.hasNoWebsite && intent !== "out_of_scope") {
     return ["strategy_call"] as ZoraResponse["recommendedActions"];
   }
@@ -4293,7 +4305,7 @@ export function buildZoraResponse(
                             ? `${buildZoraDiagnosis(effectiveDiagnosisProfile)} ${followUpQuestion(effectiveDiagnosisProfile)}`
                             : analysis.websiteUrl
                               ? buildWebsiteCapturedWithMemoryResponse(leadProfile)
-                              : buildClarifyingResponse();
+                              : buildClarifyingResponse(leadProfile);
 
   if (effectiveIntent === "thanks" && !leadProfile.hasSeenSoftClose) {
     profileChanges.push("hasSeenSoftClose: undefined -> true");
