@@ -634,6 +634,23 @@ function isCapabilityQuestion(message: string) {
   );
 }
 
+function isRealEstateLeadSystemInquiry(message: string) {
+  const hasRealEstateContext =
+    /\b(real estate|realtor|brokerage|broker|agent|property management|zillow|trulia|redfin)\b/i.test(
+      message,
+    );
+  const hasLeadSystemContext =
+    /\b(lead|leads|lead[-\s]?generat(?:ing|ion)|organic|seo|zillow|trulia|redfin|crm|follow[-\s]?up|nurture|calendar|booking|website|site|system|pipeline)\b/i.test(
+      message,
+    );
+  const asksForHelp =
+    /\b(how can you help|can you help|help me|how would you|what would you build|build(?:ing)?|create|set up|setup|system)\b/i.test(
+      message,
+    );
+
+  return hasRealEstateContext && hasLeadSystemContext && asksForHelp;
+}
+
 function isSmallTalkQuestion(message: string) {
   return /\b(how are you|how's it going|how is it going|what's up|whats up|hello|hi zora|hey zora|hi\b|hey\b|good morning|good afternoon|good evening)\b/i.test(
     message,
@@ -691,9 +708,13 @@ function isFreeAuditPricingQuestion(message: string) {
 }
 
 function isScannerExecutionRequest(message: string) {
-  return /^(run it|start it|scan it|run the audit|start the audit|start the scan|run the scan|scan my site|scan my website|scan my store|audit my site|audit my website|audit my store)[.!?]*$/i.test(
+  return /^(run it|start it|scan it|run audit|run the audit|start audit|start the audit|start the scan|run scan|run the scan|scan my site|scan my website|scan my store|audit my site|audit my website|audit my store)[.!?]*$/i.test(
     message.trim(),
   );
+}
+
+function isDiagnoseExecutionRequest(message: string) {
+  return /^diagnose my growth system[.!?]*$/i.test(message.trim());
 }
 
 function isReviewRequest(message: string) {
@@ -1344,9 +1365,16 @@ function extractDesiredOutcome(text: string) {
 }
 
 function extractLeadSource(text: string) {
+  const hasZillow = /\bzillow\b/i.test(text);
+  const hasOrganic = /\borganic|seo|search\b/i.test(text);
+
+  if (hasZillow && hasOrganic) return "Zillow and organic search";
+  if (hasZillow) return "Zillow";
+  if (/\btrulia\b/i.test(text)) return "Trulia";
+  if (/\bredfin\b/i.test(text)) return "Redfin";
   if (/\b(?:ad|ads|paid traffic|google ads|facebook ads|meta ads)\b/i.test(text)) return "Ads";
   if (/\breferrals?\b/i.test(text)) return "Referrals";
-  if (/\borganic|seo|search\b/i.test(text)) return "Organic search";
+  if (hasOrganic) return "Organic search";
   if (/\bsocial|instagram|facebook|tiktok|linkedin\b/i.test(text)) return "Social";
   if (/\bhome\s?page|homepage|hompage\b/i.test(text)) return "Homepage";
   return undefined;
@@ -1449,6 +1477,9 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const businessModelCorrection = outOfScope
     ? {}
     : detectBusinessModelCorrection(message);
+  const realEstateLeadSystemInquiry = outOfScope
+    ? false
+    : isRealEstateLeadSystemInquiry(message);
   const businessType = outOfScope ? undefined : firstMatch(message, businessTypePatterns);
   const platform = outOfScope ? undefined : firstMatch(message, platformPatterns);
   const toolsMentioned = outOfScope ? undefined : extractToolsMentioned(message);
@@ -1471,7 +1502,11 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
           : undefined
         : firstMatch(message, challengePatterns) ||
           (leadSource ? "Traffic" : undefined);
-  const currentTopic = outOfScope ? undefined : extractCurrentTopic(message, challenge);
+  const currentTopic = outOfScope
+    ? undefined
+    : realEstateLeadSystemInquiry
+      ? "lead_capture"
+      : extractCurrentTopic(message, challenge);
   const revenue = outOfScope ? {} : parseRevenue(message);
   const email = outOfScope ? undefined : extractEmail(message);
   const visitorName = extractVisitorName(message);
@@ -1496,7 +1531,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
       ? "company_background"
     : isFreeAuditPricingQuestion(message) || isPricingQuestion(message)
       ? "pricing"
-    : isScannerExecutionRequest(message)
+    : isScannerExecutionRequest(message) || isDiagnoseExecutionRequest(message)
       ? "scanner_execute"
     : isThanksMessage(message)
       ? "thanks"
@@ -1512,7 +1547,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
               ? "audit_request"
               : isBookingRequest(message)
                 ? "booking_request"
-                : isConsultantQuestion(message)
+                : realEstateLeadSystemInquiry || isConsultantQuestion(message)
                   ? "consultant"
                   : isCapabilityQuestion(message)
                     ? "capability"
@@ -3244,7 +3279,7 @@ function buildScannerExecutionResponse(profile: ZoraLeadProfile) {
     return "What website URL should I run the scan on?";
   }
 
-  return "Starting the free audit now. The scanner will use the live URL as the source of truth and turn the visible page signals into a more concrete diagnosis.";
+  return "Initiating the technical architecture scan for your domain now. Standby for the roadmap.";
 }
 
 function buildHandoffResponse(
@@ -3291,6 +3326,21 @@ function buildNoWebsiteResponse() {
   return "Got it. Since there is no live site yet, the focus shifts to pre-launch growth strategy: landing page architecture, the core offer, lead capture, follow-up, tracking, and launch timeline.";
 }
 
+function buildRealEstateLeadSystemResponse(profile: ZoraLeadProfile) {
+  const source = profile.leadSource || "Zillow and organic traffic";
+  const launchContext = profile.hasNoWebsite
+    ? " Since you do not have a website yet, I would treat this as a lead engine from scratch, not just a website build."
+    : "";
+
+  return [
+    `That gives us a strong blueprint to build from.${launchContext} For a real estate business using ${source}, the goal is not a pretty brochure site; it is an automated lead capture, validation, and nurture system.`,
+    "The biggest leak is response latency. Zillow and portal leads are volatile, and organic visitors are usually comparing agents, neighborhoods, or listing options. If a lead waits hours for a response, they often book with someone else.",
+    "What I would architect first: a focused buyer/seller landing path, localized proof, a high-utility capture offer such as a valuation, neighborhood guide, or showing request, and form or calendar routing into a CRM like Follow Up Boss, HubSpot, KVCore, or a similar pipeline.",
+    "The system should trigger an SMS/email follow-up within about 60 seconds, tag the source as Zillow or organic, qualify budget/timeline/location, and route serious buyers or sellers directly toward your calendar while filtering weaker leads in the background.",
+    "Recommended next step: map the lead flow from source -> landing page -> CRM -> instant follow-up -> booked appointment. Since this is pre-launch architecture, a strategy call is the cleanest way to sketch the data flow before design starts.",
+  ].join("\n");
+}
+
 function buildConsultantResponse(profile: ZoraLeadProfile, message: string) {
   if (
     profile.recommendationRoadmap?.length &&
@@ -3298,6 +3348,13 @@ function buildConsultantResponse(profile: ZoraLeadProfile, message: string) {
     isRoadmapSpecificFollowUp(message)
   ) {
     return buildRoadmapFollowUpResponse(message, profile.recommendationRoadmap);
+  }
+
+  if (
+    (profile.businessType === "Real Estate" || isRealEstateLeadSystemInquiry(message)) &&
+    isRealEstateLeadSystemInquiry(message)
+  ) {
+    return buildRealEstateLeadSystemResponse(profile);
   }
 
   if (

@@ -128,6 +128,22 @@ async function buildGptReply(
             "- If the corrected model is a B2B supply network, dropshipping platform, turnkey ecosystem, or ecommerce infrastructure platform, pivot to merchant acquisition, onboarding speed, integration clarity, vendor dashboard clarity, API/plugin stability, supplier logistics visibility, and enterprise lead capture.",
             "- Start with a brief apology or acknowledgement, then ask one deeper diagnostic question about the corrected model.",
             "",
+            "[STRICT SCANNER EXECUTION RULE]",
+            "- If the user types 'run audit', 'run the audit', 'start audit', 'scan my site', or 'diagnose my growth system', they expect a tool to load.",
+            "- You are strictly forbidden from repeating the B2B platform checklist or asking where visitors are dropping off in response to those commands.",
+            "- Your only allowed response text for scanner execution is: 'Initiating the technical architecture scan for your domain now. Standby for the roadmap.'",
+            "",
+            "[STRICT CONTEXT RESPONSIVENESS OVERRIDE]",
+            "- If a user writes a detailed message explaining how they get traffic, which tools they use, or what system they want to build, you are strictly forbidden from outputting generic capabilities lists or saying 'My role is to understand...'.",
+            "- You must read their exact words, apply the matching industry matrix, and explain how you would architect that specific system before suggesting the next step.",
+            "- If the user mentions real estate, Zillow, Trulia, Redfin, organic leads, or a lead-generating system, apply the Real Estate & Automated Lead Gen Matrix.",
+            "",
+            "[REAL ESTATE & AUTOMATED LEAD GEN MATRIX]",
+            "- Use only for Real Estate, Property Management, brokerage networks, or mentions of Zillow, Trulia, or Redfin. Never use ecommerce terms like cart, checkout, shipping, or product discovery.",
+            "- Level 1: For real estate businesses balancing organic growth and platforms like Zillow, the bottleneck is not a pretty website; it is automated lead capture, validation, and instantaneous nurture.",
+            "- Level 2: The key leak is response latency. Buyers and sellers from Zillow or organic search expect fast answers. If follow-up is delayed, they often move to another agent.",
+            "- Level 3: The system should bridge traffic sources and forms into a CRM such as HubSpot, KVCore, Follow Up Boss, or a similar pipeline, then trigger SMS/email follow-up quickly enough to qualify intent and book serious prospects.",
+            "",
             "[STRICT CHOICE STATE TRACKING]",
             "- If you ask a binary question such as 'Would you like to run the audit or review the strategy manually?' and the user selects 'manually', 'manual review', 'recommendation', or 'review strategy', immediately render that exact path.",
             "- You are strictly forbidden from repeating the binary question or repeating the preceding paragraph. Acknowledge their choice, provide the requested information, and move the conversation to the next logical step.",
@@ -225,7 +241,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const playbook = fallback.leadProfile.hasNoWebsite
+    const playbook = fallback.leadProfile.hasNoWebsite ||
+      fallback.action ||
+      fallback.navigationHref ||
+      fallback.responseMode === "scanner_execute"
       ? undefined
       : selectZoraPlaybook(message, fallback);
     const playbookReply = adaptZoraPlaybookResponse(playbook, fallback);

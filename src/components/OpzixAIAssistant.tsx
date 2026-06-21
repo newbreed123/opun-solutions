@@ -374,12 +374,15 @@ function bookingAction(
   };
 }
 
-function actionsFromRecommendation(actions: ZoraResponse["recommendedActions"]): ZoraAction[] {
+function actionsFromRecommendation(
+  actions: ZoraResponse["recommendedActions"],
+  profile?: ZoraLeadProfile,
+): ZoraAction[] {
   return actions.flatMap((action) =>
     action === "strategy_call"
       ? [bookingAction("Book Strategy Call", "primary")]
       : action === "free_audit"
-        ? [scannerAction("Run Free Audit", "primary")]
+        ? [scannerAction("Run Free Audit", "primary", profile)]
         : action === "diagnose"
           ? [
               {
@@ -400,6 +403,16 @@ function actionsFromRecommendation(actions: ZoraResponse["recommendedActions"]):
               ]
             : [],
   );
+}
+
+function isTextAuditCommand(value: string) {
+  return /^(run it|start it|scan it|run audit|run the audit|start audit|start the audit|start the scan|run scan|run the scan|scan my site|scan my website|scan my store|audit my site|audit my website|audit my store)[.!?]*$/i.test(
+    value.trim(),
+  );
+}
+
+function isTextDiagnoseCommand(value: string) {
+  return /^diagnose my growth system[.!?]*$/i.test(value.trim());
 }
 
 function actionTone(action: ZoraAction) {
@@ -956,7 +969,7 @@ export default function OpzixAIAssistant() {
           ? []
           : localResponse.responseMode === "diagnosis" && shouldShowPhase1Actions(responseProfile)
             ? phase1CtaActions(responseProfile)
-            : actionsFromRecommendation(localResponse.recommendedActions);
+            : actionsFromRecommendation(localResponse.recommendedActions, responseProfile);
 
       setFlowStep(null);
       setLeadProfile(responseProfile);
@@ -1165,6 +1178,19 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.value === "diagnose") {
+      const nextProfile = normalizeProfile(leadProfile);
+
+      if (nextProfile.websiteUrl && !nextProfile.hasNoWebsite) {
+        routeToLink(
+          scannerAction(
+            "Run Free Audit",
+            "primary",
+            nextProfile,
+          ) as Extract<ZoraAction, { kind: "link" }>,
+        );
+        return;
+      }
+
       startGuidedFlow();
       return;
     }
@@ -1205,6 +1231,41 @@ export default function OpzixAIAssistant() {
     if (!message || isThinking) return;
 
     setInput("");
+
+    if (isTextAuditCommand(message) || isTextDiagnoseCommand(message)) {
+      const nextProfile = normalizeProfile(leadProfile);
+
+      if (nextProfile.websiteUrl && !nextProfile.hasNoWebsite) {
+        routeToLink(
+          scannerAction(
+            "Run Free Audit",
+            "primary",
+            nextProfile,
+          ) as Extract<ZoraAction, { kind: "link" }>,
+        );
+        return;
+      }
+
+      if (isTextDiagnoseCommand(message)) {
+        startGuidedFlow();
+        return;
+      }
+
+      setFlowStep("websiteUrl");
+      appendMessages([
+        {
+          id: createId("user"),
+          role: "user",
+          text: message,
+        },
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text: "I can run the audit once I have the website URL. What site should I scan?",
+        },
+      ]);
+      return;
+    }
 
     if (flowStep) {
       const matchedValue = matchGuidedText(flowStep, message);
@@ -1303,6 +1364,7 @@ export default function OpzixAIAssistant() {
             ? phase1CtaActions(nextProfile)
             : actionsFromRecommendation(
                 payload.recommendedActions || localResponse.recommendedActions,
+                nextProfile,
               );
 
       setLeadProfile(nextProfile);
@@ -1331,7 +1393,7 @@ export default function OpzixAIAssistant() {
           ? resumedGuidedQuestion.actions || []
           : localResponse.responseMode === "diagnosis" && shouldShowPhase1Actions(nextProfile)
             ? phase1CtaActions(nextProfile)
-            : actionsFromRecommendation(localResponse.recommendedActions);
+            : actionsFromRecommendation(localResponse.recommendedActions, nextProfile);
       setLeadProfile(nextProfile);
       if (shouldResumeGuidedStep) {
         setFlowStep(pendingGuidedStep);
