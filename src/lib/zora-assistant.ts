@@ -5,17 +5,21 @@ import {
 } from "@/lib/zora-industry-awareness";
 import { OPZIX_COMPANY_PROFILE } from "@/lib/opzix-company-profile";
 import {
-  buildConsultingConceptAnswer,
   buildConsultingExperienceAnswer,
-  detectConsultingConcept,
   isConsultingExperienceQuestion,
-  type ZoraConsultingConcept,
-  type ZoraConsultingConceptConfidence,
 } from "@/lib/zora-consulting-knowledge";
 import {
   detectZoraActionIntent,
   type ZoraActionIntent,
 } from "@/lib/zora-action-intent";
+import {
+  buildOpzixBrainAnswer,
+  buildOpzixBrainLowConfidenceFallback,
+  detectOpzixBrainConcept,
+  type ConceptDetectionResult,
+  type OpzixBrainConcept,
+  type OpzixBrainIndustry,
+} from "@/lib/opzix-brain";
 
 export type ZoraBusinessType =
   | "Ecommerce"
@@ -275,8 +279,8 @@ export type ZoraLeadProfile = {
   conversationStage?: ZoraConversationStage;
   currentTopic?: ZoraTopic;
   currentSubtopic?: string;
-  detectedConcept?: ZoraConsultingConcept;
-  conceptConfidence?: ZoraConsultingConceptConfidence;
+  detectedConcept?: OpzixBrainConcept;
+  conceptConfidence?: ConceptDetectionResult["confidence"];
   conceptMatchedTerms?: string[];
   currentTopicDepth?: number;
   recentTalkingPoints?: ZoraTalkingPoint[];
@@ -325,8 +329,8 @@ export type ZoraMessageAnalysis = {
   challenge?: ZoraChallenge;
   websiteUrl?: string;
   currentTopic?: ZoraTopic;
-  consultingConcept?: ZoraConsultingConcept;
-  conceptConfidence?: ZoraConsultingConceptConfidence;
+  consultingConcept?: OpzixBrainConcept;
+  conceptConfidence?: ConceptDetectionResult["confidence"];
   conceptMatchedTerms?: string[];
   hasWebsiteOrLandingPage?: boolean;
   hasNoWebsite?: boolean;
@@ -1802,7 +1806,7 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
       });
   const consultingConcept = outOfScope
     ? { concept: null, confidence: "Low" as const, matchedTerms: [] }
-    : detectConsultingConcept(message);
+    : detectOpzixBrainConcept(message);
   const hasConsultingConcept =
     Boolean(consultingConcept.concept) && consultingConcept.confidence !== "Low";
   const intent: ZoraIntent = outOfScope
@@ -3829,7 +3833,7 @@ function buildClarifyingResponse(profile: ZoraLeadProfile = {}) {
     return `You selected ${profile.businessType}. What's the biggest challenge right now: getting traffic, converting visitors, lead follow-up, operations, tracking, or not sure?`;
   }
 
-  return "I can help with that. To give a useful recommendation, tell me what kind of business you run and what feels stuck: traffic, conversion, operations, tracking, follow-up, or the website itself.";
+  return buildOpzixBrainLowConfidenceFallback().message;
 }
 
 function buildWebsiteCapturedResponse(analysis: ZoraMessageAnalysis) {
@@ -4237,7 +4241,7 @@ function buildConsultantResponse(profile: ZoraLeadProfile, message: string) {
 function buildConsultingKnowledgeResponse(
   profile: ZoraLeadProfile,
   message: string,
-  concept?: ZoraConsultingConcept,
+  concept?: OpzixBrainConcept,
 ) {
   const activeConcept =
     concept || profile.detectedConcept || toConsultingConcept(profile.currentSubtopic);
@@ -4253,9 +4257,9 @@ function buildConsultingKnowledgeResponse(
     return buildConsultantResponse(profile, message);
   }
 
-  return buildConsultingConceptAnswer({
+  return buildOpzixBrainAnswer({
     concept: activeConcept,
-    industry: zoraIndustryForConsulting(profile),
+    industry: zoraIndustryForBrain(profile),
     businessType: profile.businessType,
     challenge: profile.challenge,
     websiteUrl: profile.websiteUrl,
@@ -4263,22 +4267,22 @@ function buildConsultingKnowledgeResponse(
   }).message;
 }
 
-function zoraIndustryForConsulting(profile: ZoraLeadProfile): ZoraIndustry | undefined {
-  if (profile.industryProfile?.industry) return profile.industryProfile.industry;
-  if (isKnownZoraIndustry(profile.confirmedIndustry)) return profile.confirmedIndustry;
-  if (isKnownZoraIndustry(profile.industry)) return profile.industry;
+function zoraIndustryForBrain(profile: ZoraLeadProfile): OpzixBrainIndustry | undefined {
+  if (isKnownBrainIndustry(profile.industryProfile?.industry)) {
+    return profile.industryProfile.industry;
+  }
+  if (isKnownBrainIndustry(profile.confirmedIndustry)) return profile.confirmedIndustry;
+  if (isKnownBrainIndustry(profile.industry)) return profile.industry;
   return undefined;
 }
 
-function isKnownZoraIndustry(value: unknown): value is ZoraIndustry {
+function isKnownBrainIndustry(value: unknown): value is OpzixBrainIndustry {
   return (
     value === "ecommerce_dtc" ||
-    value === "b2b_supply_platform" ||
     value === "industrial_b2b_catalog" ||
     value === "marketplace_retail" ||
     value === "real_estate" ||
     value === "healthcare_care" ||
-    value === "nonprofit_faith_community" ||
     value === "service_business" ||
     value === "local_service" ||
     value === "education" ||
@@ -5292,7 +5296,7 @@ function toTrackedTalkingPoint(value?: string): ZoraTalkingPoint | undefined {
   return undefined;
 }
 
-function toConsultingConcept(value?: string): ZoraConsultingConcept | undefined {
+function toConsultingConcept(value?: string): OpzixBrainConcept | undefined {
   const tracked = toTrackedTalkingPoint(value);
 
   if (
@@ -5300,42 +5304,31 @@ function toConsultingConcept(value?: string): ZoraConsultingConcept | undefined 
     tracked === "conversion_path" ||
     tracked === "product_discovery" ||
     tracked === "trust_signals" ||
-    tracked === "mobile_ux" ||
     tracked === "tracking_visibility" ||
-    tracked === "analytics_dashboard" ||
     tracked === "follow_up_speed" ||
     tracked === "booking_flow" ||
     tracked === "crm_routing" ||
     tracked === "lead_capture" ||
-    tracked === "ai_assistant" ||
-    tracked === "backend_integrations" ||
-    tracked === "support_ticket_flow" ||
-    tracked === "email_sms_automation" ||
-    tracked === "ads_readiness" ||
-    tracked === "website_rebuild" ||
-    tracked === "operations_workflow"
+    tracked === "ai_assistant"
   ) {
     return tracked;
   }
 
   if (tracked === "follow_up_handoff") return "follow_up_speed";
+  if (tracked === "analytics_dashboard") return "tracking_visibility";
 
   return undefined;
 }
 
-function topicForConsultingConcept(concept: ZoraConsultingConcept): ZoraTopic | undefined {
+function topicForConsultingConcept(concept: OpzixBrainConcept): ZoraTopic | undefined {
   if (concept === "offer_clarity") return "offer_clarity";
-  if (concept === "tracking_visibility" || concept === "analytics_dashboard") {
-    return "tracking_visibility";
-  }
-  if (concept === "follow_up_speed" || concept === "email_sms_automation") {
-    return "follow_up_handoff";
-  }
+  if (concept === "tracking_visibility") return "tracking_visibility";
+  if (concept === "follow_up_speed") return "follow_up_handoff";
   if (concept === "booking_flow") return "booking_flow";
   if (concept === "product_discovery") return "product_discovery";
   if (concept === "crm_routing") return "crm_routing";
   if (concept === "lead_capture" || concept === "ai_assistant") return "lead_capture";
-  if (concept === "conversion_path" || concept === "mobile_ux" || concept === "trust_signals") {
+  if (concept === "conversion_path" || concept === "trust_signals") {
     return "landing_page";
   }
 

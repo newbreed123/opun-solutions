@@ -38,6 +38,7 @@ const explanationStarts = [
   "explain",
   "why",
   "how does",
+  "should i",
   "tell me about",
 ];
 
