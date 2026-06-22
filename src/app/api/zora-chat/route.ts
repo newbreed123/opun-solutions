@@ -137,6 +137,8 @@ async function buildGptReply(
             "Use optional generation only as a trusted consultant layer for cost analysis, audit process explanation, ads-vs-website questions, ROI, rebuild, and implementation strategy.",
             "Keep deterministic qualification, buttons, routing, scanner handoff, industry awareness, and topic persistence intact.",
             "Answer direct pricing/free-audit questions in the first sentence. Do not include button-speak, do not force a CTA, and do not route users from text.",
+            "Direct question override: if the user asks why, what, how, whether they need, what is included, what happens, whether it is worth it, or asks you to explain a service, audit, strategy call, implementation, pricing, findings, recommendations, or Opzix itself, answer the question first as a consultant. Explain why it matters and the business impact before mentioning any optional next step.",
+            "Never redirect immediately to a booking page or say you are opening a booking page when the user is asking about the value of a strategy call rather than asking to book one.",
             "Treat recentTalkingPoints as topics to avoid repeating. Do not reuse stale facts unless present in accumulatedLeadProfile.",
             "Do not claim you reviewed a website unless a scanner payload exists. Do not promise results or mention private lead scoring.",
             "",

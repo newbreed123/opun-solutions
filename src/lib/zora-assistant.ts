@@ -973,9 +973,47 @@ function isAuditRequest(message: string) {
   );
 }
 
+function isDirectServiceInformationQuestion(message: string) {
+  const text = normalizeCommandText(message);
+  if (!text) return false;
+
+  const asksDirectQuestion =
+    /^(why|what|how|should i|do i need|do we need|is it|is this|can you explain|could you explain|explain|tell me about|what happens|whats included|what is included)\b/.test(
+      text,
+    ) ||
+    /\b(why do i need|why would i need|do i need|is it worth|can you explain|could you explain|what happens|whats included|what is included)\b/.test(
+      text,
+    );
+  const asksAboutService =
+    /\b(strategy call|consultation|audit|free audit|scanner|scan|implementation|service|pricing|price|cost|opzix|roadmap|recommendation|findings)\b/.test(
+      text,
+    );
+
+  return asksDirectQuestion && asksAboutService;
+}
+
+function isStrategyCallInformationQuestion(message: string) {
+  const text = normalizeCommandText(message);
+
+  return (
+    isDirectServiceInformationQuestion(message) &&
+    /\b(strategy call|consultation)\b/.test(text)
+  );
+}
+
 function isBookingRequest(message: string) {
-  return /\b(book|strategy call|schedule|calendly|talk to someone|speak with)\b/i.test(
-    message,
+  if (isDirectServiceInformationQuestion(message)) return false;
+
+  const text = normalizeCommandText(message);
+
+  return (
+    /^(book strategy call|strategy call|schedule strategy call)$/.test(text) ||
+    /\b(book|schedule|calendly|talk to someone|talk with someone|speak with|speak to someone)\b/i.test(
+      message,
+    ) ||
+    /\b(i want|i need|i would like|let'?s do|lets do|ready for|set up|setup|open|take me to)\b.*\b(strategy call|consultation|meeting)\b/i.test(
+      message,
+    )
   );
 }
 
@@ -4177,6 +4215,15 @@ function buildConsultantResponse(profile: ZoraLeadProfile, message: string) {
     isRoadmapSpecificFollowUp(message)
   ) {
     return buildRoadmapFollowUpResponse(message, profile.recommendationRoadmap);
+  }
+
+  if (isStrategyCallInformationQuestion(message)) {
+    return [
+      "A strategy call is useful when you need to understand whether the issues in your website, funnel, tracking, follow-up, or operations are actually affecting revenue or lead quality.",
+      "The point is not just to book time on a calendar. It is to review the context, identify the highest-impact bottleneck, and decide whether the right next step is a focused fix, a fuller system build, or no major build yet.",
+      "During the call, we would usually look at the audit context or your current customer path, map where momentum is leaking, and turn that into a practical priority order. Some businesses only need a few targeted improvements; others uncover disconnected systems that need a clearer roadmap.",
+      "I can also explain what happens during the call or help interpret your audit results.",
+    ].join("\n\n");
   }
 
   if (

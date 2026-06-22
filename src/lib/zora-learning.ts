@@ -162,6 +162,7 @@ export function normalizeZoraLearningIntent(
 ): ZoraLearningIntent {
   if (responseMode === "company_background") return "company_background";
   if (isPricingQuestion(message)) return "pricing_question";
+  if (isDirectServiceInformationQuestion(message)) return "consultant_question";
   if (isHumanRequest(message)) return "live_agent_request";
   if (responseMode === "review_request") return "review_request";
   if (
@@ -495,7 +496,28 @@ function isPricingQuestion(message: string) {
   return /\b(how much|cost|price|pricing|free|audit cost|is it free)\b/i.test(message);
 }
 
+function isDirectServiceInformationQuestion(message: string) {
+  const text = normalizeCommandText(message);
+  if (!text) return false;
+
+  const asksDirectQuestion =
+    /^(why|what|how|should i|do i need|do we need|is it|is this|can you explain|could you explain|explain|tell me about|what happens|whats included|what is included)\b/.test(
+      text,
+    ) ||
+    /\b(why do i need|why would i need|do i need|is it worth|can you explain|could you explain|what happens|whats included|what is included)\b/.test(
+      text,
+    );
+  const asksAboutService =
+    /\b(strategy call|consultation|audit|free audit|scanner|scan|implementation|service|pricing|price|cost|opzix|roadmap|recommendation|findings)\b/.test(
+      text,
+    );
+
+  return asksDirectQuestion && asksAboutService;
+}
+
 function isHumanRequest(message: string) {
+  if (isDirectServiceInformationQuestion(message)) return false;
+
   return /\b(live agent|human|person|someone|talk to|speak to|contact|representative|book a call|strategy call)\b/i.test(
     message,
   );
