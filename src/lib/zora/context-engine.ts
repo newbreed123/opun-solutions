@@ -15,6 +15,7 @@ export type ZoraVerticalTarget =
   | "nonprofit_community"
   | "service_business"
   | "b2b_saas_infrastructure"
+  | "domain_registrar"
   | "unknown";
 
 export type ZoraContextMessage = {
@@ -36,6 +37,7 @@ export type ZoraContextEngineInput = {
   currentSubtopic?: string | null;
   inferredIndustry?: string | null;
   confirmedIndustry?: string | null;
+  industryStatus?: string | null;
   recentTalkingPoints?: string[];
 };
 
@@ -178,6 +180,21 @@ const DIRECTIVES: Record<
     businessModel: "B2B SaaS / infrastructure platform",
     funnelType: "visitor -> product education -> demo/signup -> onboarding -> activation/sales handoff",
   },
+  domain_registrar: {
+    use: [
+      "domain search",
+      "domain registration",
+      "DNS setup",
+      "hosting/email add-ons",
+      "account onboarding",
+      "renewals",
+      "domain transfers",
+      "support handoff",
+    ],
+    avoid: ["DTC ecommerce", "product discovery", "checkout", "shipping", "cart abandonment"],
+    businessModel: "domain registrar",
+    funnelType: "visitor -> domain search -> registration -> DNS/hosting setup -> account management",
+  },
   unknown: {
     use: ["customer journey", "offer clarity", "lead capture", "tracking", "follow-up"],
     avoid: ["unconfirmed industry labels", "platform-specific assumptions"],
@@ -228,6 +245,7 @@ function verticalFromSignals(input: ZoraContextEngineInput): ZoraVerticalTarget 
   const confirmed = String(input.confirmedIndustry || "").toLowerCase();
 
   if (confirmed) {
+    if (/domain registrar|registrar|domains?|dns|porkbun|namecheap|godaddy/.test(confirmed)) return "domain_registrar";
     if (/real estate|realtor|brokerage|zillow|compass|serhant/.test(confirmed)) return "real_estate";
     if (/health|care|clinic|medical|therapy|disability/.test(confirmed)) return "healthcare_care";
     if (/nonprofit|non-profit|church|ministry|community/.test(confirmed)) return "nonprofit_community";
@@ -236,6 +254,10 @@ function verticalFromSignals(input: ZoraContextEngineInput): ZoraVerticalTarget 
     if (/marketplace|enterprise retail/.test(confirmed)) return "marketplace_or_enterprise_retail";
     if (/service/.test(confirmed)) return "service_business";
     if (/ecommerce|dtc|shopify|store/.test(confirmed)) return "ecommerce_dtc";
+  }
+
+  if (input.industryStatus === "needs_clarification") {
+    return "unknown";
   }
 
   if (hasAny(combined, [/\b(zillow|trulia|redfin|compass|serhant|realtor|real estate|brokerage|listings?)\b/])) {
@@ -299,6 +321,12 @@ export function buildZoraContext(input: ZoraContextEngineInput): ZoraContextEngi
 
   if (input.recentTalkingPoints?.length) {
     guardrails.push(`Recent talking points to avoid repeating verbatim: ${input.recentTalkingPoints.slice(0, 5).join(", ")}.`);
+  }
+
+  if (input.industryStatus === "needs_clarification") {
+    guardrails.push(
+      "Industry correction is unresolved: do not reuse previous inferred industry recommendations. Ask for business-model clarification.",
+    );
   }
 
   const nextStepBias =
@@ -371,6 +399,7 @@ export function contextInputFromProfile(
     currentSubtopic: profile.currentSubtopic,
     inferredIndustry: profile.inferredIndustry || String(profile.industry || ""),
     confirmedIndustry: profile.confirmedIndustry,
+    industryStatus: profile.industryStatus,
     recentTalkingPoints: profile.recentTalkingPoints,
     ...extras,
   };

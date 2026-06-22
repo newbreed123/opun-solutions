@@ -57,6 +57,10 @@ type ZoraInsights = {
   topIndustries: GroupMetric[];
   topBusinessModels: GroupMetric[];
   topChallenges: GroupMetric[];
+  topDetectedConcepts: GroupMetric[];
+  conceptConfidence: GroupMetric[];
+  conceptByIndustry: GroupMetric[];
+  conceptByCta: GroupMetric[];
   failureReasons: GroupMetric[];
   unresolvedQuestions: ZoraFailureRow[];
   bestPlaybooks: PlaybookPerformance[];
@@ -209,6 +213,33 @@ export default async function ZoraInsightsPage({
           </AnalyticsPanel>
         </section>
 
+        <section className="grid gap-6 xl:grid-cols-4">
+          <AnalyticsPanel title="Top Consulting Concepts">
+            <MetricRows
+              rows={insights.topDetectedConcepts}
+              emptyLabel="No concept questions detected yet."
+            />
+          </AnalyticsPanel>
+          <AnalyticsPanel title="Concept Confidence">
+            <MetricRows
+              rows={insights.conceptConfidence}
+              emptyLabel="No concept confidence data yet."
+            />
+          </AnalyticsPanel>
+          <AnalyticsPanel title="Concept by Industry">
+            <MetricRows
+              rows={insights.conceptByIndustry}
+              emptyLabel="No concept and industry overlap yet."
+            />
+          </AnalyticsPanel>
+          <AnalyticsPanel title="Concept by CTA">
+            <MetricRows
+              rows={insights.conceptByCta}
+              emptyLabel="No concept CTA data yet."
+            />
+          </AnalyticsPanel>
+        </section>
+
         <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
           <AnalyticsPanel title="Failure Reasons">
             <MetricRows
@@ -296,6 +327,18 @@ function buildZoraInsights(
     ),
     topBusinessModels: groupByValue(conversations, (row) => row.inferred_business_model),
     topChallenges: groupByValue(conversations, (row) => row.challenge),
+    topDetectedConcepts: groupByValue(conversations, (row) => row.detected_concept),
+    conceptConfidence: groupByValue(conversations, (row) => row.concept_confidence),
+    conceptByIndustry: groupByValue(conversations, (row) =>
+      row.detected_concept
+        ? `${row.detected_concept} / ${row.inferred_industry || row.industry || "unknown"}`
+        : null,
+    ),
+    conceptByCta: groupByValue(conversations, (row) =>
+      row.detected_concept
+        ? `${row.detected_concept} / ${row.cta_clicked || "no cta"}`
+        : null,
+    ),
     failureReasons: groupByValue(failures, (row) => row.failure_reason),
     unresolvedQuestions: failures
       .filter((failure) => failure.failure_reason === "no_next_step" || !failure.reviewed)

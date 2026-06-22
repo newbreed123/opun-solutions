@@ -167,13 +167,19 @@ export function normalizeZoraLearningIntent(
   if (
     responseMode === "audit_request" ||
     responseMode === "scanner_execute" ||
-    responseMode === "scanner_failure"
+    responseMode === "scanner_failure" ||
+    responseMode === "action_request"
   ) {
     return "audit_request";
   }
   if (responseMode === "out_of_scope") return "out_of_scope";
   if (responseMode === "recommendation") return "recommendation_request";
-  if (responseMode === "consultant" || responseMode === "trust_skepticism") {
+  if (
+    responseMode === "consultant" ||
+    responseMode === "consulting_concept" ||
+    responseMode === "terminology" ||
+    responseMode === "trust_skepticism"
+  ) {
     return "consultant_question";
   }
   if (responseMode === "diagnosis") return "diagnosis";

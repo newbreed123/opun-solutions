@@ -4,6 +4,18 @@ import {
   type ZoraIndustryProfile,
 } from "@/lib/zora-industry-awareness";
 import { OPZIX_COMPANY_PROFILE } from "@/lib/opzix-company-profile";
+import {
+  buildConsultingConceptAnswer,
+  buildConsultingExperienceAnswer,
+  detectConsultingConcept,
+  isConsultingExperienceQuestion,
+  type ZoraConsultingConcept,
+  type ZoraConsultingConceptConfidence,
+} from "@/lib/zora-consulting-knowledge";
+import {
+  detectZoraActionIntent,
+  type ZoraActionIntent,
+} from "@/lib/zora-action-intent";
 
 export type ZoraBusinessType =
   | "Ecommerce"
@@ -61,12 +73,24 @@ export type ZoraTopic =
 
 export type ZoraTalkingPoint =
   | "offer_clarity"
+  | "conversion_path"
   | "product_discovery"
+  | "trust_signals"
+  | "mobile_ux"
   | "tracking_visibility"
+  | "analytics_dashboard"
   | "follow_up_handoff"
+  | "follow_up_speed"
   | "booking_flow"
   | "crm_routing"
   | "lead_capture"
+  | "ai_assistant"
+  | "backend_integrations"
+  | "support_ticket_flow"
+  | "email_sms_automation"
+  | "ads_readiness"
+  | "website_rebuild"
+  | "operations_workflow"
   | "ecommerce_cost_analysis"
   | "audit_process";
 
@@ -85,6 +109,8 @@ export type ZoraIndustryInference = {
   inferredFunnelType?: string;
   industryConfidence?: number;
 };
+
+export type ZoraIndustryStatus = "inferred" | "needs_clarification" | "confirmed";
 
 export type ZoraFunnelStage =
   | "Before product pages"
@@ -156,10 +182,21 @@ export type ZoraFounderFollowupIntent = {
   confidence: "High" | "Moderate" | "Low";
 };
 
+export type ZoraTerminologyTerm =
+  | "dtc_store"
+  | "audit"
+  | "product_discovery"
+  | "checkout_trust"
+  | "tracking_visibility"
+  | "crm_routing"
+  | "conversion_path";
+
 export type ZoraIntent =
   | "diagnosis"
   | "business_model_correction"
   | "company_background"
+  | "terminology"
+  | "action_request"
   | "capability"
   | "small_talk"
   | "thanks"
@@ -173,6 +210,7 @@ export type ZoraIntent =
   | "audit_request"
   | "review_request"
   | "booking_request"
+  | "consulting_concept"
   | "recommendation"
   | "consultant"
   | "focus_request"
@@ -217,10 +255,12 @@ export type ZoraLeadProfile = {
   annualRevenueText?: string;
   challenge?: ZoraChallenge;
   websiteUrl?: string;
-  inferredIndustry?: string;
-  inferredBusinessModel?: string;
-  inferredFunnelType?: string;
+  inferredIndustry?: string | null;
+  inferredBusinessModel?: string | null;
+  inferredFunnelType?: string | null;
   industryConfidence?: number | ZoraIndustryProfile["confidence"];
+  industryStatus?: ZoraIndustryStatus;
+  userCorrectedIndustry?: boolean;
   needsBusinessTypeClarification?: boolean;
   industryMismatchResolved?: boolean;
   businessModelCorrection?: string;
@@ -235,6 +275,9 @@ export type ZoraLeadProfile = {
   conversationStage?: ZoraConversationStage;
   currentTopic?: ZoraTopic;
   currentSubtopic?: string;
+  detectedConcept?: ZoraConsultingConcept;
+  conceptConfidence?: ZoraConsultingConceptConfidence;
+  conceptMatchedTerms?: string[];
   currentTopicDepth?: number;
   recentTalkingPoints?: ZoraTalkingPoint[];
   leadQuality?: ZoraLeadQuality;
@@ -254,12 +297,17 @@ export type ZoraMessageAnalysis = {
   rawMessage?: string;
   companyBackgroundSubtype?: ZoraCompanyBackgroundSubtype;
   founderFollowupSubtype?: ZoraFounderFollowupSubtype;
+  terminologyTerm?: ZoraTerminologyTerm;
+  actionIntent?: ZoraActionIntent;
   visitorName?: string;
   businessType?: ZoraBusinessType;
   platform?: string;
   industry?: string;
   correctedIndustry?: ZoraIndustry;
   correctedBusinessModel?: string;
+  confirmedIndustry?: string;
+  industryStatus?: ZoraIndustryStatus;
+  userCorrectedIndustry?: boolean;
   toolsMentioned?: string[];
   leadSource?: string;
   conversionRate?: string;
@@ -277,6 +325,9 @@ export type ZoraMessageAnalysis = {
   challenge?: ZoraChallenge;
   websiteUrl?: string;
   currentTopic?: ZoraTopic;
+  consultingConcept?: ZoraConsultingConcept;
+  conceptConfidence?: ZoraConsultingConceptConfidence;
+  conceptMatchedTerms?: string[];
   hasWebsiteOrLandingPage?: boolean;
   hasNoWebsite?: boolean;
   scannerBlocked?: boolean;
@@ -294,7 +345,11 @@ export type ZoraResponse = {
   profileChanges: string[];
   responseMode: ZoraIntent;
   recommendedActions: Array<"free_audit" | "strategy_call" | "diagnose" | "ask_question">;
-  action?: { type: "start_audit"; url: string } | { type: "book_strategy_call" };
+  action?:
+    | { type: "start_audit"; url: string }
+    | { type: "book_strategy_call" }
+    | { type: "open_report"; reportId?: string }
+    | { type: "download_pdf"; reportId?: string };
   navigationHref?: string;
   recentTalkingPoint?: ZoraTalkingPoint;
 };
@@ -741,6 +796,46 @@ function normalizeCommandText(message: string) {
     .trim();
 }
 
+function detectTerminologyQuestion(message: string): ZoraTerminologyTerm | undefined {
+  const text = normalizeCommandText(message);
+  const asksDefinition =
+    /\b(what do you mean|what does .* mean|what is|what'?s|define|explain what|explain the term)\b/i.test(
+      message,
+    ) || /\b(mean by|means?)\b/i.test(message);
+
+  if (!asksDefinition) return undefined;
+
+  if (/\b(dtc|direct to consumer|direct consumer|dtc store|dtc ecommerce)\b/i.test(text)) {
+    return "dtc_store";
+  }
+
+  if (/\b(audit|scanner|scan|free audit|website audit)\b/i.test(text)) {
+    return "audit";
+  }
+
+  if (/\b(product discovery|mobile product discovery|find products|product search)\b/i.test(text)) {
+    return "product_discovery";
+  }
+
+  if (/\b(checkout trust|checkout confidence|trust at checkout)\b/i.test(text)) {
+    return "checkout_trust";
+  }
+
+  if (/\b(tracking visibility|source tracking|attribution|conversion tracking)\b/i.test(text)) {
+    return "tracking_visibility";
+  }
+
+  if (/\b(crm routing|lead routing|routing)\b/i.test(text)) {
+    return "crm_routing";
+  }
+
+  if (/\b(conversion path|customer journey|conversion mechanics|conversion)\b/i.test(text)) {
+    return "conversion_path";
+  }
+
+  return undefined;
+}
+
 function isAuditInformationIntent(message: string) {
   const text = normalizeCommandText(message);
 
@@ -1035,6 +1130,64 @@ function detectsDtcCorrection(message: string) {
   );
 }
 
+function detectsGenericIndustryCorrection(message: string) {
+  return (
+    detectsDtcCorrection(message) ||
+    /\b(that'?s wrong|thats wrong|wrong industry|wrong business|wrong model|incorrect industry|incorrect model|not ecommerce|not e-?commerce|not a real estate business|not real estate|something else|different industry|different model)\b/i.test(
+      message,
+    ) ||
+    /\b(actually|no|nah|not quite|not really)\b.*\b(we'?re|we are|it'?s|it is|this is|business|company|model|industry)\b/i.test(
+      message,
+    )
+  );
+}
+
+function normalizeConfirmedIndustry(value: string) {
+  const text = normalizeCommandText(value);
+
+  if (/\b(domain registrar|domains?|dns|registrar|porkbun|namecheap|godaddy)\b/i.test(value)) {
+    return "domain_registrar";
+  }
+
+  if (/\b(infrastructure provider|infrastructure|hosting|cloud|dns provider|platform infrastructure)\b/i.test(value)) {
+    return "infrastructure_provider";
+  }
+
+  if (/\b(saas|software|software platform|app|subscription software)\b/i.test(value)) {
+    return "saas_software";
+  }
+
+  if (/\b(marketplace|enterprise retail|multi vendor|multi-vendor)\b/i.test(value)) {
+    return "marketplace";
+  }
+
+  if (/\b(agency|services|service provider|consulting|consultancy)\b/i.test(value)) {
+    return "agency_services";
+  }
+
+  if (text === "other") {
+    return "other";
+  }
+
+  return undefined;
+}
+
+function businessTypeForConfirmedIndustry(industry?: string): ZoraBusinessType | undefined {
+  switch (industry) {
+    case "agency_services":
+      return "Service Business";
+    case "marketplace":
+      return "Ecommerce";
+    case "domain_registrar":
+    case "infrastructure_provider":
+    case "saas_software":
+    case "other":
+      return "Other";
+    default:
+      return undefined;
+  }
+}
+
 function detectBusinessModelCorrection(
   message: string,
   currentProfile: Pick<
@@ -1043,9 +1196,35 @@ function detectBusinessModelCorrection(
     | "industryProfile"
     | "inferredBusinessModel"
     | "inferredIndustry"
+    | "industryStatus"
+    | "confirmedIndustry"
+    | "userCorrectedIndustry"
     | "lastAssistantMessageSummary"
   > = {},
-): Pick<ZoraMessageAnalysis, "correctedIndustry" | "correctedBusinessModel"> {
+): Pick<
+  ZoraMessageAnalysis,
+  | "correctedIndustry"
+  | "correctedBusinessModel"
+  | "confirmedIndustry"
+  | "industryStatus"
+  | "userCorrectedIndustry"
+> {
+  const confirmedIndustry = normalizeConfirmedIndustry(message);
+
+  if (
+    confirmedIndustry &&
+    (currentProfile.industryStatus === "needs_clarification" ||
+      currentProfile.userCorrectedIndustry ||
+      detectsGenericIndustryCorrection(message))
+  ) {
+    return {
+      confirmedIndustry,
+      industryStatus: "confirmed",
+      userCorrectedIndustry: true,
+      correctedBusinessModel: `User confirmed industry: ${confirmedIndustry}`,
+    };
+  }
+
   const context = [
     message,
     currentProfile.websiteUrl ? normalizeDomainContext(currentProfile.websiteUrl) : "",
@@ -1057,7 +1236,7 @@ function detectBusinessModelCorrection(
     .join(" ");
   const correctsDtc = detectsDtcCorrection(message);
   const saysDifferentModel =
-    /\b(no|actually|correction|wrong|incorrect|not quite|not really)\b/i.test(message) &&
+    /\b(no|actually|correction|wrong|incorrect|not quite|not really|something else)\b/i.test(message) &&
     /\b(company|business|model|store|platform|site|brand|dtc|direct[-\s]?to[-\s]?consumer)\b/i.test(message);
 
   if (
@@ -1073,6 +1252,20 @@ function detectBusinessModelCorrection(
   if (correctsDtc || saysDifferentModel) {
     return {
       correctedBusinessModel: "User corrected the previous business model assumption",
+      industryStatus: "needs_clarification",
+      userCorrectedIndustry: true,
+    };
+  }
+
+  if (
+    currentProfile.industryStatus === "needs_clarification" &&
+    !confirmedIndustry &&
+    (detectsGenericIndustryCorrection(message) || normalizeCommandText(message).length > 0)
+  ) {
+    return {
+      correctedBusinessModel: "User correction needs business model clarification",
+      industryStatus: "needs_clarification",
+      userCorrectedIndustry: true,
     };
   }
 
@@ -1232,6 +1425,14 @@ export function hasUrlBusinessTypeMismatch(
 }
 
 export function shouldUseIndustryInference(profile: ZoraLeadProfile) {
+  if (
+    profile.confirmedIndustry ||
+    profile.userCorrectedIndustry ||
+    profile.industryStatus === "needs_clarification"
+  ) {
+    return false;
+  }
+
   const inferredBusinessType = businessTypeFromInference(profile);
 
   return Boolean(
@@ -1592,6 +1793,18 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
   const leadDestination = outOfScope ? undefined : extractLeadDestination(message);
   const notificationChannel = outOfScope ? undefined : extractNotificationChannel(message);
   const desiredOutcome = outOfScope ? undefined : extractDesiredOutcome(message);
+  const terminologyTerm = outOfScope ? undefined : detectTerminologyQuestion(message);
+  const actionIntent = outOfScope
+    ? undefined
+    : detectZoraActionIntent({
+        message,
+        websiteUrl,
+      });
+  const consultingConcept = outOfScope
+    ? { concept: null, confidence: "Low" as const, matchedTerms: [] }
+    : detectConsultingConcept(message);
+  const hasConsultingConcept =
+    Boolean(consultingConcept.concept) && consultingConcept.confidence !== "Low";
   const intent: ZoraIntent = outOfScope
     ? "out_of_scope"
     : businessModelCorrection.correctedIndustry || businessModelCorrection.correctedBusinessModel
@@ -1606,6 +1819,12 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
       ? "scanner_execute"
     : isFreeAuditPricingQuestion(message) || isPricingQuestion(message)
       ? "pricing"
+    : terminologyTerm
+      ? "terminology"
+    : actionIntent?.isAction
+      ? "action_request"
+    : hasConsultingConcept || isConsultingExperienceQuestion(message)
+      ? "consulting_concept"
     : isThanksMessage(message)
       ? "thanks"
       : isCasualAcknowledgmentMessage(message)
@@ -1658,8 +1877,13 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     founderFollowupSubtype: founderFollowup.isFounderFollowup
       ? founderFollowup.subtype
       : undefined,
+    terminologyTerm,
+    actionIntent,
     correctedIndustry: businessModelCorrection.correctedIndustry,
     correctedBusinessModel: businessModelCorrection.correctedBusinessModel,
+    confirmedIndustry: businessModelCorrection.confirmedIndustry,
+    industryStatus: businessModelCorrection.industryStatus,
+    userCorrectedIndustry: businessModelCorrection.userCorrectedIndustry,
     visitorName,
     businessType,
     platform,
@@ -1679,6 +1903,11 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     challenge,
     websiteUrl,
     currentTopic,
+    consultingConcept: consultingConcept.concept || undefined,
+    conceptConfidence: consultingConcept.concept ? consultingConcept.confidence : undefined,
+    conceptMatchedTerms: consultingConcept.matchedTerms.length
+      ? consultingConcept.matchedTerms
+      : undefined,
     hasWebsiteOrLandingPage,
     hasNoWebsite,
     scannerBlocked: isScannerFailureMessage(message) ? true : undefined,
@@ -1762,6 +1991,41 @@ function mergeLeadProfile(
     nextProfile.industry = analysis.industry;
   }
 
+  if (analysis.confirmedIndustry) {
+    const confirmedBusinessType = businessTypeForConfirmedIndustry(analysis.confirmedIndustry);
+
+    addChange(changes, "confirmedIndustry", nextProfile.confirmedIndustry, analysis.confirmedIndustry);
+    nextProfile.confirmedIndustry = analysis.confirmedIndustry;
+    addChange(changes, "industryStatus", nextProfile.industryStatus, "confirmed");
+    nextProfile.industryStatus = "confirmed";
+    addChange(changes, "userCorrectedIndustry", nextProfile.userCorrectedIndustry, true);
+    nextProfile.userCorrectedIndustry = true;
+    addChange(changes, "industryConfidence", nextProfile.industryConfidence, 1);
+    nextProfile.industryConfidence = 1;
+
+    if (confirmedBusinessType) {
+      addChange(changes, "businessType", nextProfile.businessType, confirmedBusinessType);
+      nextProfile.businessType = confirmedBusinessType;
+    }
+
+    if (nextProfile.industryProfile) {
+      addChange(changes, "industryProfile", nextProfile.industryProfile.industry, undefined);
+      delete nextProfile.industryProfile;
+    }
+    addChange(changes, "industry", nextProfile.industry, analysis.confirmedIndustry);
+    nextProfile.industry = analysis.confirmedIndustry;
+    addChange(changes, "inferredIndustry", nextProfile.inferredIndustry, null);
+    nextProfile.inferredIndustry = null;
+    addChange(changes, "inferredBusinessModel", nextProfile.inferredBusinessModel, null);
+    nextProfile.inferredBusinessModel = null;
+    addChange(changes, "inferredFunnelType", nextProfile.inferredFunnelType, null);
+    nextProfile.inferredFunnelType = null;
+    addChange(changes, "needsBusinessTypeClarification", nextProfile.needsBusinessTypeClarification, false);
+    nextProfile.needsBusinessTypeClarification = false;
+    addChange(changes, "industryMismatchResolved", nextProfile.industryMismatchResolved, true);
+    nextProfile.industryMismatchResolved = true;
+  }
+
   if (analysis.correctedIndustry) {
     const correctedProfile = correctedIndustryProfile(analysis.correctedIndustry, [
       `user correction: ${analysis.rawMessage || "business model correction"}`,
@@ -1813,7 +2077,7 @@ function mergeLeadProfile(
       addChange(changes, "currentTopicDepth", nextProfile.currentTopicDepth, 1);
       nextProfile.currentTopicDepth = 1;
     }
-  } else if (analysis.intent === "business_model_correction") {
+  } else if (analysis.intent === "business_model_correction" && !analysis.confirmedIndustry) {
     addChange(
       changes,
       "businessModelCorrection",
@@ -1821,6 +2085,12 @@ function mergeLeadProfile(
       analysis.correctedBusinessModel,
     );
     nextProfile.businessModelCorrection = analysis.correctedBusinessModel;
+    addChange(changes, "userCorrectedIndustry", nextProfile.userCorrectedIndustry, true);
+    nextProfile.userCorrectedIndustry = true;
+    addChange(changes, "industryStatus", nextProfile.industryStatus, "needs_clarification");
+    nextProfile.industryStatus = "needs_clarification";
+    addChange(changes, "industryConfidence", nextProfile.industryConfidence, 0);
+    nextProfile.industryConfidence = 0;
 
     if (nextProfile.industryProfile) {
       addChange(changes, "industryProfile", nextProfile.industryProfile.industry, undefined);
@@ -1831,25 +2101,37 @@ function mergeLeadProfile(
       delete nextProfile.industry;
     }
     if (nextProfile.inferredIndustry) {
-      addChange(changes, "inferredIndustry", nextProfile.inferredIndustry, undefined);
-      delete nextProfile.inferredIndustry;
+      addChange(changes, "inferredIndustry", nextProfile.inferredIndustry, null);
+      nextProfile.inferredIndustry = null;
     }
     if (nextProfile.inferredBusinessModel) {
-      addChange(changes, "inferredBusinessModel", nextProfile.inferredBusinessModel, undefined);
-      delete nextProfile.inferredBusinessModel;
+      addChange(changes, "inferredBusinessModel", nextProfile.inferredBusinessModel, null);
+      nextProfile.inferredBusinessModel = null;
     }
     if (nextProfile.inferredFunnelType) {
-      addChange(changes, "inferredFunnelType", nextProfile.inferredFunnelType, undefined);
-      delete nextProfile.inferredFunnelType;
+      addChange(changes, "inferredFunnelType", nextProfile.inferredFunnelType, null);
+      nextProfile.inferredFunnelType = null;
     }
     if (nextProfile.recommendedFocusAreas) {
       addChange(changes, "recommendedFocusAreas", nextProfile.recommendedFocusAreas.join(", "), undefined);
       delete nextProfile.recommendedFocusAreas;
     }
+    if (nextProfile.primaryBottlenecks) {
+      addChange(changes, "primaryBottlenecks", nextProfile.primaryBottlenecks.join(", "), undefined);
+      delete nextProfile.primaryBottlenecks;
+    }
+    if (nextProfile.industryEvidence) {
+      addChange(changes, "industryEvidence", nextProfile.industryEvidence.join(", "), undefined);
+      delete nextProfile.industryEvidence;
+    }
+    if (nextProfile.buyerJourney) {
+      addChange(changes, "buyerJourney", nextProfile.buyerJourney, undefined);
+      delete nextProfile.buyerJourney;
+    }
     addChange(changes, "needsBusinessTypeClarification", nextProfile.needsBusinessTypeClarification, false);
     nextProfile.needsBusinessTypeClarification = false;
-    addChange(changes, "industryMismatchResolved", nextProfile.industryMismatchResolved, true);
-    nextProfile.industryMismatchResolved = true;
+    addChange(changes, "industryMismatchResolved", nextProfile.industryMismatchResolved, false);
+    nextProfile.industryMismatchResolved = false;
   }
 
   if (analysis.toolsMentioned?.length) {
@@ -1966,11 +2248,44 @@ function mergeLeadProfile(
     nextProfile.currentTopic = analysis.currentTopic;
   }
 
+  if (analysis.consultingConcept) {
+    const sameConcept =
+      nextProfile.detectedConcept === analysis.consultingConcept ||
+      nextProfile.currentSubtopic === analysis.consultingConcept;
+    const nextDepth = sameConcept ? (nextProfile.currentTopicDepth || 0) + 1 : 0;
+    const conceptTopic = topicForConsultingConcept(analysis.consultingConcept);
+
+    addChange(changes, "detectedConcept", nextProfile.detectedConcept, analysis.consultingConcept);
+    nextProfile.detectedConcept = analysis.consultingConcept;
+    addChange(changes, "conceptConfidence", nextProfile.conceptConfidence, analysis.conceptConfidence);
+    nextProfile.conceptConfidence = analysis.conceptConfidence;
+    addChange(
+      changes,
+      "conceptMatchedTerms",
+      nextProfile.conceptMatchedTerms?.join(", "),
+      analysis.conceptMatchedTerms?.join(", "),
+    );
+    nextProfile.conceptMatchedTerms = analysis.conceptMatchedTerms;
+    addChange(changes, "currentSubtopic", nextProfile.currentSubtopic, analysis.consultingConcept);
+    nextProfile.currentSubtopic = analysis.consultingConcept;
+    addChange(changes, "currentTopicDepth", nextProfile.currentTopicDepth, nextDepth);
+    nextProfile.currentTopicDepth = nextDepth;
+
+    if (conceptTopic) {
+      addChange(changes, "currentTopic", nextProfile.currentTopic, conceptTopic);
+      nextProfile.currentTopic = conceptTopic;
+    }
+  }
+
   if (analysis.websiteUrl) {
     addChange(changes, "websiteUrl", nextProfile.websiteUrl, analysis.websiteUrl);
     nextProfile.websiteUrl = analysis.websiteUrl;
     const inference = inferIndustryFromUrl(analysis.websiteUrl);
-    if ((inference.industryConfidence ?? 0) > 0) {
+    const canApplyUrlInference =
+      !nextProfile.confirmedIndustry &&
+      !nextProfile.userCorrectedIndustry &&
+      nextProfile.industryStatus !== "needs_clarification";
+    if (canApplyUrlInference && (inference.industryConfidence ?? 0) > 0) {
       addChange(changes, "inferredIndustry", nextProfile.inferredIndustry, inference.inferredIndustry);
       addChange(
         changes,
@@ -1990,6 +2305,7 @@ function mergeLeadProfile(
       nextProfile.industryConfidence = inference.industryConfidence;
     }
     const mismatch =
+      canApplyUrlInference &&
       !nextProfile.industryMismatchResolved &&
       hasUrlBusinessTypeMismatch(nextProfile.businessType, inference);
     if (mismatch) {
@@ -2057,6 +2373,9 @@ function mergeLeadProfile(
   }
 
   const industryProfile = analysis.intent === "business_model_correction"
+    || nextProfile.confirmedIndustry
+    || nextProfile.userCorrectedIndustry
+    || nextProfile.industryStatus === "needs_clarification"
     ? undefined
     : detectZoraIndustry({
     userMessage: [
@@ -2109,7 +2428,8 @@ function applyProfileContextToAnalysis(
 
   if (
     (contextualBusinessCorrection.correctedIndustry ||
-      contextualBusinessCorrection.correctedBusinessModel) &&
+      contextualBusinessCorrection.correctedBusinessModel ||
+      contextualBusinessCorrection.confirmedIndustry) &&
     analysis.intent !== "out_of_scope"
   ) {
     const { confidenceScore, ...analysisWithoutConfidence } = analysis;
@@ -2120,8 +2440,13 @@ function applyProfileContextToAnalysis(
       intent: "business_model_correction",
       correctedIndustry: contextualBusinessCorrection.correctedIndustry,
       correctedBusinessModel: contextualBusinessCorrection.correctedBusinessModel,
+      confirmedIndustry: contextualBusinessCorrection.confirmedIndustry,
+      industryStatus: contextualBusinessCorrection.industryStatus,
+      userCorrectedIndustry: contextualBusinessCorrection.userCorrectedIndustry,
       businessType: analysis.businessType || currentProfile.businessType,
-      currentTopic: "lead_capture",
+      currentTopic: contextualBusinessCorrection.confirmedIndustry
+        ? undefined
+        : "lead_capture",
     });
   }
 
@@ -2142,6 +2467,29 @@ function applyProfileContextToAnalysis(
       intent: "company_background",
       companyBackgroundSubtype: "founder",
       founderFollowupSubtype: contextualFounderFollowup.subtype,
+    });
+  }
+
+  const contextualActionIntent = detectZoraActionIntent({
+    message: analysis.rawMessage || "",
+    websiteUrl: analysis.websiteUrl || currentProfile.websiteUrl,
+  });
+
+  if (
+    contextualActionIntent.isAction &&
+    analysis.intent !== "out_of_scope" &&
+    analysis.intent !== "company_background" &&
+    analysis.intent !== "pricing" &&
+    analysis.intent !== "terminology"
+  ) {
+    const { confidenceScore, ...analysisWithoutConfidence } = analysis;
+    void confidenceScore;
+
+    return withRecalculatedConfidence({
+      ...analysisWithoutConfidence,
+      intent: "action_request",
+      actionIntent: contextualActionIntent,
+      websiteUrl: analysis.websiteUrl,
     });
   }
 
@@ -2429,6 +2777,61 @@ export function scoreZoraLeadTemperature(
 }
 
 function focusAreas(profile: ZoraLeadProfile) {
+  if (profile.industryStatus === "needs_clarification") {
+    return ["business model clarification", "customer type", "primary action path", "operational handoff"];
+  }
+
+  if (profile.confirmedIndustry === "domain_registrar") {
+    return [
+      "domain search and registration flow",
+      "DNS setup clarity",
+      "hosting and email add-on path",
+      "account onboarding",
+      "renewal and transfer guidance",
+      "support handoff",
+    ];
+  }
+
+  if (profile.confirmedIndustry === "infrastructure_provider") {
+    return [
+      "technical onboarding",
+      "integration documentation",
+      "account setup",
+      "usage visibility",
+      "support handoff",
+    ];
+  }
+
+  if (profile.confirmedIndustry === "saas_software") {
+    return [
+      "activation path",
+      "trial or demo conversion",
+      "onboarding friction",
+      "feature education",
+      "account expansion signals",
+    ];
+  }
+
+  if (profile.confirmedIndustry === "marketplace") {
+    return [
+      "supply and demand pathing",
+      "search and matching",
+      "seller or vendor onboarding",
+      "trust and availability",
+      "account flow",
+    ];
+  }
+
+  if (profile.confirmedIndustry === "agency_services") {
+    return [
+      "offer clarity",
+      "proof and positioning",
+      "lead capture",
+      "booking flow",
+      "follow-up handoff",
+    ];
+  }
+
   if (profile.industryProfile?.recommendedFocusAreas?.length) {
     return profile.industryProfile.recommendedFocusAreas;
   }
@@ -2619,6 +3022,30 @@ export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
   const contextText =
     contextParts.length > 0 ? ` ${contextParts.join(" ")}` : "";
 
+  if (profile.industryStatus === "needs_clarification") {
+    return "Thanks. Help me understand the business model a little better before I make another recommendation.";
+  }
+
+  if (profile.confirmedIndustry === "domain_registrar") {
+    return `Since this is a domain registrar${contextText}, I would focus on ${areas}. The key path is domain search -> registration -> DNS setup -> hosting or email add-ons -> account onboarding -> renewal, transfer, and support guidance.`;
+  }
+
+  if (profile.confirmedIndustry === "infrastructure_provider") {
+    return `Since this is an infrastructure provider${contextText}, I would focus on ${areas}. The key path is technical evaluation -> account setup -> integration guidance -> usage visibility -> support handoff.`;
+  }
+
+  if (profile.confirmedIndustry === "saas_software") {
+    return `Since this is a SaaS or software business${contextText}, I would focus on ${areas}. The key path is value proof -> trial or demo -> onboarding -> activation -> expansion or retention.`;
+  }
+
+  if (profile.confirmedIndustry === "marketplace") {
+    return `Since this is a marketplace${contextText}, I would focus on ${areas}. The key path is helping buyers and sellers understand supply, trust, matching, account flow, and fulfillment or activation.`;
+  }
+
+  if (profile.confirmedIndustry === "agency_services") {
+    return `Since this is an agency or services business${contextText}, I would focus on ${areas}. The key path is positioning -> proof -> inquiry -> booking -> follow-up ownership.`;
+  }
+
   if (industry === "real_estate") {
     return `Because this looks like a real estate business${contextText}, I would first look at ${areas}. For operations, the key path is inquiry -> agent assignment -> CRM follow-up -> booking -> source tracking.`;
   }
@@ -2664,11 +3091,23 @@ export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
 }
 
 function buildBusinessModelCorrectionResponse(profile: ZoraLeadProfile) {
+  if (profile.industryStatus === "confirmed" && profile.confirmedIndustry) {
+    if (profile.confirmedIndustry === "domain_registrar") {
+      return "Got it. I will treat this as a domain registrar, not a DTC ecommerce store. Future recommendations should focus on domain registration, DNS setup clarity, hosting or email add-ons, customer onboarding, account management, renewals, transfers, and support handoff.";
+    }
+
+    return `Got it. I will treat this as ${profile.confirmedIndustry.replace(/_/g, " ")} and ignore the earlier inferred industry. Future recommendations should use that confirmed business model instead of the previous URL-based guess.`;
+  }
+
+  if (profile.industryStatus === "needs_clarification") {
+    return "Thanks. Help me understand the business model a little better.";
+  }
+
   if (profile.industryProfile?.industry === "b2b_supply_platform") {
     return "My mistake. I completely misread the architecture. If you are running a B2B supply, dropshipping, or turnkey ecosystem platform rather than a traditional DTC storefront, the strategy changes entirely.\n\nInstead of standard retail product pages, the conversion bottleneck usually lives in merchant acquisition, onboarding friction, integration clarity, supplier logistics visibility, and whether store owners quickly understand how the ecosystem helps them operate.\n\nLet's pivot there. Since this is a platform model, do you lose more people during the initial sign-up workflow, or further down when they try to connect products, inventory, or tools?";
   }
 
-  return "My mistake. I should adjust to your business model instead of repeating my earlier assumption. I will treat your correction as the source of truth and reframe the diagnosis from there.\n\nWhat model should I use instead: B2B platform, marketplace, wholesale/supplier, service business, healthcare/care, nonprofit/community, or something else?";
+  return "My mistake. I should adjust to your business model instead of repeating my earlier assumption. I will treat your correction as the source of truth and reframe the diagnosis from there.\n\nThanks. Help me understand the business model a little better.";
 }
 
 function buildRecommendationRoadmap(profile: ZoraLeadProfile): ZoraRoadmapStep[] {
@@ -2760,6 +3199,33 @@ function buildRecommendationRoadmap(profile: ZoraLeadProfile): ZoraRoadmapStep[]
           "Improve conversion readiness before ad spend or major platform work.",
         costRange: "$2,000-$6,000",
         timeline: "2-4 weeks",
+      },
+    ];
+  }
+
+  if (profile.confirmedIndustry === "domain_registrar") {
+    return [
+      {
+        title: "Domain Search and Registration Flow Review",
+        reason:
+          "For a registrar, the first growth question is whether visitors can search, compare, choose, and register a domain without confusion or trust loss.",
+        validation:
+          "Review domain search clarity, TLD suggestions, pricing transparency, availability states, transfer messaging, and registration steps.",
+        expectedImpact:
+          "Reduce drop-off before account creation and make the first registration path easier to complete.",
+        costRange: "$1,000-$3,000",
+        timeline: "1-2 weeks",
+      },
+      {
+        title: "DNS, Hosting, and Account Onboarding Review",
+        reason:
+          "The registrar experience continues after purchase; DNS setup, hosting/email add-ons, renewals, transfers, and support handoff shape retention.",
+        validation:
+          "Validate DNS setup guidance, account dashboard clarity, hosting/email cross-sell timing, renewal reminders, transfer flows, and support escalation paths.",
+        expectedImpact:
+          "Improve activation and reduce support friction after a customer registers or transfers a domain.",
+        costRange: "$2,000-$5,000",
+        timeline: "2-3 weeks",
       },
     ];
   }
@@ -2930,6 +3396,25 @@ function formatRoadmapStep(step: ZoraRoadmapStep, index: number) {
 }
 
 function buildRecommendationResponse(profile: ZoraLeadProfile) {
+  if (profile.confirmedIndustry === "domain_registrar") {
+    const roadmap = buildRecommendationRoadmap(profile);
+    const first = roadmap[0];
+    const second = roadmap[1];
+
+    return [
+      `What I would do first: ${first.title}.`,
+      `Why: ${first.reason}`,
+      `What I would validate: ${first.validation}`,
+      `Expected impact: ${first.expectedImpact}`,
+      second
+        ? `What comes second: ${second.title}. ${second.reason}`
+        : "",
+      "The next step should be based on the domain registration and account-management path, not the earlier ecommerce assumption.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   if (profile.trafficIntentCategory === "conversion_rate_optimization") {
     return [
       "I would start with the conversion path, not a visual redesign.",
@@ -3024,6 +3509,151 @@ function greetingPrefix(profile: ZoraLeadProfile) {
 
 function buildCapabilityResponse(profile: ZoraLeadProfile) {
   return `${greetingPrefix(profile)}Yes. Opzix builds websites, ecommerce systems, AI assistants, CRM and booking flows, automation, dashboards, integrations, lead-generation systems, and audit-based implementation roadmaps. My role is to understand what kind of business you have, identify the likely bottleneck, explain what it means, and recommend whether the next move is a focused fix, free audit, or strategy call.`;
+}
+
+function buildTerminologyResponse(
+  profile: ZoraLeadProfile,
+  term: ZoraTerminologyTerm | undefined,
+) {
+  const website = profile.websiteUrl || "the website";
+  const domainContext = profile.websiteUrl ? normalizeDomainContext(profile.websiteUrl) : "";
+
+  if (term === "dtc_store") {
+    const dswContext = /(^|\s)(stores\s+)?dsw\s+com(\s|$)/i.test(domainContext)
+      ? "For stores.dsw.com, the nuance is that DSW carries third-party footwear brands, but the digital experience still uses direct-to-shopper retail mechanics: category browsing, store or product discovery, size and style filtering, availability cues, cart or purchase paths, and mobile decision friction."
+      : `For ${website}, I am using that label directionally: if shoppers browse, evaluate, and take action directly on the site, the conversion mechanics are closer to direct retail than to a pure wholesale or distributor model.`;
+
+    return [
+      "By DTC store, I mean Direct-to-Consumer: a business sells directly to the end shopper through its own digital storefront or owned customer path instead of only selling through a middleman distributor.",
+      dswContext,
+      "So the practical diagnostic question is: are shoppers losing momentum in navigation and filters, on product or availability pages, or closer to cart and checkout?",
+    ].join("\n\n");
+  }
+
+  if (term === "audit") {
+    return [
+      "An audit is a structured review of the visible customer journey: how visitors arrive, understand the offer, move through the site, take action, and get tracked or followed up with.",
+      "For Zora, the free audit means using the website URL as the starting point to look for likely conversion, UX, tracking, and handoff gaps before recommending a fix.",
+      "If you want to run it, I just need the website URL you want reviewed.",
+    ].join("\n\n");
+  }
+
+  if (term === "product_discovery") {
+    return [
+      "Product discovery means how easily shoppers can find the right product, size, category, brand, location, or option.",
+      `For ${website}, I would look at whether search, categories, filters, product cards, and availability cues help visitors narrow choices quickly.`,
+      "The diagnostic question is: do visitors get stuck before they find the right item, or after they reach the product/details page?",
+    ].join("\n\n");
+  }
+
+  if (term === "checkout_trust") {
+    return [
+      "Checkout trust means whether a shopper feels safe and clear enough to finish the purchase or next step.",
+      "That usually comes from visible pricing, delivery or pickup clarity, return policy confidence, payment trust, and no surprise friction late in the path.",
+      "The diagnostic question is: do shoppers abandon because of uncertainty, unexpected costs, or technical friction?",
+    ].join("\n\n");
+  }
+
+  if (term === "tracking_visibility") {
+    return [
+      "Tracking visibility means knowing which traffic sources, pages, and customer actions are actually creating leads, purchases, appointments, or other valuable outcomes.",
+      "Without it, the team can see activity but not which part of the journey is producing business value.",
+      "The diagnostic question is: can you see the drop-off by source and page, or only broad traffic totals?",
+    ].join("\n\n");
+  }
+
+  if (term === "crm_routing") {
+    return [
+      "CRM routing means sending each inquiry to the right pipeline, owner, status, and follow-up path automatically.",
+      "It matters because lead capture is only useful if the business knows who owns the next action.",
+      "The diagnostic question is: when a lead comes in, does the right person get the right context immediately?",
+    ].join("\n\n");
+  }
+
+  if (term === "conversion_path") {
+    return [
+      "A conversion path is the sequence a visitor follows from landing on the site to taking the desired action.",
+      "For ecommerce or retail, that often means landing page, category or search, product or availability detail, cart, checkout, and post-purchase or follow-up.",
+      "The diagnostic question is: where does the visitor lose confidence or momentum in that sequence?",
+    ].join("\n\n");
+  }
+
+  return "Good question. I mean the practical business meaning behind the term, not jargon for its own sake. Tell me which phrase you want me to unpack and I’ll translate it into what it means for the customer journey.";
+}
+
+function buildActionIntentResponse(
+  profile: ZoraLeadProfile,
+  actionIntent: ZoraActionIntent | undefined,
+) {
+  if (!actionIntent?.isAction) {
+    return "What would you like to do next: run the audit, book a strategy call, or ask a question?";
+  }
+
+  if (
+    actionIntent.actionType === "start_audit" ||
+    actionIntent.actionType === "diagnose_growth_system"
+  ) {
+    if (profile.websiteUrl) {
+      return "Absolutely - I'll send you to the free audit with that URL prefilled.";
+    }
+
+    return "Yes - what website URL should I use for the audit?";
+  }
+
+  if (actionIntent.actionType === "book_strategy_call") {
+    return "Absolutely - I'll open the strategy call booking page.";
+  }
+
+  if (actionIntent.actionType === "download_pdf") {
+    if (!actionIntent.needsMissingContext) {
+      return "Absolutely - I'll download the audit PDF.";
+    }
+
+    return "Once an audit report is generated, I can help you download the PDF.";
+  }
+
+  if (actionIntent.actionType === "open_report") {
+    if (!actionIntent.needsMissingContext) {
+      return "Absolutely - I'll open the audit report.";
+    }
+
+    return "Once an audit report is generated, I can help you open the report.";
+  }
+
+  if (actionIntent.actionType === "ask_question") {
+    return "Sure - what would you like to ask?";
+  }
+
+  return "What would you like to do next?";
+}
+
+function actionObjectForIntent(
+  profile: ZoraLeadProfile,
+  actionIntent: ZoraActionIntent | undefined,
+): ZoraResponse["action"] | undefined {
+  if (!actionIntent?.isAction) return undefined;
+
+  if (
+    (actionIntent.actionType === "start_audit" ||
+      actionIntent.actionType === "diagnose_growth_system") &&
+    profile.websiteUrl
+  ) {
+    return { type: "start_audit", url: profile.websiteUrl };
+  }
+
+  if (actionIntent.actionType === "book_strategy_call") {
+    return { type: "book_strategy_call" };
+  }
+
+  if (actionIntent.actionType === "download_pdf" && !actionIntent.needsMissingContext) {
+    return { type: "download_pdf" };
+  }
+
+  if (actionIntent.actionType === "open_report" && !actionIntent.needsMissingContext) {
+    return { type: "open_report" };
+  }
+
+  return undefined;
 }
 
 function companyBackgroundContextReturn(profile: ZoraLeadProfile) {
@@ -3602,6 +4232,59 @@ function buildConsultantResponse(profile: ZoraLeadProfile, message: string) {
   }
 
   return `${buildZoraDiagnosis(profile)} Recommendation: I would diagnose the visible path first, prioritize the highest-impact bottleneck, then decide whether the next move is a focused fix, free audit, or strategy call.`;
+}
+
+function buildConsultingKnowledgeResponse(
+  profile: ZoraLeadProfile,
+  message: string,
+  concept?: ZoraConsultingConcept,
+) {
+  const activeConcept =
+    concept || profile.detectedConcept || toConsultingConcept(profile.currentSubtopic);
+
+  if (isConsultingExperienceQuestion(message)) {
+    return buildConsultingExperienceAnswer({
+      concept: activeConcept,
+      websiteUrl: profile.websiteUrl,
+    });
+  }
+
+  if (!activeConcept) {
+    return buildConsultantResponse(profile, message);
+  }
+
+  return buildConsultingConceptAnswer({
+    concept: activeConcept,
+    industry: zoraIndustryForConsulting(profile),
+    businessType: profile.businessType,
+    challenge: profile.challenge,
+    websiteUrl: profile.websiteUrl,
+    topicDepth: profile.currentTopicDepth,
+  }).message;
+}
+
+function zoraIndustryForConsulting(profile: ZoraLeadProfile): ZoraIndustry | undefined {
+  if (profile.industryProfile?.industry) return profile.industryProfile.industry;
+  if (isKnownZoraIndustry(profile.confirmedIndustry)) return profile.confirmedIndustry;
+  if (isKnownZoraIndustry(profile.industry)) return profile.industry;
+  return undefined;
+}
+
+function isKnownZoraIndustry(value: unknown): value is ZoraIndustry {
+  return (
+    value === "ecommerce_dtc" ||
+    value === "b2b_supply_platform" ||
+    value === "industrial_b2b_catalog" ||
+    value === "marketplace_retail" ||
+    value === "real_estate" ||
+    value === "healthcare_care" ||
+    value === "nonprofit_faith_community" ||
+    value === "service_business" ||
+    value === "local_service" ||
+    value === "education" ||
+    value === "restaurant_hospitality" ||
+    value === "unknown"
+  );
 }
 
 function buildContextSwitchResponse(profile: ZoraLeadProfile) {
@@ -4557,6 +5240,7 @@ function nextConversationStage(
 ): ZoraConversationStage {
   if (
     intent === "handoff" ||
+    intent === "action_request" ||
     intent === "scanner_execute" ||
     intent === "scanner_failure" ||
     intent === "booking_request"
@@ -4567,6 +5251,8 @@ function nextConversationStage(
   if (intent === "recommendation") return "recommendation";
   if (intent === "company_background") return previousStage || "qualification";
   if (intent === "business_model_correction") return "deep_dive";
+  if (intent === "terminology") return "deep_dive";
+  if (intent === "consulting_concept") return "deep_dive";
   if (intent === "trust_skepticism") return "deep_dive";
   if (intent === "review_request") return "deep_dive";
   if (intent === "next_step" || intent === "audit_request") return "next_step";
@@ -4581,14 +5267,76 @@ function nextConversationStage(
 function toTrackedTalkingPoint(value?: string): ZoraTalkingPoint | undefined {
   if (
     value === "offer_clarity" ||
+    value === "conversion_path" ||
     value === "product_discovery" ||
+    value === "trust_signals" ||
+    value === "mobile_ux" ||
     value === "tracking_visibility" ||
+    value === "analytics_dashboard" ||
     value === "follow_up_handoff" ||
+    value === "follow_up_speed" ||
     value === "booking_flow" ||
     value === "crm_routing" ||
-    value === "lead_capture"
+    value === "lead_capture" ||
+    value === "ai_assistant" ||
+    value === "backend_integrations" ||
+    value === "support_ticket_flow" ||
+    value === "email_sms_automation" ||
+    value === "ads_readiness" ||
+    value === "website_rebuild" ||
+    value === "operations_workflow"
   ) {
     return value;
+  }
+
+  return undefined;
+}
+
+function toConsultingConcept(value?: string): ZoraConsultingConcept | undefined {
+  const tracked = toTrackedTalkingPoint(value);
+
+  if (
+    tracked === "offer_clarity" ||
+    tracked === "conversion_path" ||
+    tracked === "product_discovery" ||
+    tracked === "trust_signals" ||
+    tracked === "mobile_ux" ||
+    tracked === "tracking_visibility" ||
+    tracked === "analytics_dashboard" ||
+    tracked === "follow_up_speed" ||
+    tracked === "booking_flow" ||
+    tracked === "crm_routing" ||
+    tracked === "lead_capture" ||
+    tracked === "ai_assistant" ||
+    tracked === "backend_integrations" ||
+    tracked === "support_ticket_flow" ||
+    tracked === "email_sms_automation" ||
+    tracked === "ads_readiness" ||
+    tracked === "website_rebuild" ||
+    tracked === "operations_workflow"
+  ) {
+    return tracked;
+  }
+
+  if (tracked === "follow_up_handoff") return "follow_up_speed";
+
+  return undefined;
+}
+
+function topicForConsultingConcept(concept: ZoraConsultingConcept): ZoraTopic | undefined {
+  if (concept === "offer_clarity") return "offer_clarity";
+  if (concept === "tracking_visibility" || concept === "analytics_dashboard") {
+    return "tracking_visibility";
+  }
+  if (concept === "follow_up_speed" || concept === "email_sms_automation") {
+    return "follow_up_handoff";
+  }
+  if (concept === "booking_flow") return "booking_flow";
+  if (concept === "product_discovery") return "product_discovery";
+  if (concept === "crm_routing") return "crm_routing";
+  if (concept === "lead_capture" || concept === "ai_assistant") return "lead_capture";
+  if (concept === "conversion_path" || concept === "mobile_ux" || concept === "trust_signals") {
+    return "landing_page";
   }
 
   return undefined;
@@ -4600,6 +5348,10 @@ function talkingPointForResponse(
   message: string,
   activeTopic?: ZoraTopic,
 ): ZoraTalkingPoint | undefined {
+  if (intent === "consulting_concept") {
+    return toTrackedTalkingPoint(profile.detectedConcept || profile.currentSubtopic);
+  }
+
   const trackedTopic = toTrackedTalkingPoint(activeTopic || profile.currentTopic);
 
   if (trackedTopic) return trackedTopic;
@@ -4644,6 +5396,14 @@ function actionsForIntent(
   }
 
   if (intent === "company_background") {
+    return [] as ZoraResponse["recommendedActions"];
+  }
+
+  if (intent === "terminology") {
+    return ["ask_question"] as ZoraResponse["recommendedActions"];
+  }
+
+  if (intent === "action_request") {
     return [] as ZoraResponse["recommendedActions"];
   }
 
@@ -4712,6 +5472,7 @@ function actionsForIntent(
     return [] as ZoraResponse["recommendedActions"];
   }
   if (intent === "booking_request") return ["strategy_call"] as ZoraResponse["recommendedActions"];
+  if (intent === "consulting_concept") return ["ask_question"] as ZoraResponse["recommendedActions"];
   if (intent === "recommendation" && hasSufficientQualification(profile)) {
     return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
   }
@@ -4858,10 +5619,16 @@ export function buildZoraResponse(
   const postRecommendationAckCount = isPostRecommendationAck
     ? (currentProfile.postRecommendationAckCount || 0) + 1
     : 0;
+  const isIndustryClarificationMode =
+    leadProfile.industryStatus === "needs_clarification" &&
+    !leadProfile.confirmedIndustry &&
+    analysis.intent !== "company_background" &&
+    analysis.intent !== "out_of_scope";
   const isScannerBlockedAcknowledgement =
     leadProfile.scannerBlocked && isCasualAcknowledgmentMessage(message);
   const shouldAdvanceToHandoff =
     !isPostRecommendationAck &&
+    !isIndustryClarificationMode &&
     !isScannerBlockedAcknowledgement &&
     isProgressionAgreementMessage(message) &&
     previousStage !== "handoff" &&
@@ -4878,6 +5645,7 @@ export function buildZoraResponse(
   }
   const shouldContinueMomentum =
     !isPostRecommendationAck &&
+    !isIndustryClarificationMode &&
     !isScannerBlockedAcknowledgement &&
     !shouldAdvanceToHandoff &&
     previousStage !== "handoff" &&
@@ -4886,8 +5654,28 @@ export function buildZoraResponse(
     hasProfileDiagnosisSignal(leadProfile) &&
     !leadProfile.needsBusinessTypeClarification;
   const activeTopic = analysis.currentTopic || leadProfile.currentTopic;
+  const activeConsultingConcept =
+    analysis.consultingConcept ||
+    (isTopicContinuationMessage(message) || isConsultingExperienceQuestion(message)
+      ? toConsultingConcept(currentProfile.currentSubtopic || currentProfile.detectedConcept)
+      : undefined);
+  const shouldContinueConsultingConcept =
+    !isPostRecommendationAck &&
+    !isIndustryClarificationMode &&
+    !isScannerBlockedAcknowledgement &&
+    !shouldAdvanceToHandoff &&
+    previousStage !== "handoff" &&
+    Boolean(activeConsultingConcept) &&
+    (analysis.intent === "consulting_concept" ||
+      isConsultingExperienceQuestion(message) ||
+      ((analysis.intent === "acknowledgement" ||
+        analysis.intent === "clarify" ||
+        analysis.intent === "consultant" ||
+        analysis.intent === "capability") &&
+        isTopicContinuationMessage(message)));
   const shouldContinueTopic =
     !isPostRecommendationAck &&
+    !isIndustryClarificationMode &&
     !isScannerBlockedAcknowledgement &&
     !shouldAdvanceToHandoff &&
     previousStage !== "handoff" &&
@@ -4903,8 +5691,12 @@ export function buildZoraResponse(
       ? "handoff"
       : isPostRecommendationAck
       ? "next_step"
+      : isIndustryClarificationMode
+      ? "business_model_correction"
       : isScannerBlockedAcknowledgement
       ? "next_step"
+      : shouldContinueConsultingConcept
+      ? "consulting_concept"
       : shouldContinueTopic || shouldContinueMomentum
       ? "diagnosis"
       : shouldResumeRecommendationThread && leadProfile.recommendationRoadmap?.length
@@ -4953,8 +5745,27 @@ export function buildZoraResponse(
     addChange(profileChanges, "currentTopicDepth", leadProfile.currentTopicDepth, nextDepth);
     leadProfile.currentTopicDepth = nextDepth;
   }
+  if (
+    shouldContinueConsultingConcept &&
+    activeConsultingConcept &&
+    !analysis.consultingConcept
+  ) {
+    const nextDepth = (currentProfile.currentTopicDepth || 0) + 1;
+    const conceptTopic = topicForConsultingConcept(activeConsultingConcept);
+    addChange(profileChanges, "detectedConcept", leadProfile.detectedConcept, activeConsultingConcept);
+    leadProfile.detectedConcept = activeConsultingConcept;
+    addChange(profileChanges, "currentSubtopic", leadProfile.currentSubtopic, activeConsultingConcept);
+    leadProfile.currentSubtopic = activeConsultingConcept;
+    addChange(profileChanges, "currentTopicDepth", leadProfile.currentTopicDepth, nextDepth);
+    leadProfile.currentTopicDepth = nextDepth;
+    if (conceptTopic) {
+      addChange(profileChanges, "currentTopic", leadProfile.currentTopic, conceptTopic);
+      leadProfile.currentTopic = conceptTopic;
+    }
+  }
   const shouldAnchorStrategicTopic =
-    (effectiveIntent === "review_request" || hasNewLeadSource) &&
+    (effectiveIntent === "review_request" ||
+      (hasNewLeadSource && effectiveIntent !== "consulting_concept")) &&
     !leadProfile.currentTopic &&
     !leadProfile.needsBusinessTypeClarification;
   if (shouldAnchorStrategicTopic) {
@@ -4997,11 +5808,17 @@ export function buildZoraResponse(
       : effectiveIntent === "thanks"
         ? buildThanksResponse(leadProfile, repeatedSoftClose)
         : effectiveIntent === "acknowledgement"
-          ? buildAcknowledgementResponse(leadProfile)
+        ? buildAcknowledgementResponse(leadProfile)
         : effectiveIntent === "timeline"
           ? buildTimelineResponse(leadProfile, message)
+        : effectiveIntent === "terminology"
+          ? buildTerminologyResponse(leadProfile, analysis.terminologyTerm)
           : effectiveIntent === "pricing"
           ? buildPricingResponse(leadProfile, message)
+          : effectiveIntent === "action_request"
+          ? buildActionIntentResponse(leadProfile, analysis.actionIntent)
+            : effectiveIntent === "consulting_concept"
+            ? buildConsultingKnowledgeResponse(leadProfile, message, activeConsultingConcept)
             : effectiveIntent === "scanner_execute"
               ? buildScannerExecutionResponse(leadProfile)
             : effectiveIntent === "handoff"
@@ -5163,16 +5980,17 @@ export function buildZoraResponse(
     : (currentProfile.recentTalkingPoints || []).slice(0, 5);
 
   const action =
-    !leadProfile.scannerBlocked &&
-    (effectiveIntent === "scanner_execute" ||
-    (effectiveIntent === "handoff" && isHandoffExecutionMessage(message))
-    )
-      ? leadProfile.websiteUrl
-        ? ({ type: "start_audit", url: leadProfile.websiteUrl } as const)
-        : undefined
-      : effectiveIntent === "booking_request"
-        ? ({ type: "book_strategy_call" } as const)
-        : undefined;
+    effectiveIntent === "action_request"
+      ? actionObjectForIntent(leadProfile, analysis.actionIntent)
+      : !leadProfile.scannerBlocked &&
+          (effectiveIntent === "scanner_execute" ||
+            (effectiveIntent === "handoff" && isHandoffExecutionMessage(message)))
+        ? leadProfile.websiteUrl
+          ? ({ type: "start_audit", url: leadProfile.websiteUrl } as const)
+          : undefined
+        : effectiveIntent === "booking_request"
+          ? ({ type: "book_strategy_call" } as const)
+          : undefined;
   const navigationHref =
     action?.type === "start_audit"
       ? scannerHrefForProfile({ ...leadProfile, websiteUrl: action.url })

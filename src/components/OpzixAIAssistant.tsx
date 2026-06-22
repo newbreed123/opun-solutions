@@ -36,6 +36,7 @@ import {
   type ZoraIndustry,
   type ZoraIndustryProfile,
 } from "@/lib/zora-industry-awareness";
+import { detectZoraActionIntent } from "@/lib/zora-action-intent";
 
 const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
 const ZORA_SESSION_ID_KEY = "opzix-zora-session-id";
@@ -55,7 +56,13 @@ type ZoraAction =
   | {
       kind: "start";
       label: string;
-      value: "diagnose" | "free_audit" | "strategy_call" | "ask_question" | "faq";
+      value:
+        | "diagnose"
+        | "free_audit"
+        | "strategy_call"
+        | "ask_question"
+        | "faq"
+        | `industry:${string}`;
       tone?: ZoraActionTone;
     }
   | {
@@ -236,7 +243,59 @@ function shouldUseDetectedIndustry(
   return next.confidence !== "Low";
 }
 
+function focusAreasForProfile(profile: ZoraLeadProfile) {
+  if (profile.industryStatus === "needs_clarification") {
+    return ["business model clarification", "customer type", "primary action path", "operational handoff"];
+  }
+
+  if (profile.confirmedIndustry === "domain_registrar") {
+    return [
+      "domain search and registration flow",
+      "DNS setup clarity",
+      "hosting and email add-on path",
+      "account onboarding",
+      "renewal and transfer guidance",
+      "support handoff",
+    ];
+  }
+
+  if (profile.confirmedIndustry === "infrastructure_provider") {
+    return ["technical onboarding", "integration documentation", "account setup", "usage visibility", "support handoff"];
+  }
+
+  if (profile.confirmedIndustry === "saas_software") {
+    return ["activation path", "trial or demo conversion", "onboarding friction", "feature education", "account expansion signals"];
+  }
+
+  if (profile.confirmedIndustry === "marketplace") {
+    return ["supply and demand pathing", "search and matching", "seller or vendor onboarding", "trust and availability", "account flow"];
+  }
+
+  if (profile.confirmedIndustry === "agency_services") {
+    return ["offer clarity", "proof and positioning", "lead capture", "booking flow", "follow-up handoff"];
+  }
+
+  return profile.recommendedFocusAreas || [];
+}
+
 function normalizeProfile(profile: ZoraLeadProfile): ZoraLeadProfile {
+  if (
+    profile.confirmedIndustry ||
+    profile.userCorrectedIndustry ||
+    profile.industryStatus === "needs_clarification"
+  ) {
+    const withRecommendedStep = {
+      ...profile,
+      recommendedNextStep: recommendZoraNextStep(profile),
+    };
+
+    return {
+      ...withRecommendedStep,
+      recommendedFocusAreas: focusAreasForProfile(withRecommendedStep),
+      leadQuality: scoreZoraLeadQuality(withRecommendedStep),
+    };
+  }
+
   const industryProfile = detectZoraIndustry({
     userMessage: [
       profile.industry,
@@ -426,18 +485,11 @@ function isAuditInformationIntent(value: string) {
 }
 
 function isAuditExecutionIntent(value: string) {
-  const text = normalizeCommandText(value);
-
-  if (!text || isAuditInformationIntent(text)) return false;
-
-  return /^(run (the )?(free )?audit|start (the )?(free )?audit|start (the )?scan|scan (my )?(site|website|store)|scan it|audit (my )?(site|website|store)|audit it|diagnose (my )?(site|website|store)|diagnose it|lets run it|run it|ok run it|okay run it|yes run it|go ahead and run it|launch the audit|begin the audit)$/.test(
-    text,
-  );
+  return detectZoraActionIntent({ message: value }).actionType === "start_audit";
 }
 
 function isTextDiagnoseCommand(value: string) {
-  const text = normalizeCommandText(value);
-  return text === "diagnose my growth system";
+  return detectZoraActionIntent({ message: value }).actionType === "diagnose_growth_system";
 }
 
 function actionTone(action: ZoraAction) {
@@ -600,6 +652,22 @@ function phase1CtaActions(profile: ZoraLeadProfile): ZoraAction[] {
   const call = bookingAction("Book Strategy Call", auditFirst ? "secondary" : "primary");
 
   return auditFirst ? [audit, call, ask] : [call, audit, ask];
+}
+
+function industryClarificationActions(): ZoraAction[] {
+  return [
+    { kind: "start", label: "SaaS / Software", value: "industry:saas_software", tone: "secondary" },
+    { kind: "start", label: "Domain Registrar", value: "industry:domain_registrar", tone: "secondary" },
+    { kind: "start", label: "Marketplace", value: "industry:marketplace", tone: "secondary" },
+    {
+      kind: "start",
+      label: "Infrastructure Provider",
+      value: "industry:infrastructure_provider",
+      tone: "secondary",
+    },
+    { kind: "start", label: "Agency / Services", value: "industry:agency_services", tone: "secondary" },
+    { kind: "start", label: "Other", value: "industry:other", tone: "text" },
+  ];
 }
 
 function hasWebsiteState(profile: ZoraLeadProfile) {
@@ -989,6 +1057,11 @@ export default function OpzixAIAssistant() {
     if (action.type === "book_strategy_call") {
       trackZoraEvent("strategy_call_clicked");
       openBookingUrlAfterClose(STRATEGY_CALL_URL);
+      return;
+    }
+
+    if (action.type === "download_pdf" || action.type === "open_report") {
+      return;
     }
   }
 
@@ -1166,17 +1239,116 @@ export default function OpzixAIAssistant() {
     setFlowStep(null);
     appendMessages([
       {
-        id: createId("user"),
-        role: "user",
-        text: "Ask a Question",
-      },
-      {
         id: createId("assistant"),
         role: "assistant",
         text:
           "Ask me anything about websites, ecommerce systems, AI assistants, automation, tracking, lead generation, pricing ranges, or timelines.",
       },
     ]);
+  }
+
+  function handleClientActionIntent(message: string) {
+    const nextProfile = normalizeProfile(leadProfile);
+    const actionIntent = detectZoraActionIntent({
+      message,
+      websiteUrl: nextProfile.websiteUrl,
+      hasReport: false,
+    });
+
+    if (!actionIntent.isAction) return false;
+
+    if (
+      actionIntent.actionType === "start_audit" ||
+      actionIntent.actionType === "diagnose_growth_system"
+    ) {
+      if (nextProfile.websiteUrl && !nextProfile.hasNoWebsite) {
+        if (nextProfile.scannerBlocked) {
+          showScannerBlockedStrategy(message);
+          return true;
+        }
+
+        appendMessages([
+          {
+            id: createId("user"),
+            role: "user",
+            text: message,
+          },
+          {
+            id: createId("assistant"),
+            role: "assistant",
+            text: "Absolutely - I'll send you to the free audit with that URL prefilled.",
+          },
+        ]);
+        routeToScannerHref(auditHrefForProfile(nextProfile));
+        return true;
+      }
+
+      if (nextProfile.hasNoWebsite) {
+        showNoWebsiteAuditStrategy(message);
+        return true;
+      }
+
+      askForAuditUrl(message);
+      return true;
+    }
+
+    if (actionIntent.actionType === "book_strategy_call") {
+      appendMessages([
+        {
+          id: createId("user"),
+          role: "user",
+          text: message,
+        },
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text: "Absolutely - I'll open the strategy call booking page.",
+        },
+      ]);
+      trackZoraEvent("strategy_call_clicked");
+      openBookingUrlAfterClose(STRATEGY_CALL_URL);
+      return true;
+    }
+
+    if (actionIntent.actionType === "download_pdf") {
+      appendMessages([
+        {
+          id: createId("user"),
+          role: "user",
+          text: message,
+        },
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text: "Once an audit report is generated, I can help you download the PDF.",
+        },
+      ]);
+      return true;
+    }
+
+    if (actionIntent.actionType === "open_report") {
+      appendMessages([
+        {
+          id: createId("user"),
+          role: "user",
+          text: message,
+        },
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text: "Once an audit report is generated, I can help you open the report.",
+        },
+      ]);
+      return true;
+    }
+
+    if (actionIntent.actionType === "ask_question") {
+      trackZoraEvent("ask_question_clicked");
+      showQuestionPrompt();
+      return true;
+    }
+
+    return false;
   }
 
   function showFaq() {
@@ -1302,6 +1474,31 @@ export default function OpzixAIAssistant() {
       return;
     }
 
+    if (action.value.startsWith("industry:")) {
+      const localResponse = buildZoraResponse(action.label, leadProfile);
+      const nextProfile = normalizeProfile(localResponse.leadProfile);
+      const responseActions =
+        nextProfile.industryStatus === "needs_clarification"
+          ? industryClarificationActions()
+          : actionsFromRecommendation(localResponse.recommendedActions, nextProfile);
+
+      setLeadProfile(nextProfile);
+      appendMessages([
+        {
+          id: createId("user"),
+          role: "user",
+          text: action.label,
+        },
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text: localResponse.reply,
+          actions: responseActions,
+        },
+      ]);
+      return;
+    }
+
     if (action.value === "diagnose") {
       const nextProfile = normalizeProfile(leadProfile);
 
@@ -1362,30 +1559,7 @@ export default function OpzixAIAssistant() {
 
     setInput("");
 
-    if (isAuditExecutionIntent(message)) {
-      const nextProfile = normalizeProfile(leadProfile);
-
-      if (nextProfile.websiteUrl && !nextProfile.hasNoWebsite) {
-        if (nextProfile.scannerBlocked) {
-          showScannerBlockedStrategy(message);
-          return;
-        }
-
-        routeToScannerHref(auditHrefForProfile(nextProfile));
-        return;
-      }
-
-      if (nextProfile.hasNoWebsite) {
-        showNoWebsiteAuditStrategy(message);
-        return;
-      }
-
-      askForAuditUrl(message);
-      return;
-    }
-
-    if (isTextDiagnoseCommand(message)) {
-      startGuidedFlow();
+    if (handleClientActionIntent(message)) {
       return;
     }
 
@@ -1478,6 +1652,7 @@ export default function OpzixAIAssistant() {
           challenge: leadProfile.challenge,
           industry: leadProfile.industry || leadProfile.inferredIndustry,
           confirmedIndustry: leadProfile.confirmedIndustry,
+          industryStatus: leadProfile.industryStatus,
           currentStep: flowStep,
           conversationStage: leadProfile.conversationStage,
           currentTopic: leadProfile.currentTopic,
@@ -1502,6 +1677,8 @@ export default function OpzixAIAssistant() {
       const responseActions =
         resumedGuidedQuestion
           ? resumedGuidedQuestion.actions || []
+          : nextProfile.industryStatus === "needs_clarification"
+            ? industryClarificationActions()
           : responseMode === "diagnosis" && shouldShowPhase1Actions(nextProfile)
             ? phase1CtaActions(nextProfile)
             : actionsFromRecommendation(
@@ -1533,6 +1710,8 @@ export default function OpzixAIAssistant() {
       const responseActions =
         resumedGuidedQuestion
           ? resumedGuidedQuestion.actions || []
+          : nextProfile.industryStatus === "needs_clarification"
+            ? industryClarificationActions()
           : localResponse.responseMode === "diagnosis" && shouldShowPhase1Actions(nextProfile)
             ? phase1CtaActions(nextProfile)
             : actionsFromRecommendation(localResponse.recommendedActions, nextProfile);

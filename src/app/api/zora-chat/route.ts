@@ -29,6 +29,7 @@ type ZoraChatRequest = {
   challenge?: unknown;
   industry?: unknown;
   confirmedIndustry?: unknown;
+  industryStatus?: unknown;
   currentStep?: unknown;
   conversationStage?: unknown;
   currentTopic?: unknown;
@@ -89,6 +90,7 @@ function shouldUseConsultantGeneration(message: string, fallback: ZoraResponse) 
   if (
     fallback.action ||
     fallback.navigationHref ||
+    fallback.responseMode === "action_request" ||
     fallback.leadProfile.hasNoWebsite ||
     isDirectAuditCostQuestion(message)
   ) {
@@ -145,8 +147,17 @@ async function buildGptReply(
             "- If a user gives a short, neutral response like 'ok', 'okay', 'nice', 'got it', or 'sounds good', do not repeat your previous explanation. Advance the conversation by asking a deeper diagnostic question or guiding them to the next logical step.",
             "- If the same concept must be revisited, explain it from a deeper layer: operational impact, patient/business impact, implementation detail, or next-step validation.",
             "",
+            "[CRITICAL OVERRIDE: DEFINITION REQUEST]",
+            "- If the user asks what you mean by a business term, answer the definition directly in the first two sentences before continuing.",
+            "- If the term is DTC, explain that DTC stands for Direct-to-Consumer: selling directly to the end shopper through an owned storefront or customer path rather than only through a middleman distributor.",
+            "- Connect the definition to the user's provided website. For stores.dsw.com, explain that DSW carries third-party footwear brands, but the digital experience still uses direct-to-shopper retail mechanics such as category browsing, size/style filtering, availability cues, and cart or checkout friction.",
+            "- You are strictly forbidden from repeating the multi-line DTC checklist in a definition response. Move to one consultative diagnostic question.",
+            "",
             "[STRICT INDUSTRY ALIGNMENT]",
             "- Anchor to accumulatedLeadProfile.businessType, accumulatedLeadProfile.industryProfile.industry, inferredIndustry, and inferredBusinessModel before answering.",
+            "- Priority rule: confirmedIndustry beats user correction, and user correction beats inferredIndustry. If confirmedIndustry exists, ignore inferredIndustry entirely.",
+            "- If accumulatedLeadProfile.industryStatus is 'needs_clarification', do not use prior industry checklists or old DTC/real-estate language. Ask the user to clarify the business model.",
+            "- If confirmedIndustry is 'domain_registrar', discuss domain registration, DNS setup, hosting/email add-ons, customer onboarding, account management, renewals, transfers, and support. Do not mention product discovery, checkout, shipping, or ecommerce unless the user reintroduces ecommerce explicitly.",
             "- If the chosen industry is Healthcare/Care, Medical, or Hospital Networks, talk strictly about patients, appointment booking flows, medical compliance, location-based practitioner routing, care intake, provider directory navigation, patient coordination, and response-time latency.",
             "- If Healthcare/Care is selected, you are strictly forbidden from talking about retail catalogs, store inventory, e-commerce, carts, checkout, shipping, pickup, delivery, or merchandising.",
             "- If the chosen industry or URL is an organization, church, non-profit, faith-based community, ministry, or community organization, talk strictly about digital-to-physical pathing, local campus connection, sermons, small groups, serving, giving, community care, volunteer routing, and localized follow-up.",
@@ -265,6 +276,7 @@ export async function POST(request: NextRequest) {
       ...(stringValue(body.challenge) ? { challenge: stringValue(body.challenge) as ZoraLeadProfile["challenge"] } : {}),
       ...(stringValue(body.industry) ? { industry: stringValue(body.industry) } : {}),
       ...(stringValue(body.confirmedIndustry) ? { confirmedIndustry: stringValue(body.confirmedIndustry) } : {}),
+      ...(stringValue(body.industryStatus) ? { industryStatus: stringValue(body.industryStatus) as ZoraLeadProfile["industryStatus"] } : {}),
       ...(stringValue(body.conversationStage)
         ? { conversationStage: stringValue(body.conversationStage) as ZoraLeadProfile["conversationStage"] }
         : {}),
@@ -299,6 +311,7 @@ export async function POST(request: NextRequest) {
       currentTopic: stringValue(body.currentTopic) || fallback.leadProfile.currentTopic,
       currentSubtopic: stringValue(body.currentSubtopic) || fallback.leadProfile.currentSubtopic,
       confirmedIndustry: stringValue(body.confirmedIndustry) || fallback.leadProfile.confirmedIndustry,
+      industryStatus: stringValue(body.industryStatus) || fallback.leadProfile.industryStatus,
       inferredIndustry: stringValue(body.industry) || fallback.leadProfile.inferredIndustry || String(fallback.leadProfile.industry || ""),
       recentTalkingPoints: structuredRecentTalkingPoints || fallback.leadProfile.recentTalkingPoints,
     });
@@ -327,7 +340,9 @@ export async function POST(request: NextRequest) {
       fallback.navigationHref ||
       fallback.responseMode === "scanner_execute" ||
       fallback.responseMode === "scanner_failure" ||
-      fallback.responseMode === "trust_skepticism"
+      fallback.responseMode === "trust_skepticism" ||
+      fallback.responseMode === "action_request" ||
+      fallback.responseMode === "consulting_concept"
       ? undefined
       : selectZoraPlaybook(message, fallback);
     const playbookReply = adaptZoraPlaybookResponse(playbook, fallback);
@@ -364,6 +379,9 @@ export async function POST(request: NextRequest) {
         (fallback.responseMode === "company_background"
           ? fallback.currentMessageAnalysis.companyBackgroundSubtype
           : fallback.recentTalkingPoint),
+      detectedConcept: fallback.leadProfile.detectedConcept,
+      conceptConfidence: fallback.leadProfile.conceptConfidence,
+      recentTalkingPoint: fallback.recentTalkingPoint,
       profileBefore: incomingLeadProfile,
       action: fallback.action,
       recommendedActions: finalRecommendedActions,

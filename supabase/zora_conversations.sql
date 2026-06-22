@@ -22,6 +22,9 @@ create table if not exists zora_conversations (
   conversation_stage text null,
   current_topic text null,
   current_subtopic text null,
+  detected_concept text null,
+  concept_confidence text null,
+  recent_talking_point text null,
   recommended_next_step text null,
   recommendation_roadmap jsonb null,
   cta_clicked text null,
@@ -109,6 +112,15 @@ alter table zora_conversations
   add column if not exists current_subtopic text null;
 
 alter table zora_conversations
+  add column if not exists detected_concept text null;
+
+alter table zora_conversations
+  add column if not exists concept_confidence text null;
+
+alter table zora_conversations
+  add column if not exists recent_talking_point text null;
+
+alter table zora_conversations
   add column if not exists recommended_next_step text null;
 
 alter table zora_conversations
@@ -194,6 +206,12 @@ create index if not exists zora_conversations_conversation_stage_idx
 
 create index if not exists zora_conversations_current_topic_idx
   on zora_conversations (current_topic);
+
+create index if not exists zora_conversations_detected_concept_idx
+  on zora_conversations (detected_concept);
+
+create index if not exists zora_conversations_concept_confidence_idx
+  on zora_conversations (concept_confidence);
 
 create index if not exists zora_conversations_cta_clicked_idx
   on zora_conversations (cta_clicked);

@@ -31,6 +31,9 @@ export type ZoraConversationMetadata = {
   conversationStage?: string | null;
   currentTopic?: string | null;
   currentSubtopic?: string | null;
+  detectedConcept?: string | null;
+  conceptConfidence?: string | null;
+  recentTalkingPoint?: string | null;
   ctaClicked?: string | null;
   conversationOutcome?: ZoraConversationOutcome | string | null;
   profileBefore?: ZoraLeadProfile | null;
@@ -64,6 +67,9 @@ export type ZoraConversationRow = {
   conversation_stage: string | null;
   current_topic: string | null;
   current_subtopic: string | null;
+  detected_concept: string | null;
+  concept_confidence: string | null;
+  recent_talking_point: string | null;
   recommended_next_step: string | null;
   recommendation_roadmap: unknown | null;
   cta_clicked: string | null;
@@ -146,6 +152,13 @@ export async function logZoraConversation(
           metadata.conversationStage || profile.conversationStage || null,
         current_topic: metadata.currentTopic || profile.currentTopic || null,
         current_subtopic: metadata.currentSubtopic || null,
+        detected_concept: metadata.detectedConcept || profile.detectedConcept || null,
+        concept_confidence: metadata.conceptConfidence || profile.conceptConfidence || null,
+        recent_talking_point:
+          metadata.recentTalkingPoint ||
+          profile.detectedConcept ||
+          profile.currentSubtopic ||
+          null,
         recommended_next_step: profile.recommendedNextStep || null,
         recommendation_roadmap: profile.recommendationRoadmap || null,
         cta_clicked: ctaClicked || null,
@@ -272,6 +285,10 @@ export async function updateZoraConversion(
           current_step: eventType,
           conversation_stage: profile.conversationStage || null,
           current_topic: profile.currentTopic || null,
+          current_subtopic: profile.currentSubtopic || null,
+          detected_concept: profile.detectedConcept || null,
+          concept_confidence: profile.conceptConfidence || null,
+          recent_talking_point: profile.detectedConcept || profile.currentSubtopic || null,
         },
         prefer: "returning=minimal",
       });
@@ -320,7 +337,7 @@ export async function listZoraConversations(limit = 1000) {
       {
         query: {
           select:
-            "id,created_at,session_id,business_type,challenge,website_url,platform_hint,industry,inferred_industry,inferred_business_model,inferred_funnel_type,industry_confidence,industry_confidence_score,industry_evidence,buyer_journey,primary_bottlenecks,recommended_focus_areas,optional_revenue_mention,current_step,intent,conversation_stage,current_topic,current_subtopic,recommended_next_step,recommendation_roadmap,cta_clicked,conversation_outcome,lead_score,lead_temperature,latest_user_message,latest_assistant_message,source_path,user_agent,audit_clicked,strategy_call_clicked,ask_question_clicked,faq_opened,contact_requested,live_agent_requested,email_submitted",
+            "id,created_at,session_id,business_type,challenge,website_url,platform_hint,industry,inferred_industry,inferred_business_model,inferred_funnel_type,industry_confidence,industry_confidence_score,industry_evidence,buyer_journey,primary_bottlenecks,recommended_focus_areas,optional_revenue_mention,current_step,intent,conversation_stage,current_topic,current_subtopic,detected_concept,concept_confidence,recent_talking_point,recommended_next_step,recommendation_roadmap,cta_clicked,conversation_outcome,lead_score,lead_temperature,latest_user_message,latest_assistant_message,source_path,user_agent,audit_clicked,strategy_call_clicked,ask_question_clicked,faq_opened,contact_requested,live_agent_requested,email_submitted",
           order: "created_at.desc",
           limit,
         },
