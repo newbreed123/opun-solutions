@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -89,7 +90,7 @@ export default function Header() {
               )}
             </div>
           ))}
-          <Link href="/contact?source=homepage" className="btn-primary text-sm">
+          <Link href={STRATEGY_CALL_URL} className="btn-primary text-sm">
             Book Strategy Call
           </Link>
         </div>
@@ -135,7 +136,7 @@ export default function Header() {
             ))}
             <div className="pt-4 border-t border-dark-border">
               <Link
-                href="/contact?source=homepage"
+                href={STRATEGY_CALL_URL}
                 className="block btn-primary text-center w-full"
                 onClick={() => setIsOpen(false)}
               >

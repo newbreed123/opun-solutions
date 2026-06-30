@@ -1,6 +1,7 @@
 import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import Section from "@/components/Section";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   BarChart3,
   Check,
@@ -80,7 +81,7 @@ export default function CareAgencyGrowthCaseStudy() {
               <span className="block">a care agency's inquiry flow,</span>
               <span className="block">intake experience, and path to inquiry.</span>
             </p>
-            <Button href="/contact" size="lg">
+            <Button href={STRATEGY_CALL_URL} size="lg">
               Book Strategy Call
             </Button>
           </div>
@@ -314,7 +315,7 @@ export default function CareAgencyGrowthCaseStudy() {
         headline="Want to Improve Your Client Inquiry System?"
         subheadline="Book a strategy call and we will map where your service presentation, intake flow, and follow-up journey can become clearer."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

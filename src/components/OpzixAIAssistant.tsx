@@ -37,12 +37,12 @@ import {
   type ZoraIndustryProfile,
 } from "@/lib/zora-industry-awareness";
 import { detectZoraActionIntent } from "@/lib/zora-action-intent";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 
 const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
 const ZORA_SESSION_ID_KEY = "opzix-zora-session-id";
 const ZORA_TRAFFIC_INTENT_KEY = "opzix-zora-traffic-intent";
 const BOOKING_LINK_DELAY_MS = 150;
-const STRATEGY_CALL_URL = "https://calendly.com/hello-opzix";
 const FREE_AUDIT_URL = "/tools/ecommerce-audit-scanner?source=zora";
 
 type GuidedStep =
@@ -195,14 +195,12 @@ function storedTrafficIntent(): StoredTrafficIntent | undefined {
 
 function isBookingUrl(href: string) {
   const normalized = href.toLowerCase();
+  const strategyCallUrl = STRATEGY_CALL_URL.toLowerCase();
 
   return (
-    normalized.includes("/contact") ||
-    normalized.includes("calendly.com") ||
-    normalized.includes("source=ai-chatbot") ||
-    normalized.includes("source=homepage") ||
-    normalized.includes("source=services") ||
-    normalized.includes("source=ecommerce-audit")
+    normalized === strategyCallUrl ||
+    normalized.startsWith(`${strategyCallUrl}?`) ||
+    normalized.includes("calendly.com")
   );
 }
 
@@ -999,10 +997,14 @@ export default function OpzixAIAssistant() {
     }, BOOKING_LINK_DELAY_MS);
   }
 
+  function openStrategyCallFromZora(href = STRATEGY_CALL_URL) {
+    trackZoraEvent("strategy_call_clicked");
+    openBookingUrlAfterClose(href);
+  }
+
   function routeToLink(action: Extract<ZoraAction, { kind: "link" }>) {
     if (action.booking || isBookingUrl(action.href)) {
-      trackZoraEvent("strategy_call_clicked");
-      openBookingUrlAfterClose(action.href);
+      openStrategyCallFromZora(action.href);
       return;
     }
 
@@ -1055,8 +1057,7 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.type === "book_strategy_call") {
-      trackZoraEvent("strategy_call_clicked");
-      openBookingUrlAfterClose(STRATEGY_CALL_URL);
+      openStrategyCallFromZora();
       return;
     }
 
@@ -1293,20 +1294,7 @@ export default function OpzixAIAssistant() {
     }
 
     if (actionIntent.actionType === "book_strategy_call") {
-      appendMessages([
-        {
-          id: createId("user"),
-          role: "user",
-          text: message,
-        },
-        {
-          id: createId("assistant"),
-          role: "assistant",
-          text: "Absolutely - I'll open the strategy call booking page.",
-        },
-      ]);
-      trackZoraEvent("strategy_call_clicked");
-      openBookingUrlAfterClose(STRATEGY_CALL_URL);
+      openStrategyCallFromZora();
       return true;
     }
 
@@ -1533,8 +1521,7 @@ export default function OpzixAIAssistant() {
     }
 
     if (action.value === "strategy_call") {
-      trackZoraEvent("strategy_call_clicked");
-      openBookingUrlAfterClose(STRATEGY_CALL_URL);
+      openStrategyCallFromZora();
       return;
     }
 
@@ -1760,6 +1747,9 @@ export default function OpzixAIAssistant() {
       }
 
       event.preventDefault();
+      if (target.closest(".opzix-ai-shell")) {
+        trackZoraEvent("strategy_call_clicked");
+      }
       openBookingUrlAfterClose(link.href);
     }
 

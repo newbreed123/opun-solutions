@@ -1,6 +1,7 @@
 import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import Section from "@/components/Section";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import { Check, MessageSquare, ServerCog } from "lucide-react";
 
 const failureReasons = [
@@ -110,7 +111,7 @@ export default function WhyAIChatbotsFailInsight() {
         headline="Want an AI Assistant That Supports Your Real Workflow?"
         subheadline="Book a strategy call and we will map the questions, routing, and follow-up your assistant should support."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

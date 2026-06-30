@@ -22,8 +22,8 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react";
-import { buildAuditContactHref } from "@/lib/audit-attribution";
 import { trackEvent } from "@/lib/analytics";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   sanitizeEvidenceText,
   summarizeCtaLabels,
@@ -6688,10 +6688,6 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
   const initialMessage = useMemo(() => buildInitialMessage(audit), [audit]);
   const scanContext = useMemo(() => normalizeScanContext(audit), [audit]);
   const attribution = useMemo(() => assistantAuditAttribution(audit), [audit]);
-  const contactHref = useMemo(
-    () => buildAuditContactHref(attribution),
-    [attribution],
-  );
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoScrollRef = useRef(false);
@@ -7272,7 +7268,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                       {message.cta && (
                         <div className="mt-5">
                           <Link
-                            href={contactHref}
+                            href={STRATEGY_CALL_URL}
                             onClick={() =>
                               trackEvent("audit_cta_clicked", {
                                 ...attribution,
@@ -7323,7 +7319,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
                   return (
                     <Link
                       key={reply}
-                      href={contactHref}
+                      href={STRATEGY_CALL_URL}
                       onClick={() =>
                         trackEvent("audit_cta_clicked", {
                           ...attribution,
@@ -7425,7 +7421,7 @@ export default function PostScanAssistant({ audit }: PostScanAssistantProps) {
             })}
 
             <Link
-              href={contactHref}
+              href={STRATEGY_CALL_URL}
               onClick={() =>
                 trackEvent("audit_cta_clicked", {
                   ...attribution,

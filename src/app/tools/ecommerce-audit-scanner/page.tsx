@@ -4,8 +4,8 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Button from "@/components/Button";
 import PostScanAssistant from "@/components/PostScanAssistant";
 import Section from "@/components/Section";
-import { buildAuditContactHref } from "@/lib/audit-attribution";
 import { trackEvent } from "@/lib/analytics";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   sanitizeEvidenceText,
   summarizeCtaLabels,
@@ -998,10 +998,7 @@ export default function EcommerceAuditScannerPage() {
     }
   }
 
-  const auditContactHref = audit
-    ? buildAuditContactHref(auditAttribution(audit))
-    : "/contact?source=opzix-audit";
-  const auditContactDisplay = `opzixsolutions.com${auditContactHref}`;
+  const strategyCallDisplay = STRATEGY_CALL_URL.replace(/^https?:\/\//i, "");
 
   return (
     <>
@@ -1268,7 +1265,7 @@ export default function EcommerceAuditScannerPage() {
                 </div>
                 <div className="audit-print-schedule-box">
                   <p>Schedule</p>
-                  <strong>{auditContactDisplay}</strong>
+                  <strong>{strategyCallDisplay}</strong>
                 </div>
               </div>
 
@@ -1789,7 +1786,7 @@ export default function EcommerceAuditScannerPage() {
               <div className="audit-print-only audit-print-cta audit-print-cta-slim">
                 <p>
                   <strong>Book the follow-up:</strong> review this audit with
-                  Opzix at {auditContactDisplay}
+                  Opzix at {strategyCallDisplay}
                 </p>
               </div>
 
@@ -3127,7 +3124,7 @@ export default function EcommerceAuditScannerPage() {
                   </p>
                   <div className="mt-7">
                     <Button
-                      href={buildAuditContactHref(auditAttribution(audit))}
+                      href={STRATEGY_CALL_URL}
                       onClick={() =>
                         trackEvent("audit_cta_clicked", {
                           ...auditAttribution(audit),
@@ -3171,7 +3168,7 @@ export default function EcommerceAuditScannerPage() {
                 </p>
                 <div className="mt-8 flex justify-center">
                   <Button
-                    href={auditContactHref}
+                    href={STRATEGY_CALL_URL}
                     onClick={() =>
                       trackEvent("audit_cta_clicked", {
                         ...auditAttribution(audit),
@@ -3188,7 +3185,7 @@ export default function EcommerceAuditScannerPage() {
 
               <div className="audit-print-only audit-print-footer">
                 <p>Prepared by Opzix Audit Beta</p>
-                <p>Review this audit with Opzix: {auditContactDisplay}</p>
+                <p>Review this audit with Opzix: {strategyCallDisplay}</p>
                 <p>Generated {new Date(audit.generatedAt).toLocaleString()}</p>
               </div>
             </div>

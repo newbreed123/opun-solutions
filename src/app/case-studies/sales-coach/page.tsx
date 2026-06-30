@@ -1,5 +1,6 @@
 import Section from "@/components/Section";
 import CTASection from "@/components/CTASection";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import Image from "next/image";
 
 export default function SalesCoachCaseStudy() {
@@ -217,7 +218,7 @@ export default function SalesCoachCaseStudy() {
         headline="Ready for similar results?"
         subheadline="Let's build a website and system that turns your expertise into a scalable business."
         buttonLabel="Book a Strategy Call"
-        buttonHref="/contact"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

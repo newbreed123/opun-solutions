@@ -3,6 +3,7 @@ import CaseStudyCard from "@/components/CaseStudyCard";
 import CTASection from "@/components/CTASection";
 import ProjectProofGrid from "@/components/ProjectProofGrid";
 import Section from "@/components/Section";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import { BarChart3, Check, LayoutGrid, ServerCog } from "lucide-react";
 
 const capabilityProof = [
@@ -195,7 +196,7 @@ export default function CaseStudies() {
         headline="Want to Improve Your Customer Journey?"
         subheadline="Book a strategy call and let us map the highest-impact improvements for your website, customer journey, and operations."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact?source=services"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

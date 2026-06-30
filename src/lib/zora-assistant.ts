@@ -20,6 +20,15 @@ import {
   type OpzixBrainConcept,
   type OpzixBrainIndustry,
 } from "@/lib/opzix-brain";
+import {
+  buildOpzixOfferAnswer,
+  buildOpzixProductLineAnswer,
+  detectOpzixOfferIntent,
+  isOpzixOfferFollowUp,
+  isOpzixProductLineQuestion,
+  type OpzixOfferAnswer,
+} from "@/lib/detect-opzix-offer";
+import { isOpzixOfferKey, type OpzixOfferKey } from "@/lib/opzix-offers";
 
 export type ZoraBusinessType =
   | "Ecommerce"
@@ -73,7 +82,8 @@ export type ZoraTopic =
   | "product_discovery"
   | "checkout_confidence"
   | "crm_routing"
-  | "lead_capture";
+  | "lead_capture"
+  | OpzixOfferKey;
 
 export type ZoraTalkingPoint =
   | "offer_clarity"
@@ -96,7 +106,8 @@ export type ZoraTalkingPoint =
   | "website_rebuild"
   | "operations_workflow"
   | "ecommerce_cost_analysis"
-  | "audit_process";
+  | "audit_process"
+  | OpzixOfferKey;
 
 export type ZoraRoadmapStep = {
   title: string;
@@ -214,6 +225,7 @@ export type ZoraIntent =
   | "audit_request"
   | "review_request"
   | "booking_request"
+  | "offer_catalog"
   | "consulting_concept"
   | "recommendation"
   | "consultant"
@@ -282,6 +294,7 @@ export type ZoraLeadProfile = {
   detectedConcept?: OpzixBrainConcept;
   conceptConfidence?: ConceptDetectionResult["confidence"];
   conceptMatchedTerms?: string[];
+  lastMentionedOffer?: OpzixOfferKey;
   currentTopicDepth?: number;
   recentTalkingPoints?: ZoraTalkingPoint[];
   leadQuality?: ZoraLeadQuality;
@@ -329,6 +342,9 @@ export type ZoraMessageAnalysis = {
   challenge?: ZoraChallenge;
   websiteUrl?: string;
   currentTopic?: ZoraTopic;
+  offerKey?: OpzixOfferKey;
+  offerMatchedTerms?: string[];
+  isProductLineQuestion?: boolean;
   consultingConcept?: OpzixBrainConcept;
   conceptConfidence?: ConceptDetectionResult["confidence"];
   conceptMatchedTerms?: string[];
@@ -1765,6 +1781,7 @@ function calculateConfidence(analysis: Omit<ZoraMessageAnalysis, "confidenceScor
   if (analysis.leadDestination) score += 0.12;
   if (analysis.notificationChannel) score += 0.12;
   if (analysis.email) score += 0.08;
+  if (analysis.offerKey || analysis.isProductLineQuestion) score += 0.24;
   if (analysis.businessType && analysis.challenge) score += 0.08;
 
   return Math.min(0.96, Number(score.toFixed(2)));
@@ -1842,7 +1859,13 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
         message,
         websiteUrl,
       });
-  const consultingConcept = outOfScope
+  const productLineQuestion = outOfScope ? false : isOpzixProductLineQuestion(message);
+  const offerDetection = outOfScope
+    ? { offerKey: null, confidence: "Low" as const, matchedTerms: [], isOfferQuestion: false }
+    : detectOpzixOfferIntent(message);
+  const hasOfferIntent =
+    Boolean(offerDetection.offerKey) && offerDetection.confidence !== "Low";
+  const consultingConcept = outOfScope || productLineQuestion || hasOfferIntent
     ? { concept: null, confidence: "Low" as const, matchedTerms: [] }
     : detectOpzixBrainConcept(message);
   const hasConsultingConcept =
@@ -1851,7 +1874,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     ? "out_of_scope"
     : businessModelCorrection.correctedIndustry || businessModelCorrection.correctedBusinessModel
       ? "business_model_correction"
-    : founderFollowup.isFounderFollowup || companyBackground.isCompanyBackgroundQuestion
+    : founderFollowup.isFounderFollowup ||
+        (companyBackground.isCompanyBackgroundQuestion && !productLineQuestion)
       ? "company_background"
     : isScannerFailureMessage(message)
       ? "scanner_failure"
@@ -1865,6 +1889,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
       ? "terminology"
     : actionIntent?.isAction
       ? "action_request"
+    : productLineQuestion || hasOfferIntent
+      ? "offer_catalog"
     : hasConsultingConcept || isConsultingExperienceQuestion(message)
       ? "consulting_concept"
     : isThanksMessage(message)
@@ -1945,6 +1971,11 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     challenge,
     websiteUrl,
     currentTopic,
+    offerKey: offerDetection.offerKey || undefined,
+    offerMatchedTerms: offerDetection.matchedTerms.length
+      ? offerDetection.matchedTerms
+      : undefined,
+    isProductLineQuestion: productLineQuestion || undefined,
     consultingConcept: consultingConcept.concept || undefined,
     conceptConfidence: consultingConcept.concept ? consultingConcept.confidence : undefined,
     conceptMatchedTerms: consultingConcept.matchedTerms.length
@@ -2288,6 +2319,20 @@ function mergeLeadProfile(
       nextProfile.currentTopicDepth = 1;
     }
     nextProfile.currentTopic = analysis.currentTopic;
+  }
+
+  if (analysis.offerKey) {
+    const sameOffer = nextProfile.lastMentionedOffer === analysis.offerKey;
+    const nextDepth = sameOffer ? (nextProfile.currentTopicDepth || 1) + 1 : 1;
+
+    addChange(changes, "lastMentionedOffer", nextProfile.lastMentionedOffer, analysis.offerKey);
+    nextProfile.lastMentionedOffer = analysis.offerKey;
+    addChange(changes, "currentTopic", nextProfile.currentTopic, analysis.offerKey);
+    nextProfile.currentTopic = analysis.offerKey;
+    addChange(changes, "currentSubtopic", nextProfile.currentSubtopic, analysis.offerKey);
+    nextProfile.currentSubtopic = analysis.offerKey;
+    addChange(changes, "currentTopicDepth", nextProfile.currentTopicDepth, nextDepth);
+    nextProfile.currentTopicDepth = nextDepth;
   }
 
   if (analysis.consultingConcept) {
@@ -4824,6 +4869,16 @@ function industryDeepeningInsight(profile: ZoraLeadProfile, depth = 1) {
 }
 
 function buildTopicResponse(profile: ZoraLeadProfile, topic: ZoraTopic) {
+  if (isOpzixOfferKey(topic)) {
+    return buildOpzixOfferAnswer({
+      offerKey: topic,
+      businessType: profile.businessType,
+      industry: profile.confirmedIndustry || profile.industry,
+      websiteUrl: profile.websiteUrl,
+      userMessage: "",
+    }).message;
+  }
+
   const parts = topicResponseParts(profile, topic);
   const label = topicDisplayLabel(profile, topic);
   const trackedTopic = toTrackedTalkingPoint(topic);
@@ -4834,6 +4889,8 @@ function buildTopicResponse(profile: ZoraLeadProfile, topic: ZoraTopic) {
   const depthInsight =
     industryDeepeningInsight(profile, effectiveDepth) ||
     topicDepthInsight(topic, effectiveDepth);
+
+  if (!parts) return buildClarifyingResponse(profile);
 
   return [
     `Let's stay on ${label}.`,
@@ -4850,6 +4907,16 @@ function buildTopicResponse(profile: ZoraLeadProfile, topic: ZoraTopic) {
 
 function buildMomentumResponse(profile: ZoraLeadProfile) {
   if (profile.currentTopic) {
+    if (isOpzixOfferKey(profile.currentTopic)) {
+      return buildOpzixOfferAnswer({
+        offerKey: profile.currentTopic,
+        businessType: profile.businessType,
+        industry: profile.confirmedIndustry || profile.industry,
+        websiteUrl: profile.websiteUrl,
+        userMessage: "",
+      }).message;
+    }
+
     return buildTopicResponse(profile, profile.currentTopic);
   }
 
@@ -5303,6 +5370,7 @@ function nextConversationStage(
   if (intent === "company_background") return previousStage || "qualification";
   if (intent === "business_model_correction") return "deep_dive";
   if (intent === "terminology") return "deep_dive";
+  if (intent === "offer_catalog") return "deep_dive";
   if (intent === "consulting_concept") return "deep_dive";
   if (intent === "trust_skepticism") return "deep_dive";
   if (intent === "review_request") return "deep_dive";
@@ -5316,6 +5384,8 @@ function nextConversationStage(
 }
 
 function toTrackedTalkingPoint(value?: string): ZoraTalkingPoint | undefined {
+  if (isOpzixOfferKey(value)) return value;
+
   if (
     value === "offer_clarity" ||
     value === "conversion_path" ||
@@ -5512,6 +5582,7 @@ function actionsForIntent(
     return [] as ZoraResponse["recommendedActions"];
   }
   if (intent === "booking_request") return ["strategy_call"] as ZoraResponse["recommendedActions"];
+  if (intent === "offer_catalog") return ["ask_question"] as ZoraResponse["recommendedActions"];
   if (intent === "consulting_concept") return ["ask_question"] as ZoraResponse["recommendedActions"];
   if (intent === "recommendation" && hasSufficientQualification(profile)) {
     return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
@@ -5607,6 +5678,16 @@ function buildDuplicateCommandResponse(
     command === "interesting"
   ) {
     if (profile.currentTopic) {
+      if (isOpzixOfferKey(profile.currentTopic)) {
+        return buildOpzixOfferAnswer({
+          offerKey: profile.currentTopic,
+          businessType: profile.businessType,
+          industry: profile.confirmedIndustry || profile.industry,
+          websiteUrl: profile.websiteUrl,
+          userMessage: command,
+        }).message;
+      }
+
       return buildTopicResponse(profile, profile.currentTopic);
     }
 
@@ -5625,6 +5706,18 @@ function buildDuplicateCommandResponse(
   return "";
 }
 
+function actionsForOfferButtons(
+  buttons?: OpzixOfferAnswer["suggestedButtons"],
+) {
+  if (!buttons) return undefined;
+
+  return buttons.map((button) => {
+    if (button === "Run Free Audit") return "free_audit";
+    if (button === "Book Strategy Call") return "strategy_call";
+    return "ask_question";
+  }) as ZoraResponse["recommendedActions"];
+}
+
 function enforceNoWebsiteGuardrail(reply: string) {
   return reply
     .replace(/\bwebsite URL\b/gi, "live link")
@@ -5633,6 +5726,25 @@ function enforceNoWebsiteGuardrail(reply: string) {
     .replace(/\bscanner\b/gi, "review tool")
     .replace(/\baudit\b/gi, "review")
     .replace(/\bscan\b/gi, "review");
+}
+
+function shouldPreferPreviousOfferThread(
+  message: string,
+  previousOffer: OpzixOfferKey | undefined,
+  detectedOffer: OpzixOfferKey | undefined,
+) {
+  if (!previousOffer || !detectedOffer || previousOffer === detectedOffer) return false;
+
+  const isExplicitSystemPair =
+    /\b(shopify|bigcommerce|netsuite|erp|crm)\b.+\b(to|with|and)\b.+\b(shopify|bigcommerce|netsuite|erp|crm)\b/i.test(
+      message,
+    );
+  if (isExplicitSystemPair) return false;
+
+  return (
+    /\b(they|it|that|this)\s+(need|needs|should|has|have)\s+to\b/i.test(message) ||
+    /\bconnect(ed|ing)?\s+(to|with)\b/i.test(message)
+  );
 }
 
 export function buildZoraResponse(
@@ -5699,6 +5811,28 @@ export function buildZoraResponse(
     (isTopicContinuationMessage(message) || isConsultingExperienceQuestion(message)
       ? toConsultingConcept(currentProfile.currentSubtopic || currentProfile.detectedConcept)
       : undefined);
+  const contextualOfferKey =
+    isOpzixOfferFollowUp(message) && currentProfile.lastMentionedOffer
+      ? currentProfile.lastMentionedOffer
+      : undefined;
+  const activeOfferKey = shouldPreferPreviousOfferThread(
+    message,
+    contextualOfferKey,
+    analysis.offerKey,
+  )
+    ? contextualOfferKey
+    : analysis.offerKey || contextualOfferKey;
+  const shouldUseProductLineAnswer = Boolean(analysis.isProductLineQuestion && !activeOfferKey);
+  const shouldUseOfferCatalog =
+    !isPostRecommendationAck &&
+    !isIndustryClarificationMode &&
+    !isScannerBlockedAcknowledgement &&
+    !shouldAdvanceToHandoff &&
+    previousStage !== "handoff" &&
+    analysis.intent !== "out_of_scope" &&
+    analysis.intent !== "company_background" &&
+    analysis.intent !== "action_request" &&
+    Boolean(activeOfferKey || shouldUseProductLineAnswer);
   const shouldContinueConsultingConcept =
     !isPostRecommendationAck &&
     !isIndustryClarificationMode &&
@@ -5720,6 +5854,7 @@ export function buildZoraResponse(
     !shouldAdvanceToHandoff &&
     previousStage !== "handoff" &&
     Boolean(activeTopic) &&
+    !isOpzixOfferKey(activeTopic) &&
     hasProfileDiagnosisSignal(leadProfile) &&
     (analysis.intent === "diagnosis" ||
       analysis.intent === "acknowledgement" ||
@@ -5735,6 +5870,8 @@ export function buildZoraResponse(
       ? "business_model_correction"
       : isScannerBlockedAcknowledgement
       ? "next_step"
+      : shouldUseOfferCatalog
+      ? "offer_catalog"
       : shouldContinueConsultingConcept
       ? "consulting_concept"
       : shouldContinueTopic || shouldContinueMomentum
@@ -5803,6 +5940,21 @@ export function buildZoraResponse(
       leadProfile.currentTopic = conceptTopic;
     }
   }
+  if (
+    shouldUseOfferCatalog &&
+    activeOfferKey &&
+    leadProfile.lastMentionedOffer !== activeOfferKey
+  ) {
+    const nextDepth = (currentProfile.currentTopicDepth || 1) + 1;
+    addChange(profileChanges, "lastMentionedOffer", leadProfile.lastMentionedOffer, activeOfferKey);
+    leadProfile.lastMentionedOffer = activeOfferKey;
+    addChange(profileChanges, "currentTopic", leadProfile.currentTopic, activeOfferKey);
+    leadProfile.currentTopic = activeOfferKey;
+    addChange(profileChanges, "currentSubtopic", leadProfile.currentSubtopic, activeOfferKey);
+    leadProfile.currentSubtopic = activeOfferKey;
+    addChange(profileChanges, "currentTopicDepth", leadProfile.currentTopicDepth, nextDepth);
+    leadProfile.currentTopicDepth = nextDepth;
+  }
   const shouldAnchorStrategicTopic =
     (effectiveIntent === "review_request" ||
       (hasNewLeadSource && effectiveIntent !== "consulting_concept")) &&
@@ -5828,6 +5980,18 @@ export function buildZoraResponse(
   const postRecommendationReply = isPostRecommendationAck
     ? buildPostRecommendationAcknowledgementResponse(leadProfile, postRecommendationAckCount)
     : "";
+  const offerAnswer =
+    effectiveIntent === "offer_catalog"
+      ? activeOfferKey
+        ? buildOpzixOfferAnswer({
+            offerKey: activeOfferKey,
+            businessType: leadProfile.businessType,
+            industry: leadProfile.confirmedIndustry || leadProfile.industry,
+            websiteUrl: leadProfile.websiteUrl,
+            userMessage: message,
+          })
+        : buildOpzixProductLineAnswer()
+      : undefined;
   const reply =
     duplicateReply ||
     postRecommendationReply ||
@@ -5857,6 +6021,8 @@ export function buildZoraResponse(
           ? buildPricingResponse(leadProfile, message)
           : effectiveIntent === "action_request"
           ? buildActionIntentResponse(leadProfile, analysis.actionIntent)
+          : effectiveIntent === "offer_catalog"
+          ? offerAnswer?.message || buildOpzixProductLineAnswer().message
             : effectiveIntent === "consulting_concept"
             ? buildConsultingKnowledgeResponse(leadProfile, message, activeConsultingConcept)
             : effectiveIntent === "scanner_execute"
@@ -6004,12 +6170,23 @@ export function buildZoraResponse(
     leadProfile,
   );
 
-  const recentTalkingPoint = talkingPointForResponse(
-    effectiveIntent,
-    leadProfile,
-    message,
-    activeTopic,
-  );
+  const offerRecentTalkingPointCandidate =
+    offerAnswer && "recentTalkingPoint" in offerAnswer
+      ? offerAnswer.recentTalkingPoint
+      : undefined;
+  const offerRecentTalkingPoint =
+    typeof offerRecentTalkingPointCandidate === "string" &&
+    isOpzixOfferKey(offerRecentTalkingPointCandidate)
+      ? offerRecentTalkingPointCandidate
+      : undefined;
+  const recentTalkingPoint =
+    offerRecentTalkingPoint ||
+    talkingPointForResponse(
+      effectiveIntent,
+      leadProfile,
+      message,
+      activeTopic,
+    );
   leadProfile.recentTalkingPoints = recentTalkingPoint
     ? [
         recentTalkingPoint,
@@ -6035,7 +6212,11 @@ export function buildZoraResponse(
     action?.type === "start_audit"
       ? scannerHrefForProfile({ ...leadProfile, websiteUrl: action.url })
       : undefined;
-  const recommendedActions = isPostRecommendationAck
+  const offerRecommendedActions =
+    effectiveIntent === "offer_catalog"
+      ? actionsForOfferButtons(offerAnswer?.suggestedButtons)
+      : undefined;
+  const recommendedActions = offerRecommendedActions || (isPostRecommendationAck
     ? leadProfile.scannerBlocked
       ? (["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"])
       : leadProfile.hasNoWebsite
@@ -6052,7 +6233,7 @@ export function buildZoraResponse(
         hasDiagnosis,
         leadProfile,
         repeatedSoftClose,
-      );
+      ));
 
   return {
     reply: guardedFinalReply,

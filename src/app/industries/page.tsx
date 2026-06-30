@@ -2,6 +2,7 @@ import Section from "@/components/Section";
 import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import ProofBar from "@/components/ProofBar";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   Check,
   ShoppingCart,
@@ -153,7 +154,7 @@ export default function Industries() {
               how your business actually operates — not generic templates.
             </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <Button href="/contact" variant="primary" size="lg">
+              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
                 Book Strategy Call
               </Button>
               <Button href="#overview" variant="secondary" size="lg">
@@ -332,7 +333,7 @@ export default function Industries() {
         headline="Not sure which system your business needs?"
         subheadline="We’ll review your setup and recommend the highest-impact improvements."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

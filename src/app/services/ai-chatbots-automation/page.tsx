@@ -12,6 +12,7 @@ import {
 import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import Section from "@/components/Section";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   ChatbotPreviewMockup,
   WorkflowMapMockup,
@@ -198,7 +199,7 @@ export default function AIChatbotsAutomationPage() {
               people toward the right next step.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Button href="/contact?source=ai-chatbot" variant="primary" size="lg">
+              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
                 Book Strategy Call
               </Button>
               <Button href="#automations" variant="secondary" size="lg">
@@ -468,7 +469,7 @@ export default function AIChatbotsAutomationPage() {
         headline="Ready to Turn Website Visitors Into Qualified Leads?"
         subheadline="Let's map where AI and automation can save time, capture more leads, and improve your customer journey."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact?source=ai-chatbot"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </main>
   );

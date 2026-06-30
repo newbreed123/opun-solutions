@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Section from "@/components/Section";
 import Button from "@/components/Button";
 import { trackEvent } from "@/lib/analytics";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import { Check, X, ShoppingCart, Zap } from "lucide-react";
 
 const validLeadSources = new Set([
@@ -639,7 +640,7 @@ export default function Contact() {
                       Pick a time that works for you.
                     </p>
                     <Button
-                      href="https://calendly.com/hello-opzix"
+                      href={STRATEGY_CALL_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       variant="primary"

@@ -2,6 +2,7 @@ import Button from "@/components/Button";
 import CaseStudyCard from "@/components/CaseStudyCard";
 import Section from "@/components/Section";
 import ServiceCard from "@/components/ServiceCard";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   AuditPreviewMockup,
   ChatbotPreviewMockup,
@@ -148,7 +149,7 @@ export default function Home() {
                 <Button href="/tools/ecommerce-audit-scanner" variant="primary" size="lg">
                   Run Free Audit
                 </Button>
-                <Button href="/contact?source=homepage" variant="secondary" size="lg">
+                <Button href={STRATEGY_CALL_URL} variant="secondary" size="lg">
                   Book Strategy Call
                 </Button>
               </div>
@@ -307,7 +308,7 @@ export default function Home() {
           </div>
         </div>
         <div className="mt-10 text-center">
-          <Button href="/contact?source=homepage" size="lg">
+          <Button href={STRATEGY_CALL_URL} size="lg">
             Book Strategy Call
           </Button>
         </div>
@@ -463,7 +464,7 @@ export default function Home() {
             <Button href="/tools/ecommerce-audit-scanner" size="lg">
               Run Free Audit
             </Button>
-            <Button href="/contact?source=homepage" variant="secondary" size="lg">
+            <Button href={STRATEGY_CALL_URL} variant="secondary" size="lg">
               Book Strategy Call
             </Button>
           </div>

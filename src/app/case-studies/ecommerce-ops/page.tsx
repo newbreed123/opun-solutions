@@ -1,5 +1,6 @@
 import Section from "@/components/Section";
 import CTASection from "@/components/CTASection";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import Image from "next/image";
 
 export default function EcommerceOpsStudy() {
@@ -233,7 +234,7 @@ export default function EcommerceOpsStudy() {
         headline="Ready to grow your online store?"
         subheadline="Let's build a system that scales revenue without scaling headaches."
         buttonLabel="Book a Strategy Call"
-        buttonHref="/contact"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

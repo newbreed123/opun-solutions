@@ -6,6 +6,7 @@ import {
   LeadAuditPreview,
   LeadSystemDashboardMockup,
 } from "@/components/VisualMockups";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   BarChart3,
   CalendarCheck,
@@ -197,7 +198,7 @@ export default function LeadGenerationSystemsPage() {
               businesses generate and convert more opportunities.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Button href="/contact?source=services" variant="primary" size="lg">
+              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
                 Book Strategy Call
               </Button>
               <Button href="#lead-system-flow" variant="secondary" size="lg">
@@ -379,7 +380,7 @@ export default function LeadGenerationSystemsPage() {
               ))}
             </div>
             <div className="mt-8">
-              <Button href="/contact?source=services" variant="primary" size="lg">
+              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
                 Book Strategy Call
               </Button>
             </div>
@@ -393,7 +394,7 @@ export default function LeadGenerationSystemsPage() {
         headline="Ready to Build a Smarter Lead Generation System?"
         subheadline="Let's map how your website, AI, automation, tracking, and customer journey can work together to generate more qualified opportunities."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact?source=services"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </main>
   );

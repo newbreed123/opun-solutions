@@ -2,6 +2,7 @@ import Section from "@/components/Section";
 import CTASection from "@/components/CTASection";
 import Button from "@/components/Button";
 import ProcessProof from "@/components/ProcessProof";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   Globe,
   ShoppingCart,
@@ -107,7 +108,7 @@ export default function Services() {
               and operate with confidence.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button href="/contact?source=services" variant="primary" size="lg">
+              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
                 Book Strategy Call
               </Button>
               <Button href="#packages" variant="secondary" size="lg">
@@ -396,7 +397,7 @@ export default function Services() {
         headline="Ready to build a system that grows with your business?"
         subheadline="Let’s review your current website, customer journey, and operations — then map the fastest path to more leads, better systems, and stronger growth."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact?source=services"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

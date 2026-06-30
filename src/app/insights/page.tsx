@@ -1,6 +1,7 @@
 import Button from "@/components/Button";
 import CTASection from "@/components/CTASection";
 import Section from "@/components/Section";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import { BarChart3, Check, MessageSquare, ShoppingCart } from "lucide-react";
 
 const articles = [
@@ -88,7 +89,7 @@ export default function InsightsIndex() {
             Opzix can review your current website, ecommerce workflow,
             automation, and tracking foundation.
           </p>
-          <Button href="/contact" size="lg">
+          <Button href={STRATEGY_CALL_URL} size="lg">
             Book Strategy Call
           </Button>
         </div>
@@ -98,7 +99,7 @@ export default function InsightsIndex() {
         headline="Need a Clearer Growth System?"
         subheadline="Book a strategy call and we will map the highest-impact improvements for your customer journey."
         buttonLabel="Book Strategy Call"
-        buttonHref="/contact"
+        buttonHref={STRATEGY_CALL_URL}
       />
     </>
   );

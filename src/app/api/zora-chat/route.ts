@@ -91,6 +91,7 @@ function shouldUseConsultantGeneration(message: string, fallback: ZoraResponse) 
     fallback.action ||
     fallback.navigationHref ||
     fallback.responseMode === "action_request" ||
+    fallback.responseMode === "offer_catalog" ||
     fallback.leadProfile.hasNoWebsite ||
     isDirectAuditCostQuestion(message)
   ) {
@@ -344,6 +345,7 @@ export async function POST(request: NextRequest) {
       fallback.responseMode === "scanner_failure" ||
       fallback.responseMode === "trust_skepticism" ||
       fallback.responseMode === "action_request" ||
+      fallback.responseMode === "offer_catalog" ||
       fallback.responseMode === "consulting_concept"
       ? undefined
       : selectZoraPlaybook(message, fallback);
@@ -397,6 +399,8 @@ export async function POST(request: NextRequest) {
             ? "booking_requested"
             : fallback.responseMode === "recommendation"
               ? "recommendation_requested"
+              : fallback.responseMode === "offer_catalog"
+                ? "offer_question"
               : fallback.responseMode === "consultant"
                 ? "consultant_question"
               : fallback.responseMode === "review_request"

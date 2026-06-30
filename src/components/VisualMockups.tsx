@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   ArrowDown,
   ArrowRight,
@@ -189,7 +190,7 @@ export function ChatbotPreviewMockup({ className = "" }: MockupProps) {
         </div>
 
         <Link
-          href="/contact?source=ai-chatbot"
+          href={STRATEGY_CALL_URL}
           className="mt-5 flex items-center justify-center rounded-2xl border border-brand-cyan/40 bg-gradient-to-r from-brand-blue/25 to-brand-cyan/20 px-4 py-3 text-sm font-semibold text-primary transition-colors hover:border-brand-cyan"
         >
           Book Strategy Call
