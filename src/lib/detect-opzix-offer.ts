@@ -122,6 +122,16 @@ const explicitOfferTerms: Record<OpzixOfferKey, string[]> = {
     "not converting",
     "landing page optimization",
   ],
+  google_ads_ad_readiness: [
+    "do you run google ads",
+    "google ads",
+    "paid ads",
+    "ad management",
+    "ppc",
+    "campaign strategy",
+    "launch ads",
+    "underperforming ads",
+  ],
   strategy_consulting: [
     "strategy",
     "consulting",
@@ -140,6 +150,8 @@ const productLineQuestionPatterns = [
   /\bwhat can you build\b/i,
   /\bwhat can opzix build\b/i,
   /\bhow can opzix help\b/i,
+  /\bwhat do you know\b/i,
+  /\bwhat can you help with\b/i,
 ];
 
 const followUpPatterns = [
@@ -154,6 +166,8 @@ const followUpPatterns = [
   /\bconnect(ed|ing)?\s+(to|with)\b/i,
   /\b(orders?|customers?|products?|inventory|fulfillment|refunds?|financial fields?|leads?)\b/i,
   /\b(two[-\s]?way|both ways|both directions|bidirectional|bi-directional|sync back|sync both)\b/i,
+  /\b(all of the above|all of those|everything mentioned|all mentioned|do all|all of it)\b/i,
+  /\b(lead qualification|qualify leads?|booking appointments?|customer support|routing inquiries|route inquiries|answering questions?)\b/i,
 ];
 
 function normalize(value: string) {
@@ -187,6 +201,19 @@ export function isOpzixOfferFollowUp(message: string) {
 
 export function detectOpzixOfferIntent(message: string): OpzixOfferIntentDetection {
   const normalizedMessage = normalize(message);
+
+  if (
+    /\b(what is|what are|benefit of|why does|why is|explain)\b/i.test(message) &&
+    /\blanding page(s)?\b/i.test(message)
+  ) {
+    return {
+      offerKey: null,
+      confidence: "Low",
+      matchedTerms: [],
+      isOfferQuestion: false,
+    };
+  }
+
   const matches = OPZIX_OFFERS.map((offer) => {
     const terms = [...explicitOfferTerms[offer.key], ...offer.commonUserPhrases];
     const matchedTerms = Array.from(
@@ -400,6 +427,67 @@ function buildLeadIntegrationAnswer(
   };
 }
 
+function buildAiAssistantScopeAnswer(
+  userMessage: string,
+  suggestedButtons: OpzixOfferAnswer["suggestedButtons"],
+): OpzixOfferAnswer | undefined {
+  if (/\b(lead qualification|qualify leads?)\b/i.test(userMessage)) {
+    return {
+      message:
+        "Good. For lead qualification, I would design the AI assistant to identify who the visitor is, what they need, how urgent or qualified the request is, and where the conversation should go next.\n\nThat usually means asking a short sequence of business-specific questions, tagging the lead by fit or intent, collecting contact details at the right moment, and handing qualified leads to CRM, email, or booking without making every visitor fill out a long form.\n\nWhat makes a lead qualified for you: budget, service need, company size, timeline, location, product interest, or something else?",
+      suggestedButtons,
+      recentTalkingPoint: "ai_assistant_chatbot",
+    };
+  }
+
+  if (/\b(booking appointments?|book appointments?|calendar|schedule calls?)\b/i.test(userMessage)) {
+    return {
+      message:
+        "Good. For booking appointments, I would make the AI assistant qualify the visitor before it pushes them to a calendar, then pass the right context into the booking or follow-up flow.\n\nThat helps avoid unqualified calls while still giving high-intent visitors a fast path forward.\n\nWhat should someone answer before they are invited to book: service need, timeline, budget, location, or project type?",
+      suggestedButtons,
+      recentTalkingPoint: "ai_assistant_chatbot",
+    };
+  }
+
+  if (/\b(customer support|support questions?|help requests?)\b/i.test(userMessage)) {
+    return {
+      message:
+        "Good. For customer support, I would design the AI assistant around the most common questions and escalation paths, not just a generic FAQ.\n\nIt can answer routine questions, collect order or account context, separate urgent issues from simple requests, and route anything sensitive or unresolved to a human workflow.\n\nWhat support questions come up most often right now?",
+      suggestedButtons,
+      recentTalkingPoint: "ai_assistant_chatbot",
+    };
+  }
+
+  if (/\b(routing inquiries|route inquiries|routing|route conversations?)\b/i.test(userMessage)) {
+    return {
+      message:
+        "Good. For routing inquiries, I would make the AI assistant classify the visitor's intent, collect the minimum useful context, and send the conversation to the right next step: sales, support, booking, email, CRM, or a human handoff.\n\nThe key is defining the routing rules before building the assistant, so it knows when to answer, when to qualify, and when to escalate.\n\nWhat are the main paths inquiries should route into?",
+      suggestedButtons,
+      recentTalkingPoint: "ai_assistant_chatbot",
+    };
+  }
+
+  if (/\b(answering questions?|faq|common questions?)\b/i.test(userMessage)) {
+    return {
+      message:
+        "Good. For answering questions, I would build the assistant around your actual services, policies, products, and customer decision points, then add guardrails for what it should not answer on its own.\n\nThe goal is to reduce repetitive questions while still moving serious prospects toward qualification, booking, or a human handoff.\n\nWhat questions do customers or prospects ask most often?",
+      suggestedButtons,
+      recentTalkingPoint: "ai_assistant_chatbot",
+    };
+  }
+
+  if (/\b(all of the above|all of those|everything mentioned|all mentioned|do all|all of it)\b/i.test(userMessage)) {
+    return {
+      message:
+        "Got it. If you want the AI assistant to handle all of that, I would scope it as a connected workflow rather than one oversized chat prompt.\n\nA good Opzix AI assistant could answer common questions, qualify leads, collect intake details, guide visitors to the right next step, route conversations, and hand qualified prospects to CRM, email, or booking. The important part is sequencing those jobs so the assistant knows when to answer, when to ask a qualifying question, and when to escalate to a human or calendar.\n\nWhich part should be the first priority: lead qualification, booking appointments, customer support, or routing inquiries to the right team?",
+      suggestedButtons,
+      recentTalkingPoint: "ai_assistant_chatbot",
+    };
+  }
+
+  return undefined;
+}
+
 export function buildOpzixOfferAnswer(input: {
   offerKey: OpzixOfferKey;
   businessType?: string;
@@ -419,6 +507,29 @@ export function buildOpzixOfferAnswer(input: {
       message:
         "Opzix does not usually position this as an 'AI consultant' service. What we build are AI assistants and chatbots designed around your business workflow. That could mean answering customer questions, qualifying leads, collecting intake details, routing conversations, or handing qualified prospects to email, CRM, or a booking flow.\n\nThe right starting point is deciding what job the AI should perform for your business.\n\n" +
         offer.followUpQuestion,
+      suggestedButtons,
+      recentTalkingPoint: offer.key,
+    };
+  }
+
+  if (offer.key === "ai_assistant_chatbot") {
+    const scopedAiAnswer = buildAiAssistantScopeAnswer(input.userMessage, suggestedButtons);
+    if (scopedAiAnswer) return scopedAiAnswer;
+  }
+
+  if (offer.key === "client_dashboard") {
+    return {
+      message:
+        "Opzix builds dashboards and portals that help teams see the information they need without jumping between scattered tools. For internal teams, that might mean leads, bookings, audit activity, support tickets, campaign performance, ecommerce metrics, or operational tasks in one place.\n\nDashboards are most useful when they are designed around a decision, not just charts.\n\nWho is the dashboard for: internal staff, managers, clients, customers, or a mix?",
+      suggestedButtons,
+      recentTalkingPoint: offer.key,
+    };
+  }
+
+  if (offer.key === "google_ads_ad_readiness") {
+    return {
+      message:
+        "Opzix can help with Google Ads readiness, landing page strategy, tracking, conversion paths, and campaign performance visibility. If full campaign management is part of the scope, it should be tied to clean tracking and a landing path that can convert.\n\nAre you trying to launch ads for the first time, fix underperforming ads, or make sure tracking is set up correctly?",
       suggestedButtons,
       recentTalkingPoint: offer.key,
     };

@@ -11,6 +11,7 @@ export type OpzixOfferKey =
   | "client_dashboard"
   | "support_ticket_flow"
   | "conversion_optimization"
+  | "google_ads_ad_readiness"
   | "strategy_consulting";
 
 export type OpzixOffer = {
@@ -527,6 +528,43 @@ export const OPZIX_OFFERS: OpzixOffer[] = [
     recommendedNextStep: "strategy_call",
     followUpQuestion:
       "Are you trying to build something new, fix an existing system, or decide what would help the business most right now?",
+  },
+  {
+    key: "google_ads_ad_readiness",
+    title: "Google Ads / Ad Readiness",
+    plainEnglish:
+      "Opzix can help with Google Ads readiness, landing page strategy, tracking, conversion paths, and campaign performance visibility.",
+    whatItIncludes: [
+      "Landing page strategy",
+      "Conversion tracking readiness",
+      "Campaign performance visibility",
+      "Offer and traffic alignment",
+      "Follow-up path review",
+      "Ad funnel improvement planning",
+    ],
+    whatItDoesNotMean: [
+      "Full campaign management should be tied to clean tracking and a landing path that can convert.",
+      "It is not just turning ads on before the customer journey is ready.",
+    ],
+    bestFor: [
+      "Businesses launching Google Ads",
+      "Companies fixing underperforming ads",
+      "Teams that need conversion tracking set up correctly",
+      "Landing pages preparing for paid traffic",
+    ],
+    commonUserPhrases: [
+      "do you run Google Ads",
+      "Google Ads",
+      "paid ads",
+      "ad management",
+      "PPC",
+      "campaign strategy",
+    ],
+    zoraAnswerGuidance:
+      "Answer directly that Opzix helps with Google Ads readiness, landing pages, tracking, conversion paths, and campaign visibility. Clarify full ad management should be scoped around clean tracking and a landing path that can convert.",
+    recommendedNextStep: "strategy_call",
+    followUpQuestion:
+      "Are you trying to launch ads for the first time, fix underperforming ads, or make sure tracking is set up correctly?",
   },
 ];
 

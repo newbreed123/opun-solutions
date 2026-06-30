@@ -7,6 +7,7 @@ import { OPZIX_COMPANY_PROFILE } from "@/lib/opzix-company-profile";
 import {
   buildConsultingExperienceAnswer,
   isConsultingExperienceQuestion,
+  type ZoraConsultingConcept,
 } from "@/lib/zora-consulting-knowledge";
 import {
   detectZoraActionIntent,
@@ -28,6 +29,12 @@ import {
   isOpzixProductLineQuestion,
   type OpzixOfferAnswer,
 } from "@/lib/detect-opzix-offer";
+import {
+  buildPlaybookBranchResponse,
+  buildPlaybookOpeningForOffer,
+  playbookForOfferKey,
+  type ConsultingPlaybookResponse,
+} from "@/lib/opzix-consulting/playbooks";
 import { isOpzixOfferKey, type OpzixOfferKey } from "@/lib/opzix-offers";
 
 export type ZoraBusinessType =
@@ -294,7 +301,14 @@ export type ZoraLeadProfile = {
   detectedConcept?: OpzixBrainConcept;
   conceptConfidence?: ConceptDetectionResult["confidence"];
   conceptMatchedTerms?: string[];
+  currentOfferKey?: string;
+  currentPlaybookKey?: string;
+  currentDiscoveryQuestionKey?: string;
+  lastZoraQuestion?: string;
+  lastExpectedAnswerSet?: string[];
+  lastMentionedConcept?: string;
   lastMentionedOffer?: OpzixOfferKey;
+  topicDepth?: number;
   currentTopicDepth?: number;
   recentTalkingPoints?: ZoraTalkingPoint[];
   leadQuality?: ZoraLeadQuality;
@@ -1865,7 +1879,11 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
     : detectOpzixOfferIntent(message);
   const hasOfferIntent =
     Boolean(offerDetection.offerKey) && offerDetection.confidence !== "Low";
-  const consultingConcept = outOfScope || productLineQuestion || hasOfferIntent
+  const isKnowledgeQuestion =
+    /\b(what is|what are|what do you mean|benefit of|why does|why is|explain)\b/i.test(message);
+  const consultingConcept = outOfScope ||
+    productLineQuestion ||
+    (hasOfferIntent && !isKnowledgeQuestion)
     ? { concept: null, confidence: "Low" as const, matchedTerms: [] }
     : detectOpzixBrainConcept(message);
   const hasConsultingConcept =
@@ -1889,6 +1907,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
       ? "terminology"
     : actionIntent?.isAction
       ? "action_request"
+    : hasConsultingConcept && isKnowledgeQuestion
+      ? "consulting_concept"
     : productLineQuestion || hasOfferIntent
       ? "offer_catalog"
     : hasConsultingConcept || isConsultingExperienceQuestion(message)
@@ -4340,7 +4360,7 @@ function buildConsultingKnowledgeResponse(
 
   if (isConsultingExperienceQuestion(message)) {
     return buildConsultingExperienceAnswer({
-      concept: activeConcept,
+      concept: toLegacyConsultingConcept(activeConcept),
       websiteUrl: profile.websiteUrl,
     });
   }
@@ -5437,6 +5457,27 @@ function toConsultingConcept(value?: string): OpzixBrainConcept | undefined {
   return undefined;
 }
 
+function toLegacyConsultingConcept(value?: string): ZoraConsultingConcept | undefined {
+  const concept = toConsultingConcept(value);
+
+  if (
+    concept === "tracking_visibility" ||
+    concept === "conversion_path" ||
+    concept === "lead_capture" ||
+    concept === "follow_up_speed" ||
+    concept === "crm_routing" ||
+    concept === "booking_flow" ||
+    concept === "offer_clarity" ||
+    concept === "product_discovery" ||
+    concept === "trust_signals" ||
+    concept === "ai_assistant"
+  ) {
+    return concept;
+  }
+
+  return undefined;
+}
+
 function topicForConsultingConcept(concept: OpzixBrainConcept): ZoraTopic | undefined {
   if (concept === "offer_clarity") return "offer_clarity";
   if (concept === "tracking_visibility") return "tracking_visibility";
@@ -5718,6 +5759,55 @@ function actionsForOfferButtons(
   }) as ZoraResponse["recommendedActions"];
 }
 
+function actionsForConsultingNextStep(
+  nextStep?: ConsultingPlaybookResponse["recommendedNextStep"],
+) {
+  if (nextStep === "free_audit") return ["free_audit", "ask_question"] as ZoraResponse["recommendedActions"];
+  if (nextStep === "strategy_call") return ["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"];
+  if (nextStep === "ask_followup") return ["ask_question"] as ZoraResponse["recommendedActions"];
+  return undefined;
+}
+
+function isClearConsultingTopicSwitch(analysis: ZoraMessageAnalysis, message: string) {
+  return (
+    /\b(tell me about|what is|what are|do you offer|can you build|i need help with|do you run|benefit of)\b/i.test(
+      message,
+    ) &&
+    Boolean(analysis.offerKey || analysis.consultingConcept || analysis.isProductLineQuestion)
+  );
+}
+
+function applyConsultingPlaybookState(
+  profile: ZoraLeadProfile,
+  changes: string[],
+  playbookState: ConsultingPlaybookResponse | undefined,
+) {
+  if (!playbookState) return;
+
+  addChange(changes, "currentOfferKey", profile.currentOfferKey, playbookState.offerKey);
+  profile.currentOfferKey = playbookState.offerKey;
+  addChange(changes, "currentPlaybookKey", profile.currentPlaybookKey, playbookState.playbookKey);
+  profile.currentPlaybookKey = playbookState.playbookKey;
+  addChange(
+    changes,
+    "currentDiscoveryQuestionKey",
+    profile.currentDiscoveryQuestionKey,
+    playbookState.discoveryQuestionKey,
+  );
+  profile.currentDiscoveryQuestionKey = playbookState.discoveryQuestionKey;
+  addChange(changes, "lastZoraQuestion", profile.lastZoraQuestion, playbookState.lastZoraQuestion);
+  profile.lastZoraQuestion = playbookState.lastZoraQuestion;
+  addChange(
+    changes,
+    "lastExpectedAnswerSet",
+    profile.lastExpectedAnswerSet?.join(", "),
+    playbookState.lastExpectedAnswerSet?.join(", "),
+  );
+  profile.lastExpectedAnswerSet = playbookState.lastExpectedAnswerSet;
+  addChange(changes, "topicDepth", profile.topicDepth, (profile.topicDepth || 0) + 1);
+  profile.topicDepth = (profile.topicDepth || 0) + 1;
+}
+
 function enforceNoWebsiteGuardrail(reply: string) {
   return reply
     .replace(/\bwebsite URL\b/gi, "live link")
@@ -5744,6 +5834,12 @@ function shouldPreferPreviousOfferThread(
   return (
     /\b(they|it|that|this)\s+(need|needs|should|has|have)\s+to\b/i.test(message) ||
     /\bconnect(ed|ing)?\s+(to|with)\b/i.test(message)
+  );
+}
+
+function isStandaloneAudienceContext(message: string) {
+  return /^\s*(internal staff|staff|team|employees|operations|clients?|customers?|managers?|leadership|owners?)\s*[.!?]*\s*$/i.test(
+    message,
   );
 }
 
@@ -5811,8 +5907,26 @@ export function buildZoraResponse(
     (isTopicContinuationMessage(message) || isConsultingExperienceQuestion(message)
       ? toConsultingConcept(currentProfile.currentSubtopic || currentProfile.detectedConcept)
       : undefined);
+  const activePlaybookAnswer = buildPlaybookBranchResponse({
+    playbookKey: currentProfile.currentPlaybookKey,
+    message,
+  });
+  const shouldUseActivePlaybook =
+    Boolean(activePlaybookAnswer) &&
+    !isClearConsultingTopicSwitch(analysis, message) &&
+    !isPostRecommendationAck &&
+    !isIndustryClarificationMode &&
+    !isScannerBlockedAcknowledgement &&
+    !shouldAdvanceToHandoff &&
+    previousStage !== "handoff" &&
+    analysis.intent !== "out_of_scope" &&
+    analysis.intent !== "company_background" &&
+    analysis.intent !== "action_request";
   const contextualOfferKey =
-    isOpzixOfferFollowUp(message) && currentProfile.lastMentionedOffer
+    isOpzixOfferFollowUp(message) &&
+    currentProfile.lastMentionedOffer &&
+    !analysis.consultingConcept &&
+    !analysis.isProductLineQuestion
       ? currentProfile.lastMentionedOffer
       : undefined;
   const activeOfferKey = shouldPreferPreviousOfferThread(
@@ -5870,6 +5984,8 @@ export function buildZoraResponse(
       ? "business_model_correction"
       : isScannerBlockedAcknowledgement
       ? "next_step"
+      : shouldUseActivePlaybook
+      ? "offer_catalog"
       : shouldUseOfferCatalog
       ? "offer_catalog"
       : shouldContinueConsultingConcept
@@ -5955,6 +6071,40 @@ export function buildZoraResponse(
     addChange(profileChanges, "currentTopicDepth", leadProfile.currentTopicDepth, nextDepth);
     leadProfile.currentTopicDepth = nextDepth;
   }
+  const openingPlaybookState =
+    !shouldUseActivePlaybook && effectiveIntent === "offer_catalog" && activeOfferKey
+      ? buildPlaybookOpeningForOffer(activeOfferKey)
+      : undefined;
+  applyConsultingPlaybookState(
+    leadProfile,
+    profileChanges,
+    shouldUseActivePlaybook ? activePlaybookAnswer : openingPlaybookState,
+  );
+  if (
+    effectiveIntent === "consulting_concept" &&
+    isClearConsultingTopicSwitch(analysis, message)
+  ) {
+    addChange(profileChanges, "currentOfferKey", leadProfile.currentOfferKey, undefined);
+    addChange(profileChanges, "currentPlaybookKey", leadProfile.currentPlaybookKey, undefined);
+    addChange(
+      profileChanges,
+      "currentDiscoveryQuestionKey",
+      leadProfile.currentDiscoveryQuestionKey,
+      undefined,
+    );
+    addChange(profileChanges, "lastZoraQuestion", leadProfile.lastZoraQuestion, undefined);
+    addChange(
+      profileChanges,
+      "lastExpectedAnswerSet",
+      leadProfile.lastExpectedAnswerSet?.join(", "),
+      undefined,
+    );
+    delete leadProfile.currentOfferKey;
+    delete leadProfile.currentPlaybookKey;
+    delete leadProfile.currentDiscoveryQuestionKey;
+    delete leadProfile.lastZoraQuestion;
+    delete leadProfile.lastExpectedAnswerSet;
+  }
   const shouldAnchorStrategicTopic =
     (effectiveIntent === "review_request" ||
       (hasNewLeadSource && effectiveIntent !== "consulting_concept")) &&
@@ -5982,7 +6132,16 @@ export function buildZoraResponse(
     : "";
   const offerAnswer =
     effectiveIntent === "offer_catalog"
-      ? activeOfferKey
+      ? shouldUseActivePlaybook && activePlaybookAnswer
+        ? {
+            message: activePlaybookAnswer.message,
+            suggestedButtons: ["Ask Another Question"] as OpzixOfferAnswer["suggestedButtons"],
+            recentTalkingPoint:
+              activeOfferKey && isOpzixOfferKey(activeOfferKey)
+                ? activeOfferKey
+                : leadProfile.lastMentionedOffer || "strategy_consulting",
+          }
+        : activeOfferKey
         ? buildOpzixOfferAnswer({
             offerKey: activeOfferKey,
             businessType: leadProfile.businessType,
@@ -6081,6 +6240,8 @@ export function buildZoraResponse(
                             ? `${buildZoraDiagnosis(effectiveDiagnosisProfile)} ${followUpQuestion(effectiveDiagnosisProfile)}`
                             : analysis.websiteUrl
                               ? buildWebsiteCapturedWithMemoryResponse(leadProfile)
+                              : isStandaloneAudienceContext(message)
+                                ? "Are you referring to a dashboard, workflow, CRM, support process, or internal operations system for staff?"
                               : buildClarifyingResponse(leadProfile));
 
   if (effectiveIntent === "thanks" && !leadProfile.hasSeenSoftClose) {
@@ -6213,7 +6374,9 @@ export function buildZoraResponse(
       ? scannerHrefForProfile({ ...leadProfile, websiteUrl: action.url })
       : undefined;
   const offerRecommendedActions =
-    effectiveIntent === "offer_catalog"
+    effectiveIntent === "offer_catalog" && shouldUseActivePlaybook
+      ? actionsForConsultingNextStep(activePlaybookAnswer?.recommendedNextStep)
+    : effectiveIntent === "offer_catalog"
       ? actionsForOfferButtons(offerAnswer?.suggestedButtons)
       : undefined;
   const recommendedActions = offerRecommendedActions || (isPostRecommendationAck

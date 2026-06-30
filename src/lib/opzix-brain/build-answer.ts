@@ -74,6 +74,14 @@ export function buildOpzixBrainLowConfidenceFallback() {
 }
 
 function directAnswer(concept: OpzixBrainConcept, definition: string) {
+  if (concept === "bottleneck") {
+    return "A bottleneck is the part of the customer journey or business process that limits growth. For example, if people visit your site but do not submit a form, the bottleneck may be the offer, landing page, or lead capture. If leads come in but no one follows up, the bottleneck may be CRM routing or operations. Opzix focuses on finding the bottleneck first so businesses do not waste money fixing the wrong thing.";
+  }
+
+  if (concept === "landing_page") {
+    return "A landing page gives one audience one clear path to one action. Unlike a homepage, which usually has many links and audiences, a landing page focuses on a specific offer such as booking a consultation, requesting a quote, downloading a guide, or buying a product. The benefit is less distraction, clearer messaging, better tracking, and a stronger chance that paid traffic turns into leads or sales.";
+  }
+
   if (concept === "tracking_visibility") {
     return "Tracking helps you see what is actually working. " + definition;
   }
@@ -87,7 +95,12 @@ function directAnswer(concept: OpzixBrainConcept, definition: string) {
 
 function businessImpact(concept: OpzixBrainConcept) {
   switch (concept) {
+    case "bottleneck":
+    case "customer_journey":
+    case "landing_page":
     case "tracking_visibility":
+    case "analytics_dashboard":
+    case "google_ads_readiness":
       return "the team can prioritize from evidence instead of opinions about what might be working.";
     case "conversion_path":
     case "offer_clarity":
@@ -99,9 +112,14 @@ function businessImpact(concept: OpzixBrainConcept) {
     case "follow_up_speed":
       return "existing intent is less likely to leak after a visitor has already raised their hand.";
     case "product_discovery":
+    case "ecommerce_storefront":
       return "shoppers can reach the right option faster, which improves the odds that product-page and checkout work actually matter.";
     case "ai_assistant":
       return "the business can answer, qualify, and route conversations without adding manual load.";
+    case "automation_workflow":
+    case "backend_integration":
+    case "support_ticket_flow":
+      return "the business can reduce manual work and make operational handoffs more reliable.";
     default:
       return "the business can connect customer experience to clearer operational outcomes.";
   }
@@ -109,6 +127,14 @@ function businessImpact(concept: OpzixBrainConcept) {
 
 function diagnosticQuestion(concept: OpzixBrainConcept) {
   switch (concept) {
+    case "bottleneck":
+      return "Where does growth feel stuck right now: before leads come in, after leads come in, during purchase, or inside operations?";
+    case "landing_page":
+      return "Is the landing page meant to drive form submissions, booked calls, purchases, quote requests, or another action?";
+    case "analytics_dashboard":
+      return "Who needs the dashboard first: internal staff, managers, clients, customers, or a mix?";
+    case "google_ads_readiness":
+      return "Are you launching ads for the first time, fixing underperforming ads, or making sure tracking is set up correctly?";
     case "tracking_visibility":
       return "Are you trying to understand tracking for ads, website leads, ecommerce sales, or internal operations?";
     case "conversion_path":

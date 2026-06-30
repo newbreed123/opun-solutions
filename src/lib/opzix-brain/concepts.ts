@@ -462,4 +462,152 @@ export const OPZIX_BRAIN_CONCEPTS: Record<OpzixBrainConcept, OpzixBrainEntry> = 
       },
     },
   },
+  bottleneck: {
+    concept: "bottleneck",
+    title: "Bottleneck",
+    shortDefinition:
+      "A bottleneck is the part of the customer journey or business process that limits growth.",
+    whyItMatters:
+      "If the business fixes the wrong thing, it can spend money on traffic, design, or tools while the real constraint stays in place.",
+    businessRisk:
+      "Misreading the bottleneck leads to wasted spend, scattered priorities, and fixes that do not improve leads, sales, or operations.",
+    whatGoodLooksLike:
+      "A clear bottleneck diagnosis shows where intent slows down: before the visitor acts, during the action, or after the handoff.",
+    commonMistakes: [
+      "Assuming traffic is the problem before checking the conversion path.",
+      "Redesigning pages before checking lead capture or follow-up.",
+      "Treating every symptom as a separate problem.",
+    ],
+    whatOpzixWouldValidate: ["customer journey", "traffic source", "conversion path", "lead capture", "CRM handoff", "follow-up"],
+    relatedConcepts: ["customer_journey", "conversion_path", "lead_capture"],
+    industryVariants: {},
+  },
+  customer_journey: {
+    concept: "customer_journey",
+    title: "Customer Journey",
+    shortDefinition:
+      "The customer journey is the path a person takes from first awareness to trust, action, follow-up, and eventual purchase or service delivery.",
+    whyItMatters:
+      "Growth systems break when each step is optimized alone and the handoffs between pages, forms, tools, and teams are ignored.",
+    businessRisk:
+      "A broken journey creates confusing pages, lost leads, unclear reporting, and slow follow-up.",
+    whatGoodLooksLike:
+      "A good journey gives the visitor clear information, a relevant next step, and a clean handoff after they act.",
+    commonMistakes: ["Mapping pages but not handoffs.", "Ignoring what happens after form submission.", "Using one path for every audience."],
+    whatOpzixWouldValidate: ["entry points", "offer match", "CTA path", "forms", "booking", "CRM and follow-up"],
+    relatedConcepts: ["conversion_path", "offer_clarity", "follow_up_speed"],
+    industryVariants: {},
+  },
+  landing_page: {
+    concept: "landing_page",
+    title: "Landing Page",
+    shortDefinition:
+      "A landing page gives one audience one clear path to one action, such as booking, requesting a quote, downloading a guide, or buying a product.",
+    whyItMatters:
+      "Unlike a homepage, a landing page removes distraction and makes paid or campaign traffic easier to understand and measure.",
+    businessRisk:
+      "Sending campaign traffic to a broad page can lower conversion, weaken tracking, and make ads look worse than they are.",
+    whatGoodLooksLike:
+      "A good landing page has message match, a clear offer, trust proof, one primary CTA, and conversion tracking.",
+    commonMistakes: ["Using the homepage for every campaign.", "Adding too many CTAs.", "Forgetting tracking or follow-up."],
+    whatOpzixWouldValidate: ["headline", "offer", "traffic match", "CTA", "proof", "tracking events"],
+    relatedConcepts: ["offer_clarity", "conversion_path", "tracking_visibility"],
+    industryVariants: {},
+  },
+  analytics_dashboard: {
+    concept: "analytics_dashboard",
+    title: "Analytics Dashboard",
+    shortDefinition:
+      "An analytics dashboard shows the metrics, events, and exceptions a team needs to make decisions without jumping between scattered tools.",
+    whyItMatters:
+      "Dashboards are useful when they reduce uncertainty and help teams act faster, not when they simply display charts.",
+    businessRisk:
+      "Weak dashboards create report clutter, missed issues, and disagreement over what is working.",
+    whatGoodLooksLike:
+      "A good dashboard is role-based, tied to decisions, and shows the actions or metrics that need attention.",
+    commonMistakes: ["Tracking too many metrics.", "Building charts without decisions.", "Mixing unreliable data sources."],
+    whatOpzixWouldValidate: ["data source", "decision owner", "metrics", "roles", "alerts", "reporting cadence"],
+    relatedConcepts: ["tracking_visibility", "backend_integration", "crm_routing"],
+    industryVariants: {},
+  },
+  automation_workflow: {
+    concept: "automation_workflow",
+    title: "Automation Workflow",
+    shortDefinition:
+      "An automation workflow moves information or tasks through a process without requiring every step to be handled manually.",
+    whyItMatters:
+      "Good automation reduces delay and dropped handoffs, but only when the workflow is clear before it is automated.",
+    businessRisk:
+      "Automating a messy process can scale errors, duplicate records, and make ownership less clear.",
+    whatGoodLooksLike:
+      "A good workflow has clear triggers, ownership, conditions, exceptions, and reporting.",
+    commonMistakes: ["Automating before mapping the process.", "Skipping error handling.", "Not assigning ownership."],
+    whatOpzixWouldValidate: ["trigger", "handoff", "owner", "data fields", "exceptions", "notifications"],
+    relatedConcepts: ["crm_routing", "follow_up_speed", "backend_integration"],
+    industryVariants: {},
+  },
+  backend_integration: {
+    concept: "backend_integration",
+    title: "Backend Integration",
+    shortDefinition:
+      "A backend integration connects systems such as ecommerce platforms, CRMs, ERPs, forms, dashboards, and operational tools so data can move reliably.",
+    whyItMatters:
+      "Teams lose time and accuracy when important data has to be copied manually between systems.",
+    businessRisk:
+      "Poor integrations create duplicate records, missing orders, inventory mismatch, and unreliable reporting.",
+    whatGoodLooksLike:
+      "A good integration defines source of truth, sync direction, required fields, triggers, and error handling.",
+    commonMistakes: ["Connecting tools before mapping data ownership.", "Ignoring sync failures.", "Treating every field as equal."],
+    whatOpzixWouldValidate: ["systems", "source of truth", "field map", "sync direction", "trigger", "exceptions"],
+    relatedConcepts: ["automation_workflow", "analytics_dashboard", "crm_routing"],
+    industryVariants: {},
+  },
+  support_ticket_flow: {
+    concept: "support_ticket_flow",
+    title: "Support Ticket Flow",
+    shortDefinition:
+      "A support ticket flow turns customer questions into trackable requests with categories, ownership, routing, status, and escalation.",
+    whyItMatters:
+      "Support breaks down when requests arrive through scattered channels and no one can see ownership or status.",
+    businessRisk:
+      "Weak support flow leads to slow replies, repeated questions, frustrated customers, and hidden operational problems.",
+    whatGoodLooksLike:
+      "A good support flow captures context, routes by issue type, escalates when needed, and reports response visibility.",
+    commonMistakes: ["Using inboxes as ticket systems.", "No category or priority rules.", "No escalation path."],
+    whatOpzixWouldValidate: ["intake", "categories", "ownership", "priority", "status", "reporting"],
+    relatedConcepts: ["ai_assistant", "crm_routing", "analytics_dashboard"],
+    industryVariants: {},
+  },
+  ecommerce_storefront: {
+    concept: "ecommerce_storefront",
+    title: "Ecommerce Storefront",
+    shortDefinition:
+      "An ecommerce storefront is the online shopping experience where customers find products, evaluate trust, add to cart, and complete checkout.",
+    whyItMatters:
+      "The storefront connects product discovery, product confidence, checkout, tracking, and operational handoff.",
+    businessRisk:
+      "A weak storefront can waste traffic, hide products, lower trust, and create checkout or fulfillment issues.",
+    whatGoodLooksLike:
+      "A good storefront makes products easy to find, understand, trust, and buy on mobile and desktop.",
+    commonMistakes: ["Treating design separately from checkout.", "Ignoring product discovery.", "Missing ecommerce tracking."],
+    whatOpzixWouldValidate: ["navigation", "product pages", "trust", "cart", "checkout", "tracking"],
+    relatedConcepts: ["product_discovery", "conversion_path", "tracking_visibility"],
+    industryVariants: {},
+  },
+  google_ads_readiness: {
+    concept: "google_ads_readiness",
+    title: "Google Ads Readiness",
+    shortDefinition:
+      "Google Ads readiness means the offer, landing page, tracking, conversion path, and follow-up system are prepared before ad spend increases.",
+    whyItMatters:
+      "Paid traffic can expose a weak landing path faster; it does not automatically fix the offer, page, or tracking.",
+    businessRisk:
+      "Running ads without readiness can waste spend, produce unclear data, and generate leads the team cannot follow up on.",
+    whatGoodLooksLike:
+      "Good readiness includes a focused landing page, conversion tracking, clear CTA, source attribution, and a follow-up path.",
+    commonMistakes: ["Launching ads before tracking.", "Sending all traffic to the homepage.", "Counting low-quality actions as conversions."],
+    whatOpzixWouldValidate: ["landing page", "offer match", "primary conversion", "secondary events", "tracking", "follow-up"],
+    relatedConcepts: ["landing_page", "tracking_visibility", "conversion_path"],
+    industryVariants: {},
+  },
 };

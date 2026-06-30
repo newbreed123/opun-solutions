@@ -1,6 +1,9 @@
 import type { ConceptDetectionResult, OpzixBrainConcept } from "./types";
 
 const directTerms: Record<OpzixBrainConcept, string[]> = {
+  bottleneck: ["bottleneck", "business bottleneck", "growth bottleneck"],
+  customer_journey: ["customer journey", "customer path", "buyer journey"],
+  landing_page: ["landing page", "benefit of a landing page", "landing pages"],
   tracking_visibility: [
     "tracking visibility",
     "conversion tracking",
@@ -13,6 +16,12 @@ const directTerms: Record<OpzixBrainConcept, string[]> = {
   lead_capture: ["lead capture", "contact form"],
   follow_up_speed: ["follow up", "follow-up", "response time", "speed to lead"],
   crm_routing: ["crm routing", "lead assignment", "sales process"],
+  analytics_dashboard: ["analytics dashboard", "dashboard", "reporting dashboard"],
+  automation_workflow: ["automation workflow", "workflow automation", "automated workflow"],
+  backend_integration: ["backend integration", "api integration", "system integration"],
+  support_ticket_flow: ["support ticket flow", "support tickets", "ticket system", "help desk"],
+  ecommerce_storefront: ["ecommerce storefront", "online store", "storefront"],
+  google_ads_readiness: ["google ads readiness", "google ads", "paid ads", "ad readiness"],
   product_discovery: ["product discovery", "find products", "product pages"],
   booking_flow: ["booking flow", "appointment", "schedule", "calendly", "consultation"],
   trust_signals: ["trust signals", "reviews", "testimonials", "credibility"],
@@ -20,6 +29,9 @@ const directTerms: Record<OpzixBrainConcept, string[]> = {
 };
 
 const relatedTerms: Record<OpzixBrainConcept, string[]> = {
+  bottleneck: ["stuck", "leak", "constraint", "limiting growth"],
+  customer_journey: ["journey", "path", "visitor path", "steps"],
+  landing_page: ["ad page", "campaign page", "lead page"],
   tracking_visibility: ["tracking", "analytics", "ga4", "pixel", "attribution"],
   conversion_path: [
     "conversion",
@@ -35,6 +47,12 @@ const relatedTerms: Record<OpzixBrainConcept, string[]> = {
   lead_capture: ["form", "inquiry", "request info", "get leads", "submit"],
   follow_up_speed: ["slow replies", "leads not contacted", "missed leads"],
   crm_routing: ["crm", "routing", "pipeline", "handoff"],
+  analytics_dashboard: ["metrics", "reporting", "portal", "kpi"],
+  automation_workflow: ["automation", "automate", "workflow", "handoff"],
+  backend_integration: ["integration", "api", "netsuite", "erp", "connect systems"],
+  support_ticket_flow: ["support", "tickets", "customer support", "helpdesk"],
+  ecommerce_storefront: ["ecommerce", "shopify", "bigcommerce", "products online"],
+  google_ads_readiness: ["ppc", "campaigns", "run ads", "ad management", "underperforming ads"],
   product_discovery: ["search", "categories", "filters", "catalog", "sku"],
   booking_flow: ["booking", "intake"],
   trust_signals: ["trust", "proof", "guarantee", "shipping", "returns", "certifications"],
