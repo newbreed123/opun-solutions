@@ -725,6 +725,10 @@ export function detectFounderFollowupIntent(
 }
 
 function isCapabilityQuestion(message: string) {
+  if (isIndustryScopeQuestion(message) || isLeadGenerationCapabilityQuestion(message)) {
+    return true;
+  }
+
   if (
     /\b(how can you help|what can you do|what do you do|what does opzix do|tell me more about opzix|more about opzix|about opzix|who is opzix|what is opzix|your services|services do you offer|do you build|can you build|what do you build|build websites?)\b/i.test(
       message,
@@ -738,6 +742,28 @@ function isCapabilityQuestion(message: string) {
     /\b(do you|can you|could you|will you|would you|does opzix|can opzix|what|build|offer|provide|services)\b/i.test(
       message,
     )
+  );
+}
+
+function isLeadGenerationCapabilityQuestion(message: string) {
+  const hasLeadGeneration =
+    /\blead[-\s]?(generation|gen|generating)\b/i.test(message) ||
+    /\b(generate|get|bring in|capture|produce)\s+(more\s+)?leads?\b/i.test(message);
+  const asksAboutOpzixCapability =
+    /\b(opzix|you|your|does|do|can|could|would|handle|offer|provide|build|listed|website|services?)\b/i.test(
+      message,
+    );
+  const asksForExplanation = /\b(tell me about|explain|what is|what are)\b/i.test(message);
+  const challengesCapability =
+    /\b(so|wait|but)\b.*\b(don'?t|do not|doesn'?t|does not|not)\b/i.test(message) ||
+    /\b(listed|on your website|your website|service page|services page)\b/i.test(message);
+
+  return hasLeadGeneration && (asksAboutOpzixCapability || asksForExplanation || challengesCapability);
+}
+
+function isIndustryScopeQuestion(message: string) {
+  return /\b(what|which|who|types?|kinds?)\b.*\b(industr(?:y|ies)|business(?:es)?|companies|clients|markets|verticals)\b.*\b(work with|serve|help|support|focus on|do you work|do you serve|do you help)\b/i.test(
+    message,
   );
 }
 
@@ -818,6 +844,26 @@ function isFreeAuditPricingQuestion(message: string) {
     /\bfree\b.+\b(audit|scan|scanner|website review)\b/i.test(message) ||
     /\b(how much|cost|price|pricing)\b.+\b(audit|scan|scanner|website review)\b/i.test(message)
   );
+}
+
+function isCostBeforeStrategyCallQuestion(message: string) {
+  const text = normalizeCommandText(message);
+  const hasCostLanguage =
+    /\b(cost|costs|pricing|price|prices|budget|estimate|range|quote|investment|cost analysis)\b/i.test(
+      text,
+    );
+  const hasStrategyCallLanguage = /\b(book|booking|schedule|strategy call|consultation|meeting|call)\b/i.test(
+    text,
+  );
+  const asksBeforeBooking =
+    /\bbefore\b.*\b(book|booking|schedule|strategy call|consultation|meeting|call)\b/i.test(
+      text,
+    ) ||
+    /\b(book|booking|schedule|strategy call|consultation|meeting|call)\b.*\bbefore\b/i.test(
+      text,
+    );
+
+  return hasCostLanguage && hasStrategyCallLanguage && asksBeforeBooking;
 }
 
 function normalizeCommandText(message: string) {
@@ -1874,6 +1920,9 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
         websiteUrl,
       });
   const productLineQuestion = outOfScope ? false : isOpzixProductLineQuestion(message);
+  const leadGenerationCapabilityQuestion = outOfScope
+    ? false
+    : isLeadGenerationCapabilityQuestion(message);
   const offerDetection = outOfScope
     ? { offerKey: null, confidence: "Low" as const, matchedTerms: [], isOfferQuestion: false }
     : detectOpzixOfferIntent(message);
@@ -1907,6 +1956,8 @@ export function analyzeZoraMessage(message: string): ZoraMessageAnalysis {
       ? "terminology"
     : actionIntent?.isAction
       ? "action_request"
+    : leadGenerationCapabilityQuestion
+      ? "capability"
     : hasConsultingConcept && isKnowledgeQuestion
       ? "consulting_concept"
     : productLineQuestion || hasOfferIntent
@@ -3618,6 +3669,14 @@ function buildCapabilityResponse(profile: ZoraLeadProfile) {
   return `${greetingPrefix(profile)}Yes. Opzix builds websites, ecommerce systems, AI assistants, CRM and booking flows, automation, dashboards, integrations, lead-generation systems, and audit-based implementation roadmaps. My role is to understand what kind of business you have, identify the likely bottleneck, explain what it means, and recommend whether the next move is a focused fix, free audit, or strategy call.`;
 }
 
+function buildLeadGenerationCapabilityResponse(profile: ZoraLeadProfile) {
+  return `${greetingPrefix(profile)}Yes. Opzix does handle lead generation systems.\n\nThe distinction is that Opzix is not just promising generic lead volume or selling lead lists. The work is usually the system around lead generation: offer and landing-page strategy, forms or booking paths, lead capture, tracking, source attribution, CRM routing, follow-up automation, dashboards, and AI-assisted qualification when it fits.\n\nSo if lead generation is listed on the website, this is the practical meaning: help turn the right traffic into qualified inquiries and make sure those inquiries are tracked, routed, and followed up. Are you trying to generate leads from ads, organic search, social, referrals, or an existing website?`;
+}
+
+function buildIndustryScopeResponse(profile: ZoraLeadProfile) {
+  return `${greetingPrefix(profile)}Opzix works best with businesses where the website, customer journey, tracking, follow-up, and operations need to connect. That includes ecommerce and DTC brands, service businesses, real estate, care and healthcare, local services, B2B or catalog businesses, education, hospitality, community organizations, and teams that need dashboards, integrations, CRM, support, AI, or automation systems.\n\nWhat type of business are you running, and are you trying to build something new or improve an existing system?`;
+}
+
 function buildTerminologyResponse(
   profile: ZoraLeadProfile,
   term: ZoraTerminologyTerm | undefined,
@@ -3904,6 +3963,15 @@ function buildTimelineResponse(profile: ZoraLeadProfile, message: string) {
 }
 
 function buildPricingResponse(profile: ZoraLeadProfile, message: string) {
+  if (isCostBeforeStrategyCallQuestion(message)) {
+    return [
+      `${greetingPrefix(profile)}Yes - before booking, the honest cost analysis starts with scope, because a live site or growth system can mean very different things.`,
+      "A simple lead-generation landing page is usually scoped around one offer, one audience, lead capture, tracking, and follow-up. A fuller business website adds more pages, service detail, proof, content structure, SEO basics, and more implementation time. Ecommerce, CRM routing, booking intake, automation, dashboards, AI chat, or integrations can turn it into a larger connected system build.",
+      "That is why the strategy call matters for price information: it confirms what kind of live site or system you actually need, what can wait, what must be connected on day one, and whether the first version should be a focused launch path or a broader build. After that, pricing can be tied to a real scope instead of a guess.",
+      "To get closer before the call, I would first ask: are you trying to launch a landing page, full service website, ecommerce site, AI assistant, CRM/booking flow, or connected system?",
+    ].join("\n\n");
+  }
+
   if (isFreeAuditPricingQuestion(message)) {
     if (profile.hasNoWebsite) {
       return "Yes, it is free once there is a live page to review. Since you are pre-launch, the better next step is mapping the landing page architecture, core offer, lead capture, follow-up, and tracking before you spend on traffic.";
@@ -3914,6 +3982,15 @@ function buildPricingResponse(profile: ZoraLeadProfile, message: string) {
     }
 
     return "Yes, the audit is 100% free. If you have a live URL, the scanner maps public-page blind spots in about 60 seconds so you have a data-backed starting point.";
+  }
+
+  if (profile.hasNoWebsite) {
+    return [
+      `${greetingPrefix(profile)}Yes - before booking, the honest cost analysis starts with scope, because a new live site can mean very different things.`,
+      "A simple lead-generation landing page is usually scoped around one offer, one audience, lead capture, tracking, and follow-up. A fuller business website adds more pages, service detail, proof, content structure, SEO basics, and more implementation time. If the site also needs CRM routing, booking intake, automation, dashboards, AI chat, or integrations, that becomes a larger system build rather than just a website.",
+      "That is why the strategy call matters for price information: it confirms what kind of live site you actually need, what can wait, what must be connected on day one, and whether the first version should be a focused landing page or a broader website/system. After that, pricing can be tied to a real scope instead of a guess.",
+      "To get closer before the call, I would first ask: are you trying to launch a simple landing page, a full service website, an ecommerce site, or a website connected to CRM/booking/automation?",
+    ].join("\n\n");
   }
 
   if (profile.recommendationRoadmap?.length && isRoadmapSpecificFollowUp(message)) {
@@ -5566,6 +5643,16 @@ function actionsForIntent(
     return [] as ZoraResponse["recommendedActions"];
   }
 
+  if (intent === "pricing") {
+    if (profile.hasNoWebsite) {
+      return ["ask_question", "strategy_call"] as ZoraResponse["recommendedActions"];
+    }
+
+    return profile.websiteUrl
+      ? (["free_audit", "strategy_call", "ask_question"] as ZoraResponse["recommendedActions"])
+      : (["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"]);
+  }
+
   if (profile.hasNoWebsite && intent !== "out_of_scope") {
     return ["strategy_call"] as ZoraResponse["recommendedActions"];
   }
@@ -5597,11 +5684,6 @@ function actionsForIntent(
 
   if (intent === "timeline" && profile.recommendationRoadmap?.length) {
     return [] as ZoraResponse["recommendedActions"];
-  }
-  if (intent === "pricing") {
-    return profile.websiteUrl
-      ? (["free_audit", "strategy_call", "ask_question"] as ZoraResponse["recommendedActions"])
-      : (["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"]);
   }
   if (intent === "scanner_execute") {
     return profile.websiteUrl ? [] : (["ask_question"] as ZoraResponse["recommendedActions"]);
@@ -5921,7 +6003,8 @@ export function buildZoraResponse(
     previousStage !== "handoff" &&
     analysis.intent !== "out_of_scope" &&
     analysis.intent !== "company_background" &&
-    analysis.intent !== "action_request";
+    analysis.intent !== "action_request" &&
+    analysis.intent !== "pricing";
   const contextualOfferKey =
     isOpzixOfferFollowUp(message) &&
     currentProfile.lastMentionedOffer &&
@@ -5946,6 +6029,7 @@ export function buildZoraResponse(
     analysis.intent !== "out_of_scope" &&
     analysis.intent !== "company_background" &&
     analysis.intent !== "action_request" &&
+    analysis.intent !== "pricing" &&
     Boolean(activeOfferKey || shouldUseProductLineAnswer);
   const shouldContinueConsultingConcept =
     !isPostRecommendationAck &&
@@ -6189,7 +6273,11 @@ export function buildZoraResponse(
             : effectiveIntent === "handoff"
               ? buildHandoffResponse(leadProfile, message, previousStage)
             : effectiveIntent === "capability"
-              ? buildCapabilityResponse(leadProfile)
+              ? isLeadGenerationCapabilityQuestion(message)
+                ? buildLeadGenerationCapabilityResponse(leadProfile)
+                : isIndustryScopeQuestion(message)
+                  ? buildIndustryScopeResponse(leadProfile)
+                  : buildCapabilityResponse(leadProfile)
               : effectiveIntent === "small_talk"
                 ? buildSmallTalkResponse(leadProfile)
                   : effectiveIntent === "audit_request"

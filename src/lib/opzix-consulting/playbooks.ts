@@ -296,6 +296,54 @@ export const OPZIX_CONSULTING_PLAYBOOKS: OpzixConsultingPlaybook[] = [
     },
     examples: ["form", "checkout"],
   },
+  {
+    key: "strategy_consulting_playbook",
+    offerKey: "strategy_consulting",
+    openingConsultantFrame:
+      "Strategy consulting is useful when the business needs to decide what to build, fix, automate, or measure before spending on implementation.",
+    discoveryQuestions: [
+      {
+        key: "strategy_stage",
+        question:
+          "Are you trying to build something new, fix an existing system, or decide what would help the business most right now?",
+        expectedShortAnswers: ["build something new", "fix existing system", "decide what helps", "not sure"],
+      },
+    ],
+    responseBranches: {
+      build_new: {
+        whenUserSays: ["build something new", "build new", "new site", "new website", "start from scratch", "launch"],
+        consultantResponse:
+          "If you are building something new, I would scope the first useful version before talking design or tools. That means clarifying the business type, offer, audience, first conversion action, tracking, and follow-up path. A strategy call helps turn that into a practical build scope so pricing is tied to what the site or system actually needs to do.",
+        nextQuestion:
+          "What are you trying to launch first: a landing page, full service website, ecommerce site, AI assistant, CRM/booking flow, or connected system?",
+        recommendedNextStep: "strategy_call",
+      },
+      fix_existing: {
+        whenUserSays: ["fix an existing system", "fix existing", "existing system", "improve existing", "repair", "not working"],
+        consultantResponse:
+          "If you are fixing an existing system, I would not assume rebuild first. I would map the current path, find the leak, and separate message clarity, UX, tracking, lead capture, follow-up, automation, and operations. If there is a live URL, the free audit can help; if the issue is broader than the visible site, a strategy call is the better way to scope the fix.",
+        nextQuestion:
+          "What feels most broken right now: traffic quality, conversion path, tracking, lead follow-up, automation, or operations?",
+        recommendedNextStep: "strategy_call",
+      },
+      decide_priority: {
+        whenUserSays: [
+          "decide what would help",
+          "what would help",
+          "help the business most",
+          "not sure",
+          "decide",
+          "prioritize",
+        ],
+        consultantResponse:
+          "If you are deciding what would help most, I would start with the business outcome and work backward. The priority is different if you need more qualified leads, better conversion, clearer tracking, faster follow-up, less manual work, or a cleaner customer journey. A strategy call is useful here because it turns uncertainty into an ordered roadmap instead of a random list of possible projects.",
+        nextQuestion:
+          "Which outcome matters most first: more leads, more sales, better tracking, faster follow-up, or less manual work?",
+        recommendedNextStep: "strategy_call",
+      },
+    },
+    examples: ["build something new", "fix existing system", "decide what helps"],
+  },
 ];
 
 export const OPZIX_CONSULTING_PLAYBOOKS_BY_KEY = OPZIX_CONSULTING_PLAYBOOKS.reduce(
@@ -326,6 +374,7 @@ const offerKeyAliases: Record<string, string> = {
   booking_intake_flow: "booking_intake_flows",
   support_ticket_flow: "support_ticket_flows",
   google_ads_ad_readiness: "google_ads_ad_readiness",
+  strategy_consulting: "strategy_consulting",
 };
 
 export function consultingOfferKeyForLegacyOffer(key?: string) {

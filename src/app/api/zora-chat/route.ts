@@ -86,6 +86,25 @@ function isDirectAuditCostQuestion(message: string) {
   );
 }
 
+function isCostBeforeBookingQuestion(message: string) {
+  const text = message.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const hasCostLanguage = /\b(cost|costs|pricing|price|prices|budget|estimate|range|quote|investment|cost analysis)\b/.test(
+    text,
+  );
+  const hasBookingLanguage = /\b(book|booking|schedule|strategy call|consultation|meeting|call)\b/.test(
+    text,
+  );
+  const asksBeforeBooking =
+    /\bbefore\b.*\b(book|booking|schedule|strategy call|consultation|meeting|call)\b/.test(
+      text,
+    ) ||
+    /\b(book|booking|schedule|strategy call|consultation|meeting|call)\b.*\bbefore\b/.test(
+      text,
+    );
+
+  return hasCostLanguage && hasBookingLanguage && asksBeforeBooking;
+}
+
 function shouldUseConsultantGeneration(message: string, fallback: ZoraResponse) {
   if (
     fallback.action ||
@@ -93,7 +112,8 @@ function shouldUseConsultantGeneration(message: string, fallback: ZoraResponse) 
     fallback.responseMode === "action_request" ||
     fallback.responseMode === "offer_catalog" ||
     fallback.leadProfile.hasNoWebsite ||
-    isDirectAuditCostQuestion(message)
+    isDirectAuditCostQuestion(message) ||
+    isCostBeforeBookingQuestion(message)
   ) {
     return false;
   }
@@ -345,6 +365,8 @@ export async function POST(request: NextRequest) {
       fallback.responseMode === "scanner_failure" ||
       fallback.responseMode === "trust_skepticism" ||
       fallback.responseMode === "action_request" ||
+      fallback.responseMode === "pricing" ||
+      isCostBeforeBookingQuestion(message) ||
       fallback.responseMode === "offer_catalog" ||
       fallback.responseMode === "consulting_concept"
       ? undefined

@@ -85,6 +85,10 @@ export function detectZoraActionIntent(input: ZoraActionIntentInput): ZoraAction
   const isExplanation = explanationStarts.some((prefix) => text.startsWith(prefix));
   const hasExplicitAction = explicitActionPhrases.some((phrase) => text.includes(phrase));
 
+  if (isCostBeforeBookingQuestion(text)) {
+    return emptyIntent;
+  }
+
   if (isExplanation && !hasExplicitAction) {
     return emptyIntent;
   }
@@ -211,4 +215,22 @@ function isDiagnoseGrowthSystemIntent(text: string) {
       text,
     ) || /^help diagnose (my )?(business|growth|growth system)$/.test(text)
   );
+}
+
+function isCostBeforeBookingQuestion(text: string) {
+  const hasCostLanguage = /\b(cost|costs|pricing|price|prices|budget|estimate|range|quote|investment|cost analysis)\b/.test(
+    text,
+  );
+  const hasBookingLanguage = /\b(book|booking|schedule|strategy call|consultation|meeting|call)\b/.test(
+    text,
+  );
+  const asksBeforeBooking =
+    /\bbefore\b.*\b(book|booking|schedule|strategy call|consultation|meeting|call)\b/.test(
+      text,
+    ) ||
+    /\b(book|booking|schedule|strategy call|consultation|meeting|call)\b.*\bbefore\b/.test(
+      text,
+    );
+
+  return hasCostLanguage && hasBookingLanguage && asksBeforeBooking;
 }
