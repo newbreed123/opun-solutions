@@ -107,11 +107,111 @@ function matchingTerms(text: string, terms: string[]) {
   return terms.filter((term) => lower.includes(term)).slice(0, 8);
 }
 
+function commerceEvidenceVisible(diagnostics: LiveDiagnosticsResult) {
+  const fullPage = diagnostics.fullPageDomSignals;
+
+  return Boolean(
+    diagnostics.commerceFlowSignals.cartVisible ||
+      diagnostics.commerceFlowSignals.checkoutVisible ||
+      diagnostics.commerceFlowSignals.productCatalogVisible ||
+      diagnostics.storefrontSignals.productNavigationVisible ||
+      diagnostics.storefrontSignals.collectionLinksVisible ||
+      fullPage.categoryProductVisible ||
+      fullPage.productCardCount >= 2 ||
+      fullPage.productLinks.length >= 2,
+  );
+}
+
+function visiblePageText(diagnostics: LiveDiagnosticsResult) {
+  return [
+    diagnostics.title,
+    diagnostics.metaDescription,
+    diagnostics.desktopVisualMetrics?.visibleTextSample,
+    diagnostics.mobileVisualMetrics?.visibleTextSample,
+    diagnostics.fullPageDomSignals.ctaLabels.join(" "),
+    diagnostics.fullPageDomSignals.productLinks.join(" "),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isReservedExampleHost(host: string) {
+  return /^(example\.(com|org|net)|.+\.example)$/i.test(host);
+}
+
+export function getScanReliabilityIssue(
+  diagnostics: LiveDiagnosticsResult,
+  website?: string,
+): { reason: string; evidence: string[] } | null {
+  const scannedUrl = diagnostics.finalUrl || website || "";
+  const host = hostname(scannedUrl);
+  const fullPage = diagnostics.fullPageDomSignals;
+  const text = visiblePageText(diagnostics);
+  const hasCommerceEvidence = commerceEvidenceVisible(diagnostics);
+  const hasReadableDom =
+    fullPage.visibleLinkCount > 0 ||
+    fullPage.headingCount > 0 ||
+    fullPage.buttonCount > 0 ||
+    fullPage.formCount > 0 ||
+    text.length >= 80;
+
+  if (diagnostics.scanError) {
+    return {
+      reason:
+        "The scanner could not reliably reach or read the submitted URL, so ecommerce-specific conclusions require manual confirmation.",
+      evidence: [
+        `Scanner error: ${diagnostics.scanError}.`,
+        diagnostics.scanDiagnostics?.error?.message
+          ? `Root cause: ${diagnostics.scanDiagnostics.error.message}`
+          : "No reliable storefront DOM evidence was captured.",
+      ],
+    };
+  }
+
+  if (isReservedExampleHost(host) && !hasCommerceEvidence) {
+    return {
+      reason:
+        "The submitted URL is a reserved documentation/example domain, not a real public storefront.",
+      evidence: [
+        `Reserved example domain detected: ${host}.`,
+        "No product, catalog, cart, or checkout evidence was visible.",
+      ],
+    };
+  }
+
+  if (!hasReadableDom && !hasCommerceEvidence) {
+    return {
+      reason:
+        "The submitted URL did not expose enough readable public-page evidence to classify the business or storefront type.",
+      evidence: [
+        "DOM extraction returned little or no readable page structure.",
+        "No product, catalog, cart, or checkout evidence was visible.",
+      ],
+    };
+  }
+
+  return null;
+}
+
 export function classifySiteType(scanContext: {
   diagnostics: LiveDiagnosticsResult;
   website?: string;
 }): SiteClassification {
   const diagnostics = scanContext.diagnostics;
+  const reliabilityIssue = getScanReliabilityIssue(diagnostics, scanContext.website);
+
+  if (reliabilityIssue) {
+    return {
+      siteType: "Non-Ecommerce / Unclear",
+      confidenceScore: 18,
+      confidenceLabel: "Needs Review",
+      evidence: reliabilityIssue.evidence.slice(0, 8),
+      explanation: `${reliabilityIssue.reason} Evidence: ${reliabilityIssue.evidence.slice(0, 4).join("; ")}`,
+    };
+  }
+
   const text = [
     diagnostics.title,
     diagnostics.metaDescription,

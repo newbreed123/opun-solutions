@@ -35,6 +35,7 @@ type ZoraChatRequest = {
   currentTopic?: unknown;
   currentSubtopic?: unknown;
   recentTalkingPoints?: unknown;
+  auditContext?: unknown;
   sessionId?: unknown;
   sourcePath?: unknown;
 };
@@ -57,6 +58,32 @@ function stringArrayValue(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
     : undefined;
+}
+
+function auditContextValue(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const context = value as Record<string, unknown>;
+
+  return {
+    source: stringValue(context.source),
+    action: stringValue(context.action),
+    websiteUrl: stringValue(context.websiteUrl),
+    recommendationId: stringValue(context.recommendationId),
+    recommendationTitle: stringValue(context.recommendationTitle),
+    category: stringValue(context.category),
+    severity: stringValue(context.severity),
+    businessExplanation: stringValue(context.businessExplanation),
+    technicalExplanation: stringValue(context.technicalExplanation),
+    recommendedFix: stringValue(context.recommendedFix),
+    suggestedQuestion: stringValue(context.suggestedQuestion),
+    overallScore:
+      typeof context.overallScore === "number" ? context.overallScore : undefined,
+    overallStatus: stringValue(context.overallStatus),
+    primaryConcern: stringValue(context.primaryConcern),
+  };
 }
 
 function sanitizeAssistantReply(reply: string) {
@@ -111,7 +138,6 @@ function shouldUseConsultantGeneration(message: string, fallback: ZoraResponse) 
     fallback.navigationHref ||
     fallback.responseMode === "action_request" ||
     fallback.responseMode === "offer_catalog" ||
-    fallback.leadProfile.hasNoWebsite ||
     isDirectAuditCostQuestion(message) ||
     isCostBeforeBookingQuestion(message)
   ) {
@@ -131,6 +157,7 @@ async function buildGptReply(
   message: string,
   fallback: ZoraResponse,
   context: ReturnType<typeof buildZoraContext>,
+  auditContext: ReturnType<typeof auditContextValue>,
 ): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
 
@@ -234,6 +261,11 @@ async function buildGptReply(
             "- If User Has Website is FALSE, do not ask for a website URL, do not offer an audit or scanner path, and do not use audit/scanner language.",
             "- If User Has Website is FALSE, switch completely into pre-launch growth strategy: landing page architecture, core offer, lead capture, follow-up, tracking, and launch timeline.",
             "- If User Has Website is FALSE and the user says 'okay', 'nice', or 'sounds good', move toward the strategy call path instead of repeating the previous paragraph.",
+            "",
+            "[AUDIT REPORT CONTEXT]",
+            "- If auditReportContext is present, answer follow-up questions against that audit context.",
+            "- Do not claim a human reviewed the website. Say the context came from the audit report.",
+            "- Explain recommendations in plain business language first, then mention what Opzix would validate or scope next.",
           ].join("\n"),
         },
         {
@@ -253,6 +285,7 @@ async function buildGptReply(
             leadProfileChanges: fallback.profileChanges,
             fallbackReply: fallback.reply,
             contextEngine: context,
+            auditReportContext: auditContext,
           }),
         },
       ],
@@ -282,6 +315,7 @@ export async function POST(request: NextRequest) {
     const hasWebsite = typeof body.hasWebsite === "boolean" ? body.hasWebsite : undefined;
     const structuredMessages = Array.isArray(body.messages) ? body.messages : undefined;
     const structuredRecentTalkingPoints = stringArrayValue(body.recentTalkingPoints);
+    const auditContext = auditContextValue(body.auditContext);
 
     if (!message) {
       return NextResponse.json(
@@ -375,7 +409,7 @@ export async function POST(request: NextRequest) {
 
     const gptReply =
       !playbookReply && shouldUseConsultantGeneration(message, fallback)
-        ? await buildGptReply(message, fallback, contextEngine).catch((error) => {
+        ? await buildGptReply(message, fallback, contextEngine, auditContext).catch((error) => {
             console.warn("Zora GPT reply failed:", error);
             return null;
           })

@@ -100,6 +100,24 @@ type StoredTrafficIntent = Pick<
   "trafficIntentCategory" | "trafficIntentText" | "adContext"
 >;
 
+type ZoraAuditContextEventDetail = {
+  source?: "audit_report";
+  action?: "explain_audit" | "explain_recommendation";
+  scanId?: string;
+  websiteUrl?: string;
+  recommendationId?: string;
+  recommendationTitle?: string;
+  category?: string;
+  severity?: string;
+  businessExplanation?: string;
+  technicalExplanation?: string;
+  recommendedFix?: string;
+  suggestedQuestion?: string;
+  overallScore?: number;
+  overallStatus?: string;
+  primaryConcern?: string;
+};
+
 const businessTypeChoices: Array<{ label: string; value: ZoraBusinessType }> = [
   { label: "Ecommerce", value: "Ecommerce" },
   { label: "Service Business", value: "Service Business" },
@@ -127,6 +145,64 @@ function createSessionId() {
   }
 
   return createId("zora-session");
+}
+
+function auditContextUserPrompt(detail: ZoraAuditContextEventDetail) {
+  if (detail.suggestedQuestion) {
+    return detail.suggestedQuestion;
+  }
+
+  if (detail.action === "explain_recommendation" && detail.recommendationTitle) {
+    return `Explain ${detail.recommendationTitle}.`;
+  }
+
+  return "Explain this audit.";
+}
+
+function auditContextAssistantReply(detail: ZoraAuditContextEventDetail) {
+  const target =
+    detail.recommendationTitle ||
+    detail.primaryConcern ||
+    "this audit";
+  const scoreLine =
+    typeof detail.overallScore === "number"
+      ? `The report scored ${detail.overallScore}/100${detail.overallStatus ? ` and is marked ${detail.overallStatus}` : ""}.`
+      : detail.overallStatus
+        ? `The report is marked ${detail.overallStatus}.`
+        : "";
+
+  if (detail.action === "explain_recommendation") {
+    return [
+      `I can help explain "${target}" from the audit${detail.websiteUrl ? ` for ${detail.websiteUrl}` : ""}.`,
+      detail.businessExplanation
+        ? `Why it matters: ${detail.businessExplanation}`
+        : "",
+      detail.technicalExplanation
+        ? `What the scan noticed: ${detail.technicalExplanation}`
+        : "",
+      detail.recommendedFix
+        ? `What Opzix would validate first: ${detail.recommendedFix}`
+        : "",
+      "Want me to break down why this matters, what to fix first, or what should be discussed on a strategy call?",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return [
+    `I can walk you through the audit${detail.websiteUrl ? ` for ${detail.websiteUrl}` : ""}.`,
+    scoreLine,
+    detail.primaryConcern ? `The main concern is: ${detail.primaryConcern}.` : "",
+    detail.businessExplanation
+      ? `Business interpretation: ${detail.businessExplanation}`
+      : "",
+    detail.recommendedFix
+      ? `The next thing Opzix would validate is: ${detail.recommendedFix}`
+      : "",
+    "Ask me about the score, the recommendation order, the likely cost range, or what belongs in a strategy call.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function introTextForProfile(profile?: ZoraLeadProfile) {
@@ -846,6 +922,7 @@ function matchGuidedText(step: GuidedStep, text: string) {
 export default function OpzixAIAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [inputFocused, setInputFocused] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [flowStep, setFlowStep] = useState<GuidedStep | null>("businessType");
   const [leadProfile, setLeadProfile] = useState<ZoraLeadProfile>({});
@@ -863,6 +940,8 @@ export default function OpzixAIAssistant() {
     },
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const auditContextRef = useRef<ZoraAuditContextEventDetail | null>(null);
   const sessionIdRef = useRef<string>("");
 
   useEffect(() => {
@@ -1100,7 +1179,7 @@ export default function OpzixAIAssistant() {
       {
         id: createId("assistant"),
         role: "assistant",
-        text: "There is no live site to scan yet. The right next step is a strategy call to map the launch blueprint.",
+        text: "There is no live site to review yet, so the review tool is not the right next step. The useful move is to map the pre-launch blueprint: offer, first landing page, lead capture, follow-up, tracking, and launch timeline.",
         actions: [
           bookingAction("Book Strategy Call", "primary"),
           {
@@ -1645,6 +1724,7 @@ export default function OpzixAIAssistant() {
           currentTopic: leadProfile.currentTopic,
           currentSubtopic: leadProfile.currentSubtopic,
           recentTalkingPoints: leadProfile.recentTalkingPoints,
+          auditContext: auditContextRef.current,
           sessionId: zoraSessionId(),
           sourcePath: currentSourcePath(),
         }),
@@ -1761,6 +1841,71 @@ export default function OpzixAIAssistant() {
   }, []);
 
   useEffect(() => {
+    function handleZoraContext(event: Event) {
+      if (!(event instanceof CustomEvent)) {
+        return;
+      }
+
+      const detail = event.detail as ZoraAuditContextEventDetail | undefined;
+
+      if (!detail || detail.source !== "audit_report") {
+        return;
+      }
+
+      auditContextRef.current = detail;
+      setOpen(true);
+      setFlowStep(null);
+      setInput("");
+
+      try {
+        window.localStorage.setItem(CHATBOT_STATE_KEY, "open");
+      } catch {
+        // Local storage can be unavailable in private browsing modes.
+      }
+
+      setLeadProfile((current) =>
+        normalizeProfile({
+          ...current,
+          websiteUrl: current.websiteUrl || detail.websiteUrl,
+          hasWebsiteOrLandingPage:
+            current.hasWebsiteOrLandingPage || Boolean(detail.websiteUrl),
+          desiredOutcome:
+            current.desiredOutcome || "Understand the audit recommendations",
+        }),
+      );
+
+      setMessages((current) => [
+        ...current.map((message) =>
+          message.id === "zora-intro"
+            ? { ...message, actions: undefined }
+            : message,
+        ),
+        {
+          id: createId("user"),
+          role: "user",
+          text: auditContextUserPrompt(detail),
+        },
+        {
+          id: createId("assistant"),
+          role: "assistant",
+          text: auditContextAssistantReply(detail),
+          actions: [bookingAction("Book Strategy Call", "primary")],
+        },
+      ]);
+
+      window.setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 80);
+    }
+
+    window.addEventListener("opzix:zora-context", handleZoraContext);
+
+    return () => {
+      window.removeEventListener("opzix:zora-context", handleZoraContext);
+    };
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
   }, [messages, isThinking]);
 
@@ -1859,9 +2004,12 @@ export default function OpzixAIAssistant() {
 
           <form onSubmit={submitFreeText} className="opzix-ai-form mt-3 flex shrink-0 gap-2 border-t border-dark-border pt-3">
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               placeholder="Ask Zora what to fix next..."
               className="min-h-11 min-w-0 flex-1 rounded-xl border border-brand-cyan/25 bg-white/[0.055] px-3 text-sm text-primary outline-none placeholder:text-muted focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
             />
@@ -1878,7 +2026,7 @@ export default function OpzixAIAssistant() {
         </div>
       )}
 
-      {!open && (
+      {!open && !inputFocused && (
         <button
           type="button"
           className="opzix-ai-button"

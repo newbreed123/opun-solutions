@@ -160,6 +160,16 @@ export function resolveVisualUxArchetype(scanContext: {
 
   if (
     !hasCommercePath &&
+    (/non-ecommerce|unclear/.test(siteType) ||
+      /not an ecommerce storefront|ecommerce probability unclear|platform not confidently identified/i.test(
+        scanContext.platformName || "",
+      ))
+  ) {
+    return "Unknown";
+  }
+
+  if (
+    !hasCommercePath &&
     /lead generation|service business|consultation|appointment|real estate|quote request|contact|book|schedule|portfolio|services|wedding|event|music|lesson/.test(
       siteType + haystack,
     )

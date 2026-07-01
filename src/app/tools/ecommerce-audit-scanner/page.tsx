@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Button from "@/components/Button";
-import PostScanAssistant from "@/components/PostScanAssistant";
 import Section from "@/components/Section";
 import { trackEvent } from "@/lib/analytics";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
@@ -19,6 +18,7 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  MessageCircle,
   Monitor,
   MousePointerClick,
   Search,
@@ -414,6 +414,24 @@ type ScannerResponse =
       success: false;
       error: string;
     };
+
+type ZoraAuditContextEventDetail = {
+  source: "audit_report";
+  action: "explain_audit" | "explain_recommendation";
+  scanId?: string;
+  websiteUrl: string;
+  recommendationId?: string;
+  recommendationTitle?: string;
+  category?: string;
+  severity?: string;
+  businessExplanation?: string;
+  technicalExplanation?: string;
+  recommendedFix?: string;
+  suggestedQuestion: string;
+  overallScore?: number;
+  overallStatus?: string;
+  primaryConcern?: string;
+};
 
 const scoreCards = [
   {
@@ -825,6 +843,59 @@ function auditAttribution(audit: AuditResult) {
   };
 }
 
+function auditSummaryZoraContext(audit: AuditResult): ZoraAuditContextEventDetail {
+  const concern = primaryOperationalConcern(audit);
+
+  return {
+    source: "audit_report",
+    action: "explain_audit",
+    scanId: audit.scanId,
+    websiteUrl: audit.website,
+    category:
+      audit.storefrontReviewContext?.siteType ||
+      audit.siteType ||
+      audit.diagnostics.platformDetection.name,
+    severity: concern?.severity || audit.overallStatus,
+    businessExplanation:
+      audit.executiveSummary.businessInterpretation ||
+      audit.summary ||
+      audit.overallExplanation,
+    technicalExplanation: audit.overallExplanation,
+    recommendedFix:
+      concern?.recommendedFirstAction ||
+      audit.recommendationRoadmap?.primaryRecommendation ||
+      audit.recommendedNextSteps[0]?.action,
+    suggestedQuestion: "Explain this audit.",
+    overallScore: audit.overallScore,
+    overallStatus: audit.overallStatus,
+    primaryConcern: primaryOperationalConcernTitle(audit),
+  };
+}
+
+function recommendationZoraContext(
+  audit: AuditResult,
+  step: RecommendationRoadmapStep,
+  index: number,
+): ZoraAuditContextEventDetail {
+  return {
+    source: "audit_report",
+    action: "explain_recommendation",
+    scanId: audit.scanId,
+    websiteUrl: audit.website,
+    recommendationId: `roadmap-step-${step.stepNumber}`,
+    recommendationTitle: step.title,
+    category: step.riskArea || actionPlanLabel(index),
+    severity: step.confidence || audit.overallStatus,
+    businessExplanation: step.rationale || step.expectedImpact,
+    technicalExplanation: step.sourceFinding || step.roiRationale,
+    recommendedFix: step.validationTarget,
+    suggestedQuestion: `Explain ${step.title}.`,
+    overallScore: audit.overallScore,
+    overallStatus: audit.overallStatus,
+    primaryConcern: primaryOperationalConcernTitle(audit),
+  };
+}
+
 function primaryOperationalSupportingFindings(concern: OperationalConcernView) {
   if (concern && "supportingFindings" in concern) {
     return concern.supportingFindings;
@@ -876,6 +947,24 @@ export default function EcommerceAuditScannerPage() {
 
   function scrollToResults(behavior: ScrollBehavior = "smooth") {
     resultsRef.current?.scrollIntoView({ behavior, block: "start" });
+  }
+
+  function openZoraWithAuditContext(detail: ZoraAuditContextEventDetail) {
+    if (!audit) return;
+
+    trackEvent("audit_assistant_prompt_clicked", {
+      ...auditAttribution(audit),
+      sourceArea: "report",
+      action: detail.action,
+      recommendationId: detail.recommendationId,
+      recommendationTitle: detail.recommendationTitle,
+    });
+
+    window.dispatchEvent(
+      new CustomEvent<ZoraAuditContextEventDetail>("opzix:zora-context", {
+        detail,
+      }),
+    );
   }
 
   useEffect(() => {
@@ -1508,6 +1597,38 @@ export default function EcommerceAuditScannerPage() {
                 </div>
               </div>
 
+              <div className="print-hidden rounded-[1.5rem] border border-brand-cyan/35 bg-gradient-to-br from-brand-cyan/14 via-dark-card to-brand-blue/10 p-5 shadow-[0_24px_70px_rgba(6,182,212,0.14)] md:p-6">
+                <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                  <div className="flex min-w-0 gap-4">
+                    <div className="flex h-12 w-12 flex-none items-center justify-center rounded-2xl border border-brand-cyan/40 bg-brand-cyan/14 text-brand-cyan">
+                      <MessageCircle className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-cyan">
+                        Ask Zora
+                      </p>
+                      <h3 className="mt-2 text-2xl font-bold leading-tight text-primary">
+                        Need help understanding this audit?
+                      </h3>
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
+                        Zora can explain every recommendation, why it matters, what
+                        Opzix would validate, and what should happen next.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openZoraWithAuditContext(auditSummaryZoraContext(audit))
+                    }
+                    className="inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-xl border border-brand-cyan/55 bg-gradient-to-r from-brand-blue to-brand-cyan px-5 py-3 text-sm font-bold text-white shadow-[0_16px_42px_rgba(6,182,212,0.25)] transition-all hover:-translate-y-0.5 hover:shadow-[0_22px_54px_rgba(6,182,212,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-dark-deep md:w-auto"
+                  >
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Ask Zora About This Audit
+                  </button>
+                </div>
+              </div>
+
               <div className="card-elevated p-6 md:p-8">
                 <div className="grid gap-7 lg:grid-cols-[1.15fr_0.85fr]">
                   <div>
@@ -1668,6 +1789,23 @@ export default function EcommerceAuditScannerPage() {
                                   })}
                                 </p>
                               </div>
+                              <div className="print-hidden rounded-xl border border-white/10 bg-white/[0.04] p-3.5">
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                                  Need help understanding this?
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openZoraWithAuditContext(
+                                      recommendationZoraContext(audit, step, index),
+                                    )
+                                  }
+                                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-brand-cyan/40 bg-brand-cyan/12 px-3 py-2 text-sm font-bold text-primary transition-all hover:-translate-y-0.5 hover:border-brand-cyan hover:bg-brand-cyan/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/50"
+                                >
+                                  <MessageCircle className="mr-2 h-4 w-4" />
+                                  Ask Zora
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1788,10 +1926,6 @@ export default function EcommerceAuditScannerPage() {
                   <strong>Book the follow-up:</strong> review this audit with
                   Opzix at {strategyCallDisplay}
                 </p>
-              </div>
-
-              <div className="print-hidden">
-                <PostScanAssistant audit={audit} />
               </div>
 
               <div className="card-elevated p-6 md:p-8">

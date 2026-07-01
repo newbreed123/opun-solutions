@@ -66,12 +66,23 @@ const explicitActionPhrases = [
 const actionWords = {
   start_audit: ["run", "start", "scan", "audit", "review", "check", "analyze", "analyse"],
   book_strategy_call: ["book", "schedule", "call", "talk", "meet", "consult", "strategy"],
-  download_pdf: ["download", "export", "save", "get"],
+  download_pdf: ["download", "export", "save", "get", "generate", "create"],
   open_report: ["open", "view", "show", "see"],
 };
 
 const assetWords = {
-  start_audit: ["audit", "scan", "scanner", "website", "site", "store", "url", "report"],
+  start_audit: [
+    "audit",
+    "scan",
+    "scanner",
+    "website",
+    "site",
+    "store",
+    "url",
+    "report",
+    "review",
+    "tool",
+  ],
   book_strategy_call: ["call", "strategy", "consultation", "meeting", "appointment"],
   download_pdf: ["pdf", "report", "roadmap", "audit"],
   open_report: ["report", "roadmap", "audit results", "scan results"],

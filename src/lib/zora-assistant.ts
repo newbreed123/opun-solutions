@@ -953,7 +953,7 @@ function scannerBlockedReason(message: string) {
 }
 
 function isTrustSkepticismMessage(message: string) {
-  return /\b(copy and paste|copy-paste|copy paste|generic|template|script|canned|boilerplate|not tailored|tailored to my website|tailored to my site|actual website|my website or|just.*reply|same reply)\b/i.test(
+  return /\b(copy and paste|copy-paste|copy paste|generic|template|script|canned|boilerplate|not tailored|tailored to my website|tailored to my site|actual website|my website or|just.*reply|same reply|do you understand my question|did you understand my question|are you understanding my question|answer my question)\b/i.test(
     message,
   );
 }
@@ -1124,7 +1124,7 @@ function hasNoWebsiteAnswer(message: string) {
 }
 
 function hasWebsiteOrLandingPageAnswer(message: string) {
-  return /\b(yes i do|i have (?:a )?(?:website|site|landing page)|we have (?:a )?(?:website|site|landing page)|have (?:a )?(?:website|site|landing page)|already have (?:a )?(?:website|site|landing page))\b/i.test(
+  return /\b(yes i do|i have (?:a )?(?:website|site|landing page|url|link)|we have (?:a )?(?:website|site|landing page|url|link)|have (?:a )?(?:website|site|landing page|url|link)|already have (?:a )?(?:website|site|landing page|url|link))\b/i.test(
     message,
   );
 }
@@ -3759,6 +3759,10 @@ function buildActionIntentResponse(
     actionIntent.actionType === "start_audit" ||
     actionIntent.actionType === "diagnose_growth_system"
   ) {
+    if (profile.hasNoWebsite) {
+      return "There is no live site to review yet, so the review tool is not the right next step. The useful move is to map the pre-launch blueprint: offer, first landing page, lead capture, follow-up, tracking, and launch timeline.";
+    }
+
     if (profile.websiteUrl) {
       return "Absolutely - I'll send you to the free audit with that URL prefilled.";
     }
@@ -3919,7 +3923,7 @@ function buildAcknowledgementResponse(profile: ZoraLeadProfile) {
   }
 
   if (profile.hasNoWebsite) {
-    return "Exactly. Since there is no live site yet, the focus shifts to pre-launch growth strategy: landing page architecture, the core offer, lead capture, follow-up, and tracking from day one. The best next step is a strategy call to map the launch timeline.";
+    return "Exactly. Since there is no live site yet, the focus shifts to pre-launch growth strategy: landing page architecture, the core offer, lead capture, follow-up, and tracking from day one. The best next step is a strategy call to map the launch timeline. To scope it here first: are you thinking of a simple landing page, a fuller service website, or a site connected to booking, CRM, or automation?";
   }
 
   if (profile.websiteUrl) {
@@ -3953,6 +3957,14 @@ function buildPostRecommendationAcknowledgementResponse(
 function buildTimelineResponse(profile: ZoraLeadProfile, message: string) {
   if (profile.recommendationRoadmap?.length && isRoadmapSpecificFollowUp(message)) {
     return buildRoadmapFollowUpResponse(message, profile.recommendationRoadmap);
+  }
+
+  if (profile.hasNoWebsite) {
+    return [
+      `${greetingPrefix(profile)}For a new service-business website, a focused first version can often be planned and built in about 2-4 weeks once the offer, pages, copy, assets, lead capture, and tracking decisions are clear.`,
+      "A fuller service website with multiple pages, stronger proof, booking or intake flow, CRM/email follow-up, analytics events, and launch QA can move closer to 4-8+ weeks depending on content readiness and integrations.",
+      "The strategy call matters because it separates a simple launch page from a broader connected system, so the timeline and cost are tied to the version you actually need.",
+    ].join("\n\n");
   }
 
   if (isEcommerceBuildQuestion(message)) {
@@ -4051,7 +4063,7 @@ function buildWebsiteCapturedWithMemoryResponse(profile: ZoraLeadProfile) {
   const inferredContext = inferredContextSummary(profile);
 
   if (profile.businessType && profile.challenge) {
-    return `Got it, I have ${profile.websiteUrl}.${inferredContext || ` Using the business type you selected, the issue is ${profile.challenge.toLowerCase()}, so the next useful step is to look at the actual site path before guessing further.`}`;
+    return `Got it, I have ${profile.websiteUrl}.${inferredContext || ` You selected ${profile.challenge.toLowerCase()} as the concern, but I have not scanned the page yet, so I should not treat that as a confirmed issue. The next useful step is to run the free audit or review the actual site path before guessing further.`}`;
   }
 
   if (profile.businessType) {
@@ -5145,6 +5157,10 @@ function followUpQuestion(profile: ZoraLeadProfile) {
     return "Quick question: do you already have a website URL I should use as context?";
   }
 
+  if (profile.hasNoWebsite) {
+    return "Quick question: are you trying to launch a simple landing page, a fuller service website, or a site connected to booking, CRM, or automation?";
+  }
+
   return "Quick question: do you want a high-level recommendation here, or do you want to run the scanner for a more detailed roadmap?";
 }
 
@@ -5724,7 +5740,11 @@ function actionsForIntent(
     return ["free_audit", "strategy_call"] as ZoraResponse["recommendedActions"];
   }
   if (intent === "focus_request") return [] as ZoraResponse["recommendedActions"];
-  if (intent === "diagnosis" && hasDiagnosis) return [] as ZoraResponse["recommendedActions"];
+  if (intent === "diagnosis" && hasDiagnosis) {
+    return profile.websiteUrl
+      ? (["free_audit", "strategy_call", "ask_question"] as ZoraResponse["recommendedActions"])
+      : ([] as ZoraResponse["recommendedActions"]);
+  }
   if (intent === "out_of_scope") return [] as ZoraResponse["recommendedActions"];
   return ["diagnose"] as ZoraResponse["recommendedActions"];
 }
@@ -6290,6 +6310,10 @@ export function buildZoraResponse(
                       ? buildRecommendationResponse(leadProfile)
                     : effectiveIntent === "consultant"
                       ? buildConsultantResponse(leadProfile, message)
+                    : analysis.hasWebsiteOrLandingPage && !analysis.websiteUrl
+                      ? "Great - what is the URL, or would you rather talk through the strategy first?"
+                    : analysis.websiteUrl
+                      ? buildWebsiteCapturedWithMemoryResponse(leadProfile)
                     : shouldContinueTopic && activeTopic
                       ? buildTopicResponse(leadProfile, activeTopic)
                     : shouldContinueMomentum
@@ -6326,8 +6350,6 @@ export function buildZoraResponse(
                             ? buildMobileProductPageAffirmationResponse()
                           : hasDiagnosis
                             ? `${buildZoraDiagnosis(effectiveDiagnosisProfile)} ${followUpQuestion(effectiveDiagnosisProfile)}`
-                            : analysis.websiteUrl
-                              ? buildWebsiteCapturedWithMemoryResponse(leadProfile)
                               : isStandaloneAudienceContext(message)
                                 ? "Are you referring to a dashboard, workflow, CRM, support process, or internal operations system for staff?"
                               : buildClarifyingResponse(leadProfile));

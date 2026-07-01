@@ -16,7 +16,11 @@ import {
   runLightweightEcommerceDiagnostics,
   type LiveDiagnosticsResult,
 } from "@/lib/ecommerce-audit-scanner";
-import { classifySiteType, type SiteClassification } from "@/lib/site-classifier";
+import {
+  classifySiteType,
+  getScanReliabilityIssue,
+  type SiteClassification,
+} from "@/lib/site-classifier";
 import {
   createAuditScanId,
   listAuditScans,
@@ -563,6 +567,17 @@ function classifyStorefrontReviewContext({
   website: string;
   diagnostics: LiveDiagnosticsResult;
 }): StorefrontReviewContext {
+  const reliabilityIssue = getScanReliabilityIssue(diagnostics, website);
+
+  if (reliabilityIssue) {
+    return {
+      siteType: "non-ecommerce-or-unclear",
+      confidence: "Needs Review",
+      reason: reliabilityIssue.reason,
+      supportingSignals: reliabilityIssue.evidence.slice(0, 5),
+    };
+  }
+
   const commerce = diagnostics.commerceFlowSignals;
   const storefront = diagnostics.storefrontSignals;
   const domain = safeHost(diagnostics.finalUrl || website);
@@ -5808,6 +5823,10 @@ function benchmarkGroupForScan({
     .join(" ")
     .toLowerCase();
 
+  if (reviewContext.siteType === "non-ecommerce-or-unclear") {
+    return "General Web Conversion";
+  }
+
   if (
     isNonStorefrontClassification(siteClassification.siteType) ||
     reviewContext.siteType === "lead-generation"
@@ -5899,7 +5918,11 @@ function detectSubmittedPageType({
   const isRootPath = path === "/" || path === "" || path === "/home";
   const isCartOrCheckoutPath = /\/(cart|checkout|basket|bag)(\/|$)/i.test(path);
 
-  if (isRootPath) {
+  if (isNonStorefrontClassification(siteClassification.siteType)) {
+    submittedPageType = "Unknown";
+    confidence = 42;
+    evidence.push("The site classification is unclear or non-ecommerce, so page type needs manual confirmation.");
+  } else if (isRootPath) {
     submittedPageType = "Homepage";
     confidence = 80;
     evidence.push("Submitted URL resolves to the root/home path.");
@@ -6680,16 +6703,18 @@ function buildIdentitySummary({
           ? "a lead-capture or service-focused storefront"
           : businessScale === "growth"
             ? "a growth-stage commerce storefront"
-            : "a brand-focused commerce storefront";
+            : "an unclear public entry point";
 
   const maturityPhrase =
     commerceMaturity === "advanced"
       ? "It shows a more mature purchase and measurement footprint."
       : commerceMaturity === "moderate"
         ? "It appears to have a moderate visible commerce path."
-        : "It is still in an early or lightly signaled commerce phase.";
+        : commerceMaturity === "early"
+          ? "It is still in an early or lightly signaled commerce phase."
+          : "A commerce path was not visible enough to score confidently.";
 
-  return `The storefront reads like ${scalePhrase}; ${maturityPhrase}`;
+  return `The submitted page reads like ${scalePhrase}; ${maturityPhrase}`;
 }
 
 function buildIdentityOpening({
@@ -6719,7 +6744,7 @@ function buildIdentityOpening({
     return "This looks like a lead-capture or service commerce storefront, so form paths, support cues, and purchase intent signals should be confirmed.";
   }
 
-  return "This storefront should be reviewed in the context of its visible commerce and trust signals.";
+  return "This submitted URL should be manually confirmed before treating it as a storefront or commerce entry point.";
 }
 
 function buildIdentityFraming({
@@ -6747,7 +6772,7 @@ function buildIdentityFraming({
     return "Treat the findings as part of a lead-capture or service path where contact and support signals are central.";
   }
 
-  return "Treat the findings as connected signals that should be validated in a manual storefront walkthrough.";
+  return "Treat the findings as a URL-purpose check before making storefront, platform, cart, checkout, or catalog assumptions.";
 }
 
 function buildStorefrontIdentityProfile({
@@ -6812,7 +6837,9 @@ function buildStorefrontIdentityProfile({
       ? "advanced"
       : commerce.cartVisible || commerce.checkoutVisible || commercePathVisible
         ? "moderate"
-        : "early";
+        : productEvidenceVisible || standardPlatformVisible
+          ? "early"
+          : "unknown";
 
   let operationalPattern: StorefrontIdentityProfile["operationalPattern"] = "unknown";
   if (hostIsEnterprise && commercePathVisible) {
