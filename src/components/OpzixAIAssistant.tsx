@@ -515,7 +515,7 @@ function actionsFromRecommendation(
     action === "strategy_call"
       ? [bookingAction("Book Strategy Call", "primary")]
       : action === "free_audit"
-        ? profile?.hasNoWebsite || profile?.scannerBlocked
+        ? profile?.hasNoWebsite || profile?.scannerBlocked || profile?.auditReportAvailable
           ? []
           : [scannerAction("Run Free Audit", "primary", profile)]
         : action === "diagnose"
@@ -718,6 +718,10 @@ function phase1CtaActions(profile: ZoraLeadProfile): ZoraAction[] {
   };
 
   if (profile.hasNoWebsite) {
+    return [bookingAction("Book Strategy Call", "primary"), ask];
+  }
+
+  if (profile.auditReportAvailable) {
     return [bookingAction("Book Strategy Call", "primary"), ask];
   }
 
@@ -1867,6 +1871,18 @@ export default function OpzixAIAssistant() {
         normalizeProfile({
           ...current,
           websiteUrl: current.websiteUrl || detail.websiteUrl,
+          auditReportAvailable: true,
+          auditScanId: detail.scanId || current.auditScanId,
+          auditWebsiteUrl: detail.websiteUrl || current.auditWebsiteUrl,
+          auditRecommendationTitle:
+            detail.recommendationTitle || current.auditRecommendationTitle,
+          auditRecommendedFix: detail.recommendedFix || current.auditRecommendedFix,
+          auditPrimaryConcern: detail.primaryConcern || current.auditPrimaryConcern,
+          auditOverallScore:
+            typeof detail.overallScore === "number"
+              ? detail.overallScore
+              : current.auditOverallScore,
+          auditOverallStatus: detail.overallStatus || current.auditOverallStatus,
           hasWebsiteOrLandingPage:
             current.hasWebsiteOrLandingPage || Boolean(detail.websiteUrl),
           desiredOutcome:

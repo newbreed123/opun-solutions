@@ -70,6 +70,7 @@ function auditContextValue(value: unknown) {
   return {
     source: stringValue(context.source),
     action: stringValue(context.action),
+    scanId: stringValue(context.scanId),
     websiteUrl: stringValue(context.websiteUrl),
     recommendationId: stringValue(context.recommendationId),
     recommendationTitle: stringValue(context.recommendationTitle),
@@ -264,6 +265,7 @@ async function buildGptReply(
             "",
             "[AUDIT REPORT CONTEXT]",
             "- If auditReportContext is present, answer follow-up questions against that audit context.",
+            "- If auditReportContext is present, the scanner has already been run. Do not offer Run Free Audit, do not suggest running the scanner again, and do not ask whether the user wants a more detailed scanner roadmap.",
             "- Do not claim a human reviewed the website. Say the context came from the audit report.",
             "- Explain recommendations in plain business language first, then mention what Opzix would validate or scope next.",
           ].join("\n"),
@@ -328,6 +330,18 @@ export async function POST(request: NextRequest) {
 
     const incomingLeadProfile: ZoraLeadProfile = {
       ...(body.leadProfile || {}),
+      ...(auditContext
+        ? {
+            auditReportAvailable: true,
+            auditScanId: auditContext.scanId,
+            auditWebsiteUrl: auditContext.websiteUrl,
+            auditRecommendationTitle: auditContext.recommendationTitle,
+            auditRecommendedFix: auditContext.recommendedFix,
+            auditPrimaryConcern: auditContext.primaryConcern,
+            auditOverallScore: auditContext.overallScore,
+            auditOverallStatus: auditContext.overallStatus,
+          }
+        : {}),
       ...(stringValue(body.websiteUrl) ? { websiteUrl: stringValue(body.websiteUrl) } : {}),
       ...(stringValue(body.businessType) ? { businessType: stringValue(body.businessType) as ZoraLeadProfile["businessType"] } : {}),
       ...(stringValue(body.challenge) ? { challenge: stringValue(body.challenge) as ZoraLeadProfile["challenge"] } : {}),
@@ -391,7 +405,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const playbook = fallback.leadProfile.hasNoWebsite ||
+    const playbook = auditContext ||
+      fallback.leadProfile.hasNoWebsite ||
       fallback.leadProfile.scannerBlocked ||
       fallback.action ||
       fallback.navigationHref ||
@@ -423,8 +438,11 @@ export async function POST(request: NextRequest) {
       ? sanitizeNoWebsiteReply(rawFinalReply)
       : rawFinalReply;
     const learningIntent = normalizeZoraLearningIntent(message, fallback.responseMode);
-    const finalRecommendedActions =
+    const rawRecommendedActions =
       actionsForZoraPlaybook(playbook) || fallback.recommendedActions;
+    const finalRecommendedActions = auditContext
+      ? rawRecommendedActions.filter((action) => action !== "free_audit")
+      : rawRecommendedActions;
 
     void logZoraConversation(fallback.leadProfile, message, finalReply, {
       sessionId,

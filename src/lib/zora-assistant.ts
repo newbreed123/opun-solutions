@@ -278,6 +278,14 @@ export type ZoraLeadProfile = {
   annualRevenueText?: string;
   challenge?: ZoraChallenge;
   websiteUrl?: string;
+  auditReportAvailable?: boolean;
+  auditScanId?: string;
+  auditWebsiteUrl?: string;
+  auditRecommendationTitle?: string;
+  auditRecommendedFix?: string;
+  auditPrimaryConcern?: string;
+  auditOverallScore?: number;
+  auditOverallStatus?: string;
   inferredIndustry?: string | null;
   inferredBusinessModel?: string | null;
   inferredFunnelType?: string | null;
@@ -3051,12 +3059,12 @@ function focusAreas(profile: ZoraLeadProfile) {
 
   if (profile.industryProfile?.industry === "nonprofit_faith_community") {
     return [
-      "campus discovery",
-      "service time clarity",
-      "connection forms",
-      "small group path",
+      "mission and program clarity",
+      "donation or support path",
       "volunteer routing",
-      "localized follow-up",
+      "impact proof",
+      "contact or referral follow-up",
+      "tracking",
     ];
   }
 
@@ -3221,7 +3229,7 @@ export function buildZoraDiagnosis(profile: ZoraLeadProfile) {
   }
 
   if (industry === "nonprofit_faith_community") {
-    return `Because this looks like a faith-based or community organization${contextText}, I would focus on ${areas}. The critical path is online experience -> local campus discovery -> connection form -> small group, serving, or care follow-up.`;
+    return `Because this looks like a nonprofit or community organization${contextText}, I would focus on ${areas}. The critical path is online interest -> clear mission or program path -> donation, volunteer, referral, wish/support, or contact action -> timely follow-up.`;
   }
 
   if (industry === "ecommerce_dtc") {
@@ -3445,24 +3453,24 @@ function buildRecommendationRoadmap(profile: ZoraLeadProfile): ZoraRoadmapStep[]
   if (profile.industryProfile?.industry === "nonprofit_faith_community") {
     return [
       {
-        title: "Community Path Review",
+        title: "Mission and Action Path Review",
         reason:
-          "Faith-based and community visitors need a simple path from online experience to local connection.",
+          "Nonprofit visitors need a simple path from mission interest to a concrete next action.",
         validation:
-          "Review service times, campus discovery, sermon pathways, connection forms, small group entry points, volunteer routing, and localized follow-up.",
+          "Review mission clarity, program pages, donation or support CTAs, volunteer routing, referral or contact forms, and follow-up ownership.",
         expectedImpact:
-          "Help online visitors become active local participants with less confusion.",
+          "Help visitors become donors, volunteers, referrals, supporters, or contacts with less confusion.",
         costRange: "Scope after review",
         timeline: "1-2 weeks",
       },
       {
-        title: "Localized Follow-Up Routing",
+        title: "Supporter Follow-Up Routing",
         reason:
-          "Connection forms and volunteer interest lose momentum when they do not reach the right campus or ministry team quickly.",
+          "Donation, volunteer, referral, or contact interest loses momentum when it does not reach the right owner quickly.",
         validation:
-          "Check form destinations, campus assignment, automated email or text follow-up, volunteer application routing, and response ownership.",
+          "Check form destinations, assignment rules, automated email or text follow-up, volunteer application routing, and response ownership.",
         expectedImpact:
-          "Improve continuity from online interest to local community engagement.",
+          "Improve continuity from online interest to real supporter, volunteer, or program engagement.",
         costRange: "Scope after review",
         timeline: "1-3 weeks",
       },
@@ -5161,6 +5169,10 @@ function followUpQuestion(profile: ZoraLeadProfile) {
     return "Quick question: are you trying to launch a simple landing page, a fuller service website, or a site connected to booking, CRM, or automation?";
   }
 
+  if (hasCompletedAuditContext(profile)) {
+    return "Quick question: do you want me to prioritize the first audit fix, explain one recommendation, or outline what should be discussed on a strategy call?";
+  }
+
   return "Quick question: do you want a high-level recommendation here, or do you want to run the scanner for a more detailed roadmap?";
 }
 
@@ -5209,7 +5221,27 @@ function hasSufficientQualification(profile: ZoraLeadProfile) {
   return Boolean(profile.websiteUrl || qualificationCount(profile) >= 2);
 }
 
+function hasCompletedAuditContext(profile: ZoraLeadProfile) {
+  return Boolean(
+    profile.auditReportAvailable ||
+      profile.auditScanId ||
+      profile.auditRecommendationTitle ||
+      profile.auditPrimaryConcern ||
+      profile.recommendationRoadmap?.length,
+  );
+}
+
 function buildNextStepResponse(profile: ZoraLeadProfile) {
+  if (hasCompletedAuditContext(profile)) {
+    const firstFix =
+      profile.auditRecommendationTitle ||
+      profile.auditPrimaryConcern ||
+      profile.recommendationRoadmap?.[0]?.title ||
+      "the highest-impact audit recommendation";
+
+    return `Since the audit is already generated, I would not run the scanner again. I would start with ${firstFix}, then validate whether that fix improves the visitor path, tracking clarity, or follow-up handoff. The useful next step is to review that priority on a strategy call or ask me to break down the first fix.`;
+  }
+
   if (profile.scannerBlocked) {
     return "Since automated scanning is blocked for this domain, the clean next step is a manual strategy review focused on the real customer paths: navigation, availability, account flow, checkout, and tracking visibility.";
   }
@@ -5674,6 +5706,16 @@ function actionsForIntent(
   }
 
   if (profile.scannerBlocked && intent !== "out_of_scope") {
+    return ["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"];
+  }
+
+  if (hasCompletedAuditContext(profile) && intent !== "out_of_scope") {
+    if (intent === "audit_request" || intent === "scanner_execute") {
+      return ["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"];
+    }
+
+    if (intent === "booking_request") return ["strategy_call"] as ZoraResponse["recommendedActions"];
+    if (intent === "review_request" || intent === "focus_request") return [] as ZoraResponse["recommendedActions"];
     return ["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"];
   }
 
@@ -6471,6 +6513,7 @@ export function buildZoraResponse(
     effectiveIntent === "action_request"
       ? actionObjectForIntent(leadProfile, analysis.actionIntent)
       : !leadProfile.scannerBlocked &&
+          !hasCompletedAuditContext(leadProfile) &&
           (effectiveIntent === "scanner_execute" ||
             (effectiveIntent === "handoff" && isHandoffExecutionMessage(message)))
         ? leadProfile.websiteUrl
@@ -6490,7 +6533,9 @@ export function buildZoraResponse(
       ? actionsForOfferButtons(offerAnswer?.suggestedButtons)
       : undefined;
   const recommendedActions = offerRecommendedActions || (isPostRecommendationAck
-    ? leadProfile.scannerBlocked
+    ? hasCompletedAuditContext(leadProfile)
+      ? (["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"])
+    : leadProfile.scannerBlocked
       ? (["strategy_call", "ask_question"] as ZoraResponse["recommendedActions"])
       : leadProfile.hasNoWebsite
       ? (["strategy_call"] as ZoraResponse["recommendedActions"])
