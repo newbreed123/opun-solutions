@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Button from "@/components/Button";
 import Section from "@/components/Section";
 import { trackEvent } from "@/lib/analytics";
+import { trackConversion } from "@/lib/analytics/trackConversion";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   sanitizeEvidenceText,
@@ -1012,6 +1013,11 @@ export default function EcommerceAuditScannerPage() {
     }
 
     trackEvent("audit_export_clicked", auditAttribution(audit));
+    trackConversion("roadmap_downloaded", {
+      source: "audit_scanner",
+      websiteUrl: audit.website,
+      pagePath: window.location.pathname,
+    });
     setShowVisibilityDetails(true);
     setShowRawLogs(false);
     setExpandedScreenshot(null);
@@ -1041,6 +1047,11 @@ export default function EcommerceAuditScannerPage() {
     trackEvent("audit_scan_started", {
       scannedUrl: normalizedWebsite,
       sourceArea: "hero",
+    });
+    trackConversion("audit_started", {
+      source: "audit_scanner",
+      websiteUrl: normalizedWebsite,
+      pagePath: window.location.pathname,
     });
 
     try {
@@ -1074,6 +1085,10 @@ export default function EcommerceAuditScannerPage() {
       trackEvent("audit_scan_completed", {
         ...auditAttribution(data.audit),
         sourceArea: "hero",
+      });
+      trackConversion("audit_completed", {
+        source: "audit_scanner",
+        websiteUrl: normalizedWebsite,
       });
     } catch {
       trackEvent("audit_scan_failed", {
@@ -3265,6 +3280,7 @@ export default function EcommerceAuditScannerPage() {
                           sourceArea: "report",
                         })
                       }
+                      trackingSource="audit_assistant"
                       variant="primary"
                       size="lg"
                     >
@@ -3309,6 +3325,7 @@ export default function EcommerceAuditScannerPage() {
                         sourceArea: "report",
                       })
                     }
+                    trackingSource="audit_assistant"
                     variant="primary"
                     size="lg"
                   >

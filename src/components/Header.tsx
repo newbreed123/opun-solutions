@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
+import { openStrategyCall } from "@/lib/booking/openStrategyCall";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -48,6 +49,12 @@ const navLinks = [
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
 
+  function trackHeaderStrategyCall() {
+    openStrategyCall({
+      source: "header",
+    });
+  }
+
   return (
     <header className="sticky top-0 z-50 bg-dark-bg/90 backdrop-blur-xl border-b border-dark-border shadow-sm shadow-black/20">
       <nav className="container-wide flex items-center justify-between h-16 md:h-20">
@@ -90,7 +97,11 @@ export default function Header() {
               )}
             </div>
           ))}
-          <Link href={STRATEGY_CALL_URL} className="btn-primary text-sm">
+          <Link
+            href={STRATEGY_CALL_URL}
+            className="btn-primary text-sm"
+            onClick={trackHeaderStrategyCall}
+          >
             Book Strategy Call
           </Link>
         </div>
@@ -138,7 +149,10 @@ export default function Header() {
               <Link
                 href={STRATEGY_CALL_URL}
                 className="block btn-primary text-center w-full"
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  trackHeaderStrategyCall();
+                  setIsOpen(false);
+                }}
               >
                 Book Strategy Call
               </Link>

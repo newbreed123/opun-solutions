@@ -38,10 +38,13 @@ import {
 } from "@/lib/zora-industry-awareness";
 import { detectZoraActionIntent } from "@/lib/zora-action-intent";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
+import { openStrategyCall } from "@/lib/booking/openStrategyCall";
+import { trackConversion } from "@/lib/analytics/trackConversion";
 
 const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
 const ZORA_SESSION_ID_KEY = "opzix-zora-session-id";
 const ZORA_TRAFFIC_INTENT_KEY = "opzix-zora-traffic-intent";
+const ZORA_CONVERSATION_STARTED_KEY = "opzix-zora-conversation-started";
 const BOOKING_LINK_DELAY_MS = 150;
 const FREE_AUDIT_URL = "/tools/ecommerce-audit-scanner?source=zora";
 
@@ -947,6 +950,7 @@ export default function OpzixAIAssistant() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const auditContextRef = useRef<ZoraAuditContextEventDetail | null>(null);
   const sessionIdRef = useRef<string>("");
+  const conversationStartedRef = useRef(false);
 
   useEffect(() => {
     const trafficIntent = storedTrafficIntent();
@@ -1036,6 +1040,8 @@ export default function OpzixAIAssistant() {
   }
 
   function trackZoraEvent(eventType: string, profile = leadProfile) {
+    const normalizedProfile = normalizeProfile(profile);
+
     try {
       void fetch("/api/zora-conversion", {
         method: "POST",
@@ -1045,7 +1051,7 @@ export default function OpzixAIAssistant() {
         body: JSON.stringify({
           eventType,
           sessionId: zoraSessionId(),
-          leadProfile: normalizeProfile(profile),
+          leadProfile: normalizedProfile,
           sourcePath: currentSourcePath(),
         }),
         keepalive: true,
@@ -1053,6 +1059,49 @@ export default function OpzixAIAssistant() {
     } catch {
       // Conversion tracking should never block chat navigation.
     }
+
+    if (eventType === "ask_question_clicked") {
+      trackConversion("ask_question_clicked", {
+        source: "zora",
+        pagePath: window.location.pathname,
+      });
+    }
+
+    if (eventType === "qualification_completed") {
+      trackConversion("zora_qualified_lead", {
+        source: "zora",
+        businessType: normalizedProfile.businessType,
+        challenge: normalizedProfile.challenge,
+        websiteUrl: normalizedProfile.websiteUrl,
+        leadScore: normalizedProfile.leadScore,
+        leadTemperature: normalizedProfile.leadTemperature,
+        recommendedNextStep: normalizedProfile.recommendedNextStep,
+        pagePath: window.location.pathname,
+      });
+    }
+  }
+
+  function trackZoraConversationStartedOnce() {
+    if (conversationStartedRef.current) {
+      return;
+    }
+
+    try {
+      if (window.sessionStorage.getItem(ZORA_CONVERSATION_STARTED_KEY)) {
+        conversationStartedRef.current = true;
+        return;
+      }
+
+      window.sessionStorage.setItem(ZORA_CONVERSATION_STARTED_KEY, "true");
+    } catch {
+      // If session storage is unavailable, keep this once per mounted session.
+    }
+
+    conversationStartedRef.current = true;
+    trackConversion("zora_conversation_started", {
+      source: "zora",
+      pagePath: window.location.pathname,
+    });
   }
 
   function closeChatbot({ persist = true } = {}) {
@@ -1068,6 +1117,9 @@ export default function OpzixAIAssistant() {
     setOpen((current) => {
       const nextOpen = !current;
       persistChatbotState(nextOpen ? "open" : "closed");
+      if (nextOpen) {
+        trackZoraConversationStartedOnce();
+      }
       return nextOpen;
     });
   }
@@ -1081,6 +1133,16 @@ export default function OpzixAIAssistant() {
   }
 
   function openStrategyCallFromZora(href = STRATEGY_CALL_URL) {
+    const normalizedProfile = normalizeProfile(leadProfile);
+
+    openStrategyCall({
+      source: "zora",
+      businessType: normalizedProfile.businessType,
+      challenge: normalizedProfile.challenge,
+      websiteUrl: normalizedProfile.websiteUrl,
+      leadScore: normalizedProfile.leadScore,
+      leadTemperature: normalizedProfile.leadTemperature,
+    });
     trackZoraEvent("strategy_call_clicked");
     openBookingUrlAfterClose(href);
   }
@@ -1627,6 +1689,7 @@ export default function OpzixAIAssistant() {
 
     if (!message || isThinking) return;
 
+    trackZoraConversationStartedOnce();
     setInput("");
 
     if (handleClientActionIntent(message)) {
@@ -1832,6 +1895,16 @@ export default function OpzixAIAssistant() {
 
       event.preventDefault();
       if (target.closest(".opzix-ai-shell")) {
+        const normalizedProfile = normalizeProfile(leadProfile);
+
+        openStrategyCall({
+          source: "zora",
+          businessType: normalizedProfile.businessType,
+          challenge: normalizedProfile.challenge,
+          websiteUrl: normalizedProfile.websiteUrl,
+          leadScore: normalizedProfile.leadScore,
+          leadTemperature: normalizedProfile.leadTemperature,
+        });
         trackZoraEvent("strategy_call_clicked");
       }
       openBookingUrlAfterClose(link.href);
@@ -1858,6 +1931,7 @@ export default function OpzixAIAssistant() {
 
       auditContextRef.current = detail;
       setOpen(true);
+      trackZoraConversationStartedOnce();
       setFlowStep(null);
       setInput("");
 

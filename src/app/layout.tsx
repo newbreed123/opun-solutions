@@ -3,6 +3,7 @@ import Script from "next/script";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import OpzixAIAssistant from "@/components/OpzixAIAssistant";
+import StrategyCallBookingTracker from "@/components/StrategyCallBookingTracker";
 import "./globals.css";
 
 const GA_MEASUREMENT_ID = "G-YKPQJ3XSRE";
@@ -49,6 +50,7 @@ export default function RootLayout({
         <main>{children}</main>
         <Footer />
         <OpzixAIAssistant />
+        <StrategyCallBookingTracker />
       </body>
     </html>
   );

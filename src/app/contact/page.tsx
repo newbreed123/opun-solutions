@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Section from "@/components/Section";
 import Button from "@/components/Button";
 import { trackEvent } from "@/lib/analytics";
+import { trackConversion } from "@/lib/analytics/trackConversion";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
 import { Check, X, ShoppingCart, Zap } from "lucide-react";
 
@@ -148,6 +149,12 @@ export default function Contact() {
       }
 
       setAuditSubmitted(true);
+      trackConversion("contact_form_submitted", {
+        source: "contact_form",
+        formType: "audit",
+        sourcePage,
+        pagePath: window.location.pathname,
+      });
       setSuccessMessage(
         data.message || "Thanks! We received your audit request.",
       );
@@ -205,6 +212,12 @@ export default function Contact() {
       }
 
       setServicesSubmitted(true);
+      trackConversion("contact_form_submitted", {
+        source: "contact_form",
+        formType: "services",
+        sourcePage,
+        pagePath: window.location.pathname,
+      });
       setSuccessMessage(
         data.message || "Thanks! We'll get back to you shortly.",
       );
@@ -646,6 +659,7 @@ export default function Contact() {
                       variant="primary"
                       size="lg"
                       className="w-full"
+                      trackingSource="contact_page"
                     >
                       Book on Calendly →
                     </Button>

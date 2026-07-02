@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Button from "@/components/Button";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
 import {
   ArrowDown,
@@ -189,12 +189,14 @@ export function ChatbotPreviewMockup({ className = "" }: MockupProps) {
           </div>
         </div>
 
-        <Link
+        <Button
           href={STRATEGY_CALL_URL}
-          className="mt-5 flex items-center justify-center rounded-2xl border border-brand-cyan/40 bg-gradient-to-r from-brand-blue/25 to-brand-cyan/20 px-4 py-3 text-sm font-semibold text-primary transition-colors hover:border-brand-cyan"
+          variant="secondary"
+          size="md"
+          className="mt-5 flex items-center justify-center rounded-2xl border-brand-cyan/40 bg-gradient-to-r from-brand-blue/25 to-brand-cyan/20 text-sm hover:border-brand-cyan"
         >
           Book Strategy Call
-        </Link>
+        </Button>
       </div>
     </div>
   );

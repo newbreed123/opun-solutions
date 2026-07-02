@@ -3,6 +3,11 @@
 import Link from "next/link";
 import React from "react";
 import { trackEvent } from "@/lib/analytics";
+import { STRATEGY_CALL_URL } from "@/lib/booking";
+import {
+  openStrategyCall,
+  type StrategyCallSource,
+} from "@/lib/booking/openStrategyCall";
 
 interface ButtonProps {
   href?: string;
@@ -14,6 +19,7 @@ interface ButtonProps {
   disabled?: boolean;
   target?: "_blank" | "_self";
   rel?: string;
+  trackingSource?: StrategyCallSource;
 }
 
 export default function Button({
@@ -26,6 +32,7 @@ export default function Button({
   disabled = false,
   target = "_self",
   rel = "",
+  trackingSource,
 }: ButtonProps) {
   const baseClasses = "btn";
   const variantClasses = {
@@ -43,6 +50,12 @@ export default function Button({
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
   const label = typeof children === "string" ? children.trim() : "";
   const handleClick = () => {
+    if (href === STRATEGY_CALL_URL) {
+      openStrategyCall({
+        source: trackingSource || "hero",
+      });
+    }
+
     if (label === "Talk With Opzix") {
       trackEvent("audit_cta_clicked", { sourceArea: "hero" });
     }
