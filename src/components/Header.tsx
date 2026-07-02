@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type MouseEvent } from "react";
 import { Menu, X } from "lucide-react";
-import { STRATEGY_CALL_URL } from "@/lib/booking";
+import { strategyCallBookingHref } from "@/lib/booking";
 import { openStrategyCall } from "@/lib/booking/openStrategyCall";
 
 const navLinks = [
@@ -48,6 +48,7 @@ const navLinks = [
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const headerStrategyCallHref = strategyCallBookingHref({ source: "header" });
 
   function trackHeaderStrategyCall(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
@@ -99,7 +100,7 @@ export default function Header() {
             </div>
           ))}
           <Link
-            href={STRATEGY_CALL_URL}
+            href={headerStrategyCallHref}
             className="btn-primary text-sm"
             onClick={trackHeaderStrategyCall}
           >
@@ -148,7 +149,7 @@ export default function Header() {
             ))}
             <div className="pt-4 border-t border-dark-border">
               <Link
-                href={STRATEGY_CALL_URL}
+                href={headerStrategyCallHref}
                 className="block btn-primary text-center w-full"
                 onClick={(event) => {
                   trackHeaderStrategyCall(event);

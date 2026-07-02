@@ -37,7 +37,11 @@ import {
   type ZoraIndustryProfile,
 } from "@/lib/zora-industry-awareness";
 import { detectZoraActionIntent } from "@/lib/zora-action-intent";
-import { STRATEGY_CALL_URL } from "@/lib/booking";
+import {
+  STRATEGY_CALL_BOOKING_PATH,
+  STRATEGY_CALL_URL,
+  strategyCallBookingHref,
+} from "@/lib/booking";
 import { openStrategyCall } from "@/lib/booking/openStrategyCall";
 import { trackConversion } from "@/lib/analytics/trackConversion";
 
@@ -275,10 +279,13 @@ function storedTrafficIntent(): StoredTrafficIntent | undefined {
 function isBookingUrl(href: string) {
   const normalized = href.toLowerCase();
   const strategyCallUrl = STRATEGY_CALL_URL.toLowerCase();
+  const strategyCallBookingPath = STRATEGY_CALL_BOOKING_PATH.toLowerCase();
 
   return (
     normalized === strategyCallUrl ||
     normalized.startsWith(`${strategyCallUrl}?`) ||
+    normalized.endsWith(strategyCallBookingPath) ||
+    normalized.includes(`${strategyCallBookingPath}?`) ||
     normalized.includes("calendly.com")
   );
 }
@@ -504,7 +511,7 @@ function bookingAction(
   return {
     kind: "link",
     label,
-    href: STRATEGY_CALL_URL,
+    href: strategyCallBookingHref({ source: "zora" }),
     booking: true,
     tone,
   };

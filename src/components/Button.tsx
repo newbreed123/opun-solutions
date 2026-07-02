@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React from "react";
 import { trackEvent } from "@/lib/analytics";
-import { STRATEGY_CALL_URL } from "@/lib/booking";
+import { STRATEGY_CALL_URL, strategyCallBookingHref } from "@/lib/booking";
 import {
   openStrategyCall,
   type StrategyCallSource,
@@ -49,12 +49,16 @@ export default function Button({
 
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
   const label = typeof children === "string" ? children.trim() : "";
+  const isStrategyCallLink = href === STRATEGY_CALL_URL;
+  const renderedHref = isStrategyCallLink
+    ? strategyCallBookingHref({ source: trackingSource || "hero" })
+    : href;
   const handleClick = (
     event:
       | React.MouseEvent<HTMLAnchorElement>
       | React.MouseEvent<HTMLButtonElement>,
   ) => {
-    if (href === STRATEGY_CALL_URL) {
+    if (isStrategyCallLink) {
       event.preventDefault();
       openStrategyCall({
         source: trackingSource || "hero",
@@ -68,10 +72,10 @@ export default function Button({
     onClick?.();
   };
 
-  if (href) {
+  if (renderedHref) {
     return (
       <Link
-        href={href}
+        href={renderedHref}
         target={target}
         rel={rel}
         className={classes}

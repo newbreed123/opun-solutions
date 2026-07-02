@@ -24,17 +24,36 @@ export default async function StrategyCallPage({
   const context = strategyCallContextFromParams(params);
 
   return (
-    <section className="hero-atmosphere py-12 md:py-16">
-      <div className="container-wide max-w-[94%]">
-        <div className="mb-8 max-w-3xl">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.22em] text-brand-cyan">
-            Strategy call
-          </p>
-          <h1 className="heading-1 mb-5">Book a Strategy Call</h1>
-          <p className="body-lg text-secondary">
-            Choose a time for a focused Opzix review of your funnel, tracking,
-            customer journey, and highest-impact next step.
-          </p>
+    <section className="bg-dark-bg py-8 md:py-10">
+      <div className="container-wide max-w-[96%]">
+        <div className="mb-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+          <div>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-brand-cyan">
+              Strategy call
+            </p>
+            <h1 className="text-4xl font-black leading-tight text-primary md:text-5xl">
+              Book a Strategy Call
+            </h1>
+          </div>
+          <div className="rounded-xl border border-dark-border bg-dark-card/70 p-5">
+            <p className="text-base leading-relaxed text-secondary">
+              Choose a time for a focused Opzix review of your funnel, tracking,
+              customer journey, and highest-impact next step.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              <span className="rounded-full border border-white/10 px-3 py-2">
+                30 minutes
+              </span>
+              <span className="rounded-full border border-white/10 px-3 py-2">
+                Ecommerce audit
+              </span>
+              {context?.source ? (
+                <span className="rounded-full border border-brand-cyan/30 bg-brand-cyan/10 px-3 py-2 text-brand-cyan">
+                  Source: {context.source.replace(/_/g, " ")}
+                </span>
+              ) : null}
+            </div>
+          </div>
         </div>
         <StrategyCallInlineCalendly context={context} />
       </div>

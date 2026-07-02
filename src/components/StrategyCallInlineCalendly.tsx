@@ -46,7 +46,7 @@ export default function StrategyCallInlineCalendly({
     <div>
       <div
         ref={calendlyRef}
-        className="min-h-[720px] overflow-hidden rounded-2xl border border-dark-border bg-white"
+        className="h-[900px] min-h-[900px] overflow-hidden rounded-xl border border-white/15 bg-white shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
       />
       {failed ? (
         <div className="mt-4 rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 text-sm text-amber-100">

@@ -36,7 +36,6 @@ declare global {
         url: string;
         parentElement: HTMLElement;
       }) => void;
-      initPopupWidget?: (options: { url: string }) => void;
     };
   }
 }
@@ -65,7 +64,7 @@ export function openStrategyCall(payload: StrategyCallPayload) {
   installCalendlyBookingListener();
   trackConversion("strategy_call_clicked", enrichedPayload);
   trackEvent("strategy_call_clicked", enrichedPayload);
-  openCalendlyPopup();
+  redirectToStrategyCallBookingPage();
 }
 
 export function rememberStrategyCallContext(payload: StrategyCallPayload) {
@@ -97,16 +96,6 @@ export function installCalendlyBookingListener() {
   window.addEventListener("message", handleCalendlyMessage);
   calendlyListenerInstalled = true;
   devLog("listener mounted");
-}
-
-export function preloadCalendlyWidget() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  ensureCalendlyWidget().catch(() => {
-    devLog("Calendly widget preload failed");
-  });
 }
 
 export function initStrategyCallInlineWidget(parentElement: HTMLElement) {
@@ -172,25 +161,10 @@ function trackStrategyCallBooked(
   return true;
 }
 
-function openCalendlyPopup() {
-  ensureCalendlyWidget()
-    .then(() => {
-      if (typeof window.Calendly?.initPopupWidget === "function") {
-        window.Calendly.initPopupWidget({ url: STRATEGY_CALL_URL });
-        return;
-      }
-
-      redirectToStrategyCallBookingPage();
-    })
-    .catch(() => {
-      redirectToStrategyCallBookingPage();
-    });
-}
-
 function ensureCalendlyWidget() {
   injectCalendlyStyles();
 
-  if (typeof window.Calendly?.initPopupWidget === "function") {
+  if (typeof window.Calendly?.initInlineWidget === "function") {
     return Promise.resolve();
   }
 
@@ -420,8 +394,10 @@ function redirectToStrategyCallBookingPage() {
     addQueryParam(bookingUrl, "leadTemperature", payload.leadTemperature);
   }
 
-  devLog("Calendly popup unavailable; opening on-site booking page", `${bookingUrl.pathname}${bookingUrl.search}`);
-  window.location.assign(`${bookingUrl.pathname}${bookingUrl.search}`);
+  devLog("opening on-site booking page", `${bookingUrl.pathname}${bookingUrl.search}`);
+  window.setTimeout(() => {
+    window.location.assign(`${bookingUrl.pathname}${bookingUrl.search}`);
+  }, 120);
 }
 
 function addQueryParam(url: URL, key: string, value?: string) {
