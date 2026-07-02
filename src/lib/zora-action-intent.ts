@@ -21,6 +21,7 @@ type ZoraActionIntentInput = {
   websiteUrl?: string;
   hasReport?: boolean;
   reportId?: string;
+  lastRecommendedActions?: Array<"free_audit" | "strategy_call" | "diagnose" | "ask_question">;
 };
 
 const emptyIntent: ZoraActionIntent = {
@@ -49,6 +50,12 @@ const explicitActionPhrases = [
   "run the",
   "run audit",
   "run it",
+  "lets do it",
+  "let us do it",
+  "okay lets do it",
+  "ok lets do it",
+  "go ahead",
+  "do it",
   "please start",
   "start the",
   "start scan",
@@ -111,6 +118,22 @@ export function detectZoraActionIntent(input: ZoraActionIntentInput): ZoraAction
       confidence: input.websiteUrl ? "High" : "Moderate",
       matchedActionWords: matchedWords(text, ["diagnose", "help"]),
       matchedAssetWords: matchedWords(text, ["growth system", "business"]),
+      needsMissingContext: input.websiteUrl ? null : "websiteUrl",
+    };
+  }
+
+  if (
+    input.lastRecommendedActions?.includes("free_audit") &&
+    /^(lets do it|let us do it|okay lets do it|ok lets do it|sounds good|yes|go ahead|do it|start|run it|start the audit|run the audit|scan it|scan my site)$/.test(
+      text,
+    )
+  ) {
+    return {
+      isAction: true,
+      actionType: "start_audit",
+      confidence: input.websiteUrl ? "High" : "Moderate",
+      matchedActionWords: matchedWords(text, ["lets do it", "sounds good", "yes", "go ahead", "do it", "start", "run", "scan"]),
+      matchedAssetWords: matchedWords(text, ["audit", "scan", "site"]),
       needsMissingContext: input.websiteUrl ? null : "websiteUrl",
     };
   }

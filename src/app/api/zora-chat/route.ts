@@ -18,6 +18,10 @@ import {
   normalizeZoraLearningIntent,
   selectZoraPlaybook,
 } from "@/lib/zora-learning";
+import {
+  resolveZoraResponse,
+  type ZoraStructuredResponse,
+} from "@/lib/zora-intelligence";
 
 type ZoraChatRequest = {
   message?: unknown;
@@ -104,6 +108,25 @@ function sanitizeNoWebsiteReply(reply: string) {
     .replace(/\bscanner\b/gi, "review tool")
     .replace(/\baudit\b/gi, "review")
     .replace(/\bscan\b/gi, "review");
+}
+
+function actionsFromStructuredButtons(
+  buttons?: ZoraStructuredResponse["buttons"],
+): ZoraResponse["recommendedActions"] | undefined {
+  if (!buttons?.length) return undefined;
+
+  const actions = buttons
+    .map((button) => {
+      if (button.action === "strategy_call") return "strategy_call";
+      if (button.action === "free_audit") return "free_audit";
+      if (button.action === "diagnose") return "diagnose";
+      if (button.action === "ask_question") return "ask_question";
+      return null;
+    })
+    .filter((action): action is ZoraResponse["recommendedActions"][number] => Boolean(action));
+
+  const uniqueActions = Array.from(new Set(actions)) as ZoraResponse["recommendedActions"];
+  return uniqueActions.length ? uniqueActions : undefined;
 }
 
 function isDirectAuditCostQuestion(message: string) {
@@ -368,23 +391,34 @@ export async function POST(request: NextRequest) {
           : {}),
     };
     const fallback = buildZoraResponse(message, incomingLeadProfile);
-    const contextInput: ZoraContextEngineInput = contextInputFromProfile(fallback.leadProfile, {
+    const orchestrated = resolveZoraResponse({
+      userMessage: message,
+      leadProfile: incomingLeadProfile,
+      conversationHistory: structuredMessages,
+      auditContext,
+      baseResponse: fallback,
+    });
+    const resolvedLeadProfile = {
+      ...fallback.leadProfile,
+      ...(orchestrated.updatedState || {}),
+    } as ZoraLeadProfile;
+    const contextInput: ZoraContextEngineInput = contextInputFromProfile(resolvedLeadProfile, {
       messages: structuredMessages || [message],
       hasWebsite:
         hasWebsite ??
-        (fallback.leadProfile.hasNoWebsite
+        (resolvedLeadProfile.hasNoWebsite
           ? false
-          : fallback.leadProfile.hasWebsiteOrLandingPage || fallback.leadProfile.websiteUrl
+          : resolvedLeadProfile.hasWebsiteOrLandingPage || resolvedLeadProfile.websiteUrl
             ? true
             : null),
       currentStep: stringValue(body.currentStep),
-      conversationStage: stringValue(body.conversationStage) || fallback.leadProfile.conversationStage,
-      currentTopic: stringValue(body.currentTopic) || fallback.leadProfile.currentTopic,
-      currentSubtopic: stringValue(body.currentSubtopic) || fallback.leadProfile.currentSubtopic,
-      confirmedIndustry: stringValue(body.confirmedIndustry) || fallback.leadProfile.confirmedIndustry,
-      industryStatus: stringValue(body.industryStatus) || fallback.leadProfile.industryStatus,
-      inferredIndustry: stringValue(body.industry) || fallback.leadProfile.inferredIndustry || String(fallback.leadProfile.industry || ""),
-      recentTalkingPoints: structuredRecentTalkingPoints || fallback.leadProfile.recentTalkingPoints,
+      conversationStage: stringValue(body.conversationStage) || resolvedLeadProfile.conversationStage,
+      currentTopic: stringValue(body.currentTopic) || resolvedLeadProfile.currentTopic,
+      currentSubtopic: stringValue(body.currentSubtopic) || resolvedLeadProfile.currentSubtopic,
+      confirmedIndustry: stringValue(body.confirmedIndustry) || resolvedLeadProfile.confirmedIndustry,
+      industryStatus: stringValue(body.industryStatus) || resolvedLeadProfile.industryStatus,
+      inferredIndustry: stringValue(body.industry) || resolvedLeadProfile.inferredIndustry || String(resolvedLeadProfile.industry || ""),
+      recentTalkingPoints: structuredRecentTalkingPoints || resolvedLeadProfile.recentTalkingPoints,
     });
     const contextEngine = buildZoraContext(contextInput);
     if (process.env.NODE_ENV !== "production") {
@@ -398,9 +432,10 @@ export async function POST(request: NextRequest) {
         detectedNotificationChannel: fallback.currentMessageAnalysis.notificationChannel,
         confidenceScore: fallback.confidenceScore,
         leadProfileBefore: incomingLeadProfile,
-        leadProfileAfter: fallback.leadProfile,
+        leadProfileAfter: resolvedLeadProfile,
         leadProfileChanges: fallback.profileChanges,
         selectedResponseStrategy: fallback.responseMode,
+        selectedIntelligenceIntent: orchestrated.intent,
         contextEngine,
       });
     }
@@ -430,7 +465,7 @@ export async function POST(request: NextRequest) {
           })
         : null;
 
-    const rawFinalReply = playbookReply || gptReply || fallback.reply;
+    const rawFinalReply = playbookReply || gptReply || orchestrated.message;
     const finalReply =
       fallback.leadProfile.hasNoWebsite &&
       fallback.responseMode !== "company_background" &&
@@ -439,29 +474,38 @@ export async function POST(request: NextRequest) {
       : rawFinalReply;
     const learningIntent = normalizeZoraLearningIntent(message, fallback.responseMode);
     const rawRecommendedActions =
-      actionsForZoraPlaybook(playbook) || fallback.recommendedActions;
+      actionsForZoraPlaybook(playbook) ||
+      actionsFromStructuredButtons(orchestrated.buttons) ||
+      fallback.recommendedActions;
     const finalRecommendedActions = auditContext
       ? rawRecommendedActions.filter((action) => action !== "free_audit")
       : rawRecommendedActions;
 
-    void logZoraConversation(fallback.leadProfile, message, finalReply, {
+    const finalAction = orchestrated.action
+      ? ({
+          type: orchestrated.action.type,
+          ...(orchestrated.action.url ? { url: orchestrated.action.url } : {}),
+        } as ZoraResponse["action"])
+      : fallback.action;
+
+    void logZoraConversation(resolvedLeadProfile, message, finalReply, {
       sessionId,
       sourcePath,
       userAgent: request.headers.get("user-agent"),
       currentStep: stringValue(body.currentStep) || fallback.responseMode,
       intent: learningIntent,
-      conversationStage: fallback.leadProfile.conversationStage,
-      currentTopic: fallback.leadProfile.currentTopic,
+      conversationStage: resolvedLeadProfile.conversationStage,
+      currentTopic: resolvedLeadProfile.currentTopic,
       currentSubtopic:
-        fallback.leadProfile.currentSubtopic ||
+        resolvedLeadProfile.currentSubtopic ||
         (fallback.responseMode === "company_background"
           ? fallback.currentMessageAnalysis.companyBackgroundSubtype
           : fallback.recentTalkingPoint),
-      detectedConcept: fallback.leadProfile.detectedConcept,
-      conceptConfidence: fallback.leadProfile.conceptConfidence,
-      recentTalkingPoint: fallback.recentTalkingPoint,
+      detectedConcept: resolvedLeadProfile.detectedConcept,
+      conceptConfidence: resolvedLeadProfile.conceptConfidence,
+      recentTalkingPoint: orchestrated.recentTalkingPoint || fallback.recentTalkingPoint,
       profileBefore: incomingLeadProfile,
-      action: fallback.action,
+      action: finalAction,
       recommendedActions: finalRecommendedActions,
       contextEngine,
       eventType:
@@ -487,9 +531,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ...fallback,
+        leadProfile: resolvedLeadProfile,
         reply: finalReply,
+        action: finalAction,
         recommendedActions: finalRecommendedActions,
         contextEngine,
+        intelligenceIntent: orchestrated.intent,
         playbookId: playbook?.id,
         poweredBy: gptReply ? "openai" : "local-diagnosis",
       },
