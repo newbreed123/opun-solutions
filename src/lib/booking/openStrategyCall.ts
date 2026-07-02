@@ -1,5 +1,9 @@
 import { trackEvent } from "@/lib/analytics";
-import { STRATEGY_CALL_CONFIRMED_PATH } from "@/lib/booking";
+import {
+  STRATEGY_CALL_BOOKING_PATH,
+  STRATEGY_CALL_CONFIRMED_PATH,
+  STRATEGY_CALL_URL,
+} from "@/lib/booking";
 import { trackConversion, type ConversionPayload } from "@/lib/analytics/trackConversion";
 
 export type StrategyCallSource =
@@ -25,11 +29,30 @@ type CalendlyMessageData = {
   payload?: Record<string, unknown>;
 };
 
+declare global {
+  interface Window {
+    Calendly?: {
+      initInlineWidget?: (options: {
+        url: string;
+        parentElement: HTMLElement;
+      }) => void;
+      initPopupWidget?: (options: { url: string }) => void;
+    };
+  }
+}
+
 let calendlyListenerInstalled = false;
+let calendlyWidgetLoading: Promise<void> | null = null;
 let latestStrategyCallPayload: StrategyCallPayload | null = null;
+let strategyCallRedirectStarted = false;
 const scheduledCalendlyEvents = new Set<string>();
 const PENDING_STRATEGY_CALL_PAYLOAD_KEY = "opzix-pending-strategy-call-payload";
 const TRACKED_STRATEGY_CALL_BOOKINGS_KEY = "opzix-tracked-strategy-call-bookings";
+const BOOKED_BEFORE_CONFIRMATION_KEY = "opzix-strategy-call-booked-before-confirmation";
+const CALENDLY_WIDGET_SCRIPT_ID = "calendly-widget-script";
+const CALENDLY_WIDGET_STYLES_ID = "calendly-widget-styles";
+const CALENDLY_WIDGET_SCRIPT_SRC = "https://assets.calendly.com/assets/external/widget.js";
+const CALENDLY_WIDGET_STYLES_HREF = "https://assets.calendly.com/assets/external/widget.css";
 
 export function openStrategyCall(payload: StrategyCallPayload) {
   if (typeof window === "undefined") {
@@ -38,15 +61,28 @@ export function openStrategyCall(payload: StrategyCallPayload) {
 
   const enrichedPayload = withPagePath(payload);
 
-  latestStrategyCallPayload = payload;
-  persistLatestStrategyCallPayload(payload);
+  rememberStrategyCallContext(payload);
   installCalendlyBookingListener();
   trackConversion("strategy_call_clicked", enrichedPayload);
   trackEvent("strategy_call_clicked", enrichedPayload);
+  openCalendlyPopup();
+}
+
+export function rememberStrategyCallContext(payload: StrategyCallPayload) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  latestStrategyCallPayload = payload;
+  persistLatestStrategyCallPayload(payload);
 }
 
 export function trackStrategyCallBookedFromConfirmation() {
   if (typeof window === "undefined") {
+    return;
+  }
+
+  if (wasBookedBeforeConfirmation()) {
     return;
   }
 
@@ -60,6 +96,31 @@ export function installCalendlyBookingListener() {
 
   window.addEventListener("message", handleCalendlyMessage);
   calendlyListenerInstalled = true;
+  devLog("listener mounted");
+}
+
+export function preloadCalendlyWidget() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  ensureCalendlyWidget().catch(() => {
+    devLog("Calendly widget preload failed");
+  });
+}
+
+export function initStrategyCallInlineWidget(parentElement: HTMLElement) {
+  return ensureCalendlyWidget().then(() => {
+    if (typeof window.Calendly?.initInlineWidget !== "function") {
+      throw new Error("Calendly inline widget is unavailable.");
+    }
+
+    parentElement.innerHTML = "";
+    window.Calendly.initInlineWidget({
+      url: STRATEGY_CALL_URL,
+      parentElement,
+    });
+  });
 }
 
 function handleCalendlyMessage(event: MessageEvent) {
@@ -68,10 +129,16 @@ function handleCalendlyMessage(event: MessageEvent) {
   }
 
   const eventData = event.data as CalendlyMessageData;
+  devLog("Calendly message received", {
+    event: eventData.event,
+    origin: event.origin,
+  });
 
   if (eventData.event !== "calendly.event_scheduled") {
     return;
   }
+
+  devLog("event_scheduled detected", eventData.payload);
 
   const eventKey = calendlyEventKey(eventData.payload);
   const booked = trackStrategyCallBooked(eventData.payload, eventKey);
@@ -100,8 +167,70 @@ function trackStrategyCallBooked(
 
   trackConversion("strategy_call_booked", conversionPayload);
   trackEvent("strategy_call_booked", conversionPayload);
+  markBookedBeforeConfirmation();
 
   return true;
+}
+
+function openCalendlyPopup() {
+  ensureCalendlyWidget()
+    .then(() => {
+      if (typeof window.Calendly?.initPopupWidget === "function") {
+        window.Calendly.initPopupWidget({ url: STRATEGY_CALL_URL });
+        return;
+      }
+
+      redirectToStrategyCallBookingPage();
+    })
+    .catch(() => {
+      redirectToStrategyCallBookingPage();
+    });
+}
+
+function ensureCalendlyWidget() {
+  injectCalendlyStyles();
+
+  if (typeof window.Calendly?.initPopupWidget === "function") {
+    return Promise.resolve();
+  }
+
+  if (calendlyWidgetLoading) {
+    return calendlyWidgetLoading;
+  }
+
+  calendlyWidgetLoading = new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById(
+      CALENDLY_WIDGET_SCRIPT_ID,
+    ) as HTMLScriptElement | null;
+
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = CALENDLY_WIDGET_SCRIPT_ID;
+    script.src = CALENDLY_WIDGET_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject();
+    document.head.appendChild(script);
+  });
+
+  return calendlyWidgetLoading;
+}
+
+function injectCalendlyStyles() {
+  if (document.getElementById(CALENDLY_WIDGET_STYLES_ID)) {
+    return;
+  }
+
+  const styles = document.createElement("link");
+  styles.id = CALENDLY_WIDGET_STYLES_ID;
+  styles.rel = "stylesheet";
+  styles.href = CALENDLY_WIDGET_STYLES_HREF;
+  document.head.appendChild(styles);
 }
 
 function persistLatestStrategyCallPayload(payload: StrategyCallPayload) {
@@ -178,14 +307,48 @@ function markStrategyCallBookedTracked(eventKey: string) {
   }
 }
 
+function markBookedBeforeConfirmation() {
+  try {
+    window.sessionStorage.setItem(BOOKED_BEFORE_CONFIRMATION_KEY, "true");
+  } catch {
+    // Session storage can be unavailable in private browsing modes.
+  }
+}
+
+function wasBookedBeforeConfirmation() {
+  try {
+    const bookedBeforeConfirmation = window.sessionStorage.getItem(
+      BOOKED_BEFORE_CONFIRMATION_KEY,
+    );
+
+    if (bookedBeforeConfirmation === "true") {
+      window.sessionStorage.removeItem(BOOKED_BEFORE_CONFIRMATION_KEY);
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function isCalendlyEvent(event: MessageEvent) {
   const data = event.data as CalendlyMessageData | undefined;
 
   return (
-    event.origin === "https://calendly.com" &&
+    isCalendlyOrigin(event.origin) &&
     typeof data?.event === "string" &&
     data.event.startsWith("calendly.")
   );
+}
+
+function isCalendlyOrigin(origin: string) {
+  try {
+    const hostname = new URL(origin).hostname;
+    return hostname === "calendly.com" || hostname.endsWith(".calendly.com");
+  } catch {
+    return false;
+  }
 }
 
 function calendlyEventKey(payload?: Record<string, unknown>) {
@@ -212,6 +375,12 @@ function withPagePath(payload: StrategyCallPayload): ConversionPayload {
 }
 
 function redirectToStrategyCallConfirmed() {
+  if (strategyCallRedirectStarted) {
+    return;
+  }
+
+  strategyCallRedirectStarted = true;
+
   const payload = latestStrategyCallPayload || storedStrategyCallPayload();
   const confirmationUrl = new URL(STRATEGY_CALL_CONFIRMED_PATH, window.location.origin);
 
@@ -228,7 +397,31 @@ function redirectToStrategyCallConfirmed() {
     addQueryParam(confirmationUrl, "leadTemperature", payload.leadTemperature);
   }
 
-  window.location.assign(`${confirmationUrl.pathname}${confirmationUrl.search}`);
+  devLog("redirect started", `${confirmationUrl.pathname}${confirmationUrl.search}`);
+  window.setTimeout(() => {
+    window.location.assign(`${confirmationUrl.pathname}${confirmationUrl.search}`);
+  }, 300);
+}
+
+function redirectToStrategyCallBookingPage() {
+  const payload = latestStrategyCallPayload || storedStrategyCallPayload();
+  const bookingUrl = new URL(STRATEGY_CALL_BOOKING_PATH, window.location.origin);
+
+  if (payload) {
+    addQueryParam(bookingUrl, "source", payload.source);
+    addQueryParam(bookingUrl, "businessType", payload.businessType);
+    addQueryParam(bookingUrl, "challenge", payload.challenge);
+    addQueryParam(bookingUrl, "websiteUrl", payload.websiteUrl);
+    addQueryParam(
+      bookingUrl,
+      "leadScore",
+      typeof payload.leadScore === "number" ? String(payload.leadScore) : undefined,
+    );
+    addQueryParam(bookingUrl, "leadTemperature", payload.leadTemperature);
+  }
+
+  devLog("Calendly popup unavailable; opening on-site booking page", `${bookingUrl.pathname}${bookingUrl.search}`);
+  window.location.assign(`${bookingUrl.pathname}${bookingUrl.search}`);
 }
 
 function addQueryParam(url: URL, key: string, value?: string) {
@@ -255,4 +448,17 @@ function stringOrUndefined(value: unknown) {
 
 function numberOrUndefined(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function devLog(message: string, details?: unknown) {
+  if (process.env.NODE_ENV !== "development") {
+    return;
+  }
+
+  if (details === undefined) {
+    console.info(`[Calendly booking] ${message}`);
+    return;
+  }
+
+  console.info(`[Calendly booking] ${message}`, details);
 }

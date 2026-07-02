@@ -1132,7 +1132,7 @@ export default function OpzixAIAssistant() {
     }, BOOKING_LINK_DELAY_MS);
   }
 
-  function openStrategyCallFromZora(href = STRATEGY_CALL_URL) {
+  function openStrategyCallFromZora() {
     const normalizedProfile = normalizeProfile(leadProfile);
 
     openStrategyCall({
@@ -1144,12 +1144,11 @@ export default function OpzixAIAssistant() {
       leadTemperature: normalizedProfile.leadTemperature,
     });
     trackZoraEvent("strategy_call_clicked");
-    openBookingUrlAfterClose(href);
   }
 
   function routeToLink(action: Extract<ZoraAction, { kind: "link" }>) {
     if (action.booking || isBookingUrl(action.href)) {
-      openStrategyCallFromZora(action.href);
+      openStrategyCallFromZora();
       return;
     }
 
@@ -1907,7 +1906,9 @@ export default function OpzixAIAssistant() {
         });
         trackZoraEvent("strategy_call_clicked");
       }
-      openBookingUrlAfterClose(link.href);
+      if (!target.closest(".opzix-ai-shell")) {
+        openBookingUrlAfterClose(link.href);
+      }
     }
 
     document.addEventListener("click", handleDocumentClick, true);

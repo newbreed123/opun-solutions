@@ -49,8 +49,13 @@ export default function Button({
 
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
   const label = typeof children === "string" ? children.trim() : "";
-  const handleClick = () => {
+  const handleClick = (
+    event:
+      | React.MouseEvent<HTMLAnchorElement>
+      | React.MouseEvent<HTMLButtonElement>,
+  ) => {
     if (href === STRATEGY_CALL_URL) {
+      event.preventDefault();
       openStrategyCall({
         source: trackingSource || "hero",
       });
