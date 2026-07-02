@@ -24,6 +24,7 @@ export type ConversionPayload = {
 type ConversionEventConfig = {
   ga4Event: ConversionEventName;
   adsConversionLabel?: string;
+  adsConversionLabelEnvName?: string;
   adsPayload?: ConversionPayload;
   primary: boolean;
 };
@@ -35,6 +36,7 @@ export const CONVERSION_EVENTS: Record<ConversionEventName, ConversionEventConfi
   audit_started: {
     ga4Event: "audit_started",
     adsConversionLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_AUDIT_STARTED_LABEL,
+    adsConversionLabelEnvName: "NEXT_PUBLIC_GOOGLE_ADS_AUDIT_STARTED_LABEL",
     adsPayload: {
       value: 1.0,
       currency: "USD",
@@ -48,16 +50,19 @@ export const CONVERSION_EVENTS: Record<ConversionEventName, ConversionEventConfi
   strategy_call_booked: {
     ga4Event: "strategy_call_booked",
     adsConversionLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_STRATEGY_CALL_BOOKED_LABEL,
+    adsConversionLabelEnvName: "NEXT_PUBLIC_GOOGLE_ADS_STRATEGY_CALL_BOOKED_LABEL",
     primary: true,
   },
   contact_form_submitted: {
     ga4Event: "contact_form_submitted",
     adsConversionLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_CONTACT_FORM_LABEL,
+    adsConversionLabelEnvName: "NEXT_PUBLIC_GOOGLE_ADS_CONTACT_FORM_LABEL",
     primary: true,
   },
   audit_completed: {
     ga4Event: "audit_completed",
     adsConversionLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_AUDIT_COMPLETED_LABEL,
+    adsConversionLabelEnvName: "NEXT_PUBLIC_GOOGLE_ADS_AUDIT_COMPLETED_LABEL",
     primary: false,
   },
   zora_conversation_started: {
@@ -118,8 +123,20 @@ export function trackConversion(
     gtag("event", eventConfig.ga4Event, cleanPayload);
 
     if (eventConfig.adsConversionLabel && GOOGLE_ADS_ID) {
+      const adsSendTo = `${GOOGLE_ADS_ID}/${eventConfig.adsConversionLabel}`;
+
+      if (shouldLogConversions()) {
+        console.info("[google ads conversion]", eventName, {
+          googleAdsIdEnvName: "NEXT_PUBLIC_GOOGLE_ADS_ID",
+          googleAdsId: GOOGLE_ADS_ID,
+          conversionLabelEnvName: eventConfig.adsConversionLabelEnvName,
+          conversionLabel: eventConfig.adsConversionLabel,
+          send_to: adsSendTo,
+        });
+      }
+
       gtag("event", "conversion", {
-        send_to: `${GOOGLE_ADS_ID}/${eventConfig.adsConversionLabel}`,
+        send_to: adsSendTo,
         ...eventConfig.adsPayload,
         ...cleanPayload,
       });
