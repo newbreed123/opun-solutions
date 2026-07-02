@@ -43,7 +43,6 @@ export function openStrategyCall(payload: StrategyCallPayload) {
   installCalendlyBookingListener();
   trackConversion("strategy_call_clicked", enrichedPayload);
   trackEvent("strategy_call_clicked", enrichedPayload);
-  logInternalBookingEvent("strategy_call_clicked", enrichedPayload);
 }
 
 export function trackStrategyCallBookedFromConfirmation() {
@@ -101,11 +100,6 @@ function trackStrategyCallBooked(
 
   trackConversion("strategy_call_booked", conversionPayload);
   trackEvent("strategy_call_booked", conversionPayload);
-  logInternalBookingEvent(
-    "strategy_call_booked",
-    conversionPayload,
-    calendlyPayload,
-  );
 
   return true;
 }
@@ -261,27 +255,4 @@ function stringOrUndefined(value: unknown) {
 
 function numberOrUndefined(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function logInternalBookingEvent(
-  eventName: "strategy_call_clicked" | "strategy_call_booked",
-  payload: ConversionPayload,
-  calendlyPayload?: Record<string, unknown>,
-) {
-  try {
-    void fetch("/api/booking-conversion", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        eventName,
-        payload,
-        calendlyPayload,
-      }),
-      keepalive: true,
-    }).catch(() => undefined);
-  } catch {
-    // Booking tracking should never interrupt navigation.
-  }
 }

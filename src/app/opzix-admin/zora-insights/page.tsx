@@ -125,7 +125,7 @@ export default async function ZoraInsightsPage({
           </p>
         </div>
         <a
-          href={`/admin/insights?passcode=${encodeURIComponent(providedPasscode)}`}
+          href={`/opzix-admin/insights?passcode=${encodeURIComponent(providedPasscode)}`}
           className="inline-flex min-h-11 items-center justify-center rounded-xl border border-dark-border bg-white/[0.04] px-4 text-sm font-semibold text-secondary transition-colors hover:border-brand-cyan hover:text-primary"
         >
           Main Insights

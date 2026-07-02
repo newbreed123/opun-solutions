@@ -78,10 +78,12 @@ export const CONVERSION_EVENTS: Record<ConversionEventName, ConversionEventConfi
   },
 };
 
-function cleanConversionPayload(payload: ConversionPayload) {
+function cleanConversionPayload(
+  payload: ConversionPayload,
+): Record<string, string | number | boolean> {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined),
-  );
+  ) as Record<string, string | number | boolean>;
 }
 
 function shouldLogConversions() {
@@ -102,6 +104,8 @@ export function trackConversion(
     const cleanPayload = cleanConversionPayload(enrichConversionPayload(payload));
 
     if (typeof gtag !== "function") {
+      logInternalConversionEvent(eventName, cleanPayload);
+
       if (shouldLogConversions()) {
         console.info("[conversion skipped]", eventName, {
           reason: "gtag_unavailable",
