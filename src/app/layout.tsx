@@ -7,6 +7,8 @@ import StrategyCallBookingTracker from "@/components/StrategyCallBookingTracker"
 import "./globals.css";
 
 const GA_MEASUREMENT_ID = "G-YKPQJ3XSRE";
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+const GOOGLE_TAG_ID = GOOGLE_ADS_ID || GA_MEASUREMENT_ID;
 
 export const metadata: Metadata = {
   title: "Opzix - Commerce Systems Consultancy",
@@ -35,7 +37,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`}
           strategy="afterInteractive"
         />
         <Script id="google-analytics" strategy="afterInteractive">
@@ -44,6 +46,7 @@ export default function RootLayout({
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', '${GA_MEASUREMENT_ID}');
+            ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}');` : ""}
           `}
         </Script>
         <Header />
