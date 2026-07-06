@@ -29,7 +29,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="/services"
+                  href="/services/ai-chatbots-automation"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Web Design
@@ -40,7 +40,7 @@ export default function Footer() {
                   href="/services"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  AI Chatbots
+                  AI Business Assistants
                 </Link>
               </li>
               <li>

@@ -1,403 +1,372 @@
 import {
-  BarChart3,
+  CalendarCheck,
   Check,
-  Globe,
+  ClipboardList,
+  Database,
+  GitBranch,
+  HeartPulse,
+  HelpCircle,
+  Home,
   LayoutGrid,
   MessageSquare,
+  Search,
   ServerCog,
-  Settings,
-  ShoppingCart,
-  Zap,
+  ShieldCheck,
+  ShoppingBag,
+  SlidersHorizontal,
+  Sparkles,
+  Users,
 } from "lucide-react";
 import Button from "@/components/Button";
-import CTASection from "@/components/CTASection";
 import Section from "@/components/Section";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
-import {
-  ChatbotPreviewMockup,
-  WorkflowMapMockup,
-} from "@/components/VisualMockups";
+
+const chatbotComparison = [
+  {
+    generic: "Answer FAQs",
+    assistant: "Learns business workflows",
+  },
+  {
+    generic: "Forgets context",
+    assistant: "Collects customer context",
+  },
+  {
+    generic: "Cannot qualify leads",
+    assistant: "Guides qualification paths",
+  },
+  {
+    generic: "Sits outside your systems",
+    assistant: "Triggers automations and CRM handoffs",
+  },
+];
+
+const assistantTypes = [
+  {
+    title: "Lead Qualification Assistant",
+    description: "Qualifies prospects before they reach your sales team.",
+    icon: Users,
+  },
+  {
+    title: "Customer Support Assistant",
+    description: "Answers common customer questions around the clock.",
+    icon: MessageSquare,
+  },
+  {
+    title: "Appointment Assistant",
+    description: "Books consultations, appointments, and next-step calls.",
+    icon: CalendarCheck,
+  },
+  {
+    title: "Ecommerce Assistant",
+    description: "Helps shoppers discover products and complete purchases.",
+    icon: ShoppingBag,
+  },
+  {
+    title: "Intake Assistant",
+    description: "Collects forms, documents, and customer information before meetings.",
+    icon: ClipboardList,
+  },
+  {
+    title: "Internal Team Assistant",
+    description: "Gives employees access to SOPs, documents, policies, and guidance.",
+    icon: Database,
+  },
+];
+
+const industryExamples = [
+  {
+    title: "Real Estate",
+    icon: Home,
+    items: ["Buyer qualification", "Seller qualification", "Property questions", "Book showings", "Home valuation"],
+  },
+  {
+    title: "Healthcare",
+    icon: HeartPulse,
+    items: ["Patient intake", "Referral questions", "Appointment scheduling", "Service guidance"],
+  },
+  {
+    title: "Ecommerce",
+    icon: ShoppingBag,
+    items: ["Product discovery", "Order questions", "Returns", "Checkout support", "Recommendations"],
+  },
+  {
+    title: "Professional Services",
+    icon: BriefcaseIcon,
+    items: ["Lead qualification", "Consultation booking", "Proposal requests", "FAQs"],
+  },
+  {
+    title: "Manufacturing",
+    icon: ServerCog,
+    items: ["RFQ intake", "Product lookup", "Specification questions", "Distributor support"],
+  },
+];
 
 const assistantCapabilities = [
-  "Answer FAQs instantly",
-  "Capture leads 24/7",
-  "Qualify prospects",
-  "Route inquiries",
+  "Answer customer questions",
+  "Qualify leads",
   "Book appointments",
-  "Trigger follow-ups",
+  "Collect customer information",
+  "Recommend products or services",
+  "Route conversations",
+  "Connect with CRM",
+  "Trigger email workflows",
+  "Support internal teams",
+  "Surface business knowledge",
 ];
 
-const problems = [
-  "Visitors leave without contacting you",
-  "Common questions take too much time",
-  "Leads are not qualified before calls",
-  "Follow-ups are manual",
-  "Customer inquiries are scattered",
-  "Team members repeat the same answers daily",
+const integrations = [
+  "Website",
+  "Shopify",
+  "BigCommerce",
+  "WooCommerce",
+  "HubSpot",
+  "Salesforce",
+  "NetSuite",
+  "Calendly",
+  "Google Calendar",
+  "Slack",
+  "Microsoft Teams",
+  "Email platforms",
+  "Custom APIs",
 ];
 
-const solutions = [
-  {
-    title: "Website AI Assistant",
-    description:
-      "A guided assistant that answers questions, captures interest, and helps visitors find the right next step.",
-    icon: MessageSquare,
-  },
-  {
-    title: "Lead Qualification Flow",
-    description:
-      "Structured questions that collect useful context before a sales call or consultation.",
-    icon: BarChart3,
-  },
-  {
-    title: "Appointment Booking Support",
-    description:
-      "Prompts and handoff flows that guide qualified visitors toward your booking process.",
-    icon: Check,
-  },
-  {
-    title: "FAQ & Customer Support Automation",
-    description:
-      "Clear answers for common questions across services, policies, products, and support topics.",
-    icon: MessageSquare,
-  },
-  {
-    title: "Follow-Up Automation",
-    description:
-      "Automated messages that help keep prospects engaged after they submit details or ask for help.",
-    icon: Zap,
-  },
-  {
-    title: "Internal Request Routing",
-    description:
-      "Inquiry paths that direct leads, support requests, and internal needs to the right team or workflow.",
-    icon: LayoutGrid,
-  },
-  {
-    title: "CRM / Email Notifications",
-    description:
-      "Lead alerts and routing plans for your inbox, CRM, forms, dashboard, or operating system.",
-    icon: ServerCog,
-  },
-  {
-    title: "Ecommerce Support Automation",
-    description:
-      "Shopping assistance for product questions, order support, returns, and customer-service routing.",
-    icon: ShoppingCart,
-  },
-];
-
-const useCases = [
-  {
-    title: "Ecommerce Stores",
-    description:
-      "Help shoppers find products, answer shipping/return questions, capture abandoned interest, and route support requests.",
-    icon: ShoppingCart,
-  },
-  {
-    title: "Care Agencies",
-    description:
-      "Answer service questions, guide families to intake forms, and help collect client inquiry details.",
-    icon: Globe,
-  },
-  {
-    title: "Coaches & Consultants",
-    description:
-      "Qualify prospects, answer program questions, and guide visitors to book calls.",
-    icon: BarChart3,
-  },
-  {
-    title: "Local Service Businesses",
-    description:
-      "Capture quote requests, answer basic questions, and route inquiries to the right service.",
-    icon: Settings,
-  },
-];
-
-const workflowSteps = [
-  "Visitor asks a question",
-  "Assistant answers or qualifies the lead",
-  "System captures contact details",
-  "Lead is routed to email, CRM, dashboard, or booking flow",
-  "Follow-up automation begins",
-];
-
-const packages = [
-  {
-    title: "Starter Assistant",
-    description:
-      "Best for businesses that need a simple website chatbot and lead capture.",
-    includes: [
-      "Website chatbot setup",
-      "FAQ training",
-      "Lead capture form",
-      "Email notification",
-      "Basic handoff flow",
-    ],
-  },
-  {
-    title: "Growth Assistant",
-    description:
-      "Best for businesses that want qualification, booking, and follow-up automation.",
-    includes: [
-      "Everything in Starter",
-      "Lead qualification logic",
-      "Booking link integration",
-      "Follow-up automation",
-      "CRM/email routing",
-    ],
-  },
-  {
-    title: "Operations Assistant",
-    description:
-      "Best for businesses that need AI connected to internal workflows.",
-    includes: [
-      "Everything in Growth",
-      "Custom workflows",
-      "Client intake routing",
-      "Ticket/request routing",
-      "Dashboard or backend integration planning",
-    ],
-  },
+const buildSteps = [
+  "Understand your business",
+  "Map customer conversations",
+  "Design AI workflows",
+  "Train the assistant",
+  "Connect your systems",
+  "Launch",
+  "Improve continuously",
 ];
 
 const whyOpzix = [
-  "Built around real business workflows",
-  "Designed for lead capture and conversion",
-  "Practical automation, not gimmicks",
-  "Connected to your website, forms, booking, and backend systems",
+  "Business-first approach",
+  "Custom AI assistants",
+  "Industry-specific workflows",
+  "Real integrations",
+  "Conversation intelligence",
+  "Continuous improvement",
 ];
 
-const afterSubmitSteps = [
-  "Contact details and context are saved",
-  "Inquiry is tagged by service, urgency, or fit",
-  "Your team gets a clear notification",
-  "The visitor receives a useful next step",
-  "Follow-up reminders or email workflows can begin",
+const faqs = [
+  "Can the assistant answer customer questions?",
+  "Can it connect to my CRM?",
+  "Can it schedule appointments?",
+  "Can it qualify leads?",
+  "Can it hand conversations to humans?",
+  "Can it work with Shopify?",
+  "Can it support internal employees?",
+  "How long does implementation take?",
 ];
 
-export default function AIChatbotsAutomationPage() {
+export default function AIBusinessAssistantsPage() {
   return (
     <main>
-      <Section bgColor="secondary" padded>
-        <div className="grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
+      <Section bgColor="secondary" padded className="hero-atmosphere">
+        <div className="grid min-h-[calc(100vh-5rem)] items-center gap-10 py-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div>
             <p className="mb-5 text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              AI & AUTOMATION
+              AI Business Assistants
             </p>
-            <h1 className="heading-1 w-[calc(100vw-2rem)] max-w-4xl md:w-auto">
-              <span className="block">AI Assistants That</span>
-              <span className="block">Capture Leads,</span>
-              <span className="block">Answer Questions,</span>
-              <span className="block">and Reduce</span>
-              <span className="block">Manual Work</span>
+            <h1 className="heading-1 max-w-4xl">
+              AI Assistants That Work Like Part of Your Team
             </h1>
-            <p className="mt-6 max-w-[32ch] text-lg leading-relaxed text-dark-muted md:max-w-2xl md:text-xl">
-              We build AI-powered assistants, automation workflows, dashboard
-              handoffs, and CRM/email integrations that help your business
-              respond quickly, qualify prospects, support customers, and move
-              people toward the right next step.
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-secondary md:text-xl">
+              Purpose-built AI assistants trained around your business to answer
+              questions, qualify leads, automate repetitive work, and help your
+              team serve customers faster.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
+              <Button
+                href={STRATEGY_CALL_URL}
+                variant="primary"
+                size="lg"
+                trackingSource="hero"
+              >
                 Book Strategy Call
               </Button>
-              <Button href="#automations" variant="secondary" size="lg">
-                See What We Automate
+              <Button href="#examples" variant="secondary" size="lg">
+                See AI Examples
               </Button>
             </div>
+            <p className="mt-6 max-w-2xl text-sm leading-6 text-muted">
+              AI should not replace your business. It should strengthen it.
+              Your assistant should understand your customers, your workflow,
+              and the job it is responsible for.
+            </p>
           </div>
 
-          <div className="card-elevated relative overflow-hidden p-6 md:p-8">
-            <div className="absolute -right-20 -top-24 h-52 w-52 rounded-full bg-brand-blue/20 blur-3xl" />
-            <div className="absolute -bottom-24 -left-20 h-52 w-52 rounded-full bg-brand-cyan/10 blur-3xl" />
-            <div className="relative">
-              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-dark-border bg-brand-blue/15 text-brand-cyan">
-                <MessageSquare className="h-6 w-6" />
-              </div>
-              <h2 className="text-2xl font-bold text-dark-text">
-                What Your Assistant Can Do
-              </h2>
-              <div className="mt-6 grid gap-3">
-                {assistantCapabilities.map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-dark-muted"
-                  >
-                    <Check className="h-4 w-4 flex-none text-brand-cyan" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <AssistantSystemVisual />
         </div>
       </Section>
 
       <Section bgColor="deep">
-        <div className="grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr]">
-          <ChatbotPreviewMockup />
-
+        <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              Productized Automation
+              Why Most Chatbots Fail
             </p>
-            <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-              More Than a Popup. A Guided Lead and Support System.
+            <h2 className="mt-4 text-3xl font-bold text-primary md:text-5xl">
+              A generic bot cannot run a business workflow.
             </h2>
-            <p className="mt-5 text-lg leading-relaxed text-dark-muted">
-              The assistant helps visitors get answers quickly, but the real
-              value is what happens next: useful context is captured, the right
-              team sees it, and the visitor is guided toward a human-supported
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-secondary">
+              Most chat widgets are trained to answer static questions. An AI
+              Business Assistant is designed around a job: qualify the visitor,
+              collect the right context, route the conversation, and trigger the
               next step.
             </p>
-            <div className="mt-8 rounded-3xl border border-dark-border bg-white/[0.035] p-5">
-              <h3 className="text-xl font-bold text-dark-text">
-                AI supports your team. It does not replace your team.
-              </h3>
-              <p className="mt-3 leading-relaxed text-dark-muted">
-                We design assistants to reduce repetitive work, improve
-                response time, and make handoff cleaner when a person should
-                take over.
-              </p>
-            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {chatbotComparison.map((item) => (
+              <div
+                key={item.generic}
+                className="rounded-xl border border-dark-border bg-dark-card p-5"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                  Generic bots
+                </p>
+                <p className="mt-2 text-base font-semibold text-secondary">
+                  {item.generic}
+                </p>
+                <div className="my-4 h-px bg-dark-border" />
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                  Opzix assistants
+                </p>
+                <p className="mt-2 text-base font-bold text-primary">
+                  {item.assistant}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      <Section id="examples" bgColor="primary">
+        <SectionIntro
+          eyebrow="AI Assistants We Build"
+          title="Every assistant has a job."
+          description="Opzix designs assistants around the workflow they need to perform, not around a generic chat widget template."
+        />
+        <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {assistantTypes.map((assistant) => {
+            const Icon = assistant.icon;
+            return (
+              <div key={assistant.title} className="card p-6">
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="text-xl font-bold text-primary">
+                  {assistant.title}
+                </h3>
+                <p className="mt-3 leading-relaxed text-secondary">
+                  {assistant.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section bgColor="secondary">
+        <SectionIntro
+          eyebrow="Industry Examples"
+          title="Designed for the way your customers actually ask for help."
+          description="A real estate assistant should not behave like an ecommerce assistant. Opzix maps the assistant to the industry, customer journey, and handoff."
+        />
+        <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+          {industryExamples.map((industry) => {
+            const Icon = industry.icon;
+            return (
+              <div key={industry.title} className="rounded-xl border border-dark-border bg-dark-card p-5">
+                <Icon className="mb-5 h-7 w-7 text-brand-cyan" />
+                <h3 className="text-lg font-bold text-primary">{industry.title}</h3>
+                <div className="mt-4 space-y-3">
+                  {industry.items.map((item) => (
+                    <div key={item} className="flex gap-2 text-sm leading-6 text-secondary">
+                      <Check className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section bgColor="deep">
+        <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
+              What Can Your Assistant Do?
+            </p>
+            <h2 className="mt-4 text-3xl font-bold text-primary md:text-5xl">
+              Turn repeated conversations into a connected business system.
+            </h2>
+            <p className="mt-5 text-lg leading-relaxed text-secondary">
+              The assistant is only one part of the system. The value comes from
+              the workflow around it: intake, routing, CRM updates, scheduling,
+              internal support, and continuous improvement.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {assistantCapabilities.map((capability) => (
+              <div
+                key={capability}
+                className="flex items-center gap-3 rounded-xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm font-semibold text-secondary"
+              >
+                <Check className="h-4 w-4 flex-none text-brand-cyan" />
+                {capability}
+              </div>
+            ))}
           </div>
         </div>
       </Section>
 
       <Section bgColor="primary">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            The Response Gap
-          </p>
-          <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-            Your Business May Be Losing Leads Because Response Is Too Slow
-          </h2>
-        </div>
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {problems.map((problem) => (
-            <div key={problem} className="card p-6">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-dark-border bg-brand-blue/10 text-brand-cyan">
-                <Zap className="h-5 w-5" />
-              </div>
-              <p className="text-lg font-semibold leading-snug text-dark-text">
-                {problem}
-              </p>
+        <SectionIntro
+          eyebrow="Integrations"
+          title="Built to work with the tools your business already uses."
+          description="Your assistant can sit on the website, hand context to the CRM, schedule meetings, alert the team, and connect to custom systems when needed."
+        />
+        <div className="mt-12 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          {integrations.map((integration) => (
+            <div
+              key={integration}
+              className="rounded-xl border border-dark-border bg-dark-card px-4 py-4 text-center text-sm font-bold text-primary"
+            >
+              {integration}
             </div>
           ))}
         </div>
       </Section>
 
       <Section bgColor="secondary">
-        <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              After Submission
+              How We Build Your Assistant
             </p>
-            <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-              What Happens After a Visitor Submits Info
+            <h2 className="mt-4 text-3xl font-bold text-primary md:text-5xl">
+              Business process first. AI model second.
             </h2>
-            <p className="mt-5 text-lg leading-relaxed text-dark-muted">
-              A good assistant should not just collect a name and email. It
-              should make the next action clearer for your visitor and easier
-              for your team to process.
+            <p className="mt-5 text-lg leading-relaxed text-secondary">
+              We start by understanding the job the assistant needs to perform,
+              then design the conversation, routing, integrations, and
+              improvement loop around that job.
             </p>
-            <div className="mt-8 grid gap-3">
-              {afterSubmitSteps.map((step, index) => (
-                <div
-                  key={step}
-                  className="flex items-center gap-4 rounded-2xl border border-dark-border bg-white/[0.035] p-4"
-                >
-                  <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-bold text-white">
-                    {index + 1}
-                  </div>
-                  <p className="font-semibold text-dark-text">{step}</p>
-                </div>
-              ))}
-            </div>
           </div>
-          <WorkflowMapMockup />
-        </div>
-      </Section>
-
-      <Section id="automations" bgColor="deep">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            What We Automate
-          </p>
-          <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-            A Smarter Way to Capture, Qualify, and Respond
-          </h2>
-        </div>
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {solutions.map((solution) => {
-            const Icon = solution.icon;
-            return (
-              <div key={solution.title} className="card p-6">
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-dark-border bg-brand-blue/10 text-brand-cyan">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="text-xl font-bold text-dark-text">
-                  {solution.title}
-                </h3>
-                <p className="mt-3 leading-relaxed text-dark-muted">
-                  {solution.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section bgColor="secondary">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            Use Cases
-          </p>
-          <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-            Where AI Assistants Create Immediate Value
-          </h2>
-        </div>
-        <div className="mt-12 grid gap-5 md:grid-cols-2">
-          {useCases.map((useCase) => {
-            const Icon = useCase.icon;
-            return (
-              <div key={useCase.title} className="card-elevated p-7">
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-dark-border bg-brand-blue/10 text-brand-cyan">
-                  <Icon className="h-6 w-6" />
-                </div>
-                <h3 className="text-2xl font-bold text-dark-text">
-                  {useCase.title}
-                </h3>
-                <p className="mt-4 leading-relaxed text-dark-muted">
-                  {useCase.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section bgColor="primary">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            Workflow
-          </p>
-          <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-            How the System Works
-          </h2>
-        </div>
-        <div className="mx-auto mt-12 max-w-4xl">
-          <div className="grid gap-4">
-            {workflowSteps.map((step, index) => (
+          <div className="grid gap-3">
+            {buildSteps.map((step, index) => (
               <div
                 key={step}
-                className="card flex gap-5 p-5 sm:items-center sm:p-6"
+                className="grid gap-4 rounded-xl border border-dark-border bg-dark-card p-4 sm:grid-cols-[auto_1fr] sm:items-center"
               >
-                <div className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl border border-dark-border bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-bold text-white shadow-button">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue to-brand-cyan text-sm font-black text-white">
                   {index + 1}
                 </div>
-                <p className="text-lg font-semibold text-dark-text">{step}</p>
+                <p className="text-base font-bold text-primary">{step}</p>
               </div>
             ))}
           </div>
@@ -405,72 +374,209 @@ export default function AIChatbotsAutomationPage() {
       </Section>
 
       <Section bgColor="deep">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            Packages
-          </p>
-          <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-            AI Assistant Packages Built Around Your Workflow
-          </h2>
+        <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
+              Why Businesses Choose Opzix
+            </p>
+            <h2 className="mt-4 text-3xl font-bold text-primary md:text-5xl">
+              AI assistants built like business infrastructure.
+            </h2>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {whyOpzix.map((item) => (
+                <div key={item} className="flex gap-3 rounded-xl border border-dark-border bg-dark-card p-4 text-secondary">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 flex-none text-brand-cyan" />
+                  <span className="font-semibold">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-brand-cyan/30 bg-brand-cyan/10 p-6">
+            <Sparkles className="h-8 w-8 text-brand-cyan" />
+            <p className="mt-5 text-2xl font-bold leading-snug text-primary">
+              Businesses do not need another generic chatbot.
+            </p>
+            <p className="mt-4 leading-7 text-secondary">
+              They need an assistant trained around how the business operates:
+              how leads are qualified, how customers ask questions, how teams
+              route work, and which systems need to receive context.
+            </p>
+          </div>
         </div>
-        <div className="mt-12 grid gap-6 lg:grid-cols-3">
-          {packages.map((servicePackage) => (
-            <div key={servicePackage.title} className="card-elevated p-7">
-              <h3 className="text-2xl font-bold text-dark-text">
-                {servicePackage.title}
-              </h3>
-              <p className="mt-4 min-h-[72px] leading-relaxed text-dark-muted">
-                {servicePackage.description}
-              </p>
-              <div className="mt-7 space-y-3">
-                {servicePackage.includes.map((item) => (
-                  <div key={item} className="flex gap-3 text-dark-muted">
-                    <Check className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
+      </Section>
+
+      <Section bgColor="primary">
+        <SectionIntro
+          eyebrow="Frequently Asked Questions"
+          title="Common questions before building an AI assistant."
+          description="These are the questions we usually answer before scoping the workflow, integrations, and launch plan."
+        />
+        <div className="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-2">
+          {faqs.map((question) => (
+            <div
+              key={question}
+              className="flex gap-3 rounded-xl border border-dark-border bg-dark-card p-5"
+            >
+              <HelpCircle className="mt-0.5 h-5 w-5 flex-none text-brand-cyan" />
+              <p className="font-semibold leading-6 text-primary">{question}</p>
             </div>
           ))}
         </div>
       </Section>
 
       <Section bgColor="secondary">
-        <div className="grid items-center gap-10 lg:grid-cols-[0.92fr_1.08fr]">
-          <div className="card-elevated p-7 md:p-8">
-            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-dark-border bg-brand-blue/10 text-brand-cyan">
-              <ServerCog className="h-6 w-6" />
-            </div>
-            <p className="text-lg leading-relaxed text-dark-muted">
-              Most chatbots are just popups. We build assistants that connect to
-              your customer journey and business operations.
+        <div className="grid gap-8 rounded-xl border border-brand-cyan/30 bg-gradient-to-br from-brand-blue/15 via-dark-card to-brand-cyan/10 p-6 shadow-[0_30px_90px_rgba(6,182,212,0.12)] md:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+              Final Step
+            </p>
+            <h2 className="mt-4 text-3xl font-bold text-primary md:text-5xl">
+              Ready to Build an AI Assistant That Actually Helps Your Business?
+            </h2>
+            <p className="mt-4 max-w-3xl leading-7 text-secondary">
+              We will map the job your assistant should perform, the systems it
+              needs to connect with, and the fastest path to launch.
             </p>
           </div>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              Why Opzix
-            </p>
-            <h2 className="mt-4 text-3xl font-bold text-dark-text md:text-5xl">
-              Why Our AI Systems Are Different
-            </h2>
-            <div className="mt-8 grid gap-4">
-              {whyOpzix.map((item) => (
-                <div key={item} className="flex gap-3 text-lg text-dark-muted">
-                  <Check className="mt-1 h-5 w-5 flex-none text-brand-cyan" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+            <Button
+              href={STRATEGY_CALL_URL}
+              variant="primary"
+              size="lg"
+              trackingSource="pricing"
+            >
+              Book Strategy Call
+            </Button>
+            <Button href="/" variant="secondary" size="lg">
+              Talk to Zora
+            </Button>
           </div>
         </div>
       </Section>
-
-      <CTASection
-        headline="Ready to Turn Website Visitors Into Qualified Leads?"
-        subheadline="Let's map where AI and automation can save time, capture more leads, and improve your customer journey."
-        buttonLabel="Book Strategy Call"
-        buttonHref={STRATEGY_CALL_URL}
-      />
     </main>
   );
+}
+
+function AssistantSystemVisual() {
+  const journey = [
+    { label: "Visitor", icon: Search },
+    { label: "AI conversation", icon: MessageSquare },
+    { label: "Qualification", icon: SlidersHorizontal },
+    { label: "CRM workflow", icon: GitBranch },
+    { label: "Booked next step", icon: CalendarCheck },
+  ];
+
+  return (
+    <div className="relative min-w-0 overflow-hidden rounded-xl border border-dark-border bg-dark-card p-5 shadow-[0_28px_90px_rgba(2,8,23,0.35)] md:p-6">
+      <div className="absolute -right-24 -top-24 h-60 w-60 rounded-full bg-brand-blue/20 blur-3xl" />
+      <div className="absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-brand-cyan/12 blur-3xl" />
+      <div className="relative">
+        <div className="mb-5 flex items-center justify-between gap-4 border-b border-dark-border pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-cyan">
+              Assistant Command Center
+            </p>
+            <h2 className="mt-2 text-xl font-bold text-primary">
+              Conversation to workflow
+            </h2>
+          </div>
+          <span className="rounded-full border border-brand-cyan/30 bg-brand-cyan/10 px-3 py-1 text-xs font-bold text-brand-cyan">
+            Live
+          </span>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="space-y-3">
+            <div className="max-w-[90%] rounded-xl rounded-tl-sm border border-white/10 bg-white/[0.05] p-3 text-sm leading-6 text-secondary">
+              We need help qualifying leads before our team calls them.
+            </div>
+            <div className="ml-auto max-w-[92%] rounded-xl rounded-tr-sm border border-brand-cyan/30 bg-brand-blue/15 p-3 text-sm leading-6 text-primary">
+              I can collect fit, urgency, service need, and budget range, then
+              route qualified prospects to your CRM and booking flow.
+            </div>
+            <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                Captured context
+              </p>
+              <div className="mt-3 grid gap-2 text-sm text-secondary">
+                <span>Business type: Service firm</span>
+                <span>Need: Lead qualification</span>
+                <span>Next step: Strategy call</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-dark-border bg-dark-deep/80 p-4">
+            <p className="text-sm font-bold text-primary">Workflow route</p>
+            <div className="mt-4 space-y-3">
+              {journey.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <div key={step.label}>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 flex-none items-center justify-center rounded-lg border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <p className="text-sm font-semibold text-secondary">
+                        {step.label}
+                      </p>
+                    </div>
+                    {index < journey.length - 1 ? (
+                      <div className="ml-4 h-4 w-px bg-brand-cyan/30" />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          {[
+            ["Lead score", "82%"],
+            ["Context fields", "9"],
+            ["Workflow", "CRM + calendar"],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-xl border border-dark-border bg-white/[0.035] p-3"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                {label}
+              </p>
+              <p className="mt-2 text-lg font-black text-primary">{value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionIntro({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl text-center">
+      <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
+        {eyebrow}
+      </p>
+      <h2 className="mt-4 text-3xl font-bold text-primary md:text-5xl">
+        {title}
+      </h2>
+      <p className="mt-5 text-lg leading-relaxed text-secondary">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function BriefcaseIcon({ className = "" }: { className?: string }) {
+  return <LayoutGrid className={className} />;
 }

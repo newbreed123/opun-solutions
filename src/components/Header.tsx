@@ -17,7 +17,7 @@ const navLinks = [
         href: "/services/ecommerce-solutions",
       },
       {
-        label: "AI & Automation",
+        label: "AI Business Assistants",
         href: "/services/ai-chatbots-automation",
       },
       {

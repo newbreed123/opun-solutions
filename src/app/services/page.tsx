@@ -40,13 +40,13 @@ const coreServices = [
   },
   {
     icon: MessageSquare,
-    title: "AI Chatbots & Lead Capture",
+    title: "AI Business Assistants",
     description:
-      "AI assistants that qualify prospects, answer questions, and book sales conversations automatically — so you never miss a lead.",
+      "Purpose-built AI assistants that qualify prospects, answer questions, route conversations, and connect to business workflows.",
     bullets: [
       "Lead capture and qualification",
       "Appointment and follow-up automation",
-      "FAQ and contact handling",
+      "Customer question handling",
       "Human handoff when needed",
     ],
   },
@@ -346,7 +346,7 @@ export default function Services() {
                   "Best for businesses ready to add automation, AI chat, and conversion tracking.",
                 features: [
                   "Everything in Launch",
-                  "AI chatbot setup",
+                  "AI assistant setup",
                   "Lead capture automation",
                   "Google Ads tracking",
                   "Email follow-up setup",
