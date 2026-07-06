@@ -13,6 +13,7 @@ export const demoFounderDashboardMetrics: FounderDashboardMetrics = {
   zoraConversations: 84,
   strategyCallsBooked: 19,
   contactFormsSubmitted: 27,
+  zoraQualifiedLeads: 31,
 };
 
 export const demoProblemCategories: ProblemCategory[] = [

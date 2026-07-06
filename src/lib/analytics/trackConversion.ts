@@ -9,6 +9,16 @@ export type ConversionEventName =
   | "ask_question_clicked"
   | "roadmap_downloaded";
 
+type FounderEventName =
+  | "audit_started"
+  | "audit_completed"
+  | "zora_conversation_started"
+  | "strategy_call_booked"
+  | "contact_form_submitted"
+  | "zora_qualified_lead"
+  | "pdf_downloaded"
+  | "strategy_call_clicked";
+
 export type ConversionPayload = {
   source?: string;
   businessType?: string;
@@ -234,7 +244,52 @@ function logInternalConversionEvent(
       }),
       keepalive: true,
     }).catch(() => undefined);
+    logInternalFounderEvent(eventName, payload);
   } catch {
     // Internal analytics should never interrupt the product experience.
   }
+}
+
+function logInternalFounderEvent(
+  eventName: ConversionEventName,
+  payload: Record<string, string | number | boolean>,
+) {
+  const founderEventName = founderEventNameForConversion(eventName);
+
+  if (!founderEventName) {
+    return;
+  }
+
+  try {
+    void fetch("/api/founder-dashboard/events", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        eventName: founderEventName,
+        source: stringField(payload.source),
+        websiteUrl: stringField(payload.websiteUrl),
+        scanId: stringField(payload.scanId),
+        businessType: stringField(payload.businessType),
+        challenge: stringField(payload.challenge),
+        industry: stringField(payload.industry),
+      }),
+      keepalive: true,
+    }).catch(() => undefined);
+  } catch {
+    // Founder analytics should never interrupt the product experience.
+  }
+}
+
+function founderEventNameForConversion(
+  eventName: ConversionEventName,
+): FounderEventName | null {
+  if (eventName === "roadmap_downloaded") return "pdf_downloaded";
+  if (eventName === "ask_question_clicked") return null;
+  return eventName;
+}
+
+function stringField(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

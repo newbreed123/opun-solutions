@@ -4,7 +4,6 @@ const funnelDefinitions: Array<{
   key: keyof FounderDashboardMetrics;
   label: string;
 }> = [
-  { key: "visitors", label: "Visitors" },
   { key: "auditStarted", label: "Audit Started" },
   { key: "auditCompleted", label: "Audit Completed" },
   { key: "auditAssistantPrompts", label: "Audit Assistant Prompt Clicked" },

@@ -67,7 +67,22 @@ export async function supabaseAdminFetch<T>(
       ...(options.prefer ? { Prefer: options.prefer } : {}),
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  }).catch((error: unknown) => {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Supabase request failed before a response was received.";
+
+    return {
+      ok: false as const,
+      error: message,
+      status: 0,
+    };
   });
+
+  if (!("text" in response)) {
+    return response;
+  }
 
   const text = await response.text();
   const data = text ? safeParseJson<T>(text) : (null as T);

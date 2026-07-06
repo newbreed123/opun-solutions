@@ -20,8 +20,10 @@ import {
   demoProblemCategories,
   demoRecentFounderEvents,
 } from "@/lib/founder-dashboard/mock-data";
+import { getFounderDashboardMetrics } from "@/lib/founder-dashboard/events";
 import { calculateFunnelRates, percentage } from "@/lib/founder-dashboard/metrics";
 import type {
+  FounderDashboardEvent,
   FounderDashboardMetrics,
   FounderEvent,
   FunnelStep,
@@ -53,6 +55,7 @@ type HealthMetric = {
 };
 
 const dataStatusLabel = "Demo data until GA4 API is connected.";
+const liveDataStatusLabel = "Live internal events";
 
 const insightCards = [
   "Audit completion rate is strong",
@@ -76,7 +79,26 @@ export default async function FounderDashboardPage({
     );
   }
 
-  const metrics = demoFounderDashboardMetrics;
+  const dashboardData = await getFounderDashboardMetrics();
+  const hasRealEvents = dashboardData.ok && dashboardData.data.events.length > 0;
+  const metrics = hasRealEvents
+    ? dashboardData.data.metrics
+    : demoFounderDashboardMetrics;
+  const problemCategories = hasRealEvents
+    ? categoryRows(
+        dashboardData.data.topProblems,
+        "Sourced from sanitized event challenge fields.",
+      )
+    : demoProblemCategories;
+  const industryCategories = hasRealEvents
+    ? categoryRows(
+        dashboardData.data.topIndustries,
+        "Sourced from sanitized industry and business type fields.",
+      )
+    : demoIndustryCategories;
+  const recentEvents = hasRealEvents
+    ? dashboardData.data.events.slice(0, 12).map(founderEventForDisplay)
+    : demoRecentFounderEvents;
   const funnelSteps = calculateFunnelRates(metrics);
   const healthMetrics = buildHealthMetrics(metrics);
 
@@ -96,7 +118,7 @@ export default async function FounderDashboardPage({
         </div>
         <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-brand-cyan/30 bg-brand-cyan/10 px-4 py-3 text-sm font-semibold text-brand-cyan">
           <CircleAlert className="h-4 w-4 flex-none" />
-          {dataStatusLabel}
+          {hasRealEvents ? liveDataStatusLabel : dataStatusLabel}
         </div>
       </div>
 
@@ -117,8 +139,12 @@ export default async function FounderDashboardPage({
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <AnalyticsPanel
             eyebrow="Funnel View"
-            title="Visitor to Revenue Intent"
-            description="Each step shows demo count and conversion from the previous step."
+            title="Audit to Revenue Intent"
+            description={
+              hasRealEvents
+                ? "Each step shows live internal count and conversion from the previous step."
+                : "Each step shows demo count and conversion from the previous step."
+            }
           >
             <FunnelView steps={funnelSteps} />
           </AnalyticsPanel>
@@ -140,17 +166,25 @@ export default async function FounderDashboardPage({
           <AnalyticsPanel
             eyebrow="Lead Profile Placeholders"
             title="Top Business Problems"
-            description="Eventually sourced from Zora lead profile data."
+            description={
+              hasRealEvents
+                ? "Grouped from sanitized challenge fields on internal events."
+                : "Eventually sourced from Zora lead profile data."
+            }
           >
-            <CategoryGrid categories={demoProblemCategories} />
+            <CategoryGrid categories={problemCategories} />
           </AnalyticsPanel>
 
           <AnalyticsPanel
             eyebrow="Market Mix Placeholders"
             title="Top Industries"
-            description="Eventually sourced from Zora qualification and scanner industry detection."
+            description={
+              hasRealEvents
+                ? "Grouped from sanitized industry and business type fields."
+                : "Eventually sourced from Zora qualification and scanner industry detection."
+            }
           >
-            <CategoryGrid categories={demoIndustryCategories} />
+            <CategoryGrid categories={industryCategories} />
           </AnalyticsPanel>
         </section>
 
@@ -158,9 +192,13 @@ export default async function FounderDashboardPage({
           <AnalyticsPanel
             eyebrow="Recent Activity"
             title="Latest Funnel Events"
-            description="Mock event stream only; no private customer data is shown."
+            description={
+              hasRealEvents
+                ? "Latest sanitized internal events; no names, emails, phones, or message content."
+                : "Mock event stream only; no private customer data is shown."
+            }
           >
-            <RecentActivity events={demoRecentFounderEvents} />
+            <RecentActivity events={recentEvents} />
           </AnalyticsPanel>
 
           <AnalyticsPanel
@@ -187,7 +225,7 @@ export default async function FounderDashboardPage({
         <AnalyticsPanel
           eyebrow="Future Data Sources"
           title="GA4 and Internal Event Integration"
-          description="This v1 intentionally avoids GA4 API work until credentials and architecture are ready."
+          description="This v2 uses internal event storage first and still avoids GA4 API work until credentials and architecture are ready."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
@@ -212,12 +250,6 @@ export default async function FounderDashboardPage({
 
 function buildKpiCards(metrics: FounderDashboardMetrics): KpiCard[] {
   return [
-    {
-      label: "Visitors",
-      value: metrics.visitors,
-      icon: Users,
-      helper: "Top-of-funnel sessions",
-    },
     {
       label: "Audit Started",
       value: metrics.auditStarted,
@@ -254,16 +286,17 @@ function buildKpiCards(metrics: FounderDashboardMetrics): KpiCard[] {
       icon: Contact,
       helper: "Direct inquiry",
     },
+    {
+      label: "Zora Qualified Leads",
+      value: metrics.zoraQualifiedLeads,
+      icon: Users,
+      helper: "Qualification signal",
+    },
   ];
 }
 
 function buildHealthMetrics(metrics: FounderDashboardMetrics): HealthMetric[] {
   return [
-    {
-      label: "Audit start rate",
-      value: percentage(metrics.auditStarted, metrics.visitors),
-      base: "Audit started / visitors",
-    },
     {
       label: "Audit completion rate",
       value: percentage(metrics.auditCompleted, metrics.auditStarted),
@@ -285,6 +318,43 @@ function buildHealthMetrics(metrics: FounderDashboardMetrics): HealthMetric[] {
       base: "Contact forms / audit completed",
     },
   ];
+}
+
+function categoryRows(
+  rows: Array<{ label: string; count: number }>,
+  note: string,
+): ProblemCategory[] {
+  return rows.map((row) => ({
+    ...row,
+    note,
+  }));
+}
+
+function founderEventForDisplay(event: FounderDashboardEvent): FounderEvent {
+  return {
+    id: event.id,
+    eventName: event.eventName,
+    label: labelForEvent(event.eventName),
+    occurredAt: event.createdAt,
+    source: [event.source || "unknown", event.websiteUrl].filter(Boolean).join(" - "),
+    websiteUrl: event.websiteUrl,
+  };
+}
+
+function labelForEvent(eventName: FounderDashboardEvent["eventName"]) {
+  const labels: Record<FounderDashboardEvent["eventName"], string> = {
+    audit_started: "Audit started",
+    audit_completed: "Audit completed",
+    zora_conversation_started: "Zora conversation started",
+    audit_assistant_prompt_clicked: "Audit assistant prompt clicked",
+    strategy_call_booked: "Strategy call booked",
+    contact_form_submitted: "Contact form submitted",
+    zora_qualified_lead: "Zora qualified lead",
+    pdf_downloaded: "PDF downloaded",
+    strategy_call_clicked: "Strategy call clicked",
+  };
+
+  return labels[eventName];
 }
 
 function DashboardShell({ children }: { children: ReactNode }) {
@@ -449,6 +519,9 @@ function CategoryGrid({
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      {categories.length === 0 ? (
+        <p className="text-sm text-muted">No categorized event data yet.</p>
+      ) : null}
       {categories.map((category) => (
         <div
           key={category.label}
