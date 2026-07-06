@@ -1086,6 +1086,54 @@ export default function OpzixAIAssistant() {
         pagePath: window.location.pathname,
       });
     }
+
+    trackFounderZoraEvent(eventType, normalizedProfile);
+  }
+
+  function trackFounderZoraEvent(
+    eventType: string,
+    profile: ReturnType<typeof normalizeProfile>,
+  ) {
+    const ctaType = ctaTypeForZoraEvent(eventType);
+    const isCompletedProfile =
+      eventType === "qualification_completed" &&
+      Boolean(profile.businessType && profile.challenge && profile.websiteUrl);
+
+    if (!ctaType && !isCompletedProfile) {
+      return;
+    }
+
+    const eventName = ctaType ? "zora_cta_clicked" : "zora_lead_profile_completed";
+
+    try {
+      void fetch("/api/founder-dashboard/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventName,
+          source: "zora",
+          websiteUrl: profile.websiteUrl,
+          businessType: profile.businessType,
+          challenge: profile.challenge,
+          industry: profile.industry || profile.inferredIndustry,
+          ctaType,
+        }),
+        keepalive: true,
+      }).catch(() => undefined);
+    } catch {
+      // Founder analytics should never interrupt chat navigation.
+    }
+  }
+
+  function ctaTypeForZoraEvent(eventType: string) {
+    if (eventType === "audit_clicked") return "run_audit";
+    if (eventType === "strategy_call_clicked") return "book_strategy_call";
+    if (eventType === "ask_question_clicked") return "ask_question";
+    if (eventType === "contact_requested") return "contact";
+    if (eventType === "download_pdf") return "download_pdf";
+    return "";
   }
 
   function trackZoraConversationStartedOnce() {

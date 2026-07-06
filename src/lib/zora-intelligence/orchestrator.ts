@@ -337,7 +337,12 @@ function actionCommitmentResponse(
 function explainerResponse(context: ZoraIntelligenceContext): ZoraStructuredResponse | null {
   const text = normalizedText(context.userMessage);
 
-  if (/^(what is|what are|define|meaning of|explain) tracking$/.test(text)) {
+  if (
+    /^(what is|what are|what does|define|meaning of|explain) tracking( mean| means)?$/.test(
+      text,
+    ) ||
+    /^what does tracking mean$/.test(text)
+  ) {
     return {
       intent: "explainer",
       message: [

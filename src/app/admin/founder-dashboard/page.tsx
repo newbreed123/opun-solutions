@@ -19,8 +19,10 @@ import {
   demoIndustryCategories,
   demoProblemCategories,
   demoRecentFounderEvents,
+  demoZoraIntelligenceInsights,
 } from "@/lib/founder-dashboard/mock-data";
 import { getFounderDashboardMetrics } from "@/lib/founder-dashboard/events";
+import type { ZoraIntelligenceInsights } from "@/lib/founder-dashboard/events";
 import { calculateFunnelRates, percentage } from "@/lib/founder-dashboard/metrics";
 import type {
   FounderDashboardEvent,
@@ -56,6 +58,7 @@ type HealthMetric = {
 
 const dataStatusLabel = "Demo data until GA4 API is connected.";
 const liveDataStatusLabel = "Live internal events";
+const demoZoraStatusLabel = "Demo Zora insights until real Zora events are collected.";
 
 const insightCards = [
   "Audit completion rate is strong",
@@ -99,6 +102,11 @@ export default async function FounderDashboardPage({
   const recentEvents = hasRealEvents
     ? dashboardData.data.events.slice(0, 12).map(founderEventForDisplay)
     : demoRecentFounderEvents;
+  const hasRealZoraInsightEvents =
+    dashboardData.ok && dashboardData.data.zoraInsights.hasRealZoraInsightEvents;
+  const zoraInsights = hasRealZoraInsightEvents
+    ? dashboardData.data.zoraInsights
+    : demoZoraIntelligenceInsights;
   const funnelSteps = calculateFunnelRates(metrics);
   const healthMetrics = buildHealthMetrics(metrics);
 
@@ -157,6 +165,185 @@ export default async function FounderDashboardPage({
             <div className="space-y-4">
               {healthMetrics.map((metric) => (
                 <HealthRateCard key={metric.label} metric={metric} />
+              ))}
+            </div>
+          </AnalyticsPanel>
+        </section>
+
+        <AnalyticsPanel
+          eyebrow="Zora Intelligence"
+          title="Conversation Learning"
+          description={
+            hasRealZoraInsightEvents
+              ? "Live sanitized Zora events grouped into founder-level learning signals."
+              : demoZoraStatusLabel
+          }
+        >
+          {!hasRealZoraInsightEvents ? (
+            <div className="mb-5 rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">
+              {demoZoraStatusLabel}
+            </div>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <InsightStatCard
+              label="Zora Conversations"
+              value={zoraInsights.totalZoraConversations}
+              helper="Conversation starts or message signals"
+            />
+            <InsightStatCard
+              label="Qualified Leads"
+              value={zoraInsights.qualifiedZoraLeads}
+              helper={`${formatPercent(zoraInsights.qualifiedLeadRate)} qualified rate`}
+            />
+            <InsightStatCard
+              label="Profile Completion Rate"
+              value={formatPercent(zoraInsights.leadProfileCompletionRate)}
+              helper={`${zoraInsights.leadProfileCompleted} completed profiles`}
+            />
+            <InsightStatCard
+              label="Low Confidence Fallbacks"
+              value={zoraInsights.lowConfidenceFallbacks}
+              helper={`${formatPercent(zoraInsights.lowConfidenceFallbackRate)} fallback rate`}
+            />
+          </div>
+        </AnalyticsPanel>
+
+        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <AnalyticsPanel
+            eyebrow="Top Prospect Questions"
+            title="Sanitized Question Summaries"
+            description="Short non-sensitive summaries only; raw chat messages are not displayed."
+          >
+            <InsightRows
+              rows={zoraInsights.topQuestionSummaries}
+              emptyLabel="No sanitized Zora question summaries yet."
+            />
+          </AnalyticsPanel>
+
+          <AnalyticsPanel
+            eyebrow="Top Detected Intent"
+            title="Intent Mix"
+            description="Grouped Zora intent categories such as offer, concept, framework, action, pricing, and fallback."
+          >
+            <InsightRows
+              rows={zoraInsights.topZoraIntents}
+              emptyLabel="No detected Zora intents yet."
+            />
+          </AnalyticsPanel>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2">
+          <AnalyticsPanel
+            eyebrow="Top Concepts / Offers"
+            title="What Users Ask About"
+            description="Concepts and services detected from sanitized Zora routing signals."
+          >
+            <div className="grid gap-6 md:grid-cols-2">
+              <InsightSubpanel title="Concepts users ask about">
+                <InsightRows
+                  rows={zoraInsights.topZoraConcepts}
+                  emptyLabel="No concept detections yet."
+                />
+              </InsightSubpanel>
+              <InsightSubpanel title="Services users ask about">
+                <InsightRows
+                  rows={zoraInsights.topZoraOffers}
+                  emptyLabel="No offer detections yet."
+                />
+              </InsightSubpanel>
+            </div>
+          </AnalyticsPanel>
+
+          <AnalyticsPanel
+            eyebrow="Solution Framework Usage"
+            title="Framework Demand"
+            description="Frameworks Zora used to explain prospect problems and next steps."
+          >
+            <InsightRows
+              rows={zoraInsights.topSolutionFrameworks}
+              emptyLabel="No solution framework usage yet."
+            />
+          </AnalyticsPanel>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <AnalyticsPanel
+            eyebrow="Conversation Quality"
+            title="Qualification and Drop-off Signals"
+            description="Session-level attribution requires anonymous sessionId."
+          >
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <HealthRateCard
+                metric={{
+                  label: "Low-confidence fallback rate",
+                  value: zoraInsights.lowConfidenceFallbackRate,
+                  base: "Fallbacks / conversations",
+                }}
+              />
+              <HealthRateCard
+                metric={{
+                  label: "Qualified lead rate",
+                  value: zoraInsights.qualifiedLeadRate,
+                  base: "Qualified leads / conversations",
+                }}
+              />
+              <HealthRateCard
+                metric={{
+                  label: "CTA click rate",
+                  value: zoraInsights.ctaClickRate,
+                  base: "Zora CTA clicks / conversations",
+                }}
+              />
+            </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <InsightStatCard
+                label="With Business Type"
+                value={zoraInsights.conversationsWithBusinessType}
+                helper="Profile context present"
+              />
+              <InsightStatCard
+                label="With Challenge"
+                value={zoraInsights.conversationsWithChallenge}
+                helper="Problem context present"
+              />
+              <InsightStatCard
+                label="With Website Domain"
+                value={zoraInsights.conversationsWithWebsiteDomain}
+                helper="Domain context present"
+              />
+              <InsightStatCard
+                label="All 3 Fields"
+                value={zoraInsights.conversationsWithAllProfileFields}
+                helper="Business, challenge, and domain"
+              />
+            </div>
+            <p className="mt-4 text-sm leading-6 text-muted">
+              Strategy call clicks after Zora:{" "}
+              <span className="font-bold text-primary">
+                {zoraInsights.strategyCallClicksAfterZora}
+              </span>
+              . Session-level attribution requires anonymous sessionId.
+            </p>
+          </AnalyticsPanel>
+
+          <AnalyticsPanel
+            eyebrow="Founder Insight Notes"
+            title="Zora Learning Actions"
+            description="Static v3 notes for prioritizing knowledge and campaign updates."
+          >
+            <div className="space-y-3">
+              {[
+                "Repeated unknown questions should become Brain entries.",
+                "High offer interest should become landing pages.",
+                "High framework usage should influence Google Ads campaigns.",
+                "Low-confidence fallback spikes mean Zora needs knowledge/playbook updates.",
+              ].map((note) => (
+                <div
+                  key={note}
+                  className="rounded-xl border border-brand-cyan/20 bg-brand-cyan/10 p-4 text-sm font-semibold leading-6 text-primary"
+                >
+                  {note}
+                </div>
               ))}
             </div>
           </AnalyticsPanel>
@@ -352,6 +539,15 @@ function labelForEvent(eventName: FounderDashboardEvent["eventName"]) {
     zora_qualified_lead: "Zora qualified lead",
     pdf_downloaded: "PDF downloaded",
     strategy_call_clicked: "Strategy call clicked",
+    zora_message_received: "Zora message received",
+    zora_intent_detected: "Zora intent detected",
+    zora_concept_detected: "Zora concept detected",
+    zora_offer_detected: "Zora offer detected",
+    zora_solution_framework_used: "Zora solution framework used",
+    zora_playbook_used: "Zora playbook used",
+    zora_low_confidence_fallback: "Zora low-confidence fallback",
+    zora_lead_profile_completed: "Zora lead profile completed",
+    zora_cta_clicked: "Zora CTA clicked",
   };
 
   return labels[eventName];
@@ -510,6 +706,75 @@ function HealthRateCard({ metric }: { metric: HealthMetric }) {
   );
 }
 
+function InsightStatCard({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: number | string;
+  helper: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-dark-deep/60 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+        {label}
+      </p>
+      <p className="mt-3 text-3xl font-black text-primary">
+        {typeof value === "number" ? formatNumber(value) : value}
+      </p>
+      <p className="mt-2 text-sm text-muted">{helper}</p>
+    </div>
+  );
+}
+
+function InsightSubpanel({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-dark-deep/60 p-4">
+      <h3 className="text-sm font-bold text-primary">{title}</h3>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function InsightRows({
+  rows,
+  emptyLabel,
+}: {
+  rows: ZoraIntelligenceInsights["topZoraIntents"];
+  emptyLabel: string;
+}) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted">{emptyLabel}</p>;
+  }
+
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+
+  return (
+    <div className="space-y-4">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <div className="flex items-start justify-between gap-4">
+            <p className="min-w-0 break-words text-sm font-semibold text-secondary">
+              {cleanInsightLabel(row.label)}
+            </p>
+            <p className="flex-none text-sm font-bold text-primary">
+              {row.count}
+            </p>
+          </div>
+          <ProgressBar value={percentage(row.count, total)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CategoryGrid({
   categories,
 }: {
@@ -597,4 +862,10 @@ function formatDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function cleanInsightLabel(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

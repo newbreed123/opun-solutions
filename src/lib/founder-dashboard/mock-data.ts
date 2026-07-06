@@ -1,4 +1,7 @@
 import type {
+  ZoraIntelligenceInsights,
+} from "./events";
+import type {
   FounderDashboardMetrics,
   FounderEvent,
   IndustryCategory,
@@ -119,3 +122,62 @@ export const demoRecentFounderEvents: FounderEvent[] = [
     source: "Contact form",
   },
 ];
+
+export const demoZoraIntelligenceInsights: ZoraIntelligenceInsights = {
+  hasRealZoraInsightEvents: false,
+  totalZoraConversations: 84,
+  qualifiedZoraLeads: 31,
+  leadProfileCompleted: 37,
+  leadProfileCompletionRate: 44,
+  lowConfidenceFallbacks: 9,
+  lowConfidenceFallbackRate: 10.7,
+  ctaClicksFromZora: 46,
+  ctaClickRate: 54.8,
+  qualifiedLeadRate: 36.9,
+  conversationsWithBusinessType: 52,
+  conversationsWithChallenge: 44,
+  conversationsWithWebsiteDomain: 39,
+  conversationsWithAllProfileFields: 28,
+  strategyCallClicksAfterZora: 18,
+  topZoraIntents: [
+    { label: "offer", count: 26 },
+    { label: "solution_framework", count: 21 },
+    { label: "brain_concept", count: 14 },
+    { label: "audit_context", count: 11 },
+    { label: "pricing", count: 7 },
+    { label: "fallback", count: 5 },
+  ],
+  topZoraConcepts: [
+    { label: "tracking_visibility", count: 14 },
+    { label: "conversion_path", count: 11 },
+    { label: "lead_follow_up", count: 8 },
+    { label: "customer_journey", count: 7 },
+  ],
+  topZoraOffers: [
+    { label: "ai_assistant_chatbot", count: 17 },
+    { label: "analytics_tracking", count: 13 },
+    { label: "ecommerce_storefront", count: 10 },
+    { label: "crm_email_automation", count: 8 },
+  ],
+  topSolutionFrameworks: [
+    { label: "traffic_growth", count: 18 },
+    { label: "conversion_improvement", count: 16 },
+    { label: "follow_up_system", count: 10 },
+    { label: "tracking_visibility", count: 9 },
+    { label: "ai_assistant_adoption", count: 8 },
+    { label: "ecommerce_growth", count: 7 },
+    { label: "business_systems", count: 5 },
+  ],
+  topPlaybooks: [
+    { label: "client_dashboard", count: 7 },
+    { label: "audit_next_step", count: 6 },
+    { label: "manual_review", count: 4 },
+  ],
+  topQuestionSummaries: [
+    { label: "Asked about AI chatbot", count: 16 },
+    { label: "Asked how Opzix can help with traffic", count: 13 },
+    { label: "Asked about tracking", count: 11 },
+    { label: "Asked about converting visitors", count: 9 },
+    { label: "Asked about pricing", count: 7 },
+  ],
+};

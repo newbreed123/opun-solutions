@@ -13,10 +13,20 @@ type FounderEventRequest = {
   eventName?: unknown;
   source?: unknown;
   websiteUrl?: unknown;
+  websiteDomain?: unknown;
   scanId?: unknown;
   businessType?: unknown;
   challenge?: unknown;
   industry?: unknown;
+  detectedIntent?: unknown;
+  detectedConcept?: unknown;
+  detectedOffer?: unknown;
+  detectedFramework?: unknown;
+  detectedPlaybook?: unknown;
+  ctaType?: unknown;
+  confidence?: unknown;
+  messageCategory?: unknown;
+  sanitizedQuestionSummary?: unknown;
   createdAt?: unknown;
 };
 
@@ -65,10 +75,23 @@ export async function POST(request: NextRequest) {
     eventName,
     source: stringValue(body.source),
     websiteUrl: stringValue(body.websiteUrl),
+    websiteDomain: stringValue(body.websiteDomain),
     scanId: stringValue(body.scanId),
     businessType: stringValue(body.businessType),
     challenge: stringValue(body.challenge),
     industry: stringValue(body.industry),
+    detectedIntent: stringValue(body.detectedIntent),
+    detectedConcept: stringValue(body.detectedConcept),
+    detectedOffer: stringValue(body.detectedOffer),
+    detectedFramework: stringValue(body.detectedFramework),
+    detectedPlaybook: stringValue(body.detectedPlaybook),
+    ctaType: stringValue(body.ctaType),
+    confidence:
+      typeof body.confidence === "number" && Number.isFinite(body.confidence)
+        ? body.confidence
+        : undefined,
+    messageCategory: stringValue(body.messageCategory),
+    sanitizedQuestionSummary: stringValue(body.sanitizedQuestionSummary),
     createdAt: stringValue(body.createdAt),
   };
   const result = await recordFounderEvent(event);

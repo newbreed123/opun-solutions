@@ -22,6 +22,8 @@ import {
   resolveZoraResponse,
   type ZoraStructuredResponse,
 } from "@/lib/zora-intelligence";
+import { recordFounderEvent } from "@/lib/founder-dashboard/events";
+import { summarizeZoraQuestion } from "@/lib/founder-dashboard/sanitize";
 
 type ZoraChatRequest = {
   message?: unknown;
@@ -488,6 +490,15 @@ export async function POST(request: NextRequest) {
         } as ZoraResponse["action"])
       : fallback.action;
 
+    recordFounderZoraInsights({
+      message,
+      sourcePath,
+      fallback,
+      orchestrated,
+      resolvedLeadProfile,
+      playbookId: playbook?.id,
+    });
+
     void logZoraConversation(resolvedLeadProfile, message, finalReply, {
       sessionId,
       sourcePath,
@@ -551,4 +562,150 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+function recordFounderZoraInsights({
+  message,
+  sourcePath,
+  fallback,
+  orchestrated,
+  resolvedLeadProfile,
+  playbookId,
+}: {
+  message: string;
+  sourcePath: string;
+  fallback: ZoraResponse;
+  orchestrated: ZoraStructuredResponse;
+  resolvedLeadProfile: ZoraLeadProfile;
+  playbookId?: string;
+}) {
+  const analysis = fallback.currentMessageAnalysis;
+  const common = {
+    source: "zora",
+    websiteUrl: resolvedLeadProfile.websiteUrl || resolvedLeadProfile.auditWebsiteUrl,
+    businessType: resolvedLeadProfile.businessType,
+    challenge: resolvedLeadProfile.challenge,
+    industry: stringValue(
+      resolvedLeadProfile.confirmedIndustry ||
+      resolvedLeadProfile.industry ||
+      resolvedLeadProfile.inferredIndustry,
+    ),
+    scanId: resolvedLeadProfile.auditScanId,
+  };
+  const confidence = fallback.confidenceScore;
+  const summary = summarizeZoraQuestion(message);
+  const detectedConcept =
+    resolvedLeadProfile.detectedConcept ||
+    analysis.consultingConcept ||
+    (orchestrated.intent === "explainer"
+      ? stringValue(orchestrated.recentTalkingPoint) ||
+        stringValue(orchestrated.updatedState?.currentTopic)
+      : undefined);
+  const detectedOffer =
+    analysis.offerKey || resolvedLeadProfile.lastMentionedOffer || undefined;
+  const detectedFramework =
+    orchestrated.intent === "solution_framework"
+      ? stringValue(orchestrated.recentTalkingPoint) ||
+        stringValue(resolvedLeadProfile.currentTopic)
+      : undefined;
+
+  try {
+    void Promise.all([
+      recordFounderEvent({
+        eventName: "zora_message_received",
+        ...common,
+        sanitizedQuestionSummary: summary,
+        messageCategory: categoryForSummary(summary),
+        confidence,
+      }),
+      recordFounderEvent({
+        eventName: "zora_intent_detected",
+        ...common,
+        detectedIntent: founderIntentForZora(orchestrated.intent),
+        confidence,
+      }),
+      detectedConcept
+        ? recordFounderEvent({
+            eventName: "zora_concept_detected",
+            ...common,
+            detectedConcept,
+            confidence: confidenceForConcept(resolvedLeadProfile.conceptConfidence),
+          })
+        : Promise.resolve(),
+      detectedOffer
+        ? recordFounderEvent({
+            eventName: "zora_offer_detected",
+            ...common,
+            detectedOffer,
+            confidence,
+          })
+        : Promise.resolve(),
+      detectedFramework
+        ? recordFounderEvent({
+            eventName: "zora_solution_framework_used",
+            ...common,
+            detectedFramework,
+            confidence,
+          })
+        : Promise.resolve(),
+      playbookId
+        ? recordFounderEvent({
+            eventName: "zora_playbook_used",
+            ...common,
+            detectedPlaybook: playbookId,
+            confidence,
+          })
+        : Promise.resolve(),
+      orchestrated.intent === "fallback" || fallback.responseMode === "out_of_scope"
+        ? recordFounderEvent({
+            eventName: "zora_low_confidence_fallback",
+            ...common,
+            sanitizedQuestionSummary: summary,
+            messageCategory: categoryForSummary(summary),
+            confidence,
+          })
+        : Promise.resolve(),
+      hasCompletedProfile(resolvedLeadProfile)
+        ? recordFounderEvent({
+            eventName: "zora_lead_profile_completed",
+            ...common,
+            confidence,
+          })
+        : Promise.resolve(),
+    ]).catch(() => undefined);
+  } catch {
+    // Founder intelligence should never block Zora responses.
+  }
+
+  void sourcePath;
+}
+
+function hasCompletedProfile(profile: ZoraLeadProfile) {
+  return Boolean(profile.businessType && profile.challenge && profile.websiteUrl);
+}
+
+function confidenceForConcept(confidence: ZoraLeadProfile["conceptConfidence"]) {
+  if (confidence === "High") return 0.9;
+  if (confidence === "Moderate") return 0.7;
+  if (confidence === "Low") return 0.35;
+  return undefined;
+}
+
+function categoryForSummary(summary: string) {
+  const text = summary.toLowerCase();
+
+  if (text.includes("traffic")) return "traffic";
+  if (text.includes("chatbot")) return "ai_assistant";
+  if (text.includes("tracking")) return "tracking";
+  if (text.includes("pricing")) return "pricing";
+  if (text.includes("audit")) return "audit";
+  if (text.includes("converting")) return "conversion";
+  if (text.includes("follow-up")) return "follow_up";
+
+  return "uncategorized";
+}
+
+function founderIntentForZora(intent: ZoraStructuredResponse["intent"]) {
+  if (intent === "explainer") return "brain_concept";
+  return intent;
 }
