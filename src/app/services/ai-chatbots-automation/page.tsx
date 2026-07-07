@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Button from "@/components/Button";
 import Section from "@/components/Section";
+import TalkToZoraButton from "@/components/TalkToZoraButton";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
 
 const chatbotComparison = [
@@ -447,9 +448,7 @@ export default function AIBusinessAssistantsPage() {
             >
               Book Strategy Call
             </Button>
-            <Button href="/" variant="secondary" size="lg">
-              Talk to Zora
-            </Button>
+            <TalkToZoraButton />
           </div>
         </div>
       </Section>

@@ -49,6 +49,7 @@ const CHATBOT_STATE_KEY = "opzix-ai-chatbot-state";
 const ZORA_SESSION_ID_KEY = "opzix-zora-session-id";
 const ZORA_TRAFFIC_INTENT_KEY = "opzix-zora-traffic-intent";
 const ZORA_CONVERSATION_STARTED_KEY = "opzix-zora-conversation-started";
+const ZORA_OPEN_EVENT = "opzix:zora-open";
 const BOOKING_LINK_DELAY_MS = 150;
 const FREE_AUDIT_URL = "/tools/ecommerce-audit-scanner?source=zora";
 
@@ -1970,6 +1971,25 @@ export default function OpzixAIAssistant() {
 
     return () => {
       document.removeEventListener("click", handleDocumentClick, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleZoraOpen() {
+      setOpen(true);
+      setFlowStep(null);
+      persistChatbotState("open");
+      trackZoraConversationStartedOnce();
+
+      window.setTimeout(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      }, 80);
+    }
+
+    window.addEventListener(ZORA_OPEN_EVENT, handleZoraOpen);
+
+    return () => {
+      window.removeEventListener(ZORA_OPEN_EVENT, handleZoraOpen);
     };
   }, []);
 
