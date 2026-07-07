@@ -4,6 +4,7 @@ import {
   isFounderDashboardEventName,
   recordFounderEvent,
 } from "@/lib/founder-dashboard/events";
+import { getFounderDateRange } from "@/lib/founder-dashboard/date-ranges";
 import type {
   FounderDashboardEventInput,
   FounderDashboardEventQuery,
@@ -44,9 +45,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const range = getFounderDateRange(
+    request.nextUrl.searchParams.get("preset"),
+    request.nextUrl.searchParams.get("from"),
+    request.nextUrl.searchParams.get("to"),
+  );
   const query: FounderDashboardEventQuery = {
-    from: request.nextUrl.searchParams.get("from") || undefined,
-    to: request.nextUrl.searchParams.get("to") || undefined,
+    from: range.from,
+    to: range.to,
   };
   const result = await getFounderDashboardMetrics(query);
 
@@ -54,6 +60,7 @@ export async function GET(request: NextRequest) {
     {
       ok: result.ok,
       data: result.data,
+      range,
       error: result.ok ? undefined : result.error,
     },
     { status: result.ok ? 200 : 200 },

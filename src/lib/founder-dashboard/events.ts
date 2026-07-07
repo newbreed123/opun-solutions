@@ -135,7 +135,7 @@ export async function recordFounderEvent(event: FounderDashboardEventInput) {
 export async function getFounderDashboardEvents(
   query: FounderDashboardEventQuery = {},
 ) {
-  const result = await listConversionEvents(2000);
+  const result = await listConversionEvents(2000, query);
 
   if (!result.ok) {
     return { ok: false as const, data: [] as FounderDashboardEvent[], error: result.error };
@@ -267,11 +267,12 @@ function eventFromConversionRow(row: ConversionEventRow): FounderDashboardEvent 
       sanitizeWebsiteToDomain(row.website_url) ||
       sanitizeWebsiteToDomain(payload.websiteUrl) ||
       undefined,
-    scanId: safeIdentifier(payload.scanId) || undefined,
+    scanId:
+      safeIdentifier(row.scan_id) || safeIdentifier(payload.scanId) || undefined,
     businessType:
       safeText(row.business_type) || safeText(payload.businessType) || undefined,
     challenge: safeText(row.challenge) || safeText(payload.challenge) || undefined,
-    industry: safeText(payload.industry) || undefined,
+    industry: safeText(row.industry) || safeText(payload.industry) || undefined,
     detectedIntent: safeIdentifier(payload.detectedIntent) || undefined,
     detectedConcept: safeIdentifier(payload.detectedConcept) || undefined,
     detectedOffer: safeIdentifier(payload.detectedOffer) || undefined,

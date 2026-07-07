@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  CalendarDays,
   CircleAlert,
   ClipboardList,
   Contact,
@@ -23,6 +24,11 @@ import {
 } from "@/lib/founder-dashboard/mock-data";
 import { getFounderDashboardMetrics } from "@/lib/founder-dashboard/events";
 import type { ZoraIntelligenceInsights } from "@/lib/founder-dashboard/events";
+import {
+  getFounderDateRange,
+  type FounderDateRange,
+  type FounderDateRangePreset,
+} from "@/lib/founder-dashboard/date-ranges";
 import { calculateFunnelRates, percentage } from "@/lib/founder-dashboard/metrics";
 import type {
   FounderDashboardEvent,
@@ -56,9 +62,18 @@ type HealthMetric = {
   base: string;
 };
 
-const dataStatusLabel = "Demo data until GA4 API is connected.";
-const liveDataStatusLabel = "Live internal events";
 const demoZoraStatusLabel = "Demo Zora insights until real Zora events are collected.";
+
+const dateFilterOptions: Array<{
+  label: string;
+  preset: Exclude<FounderDateRangePreset, "custom">;
+}> = [
+  { label: "Today", preset: "today" },
+  { label: "Yesterday", preset: "yesterday" },
+  { label: "7 Days", preset: "last_7_days" },
+  { label: "Month", preset: "this_month" },
+  { label: "Year", preset: "this_year" },
+];
 
 const insightCards = [
   "Audit completion rate is strong",
@@ -73,6 +88,11 @@ export default async function FounderDashboardPage({
   const params = (await searchParams) ?? {};
   const passcode = process.env.OPZIX_ADMIN_PASSCODE?.trim();
   const providedPasscode = getParam(params, "passcode");
+  const dateRange = getFounderDateRange(
+    getParam(params, "preset") || "today",
+    getParam(params, "from"),
+    getParam(params, "to"),
+  );
 
   if (passcode && providedPasscode !== passcode) {
     return (
@@ -82,8 +102,16 @@ export default async function FounderDashboardPage({
     );
   }
 
-  const dashboardData = await getFounderDashboardMetrics();
+  const dashboardData = await getFounderDashboardMetrics({
+    from: dateRange.from,
+    to: dateRange.to,
+  });
   const hasRealEvents = dashboardData.ok && dashboardData.data.events.length > 0;
+  const status = dataSourceStatus(
+    dashboardData.ok,
+    hasRealEvents,
+    dashboardData.ok ? undefined : dashboardData.error,
+  );
   const metrics = hasRealEvents
     ? dashboardData.data.metrics
     : demoFounderDashboardMetrics;
@@ -102,6 +130,9 @@ export default async function FounderDashboardPage({
   const recentEvents = hasRealEvents
     ? dashboardData.data.events.slice(0, 12).map(founderEventForDisplay)
     : demoRecentFounderEvents;
+  const recentDebugEvents = dashboardData.ok
+    ? dashboardData.data.events.slice(0, 25)
+    : [];
   const hasRealZoraInsightEvents =
     dashboardData.ok && dashboardData.data.zoraInsights.hasRealZoraInsightEvents;
   const zoraInsights = hasRealZoraInsightEvents
@@ -109,6 +140,7 @@ export default async function FounderDashboardPage({
     : demoZoraIntelligenceInsights;
   const funnelSteps = calculateFunnelRates(metrics);
   const healthMetrics = buildHealthMetrics(metrics);
+  const latestEvent = dashboardData.ok ? dashboardData.data.events[0] : undefined;
 
   return (
     <DashboardShell>
@@ -126,7 +158,7 @@ export default async function FounderDashboardPage({
         </div>
         <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-brand-cyan/30 bg-brand-cyan/10 px-4 py-3 text-sm font-semibold text-brand-cyan">
           <CircleAlert className="h-4 w-4 flex-none" />
-          {hasRealEvents ? liveDataStatusLabel : dataStatusLabel}
+          {status.label}
         </div>
       </div>
 
@@ -137,7 +169,36 @@ export default async function FounderDashboardPage({
         />
       ) : null}
 
+      <DateRangeControls
+        dateRange={dateRange}
+        passcode={providedPasscode}
+      />
+
+      <DashboardDataStatus
+        dateRange={dateRange}
+        status={status}
+        totalEvents={dashboardData.ok ? dashboardData.data.events.length : 0}
+        latestEvent={latestEvent}
+        showingDemoPreview={!hasRealEvents}
+      />
+
       <div className="mt-6 space-y-8">
+        {!hasRealEvents ? (
+          <AnalyticsPanel
+            eyebrow="Live Event Visibility"
+            title={dashboardData.ok ? "No Live Events Found for This Date Range" : status.label}
+            description={
+              dashboardData.ok
+                ? "The dashboard did not receive conversion_events rows for the selected range. Demo preview values are shown below so the dashboard layout remains inspectable."
+                : "The dashboard could not load live conversion_events rows. Demo preview values are shown below so the dashboard layout remains inspectable."
+            }
+          >
+            <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100">
+              Demo preview
+            </div>
+          </AnalyticsPanel>
+        ) : null}
+
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-7">
           {buildKpiCards(metrics).map((card) => (
             <KpiCard key={card.label} card={card} />
@@ -409,6 +470,8 @@ export default async function FounderDashboardPage({
           </AnalyticsPanel>
         </section>
 
+        <RecentEventsDebugPanel events={recentDebugEvents} hasRealEvents={hasRealEvents} />
+
         <AnalyticsPanel
           eyebrow="Future Data Sources"
           title="GA4 and Internal Event Integration"
@@ -603,6 +666,194 @@ function WarningPanel({
       </div>
     </div>
   );
+}
+
+function DateRangeControls({
+  dateRange,
+  passcode,
+}: {
+  dateRange: FounderDateRange;
+  passcode: string;
+}) {
+  return (
+    <section className="rounded-2xl border border-dark-border bg-dark-card p-5 md:p-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+            <CalendarDays className="h-4 w-4" />
+            Date Range
+          </p>
+          <h2 className="mt-3 text-2xl font-bold text-primary">
+            {dateRange.label}
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {dateFilterOptions.map((option) => (
+            <a
+              key={option.preset}
+              href={dashboardRangeHref(passcode, option.preset)}
+              className={dateRangeButtonClass(dateRange.preset === option.preset)}
+            >
+              {option.label}
+            </a>
+          ))}
+          <a
+            href={dashboardRangeHref(passcode, "custom", dateRange.from, dateRange.to)}
+            className={dateRangeButtonClass(dateRange.preset === "custom")}
+          >
+            Custom
+          </a>
+        </div>
+      </div>
+
+      <form
+        action="/admin/founder-dashboard"
+        className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+      >
+        {passcode ? <input type="hidden" name="passcode" value={passcode} /> : null}
+        <input type="hidden" name="preset" value="custom" />
+        <label className="block text-sm font-semibold text-secondary">
+          From
+          <input
+            type="date"
+            name="from"
+            defaultValue={dateInputValue(dateRange.from)}
+            className="mt-2 min-h-12 w-full rounded-xl border border-dark-border bg-dark-deep px-4 text-primary outline-none focus:border-brand-cyan"
+          />
+        </label>
+        <label className="block text-sm font-semibold text-secondary">
+          To
+          <input
+            type="date"
+            name="to"
+            defaultValue={dateInputValue(dateRange.to)}
+            className="mt-2 min-h-12 w-full rounded-xl border border-dark-border bg-dark-deep px-4 text-primary outline-none focus:border-brand-cyan"
+          />
+        </label>
+        <button type="submit" className="btn btn-secondary min-h-12">
+          Apply
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function DashboardDataStatus({
+  dateRange,
+  status,
+  totalEvents,
+  latestEvent,
+  showingDemoPreview,
+}: {
+  dateRange: FounderDateRange;
+  status: DashboardStatus;
+  totalEvents: number;
+  latestEvent?: FounderDashboardEvent;
+  showingDemoPreview: boolean;
+}) {
+  return (
+    <section className={`mt-5 rounded-2xl border p-5 ${statusPanelClass(status.tone)}`}>
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-sm font-bold text-primary">{status.label}</p>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Range: {dateRange.label} | Events: {formatNumber(totalEvents)}
+            {latestEvent
+              ? ` | Last event: ${latestEvent.eventName} at ${formatTime(latestEvent.createdAt)}`
+              : " | Last event: none"}
+          </p>
+          {showingDemoPreview ? (
+            <p className="mt-2 text-sm font-semibold text-amber-100">
+              Demo data shown below as a preview.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type DashboardStatus = {
+  label: string;
+  tone: "live" | "empty" | "demo" | "error";
+};
+
+function dataSourceStatus(
+  ok: boolean,
+  hasRealEvents: boolean,
+  error?: string,
+): DashboardStatus {
+  if (ok && hasRealEvents) {
+    return { label: "Live internal events loaded", tone: "live" };
+  }
+
+  if (ok) {
+    return { label: "No live events found for this date range", tone: "empty" };
+  }
+
+  if (error?.toLowerCase().includes("supabase")) {
+    return { label: "Supabase unavailable", tone: "error" };
+  }
+
+  return { label: "API error", tone: "error" };
+}
+
+function statusPanelClass(tone: DashboardStatus["tone"]) {
+  if (tone === "live") {
+    return "border-emerald-300/30 bg-emerald-400/10";
+  }
+
+  if (tone === "error") {
+    return "border-red-300/30 bg-red-400/10";
+  }
+
+  if (tone === "demo") {
+    return "border-amber-300/30 bg-amber-400/10";
+  }
+
+  return "border-amber-300/30 bg-amber-400/10";
+}
+
+function dateRangeButtonClass(active: boolean) {
+  return [
+    "inline-flex min-h-11 items-center justify-center rounded-xl border px-4 text-sm font-bold transition-colors",
+    active
+      ? "border-brand-cyan bg-brand-cyan text-dark-bg"
+      : "border-dark-border bg-dark-deep/60 text-secondary hover:border-brand-cyan hover:text-primary",
+  ].join(" ");
+}
+
+function dashboardRangeHref(
+  passcode: string,
+  preset: FounderDateRangePreset,
+  from?: string,
+  to?: string,
+) {
+  const params = new URLSearchParams();
+
+  if (passcode) params.set("passcode", passcode);
+  params.set("preset", preset);
+
+  if (preset === "custom") {
+    if (from) params.set("from", dateInputValue(from));
+    if (to) params.set("to", dateInputValue(to));
+  }
+
+  return `/admin/founder-dashboard?${params.toString()}`;
+}
+
+function dateInputValue(value: string) {
+  const date = new Date(value);
+
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function AnalyticsPanel({
@@ -828,6 +1079,84 @@ function RecentActivity({ events }: { events: FounderEvent[] }) {
   );
 }
 
+function RecentEventsDebugPanel({
+  events,
+  hasRealEvents,
+}: {
+  events: FounderDashboardEvent[];
+  hasRealEvents: boolean;
+}) {
+  return (
+    <details
+      open={hasRealEvents}
+      className="rounded-2xl border border-dark-border bg-dark-card p-5 shadow-[0_24px_70px_rgba(2,8,23,0.32)] md:p-6"
+    >
+      <summary className="cursor-pointer text-xl font-bold text-primary">
+        Recent Events
+      </summary>
+      <p className="mt-3 text-sm leading-6 text-muted">
+        Latest 25 sanitized events for the selected date range. Raw messages,
+        names, emails, and phone numbers are not displayed.
+      </p>
+      <div className="mt-5 overflow-x-auto">
+        {events.length === 0 ? (
+          <p className="text-sm text-muted">
+            No live events found for this date range.
+          </p>
+        ) : (
+          <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+            <thead className="border-b border-dark-border text-xs uppercase tracking-[0.14em] text-muted">
+              <tr>
+                <th className="px-3 py-3">Event</th>
+                <th className="px-3 py-3">Timestamp</th>
+                <th className="px-3 py-3">Source</th>
+                <th className="px-3 py-3">Website Domain</th>
+                <th className="px-3 py-3">Business Type</th>
+                <th className="px-3 py-3">Challenge</th>
+                <th className="px-3 py-3">Industry</th>
+                <th className="px-3 py-3">Scan ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((event) => (
+                <tr
+                  key={event.id}
+                  className="border-b border-dark-border last:border-b-0"
+                >
+                  <td className="px-3 py-4 font-semibold text-primary">
+                    {cleanInsightLabel(event.eventName)}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {formatDate(event.createdAt)}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {event.source || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {event.websiteDomain || event.websiteUrl || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {event.businessType || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {event.challenge || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {event.industry || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-muted">
+                    {event.scanId || "none"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function ProgressBar({ value }: { value: number }) {
   return (
     <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
@@ -859,6 +1188,13 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
