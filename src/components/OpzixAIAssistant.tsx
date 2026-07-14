@@ -1191,11 +1191,15 @@ export default function OpzixAIAssistant() {
   function openStrategyCallFromZora() {
     const normalizedProfile = normalizeProfile(leadProfile);
 
+    closeChatbot();
     openStrategyCall({
       source: "zora",
       businessType: normalizedProfile.businessType,
       challenge: normalizedProfile.challenge,
       websiteUrl: normalizedProfile.websiteUrl,
+      industry: normalizedProfile.industry || normalizedProfile.inferredIndustry || undefined,
+      scanId: normalizedProfile.auditScanId || undefined,
+      sessionId: zoraSessionId(),
       leadScore: normalizedProfile.leadScore,
       leadTemperature: normalizedProfile.leadTemperature,
     });
@@ -1957,6 +1961,9 @@ export default function OpzixAIAssistant() {
           businessType: normalizedProfile.businessType,
           challenge: normalizedProfile.challenge,
           websiteUrl: normalizedProfile.websiteUrl,
+          industry: normalizedProfile.industry || normalizedProfile.inferredIndustry || undefined,
+          scanId: normalizedProfile.auditScanId || undefined,
+          sessionId: zoraSessionId(),
           leadScore: normalizedProfile.leadScore,
           leadTemperature: normalizedProfile.leadTemperature,
         });

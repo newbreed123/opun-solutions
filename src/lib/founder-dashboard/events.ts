@@ -24,6 +24,7 @@ export type FounderDashboardEventInput = {
   scanId?: string;
   businessType?: string;
   challenge?: string;
+  serviceRequested?: string;
   industry?: string;
   detectedIntent?: string;
   detectedConcept?: string;
@@ -84,6 +85,13 @@ const allowedFounderEvents = new Set<FounderDashboardEventName>([
   "zora_qualified_lead",
   "pdf_downloaded",
   "strategy_call_clicked",
+  "strategy_call_booking_viewed",
+  "strategy_call_slot_selected",
+  "strategy_call_booking_started",
+  "strategy_call_booking_failed",
+  "strategy_call_confirmation_email_sent",
+  "strategy_call_reminder_24h_sent",
+  "strategy_call_reminder_1h_sent",
   "zora_message_received",
   "zora_intent_detected",
   "zora_concept_detected",
@@ -117,6 +125,7 @@ export async function recordFounderEvent(event: FounderDashboardEventInput) {
       scanId: safeEvent.scanId,
       businessType: safeEvent.businessType,
       challenge: safeEvent.challenge,
+      serviceRequested: safeEvent.serviceRequested,
       industry: safeEvent.industry,
       detectedIntent: safeEvent.detectedIntent,
       detectedConcept: safeEvent.detectedConcept,
@@ -180,6 +189,7 @@ export function sanitizeFounderEvent(
     scanId: safeIdentifier(event.scanId) || "",
     businessType: safeText(event.businessType) || "",
     challenge: safeText(event.challenge) || "",
+    serviceRequested: safeText(event.serviceRequested) || "",
     industry: safeText(event.industry) || "",
     detectedIntent: safeIdentifier(event.detectedIntent) || "",
     detectedConcept: safeIdentifier(event.detectedConcept) || "",
@@ -218,6 +228,13 @@ function buildFounderDashboardData(
       zora_qualified_lead: 0,
       pdf_downloaded: 0,
       strategy_call_clicked: 0,
+      strategy_call_booking_viewed: 0,
+      strategy_call_slot_selected: 0,
+      strategy_call_booking_started: 0,
+      strategy_call_booking_failed: 0,
+      strategy_call_confirmation_email_sent: 0,
+      strategy_call_reminder_24h_sent: 0,
+      strategy_call_reminder_1h_sent: 0,
       zora_message_received: 0,
       zora_intent_detected: 0,
       zora_concept_detected: 0,
@@ -272,6 +289,7 @@ function eventFromConversionRow(row: ConversionEventRow): FounderDashboardEvent 
     businessType:
       safeText(row.business_type) || safeText(payload.businessType) || undefined,
     challenge: safeText(row.challenge) || safeText(payload.challenge) || undefined,
+    serviceRequested: safeText(payload.serviceRequested) || undefined,
     industry: safeText(row.industry) || safeText(payload.industry) || undefined,
     detectedIntent: safeIdentifier(payload.detectedIntent) || undefined,
     detectedConcept: safeIdentifier(payload.detectedConcept) || undefined,

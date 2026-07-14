@@ -1,5 +1,7 @@
 import { trackEvent } from "@/lib/analytics";
 import {
+  CALENDLY_FALLBACK_URL,
+  OPZIX_BOOKING_ENABLED,
   STRATEGY_CALL_BOOKING_PATH,
   STRATEGY_CALL_CONFIRMED_PATH,
   STRATEGY_CALL_URL,
@@ -12,14 +14,19 @@ export type StrategyCallSource =
   | "zora"
   | "audit_assistant"
   | "contact_page"
+  | "services_page"
   | "pricing"
   | "footer";
 
 export type StrategyCallPayload = {
   source: StrategyCallSource;
+  serviceRequested?: string;
   businessType?: string;
   challenge?: string;
   websiteUrl?: string;
+  industry?: string;
+  scanId?: string;
+  sessionId?: string;
   leadScore?: number;
   leadTemperature?: string;
 };
@@ -61,7 +68,9 @@ export function openStrategyCall(payload: StrategyCallPayload) {
   const enrichedPayload = withPagePath(payload);
 
   rememberStrategyCallContext(payload);
-  installCalendlyBookingListener();
+  if (!OPZIX_BOOKING_ENABLED) {
+    installCalendlyBookingListener();
+  }
   trackConversion("strategy_call_clicked", enrichedPayload);
   trackEvent("strategy_call_clicked", enrichedPayload);
   redirectToStrategyCallBookingPage();
@@ -106,7 +115,7 @@ export function initStrategyCallInlineWidget(parentElement: HTMLElement) {
 
     parentElement.innerHTML = "";
     window.Calendly.initInlineWidget({
-      url: STRATEGY_CALL_URL,
+      url: CALENDLY_FALLBACK_URL,
       parentElement,
     });
   });
@@ -231,9 +240,13 @@ function storedStrategyCallPayload(): StrategyCallPayload | null {
     return isStrategyCallSource(parsed.source)
       ? {
           source: parsed.source,
+          serviceRequested: stringOrUndefined(parsed.serviceRequested),
           businessType: stringOrUndefined(parsed.businessType),
           challenge: stringOrUndefined(parsed.challenge),
           websiteUrl: stringOrUndefined(parsed.websiteUrl),
+          industry: stringOrUndefined(parsed.industry),
+          scanId: stringOrUndefined(parsed.scanId),
+          sessionId: stringOrUndefined(parsed.sessionId),
           leadScore: numberOrUndefined(parsed.leadScore),
           leadTemperature: stringOrUndefined(parsed.leadTemperature),
         }
@@ -360,9 +373,14 @@ function redirectToStrategyCallConfirmed() {
 
   if (payload) {
     addQueryParam(confirmationUrl, "source", payload.source);
+    addQueryParam(confirmationUrl, "serviceRequested", payload.serviceRequested);
     addQueryParam(confirmationUrl, "businessType", payload.businessType);
     addQueryParam(confirmationUrl, "challenge", payload.challenge);
+    addQueryParam(confirmationUrl, "website", payload.websiteUrl);
     addQueryParam(confirmationUrl, "websiteUrl", payload.websiteUrl);
+    addQueryParam(confirmationUrl, "industry", payload.industry);
+    addQueryParam(confirmationUrl, "scanId", payload.scanId);
+    addQueryParam(confirmationUrl, "sessionId", payload.sessionId);
     addQueryParam(
       confirmationUrl,
       "leadScore",
@@ -379,13 +397,18 @@ function redirectToStrategyCallConfirmed() {
 
 function redirectToStrategyCallBookingPage() {
   const payload = latestStrategyCallPayload || storedStrategyCallPayload();
-  const bookingUrl = new URL(STRATEGY_CALL_BOOKING_PATH, window.location.origin);
+  const bookingUrl = new URL(STRATEGY_CALL_URL, window.location.origin);
 
   if (payload) {
     addQueryParam(bookingUrl, "source", payload.source);
+    addQueryParam(bookingUrl, "serviceRequested", payload.serviceRequested);
     addQueryParam(bookingUrl, "businessType", payload.businessType);
     addQueryParam(bookingUrl, "challenge", payload.challenge);
+    addQueryParam(bookingUrl, "website", payload.websiteUrl);
     addQueryParam(bookingUrl, "websiteUrl", payload.websiteUrl);
+    addQueryParam(bookingUrl, "industry", payload.industry);
+    addQueryParam(bookingUrl, "scanId", payload.scanId);
+    addQueryParam(bookingUrl, "sessionId", payload.sessionId);
     addQueryParam(
       bookingUrl,
       "leadScore",
@@ -394,9 +417,13 @@ function redirectToStrategyCallBookingPage() {
     addQueryParam(bookingUrl, "leadTemperature", payload.leadTemperature);
   }
 
-  devLog("opening on-site booking page", `${bookingUrl.pathname}${bookingUrl.search}`);
+  devLog("opening booking page", bookingUrl.toString());
   window.setTimeout(() => {
-    window.location.assign(`${bookingUrl.pathname}${bookingUrl.search}`);
+    window.location.assign(
+      bookingUrl.origin === window.location.origin
+        ? `${bookingUrl.pathname}${bookingUrl.search}`
+        : bookingUrl.toString(),
+    );
   }, 120);
 }
 
@@ -413,6 +440,7 @@ function isStrategyCallSource(value: unknown): value is StrategyCallSource {
     value === "zora" ||
     value === "audit_assistant" ||
     value === "contact_page" ||
+    value === "services_page" ||
     value === "pricing" ||
     value === "footer"
   );

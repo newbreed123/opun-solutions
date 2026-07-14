@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { STRATEGY_CALL_URL } from "@/lib/booking";
+import { CALENDLY_FALLBACK_URL } from "@/lib/booking";
 import {
   initStrategyCallInlineWidget,
   installCalendlyBookingListener,
@@ -54,7 +54,7 @@ export default function StrategyCallInlineCalendly({
           then make sure Calendly is configured to redirect after booking to
           /strategy-call-confirmed.
           <a
-            href={STRATEGY_CALL_URL}
+            href={CALENDLY_FALLBACK_URL}
             className="ml-2 font-semibold text-primary underline"
             rel="noopener noreferrer"
             target="_blank"

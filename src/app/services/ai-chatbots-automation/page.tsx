@@ -184,6 +184,7 @@ export default function AIBusinessAssistantsPage() {
                 variant="primary"
                 size="lg"
                 trackingSource="hero"
+                serviceRequested="AI Business Assistants"
               >
                 Book Strategy Call
               </Button>
@@ -445,6 +446,7 @@ export default function AIBusinessAssistantsPage() {
               variant="primary"
               size="lg"
               trackingSource="pricing"
+              serviceRequested="AI Business Assistants"
             >
               Book Strategy Call
             </Button>

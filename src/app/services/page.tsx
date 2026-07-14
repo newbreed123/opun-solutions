@@ -108,7 +108,13 @@ export default function Services() {
               and operate with confidence.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
+              <Button
+                href={STRATEGY_CALL_URL}
+                variant="primary"
+                size="lg"
+                trackingSource="services_page"
+                serviceRequested="Website Design & Digital Systems"
+              >
                 Book Strategy Call
               </Button>
               <Button href="#packages" variant="secondary" size="lg">
@@ -398,6 +404,8 @@ export default function Services() {
         subheadline="Let’s review your current website, customer journey, and operations — then map the fastest path to more leads, better systems, and stronger growth."
         buttonLabel="Book Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
+        trackingSource="services_page"
+        serviceRequested="Website Design & Digital Systems"
       />
     </>
   );

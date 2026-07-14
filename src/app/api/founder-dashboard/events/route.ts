@@ -25,6 +25,7 @@ type FounderEventRequest = {
   detectedFramework?: unknown;
   detectedPlaybook?: unknown;
   ctaType?: unknown;
+  failureReason?: unknown;
   confidence?: unknown;
   messageCategory?: unknown;
   sanitizedQuestionSummary?: unknown;

@@ -198,7 +198,13 @@ export default function LeadGenerationSystemsPage() {
               businesses generate and convert more opportunities.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
+              <Button
+                href={STRATEGY_CALL_URL}
+                variant="primary"
+                size="lg"
+                trackingSource="services_page"
+                serviceRequested="Lead Generation Systems"
+              >
                 Book Strategy Call
               </Button>
               <Button href="#lead-system-flow" variant="secondary" size="lg">
@@ -380,7 +386,13 @@ export default function LeadGenerationSystemsPage() {
               ))}
             </div>
             <div className="mt-8">
-              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
+              <Button
+                href={STRATEGY_CALL_URL}
+                variant="primary"
+                size="lg"
+                trackingSource="services_page"
+                serviceRequested="Lead Generation Systems"
+              >
                 Book Strategy Call
               </Button>
             </div>
@@ -395,6 +407,8 @@ export default function LeadGenerationSystemsPage() {
         subheadline="Let's map how your website, AI, automation, tracking, and customer journey can work together to generate more qualified opportunities."
         buttonLabel="Book Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
+        trackingSource="services_page"
+        serviceRequested="Lead Generation Systems"
       />
     </main>
   );

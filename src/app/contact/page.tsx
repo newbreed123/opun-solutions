@@ -661,7 +661,7 @@ export default function Contact() {
                       className="w-full"
                       trackingSource="contact_page"
                     >
-                      Book on Calendly →
+                      Book Strategy Session
                     </Button>
 
                     <div className="mt-8 pt-8 border-t border-dark-border">

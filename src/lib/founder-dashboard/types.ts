@@ -8,6 +8,13 @@ export type FounderDashboardEventName =
   | "zora_qualified_lead"
   | "pdf_downloaded"
   | "strategy_call_clicked"
+  | "strategy_call_booking_viewed"
+  | "strategy_call_slot_selected"
+  | "strategy_call_booking_started"
+  | "strategy_call_booking_failed"
+  | "strategy_call_confirmation_email_sent"
+  | "strategy_call_reminder_24h_sent"
+  | "strategy_call_reminder_1h_sent"
   | "zora_message_received"
   | "zora_intent_detected"
   | "zora_concept_detected"
@@ -45,6 +52,7 @@ export type FounderDashboardEvent = {
   scanId?: string;
   businessType?: string;
   challenge?: string;
+  serviceRequested?: string;
   industry?: string;
   detectedIntent?: string;
   detectedConcept?: string;

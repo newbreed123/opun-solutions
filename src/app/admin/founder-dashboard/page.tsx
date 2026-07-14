@@ -30,6 +30,8 @@ import {
   type FounderDateRangePreset,
 } from "@/lib/founder-dashboard/date-ranges";
 import { calculateFunnelRates, percentage } from "@/lib/founder-dashboard/metrics";
+import { listAppointments } from "@/lib/scheduling/appointments";
+import type { AppointmentRecord } from "@/lib/scheduling/types";
 import type {
   FounderDashboardEvent,
   FounderDashboardMetrics,
@@ -60,6 +62,16 @@ type HealthMetric = {
   label: string;
   value: number;
   base: string;
+};
+
+type SchedulingStats = {
+  upcoming: number;
+  today: number;
+  tomorrow: number;
+  bookedInRange: number;
+  cancelled: number;
+  completed: number;
+  noShow: number;
 };
 
 const demoZoraStatusLabel = "Demo Zora insights until real Zora events are collected.";
@@ -106,6 +118,10 @@ export default async function FounderDashboardPage({
     from: dateRange.from,
     to: dateRange.to,
   });
+  const appointmentsData = await listAppointments({
+    from: dateRange.from,
+    to: dateRange.to,
+  });
   const hasRealEvents = dashboardData.ok && dashboardData.data.events.length > 0;
   const status = dataSourceStatus(
     dashboardData.ok,
@@ -141,6 +157,8 @@ export default async function FounderDashboardPage({
   const funnelSteps = calculateFunnelRates(metrics);
   const healthMetrics = buildHealthMetrics(metrics);
   const latestEvent = dashboardData.ok ? dashboardData.data.events[0] : undefined;
+  const appointments = appointmentsData.ok ? appointmentsData.data : [];
+  const schedulingStats = buildSchedulingStats(appointments);
 
   return (
     <DashboardShell>
@@ -204,6 +222,18 @@ export default async function FounderDashboardPage({
             <KpiCard key={card.label} card={card} />
           ))}
         </section>
+
+        <AnalyticsPanel
+          eyebrow="Scheduling"
+          title="Native Strategy Sessions"
+          description={
+            appointmentsData.ok
+              ? "Live appointments from the native scheduling table. Main dashboard rows omit prospect email."
+              : "Appointments could not be loaded from Supabase."
+          }
+        >
+          <SchedulingPanel stats={schedulingStats} appointments={appointments} />
+        </AnalyticsPanel>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <AnalyticsPanel
@@ -545,6 +575,118 @@ function buildKpiCards(metrics: FounderDashboardMetrics): KpiCard[] {
   ];
 }
 
+function buildSchedulingStats(appointments: AppointmentRecord[]): SchedulingStats {
+  const now = new Date();
+  const today = localDateKey(now);
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = localDateKey(tomorrowDate);
+
+  return {
+    upcoming: appointments.filter(
+      (appointment) =>
+        appointment.status === "confirmed" &&
+        new Date(appointment.start_at).getTime() >= now.getTime(),
+    ).length,
+    today: appointments.filter(
+      (appointment) => localDateKey(new Date(appointment.start_at)) === today,
+    ).length,
+    tomorrow: appointments.filter(
+      (appointment) => localDateKey(new Date(appointment.start_at)) === tomorrow,
+    ).length,
+    bookedInRange: appointments.length,
+    cancelled: appointments.filter((appointment) => appointment.status === "cancelled").length,
+    completed: appointments.filter((appointment) => appointment.status === "completed").length,
+    noShow: appointments.filter((appointment) => appointment.status === "no_show").length,
+  };
+}
+
+function SchedulingPanel({
+  stats,
+  appointments,
+}: {
+  stats: SchedulingStats;
+  appointments: AppointmentRecord[];
+}) {
+  const statRows = [
+    ["Upcoming", stats.upcoming],
+    ["Today", stats.today],
+    ["Tomorrow", stats.tomorrow],
+    ["Booked in range", stats.bookedInRange],
+    ["Cancelled", stats.cancelled],
+    ["Completed", stats.completed],
+    ["No-show", stats.noShow],
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+        {statRows.map(([label, value]) => (
+          <div
+            key={label}
+            className="rounded-xl border border-dark-border bg-dark-deep/60 p-4"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+              {label}
+            </p>
+            <p className="mt-3 text-3xl font-black text-primary">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto">
+        {appointments.length === 0 ? (
+          <p className="text-sm text-muted">No appointments found for this date range.</p>
+        ) : (
+          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+            <thead className="border-b border-dark-border text-xs uppercase tracking-[0.14em] text-muted">
+              <tr>
+                <th className="px-3 py-3">Time</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="px-3 py-3">Source</th>
+                <th className="px-3 py-3">Website</th>
+                <th className="px-3 py-3">Business Type</th>
+                <th className="px-3 py-3">Challenge</th>
+                <th className="px-3 py-3">Audit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {appointments.slice(0, 18).map((appointment) => (
+                <tr
+                  key={appointment.id}
+                  className="border-b border-dark-border last:border-b-0"
+                >
+                  <td className="px-3 py-4 font-semibold text-primary">
+                    {formatDate(appointment.start_at)}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {cleanInsightLabel(appointment.status)}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {appointment.source || "direct"}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {appointment.website_domain || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {appointment.business_type || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-secondary">
+                    {appointment.challenge || "unknown"}
+                  </td>
+                  <td className="px-3 py-4 text-muted">
+                    {appointment.scan_id ? "available" : "none"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function buildHealthMetrics(metrics: FounderDashboardMetrics): HealthMetric[] {
   return [
     {
@@ -568,6 +710,13 @@ function buildHealthMetrics(metrics: FounderDashboardMetrics): HealthMetric[] {
       base: "Contact forms / audit completed",
     },
   ];
+}
+
+function localDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function categoryRows(
@@ -602,6 +751,13 @@ function labelForEvent(eventName: FounderDashboardEvent["eventName"]) {
     zora_qualified_lead: "Zora qualified lead",
     pdf_downloaded: "PDF downloaded",
     strategy_call_clicked: "Strategy call clicked",
+    strategy_call_booking_viewed: "Booking page viewed",
+    strategy_call_slot_selected: "Booking slot selected",
+    strategy_call_booking_started: "Booking started",
+    strategy_call_booking_failed: "Booking failed",
+    strategy_call_confirmation_email_sent: "Confirmation email sent",
+    strategy_call_reminder_24h_sent: "24-hour reminder sent",
+    strategy_call_reminder_1h_sent: "1-hour reminder sent",
     zora_message_received: "Zora message received",
     zora_intent_detected: "Zora intent detected",
     zora_concept_detected: "Zora concept detected",

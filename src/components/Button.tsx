@@ -20,6 +20,7 @@ interface ButtonProps {
   target?: "_blank" | "_self";
   rel?: string;
   trackingSource?: StrategyCallSource;
+  serviceRequested?: string;
 }
 
 export default function Button({
@@ -33,6 +34,7 @@ export default function Button({
   target = "_self",
   rel = "",
   trackingSource,
+  serviceRequested,
 }: ButtonProps) {
   const baseClasses = "btn";
   const variantClasses = {
@@ -51,7 +53,10 @@ export default function Button({
   const label = typeof children === "string" ? children.trim() : "";
   const isStrategyCallLink = href === STRATEGY_CALL_URL;
   const renderedHref = isStrategyCallLink
-    ? strategyCallBookingHref({ source: trackingSource || "hero" })
+    ? strategyCallBookingHref({
+        source: trackingSource || "hero",
+        serviceRequested,
+      })
     : href;
   const handleClick = (
     event:
@@ -62,6 +67,7 @@ export default function Button({
       event.preventDefault();
       openStrategyCall({
         source: trackingSource || "hero",
+        serviceRequested,
       });
     }
 

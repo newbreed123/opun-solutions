@@ -4,7 +4,14 @@ export type ConversionEventName =
   | "audit_started"
   | "audit_completed"
   | "strategy_call_clicked"
+  | "strategy_call_booking_viewed"
+  | "strategy_call_slot_selected"
+  | "strategy_call_booking_started"
   | "strategy_call_booked"
+  | "strategy_call_booking_failed"
+  | "strategy_call_confirmation_email_sent"
+  | "strategy_call_reminder_24h_sent"
+  | "strategy_call_reminder_1h_sent"
   | "contact_form_submitted"
   | "ask_question_clicked"
   | "roadmap_downloaded";
@@ -14,6 +21,13 @@ type FounderEventName =
   | "audit_completed"
   | "zora_conversation_started"
   | "strategy_call_booked"
+  | "strategy_call_booking_viewed"
+  | "strategy_call_slot_selected"
+  | "strategy_call_booking_started"
+  | "strategy_call_booking_failed"
+  | "strategy_call_confirmation_email_sent"
+  | "strategy_call_reminder_24h_sent"
+  | "strategy_call_reminder_1h_sent"
   | "contact_form_submitted"
   | "zora_qualified_lead"
   | "pdf_downloaded"
@@ -57,11 +71,39 @@ export const CONVERSION_EVENTS: Record<ConversionEventName, ConversionEventConfi
     ga4Event: "strategy_call_clicked",
     primary: false,
   },
+  strategy_call_booking_viewed: {
+    ga4Event: "strategy_call_booking_viewed",
+    primary: false,
+  },
+  strategy_call_slot_selected: {
+    ga4Event: "strategy_call_slot_selected",
+    primary: false,
+  },
+  strategy_call_booking_started: {
+    ga4Event: "strategy_call_booking_started",
+    primary: false,
+  },
   strategy_call_booked: {
     ga4Event: "strategy_call_booked",
     adsConversionLabel: process.env.NEXT_PUBLIC_GOOGLE_ADS_STRATEGY_CALL_BOOKED_LABEL,
     adsConversionLabelEnvName: "NEXT_PUBLIC_GOOGLE_ADS_STRATEGY_CALL_BOOKED_LABEL",
     primary: true,
+  },
+  strategy_call_booking_failed: {
+    ga4Event: "strategy_call_booking_failed",
+    primary: false,
+  },
+  strategy_call_confirmation_email_sent: {
+    ga4Event: "strategy_call_confirmation_email_sent",
+    primary: false,
+  },
+  strategy_call_reminder_24h_sent: {
+    ga4Event: "strategy_call_reminder_24h_sent",
+    primary: false,
+  },
+  strategy_call_reminder_1h_sent: {
+    ga4Event: "strategy_call_reminder_1h_sent",
+    primary: false,
   },
   contact_form_submitted: {
     ga4Event: "contact_form_submitted",

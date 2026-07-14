@@ -154,7 +154,13 @@ export default function Industries() {
               how your business actually operates — not generic templates.
             </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
+              <Button
+                href={STRATEGY_CALL_URL}
+                variant="primary"
+                size="lg"
+                trackingSource="services_page"
+                serviceRequested="Industry-Specific Website & Automation Systems"
+              >
                 Book Strategy Call
               </Button>
               <Button href="#overview" variant="secondary" size="lg">
@@ -334,6 +340,8 @@ export default function Industries() {
         subheadline="We’ll review your setup and recommend the highest-impact improvements."
         buttonLabel="Book Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
+        trackingSource="services_page"
+        serviceRequested="Industry-Specific Website & Automation Systems"
       />
     </>
   );
