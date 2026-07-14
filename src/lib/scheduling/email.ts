@@ -486,11 +486,11 @@ function calendarStatusLabel(appointment: AppointmentRecord) {
       needsAttention: true,
     },
     oauth_config_incomplete: {
-      systemLabel: "Google OAuth configuration incomplete",
-      meetLabel: "Configuration incomplete",
+      systemLabel: "Google OAuth configuration missing or invalid",
+      meetLabel: "Configuration missing or invalid",
       message:
         appointment.calendar_sync_error ||
-        "Google OAuth configuration is incomplete.",
+        "Google OAuth configuration is missing or invalid.",
       needsAttention: true,
     },
     skipped: {

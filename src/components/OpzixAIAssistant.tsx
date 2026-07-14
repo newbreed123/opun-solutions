@@ -1154,10 +1154,14 @@ export default function OpzixAIAssistant() {
     }
 
     conversationStartedRef.current = true;
+    const sessionId = zoraSessionId();
+
     trackConversion("zora_conversation_started", {
       source: "zora",
+      sessionId,
       pagePath: window.location.pathname,
     });
+    trackZoraEvent("conversation_started");
   }
 
   function closeChatbot({ persist = true } = {}) {

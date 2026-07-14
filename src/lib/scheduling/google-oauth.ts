@@ -17,7 +17,7 @@ export type GoogleOAuthConfig = {
   calendarTimezone: string;
 };
 
-const PRODUCTION_REDIRECT_URI = "https://opzix.io/api/google/oauth/callback";
+export const PRODUCTION_REDIRECT_URI = "https://opzix.io/api/google/oauth/callback";
 
 export function getGoogleOAuthConfig(): GoogleOAuthConfig {
   return {

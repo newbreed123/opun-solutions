@@ -31,6 +31,7 @@ import {
 } from "@/lib/founder-dashboard/date-ranges";
 import { calculateFunnelRates, percentage } from "@/lib/founder-dashboard/metrics";
 import { listAppointments } from "@/lib/scheduling/appointments";
+import { formatTimezoneLabel } from "@/lib/scheduling/display";
 import type { AppointmentRecord } from "@/lib/scheduling/types";
 import type {
   FounderDashboardEvent,
@@ -42,6 +43,8 @@ import type {
 } from "@/lib/founder-dashboard/types";
 
 export const dynamic = "force-dynamic";
+
+const FOUNDER_DASHBOARD_TIMEZONE = "America/New_York";
 
 type SearchParams = Promise<
   Record<string, string | string[] | undefined> | undefined
@@ -657,7 +660,7 @@ function SchedulingPanel({
                   className="border-b border-dark-border last:border-b-0"
                 >
                   <td className="px-3 py-4 font-semibold text-primary">
-                    {formatDate(appointment.start_at)}
+                    {formatAppointmentDate(appointment)}
                   </td>
                   <td className="px-3 py-4 text-secondary">
                     {cleanInsightLabel(appointment.status)}
@@ -713,9 +716,18 @@ function buildHealthMetrics(metrics: FounderDashboardMetrics): HealthMetric[] {
 }
 
 function localDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: FOUNDER_DASHBOARD_TIMEZONE,
+  }).formatToParts(date);
+  const valueFor = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "";
+  const year = valueFor("year");
+  const month = valueFor("month");
+  const day = valueFor("day");
+
   return `${year}-${month}-${day}`;
 }
 
@@ -1340,19 +1352,27 @@ function formatPercent(value: number) {
   return `${value.toFixed(value >= 10 || value === 0 ? 0 : 1)}%`;
 }
 
-function formatDate(value: string) {
+function formatAppointmentDate(appointment: AppointmentRecord) {
+  return `${formatDate(appointment.start_at, appointment.timezone)} ${formatTimezoneLabel(
+    appointment.timezone,
+  )}`;
+}
+
+function formatDate(value: string, timezone = FOUNDER_DASHBOARD_TIMEZONE) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: timezone,
   }).format(new Date(value));
 }
 
-function formatTime(value: string) {
+function formatTime(value: string, timezone = FOUNDER_DASHBOARD_TIMEZONE) {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
+    timeZone: timezone,
   }).format(new Date(value));
 }
 

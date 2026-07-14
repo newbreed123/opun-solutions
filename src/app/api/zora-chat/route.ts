@@ -499,7 +499,7 @@ export async function POST(request: NextRequest) {
       playbookId: playbook?.id,
     });
 
-    void logZoraConversation(resolvedLeadProfile, message, finalReply, {
+    const conversationLog = await logZoraConversation(resolvedLeadProfile, message, finalReply, {
       sessionId,
       sourcePath,
       userAgent: request.headers.get("user-agent"),
@@ -538,6 +538,14 @@ export async function POST(request: NextRequest) {
               ? "cost_or_fix_requested"
               : fallback.responseMode,
     });
+
+    if (!conversationLog.ok) {
+      console.error("Zora conversation persistence failed:", {
+        sessionId,
+        skipped: conversationLog.skipped,
+        error: conversationLog.error,
+      });
+    }
 
     return NextResponse.json(
       {

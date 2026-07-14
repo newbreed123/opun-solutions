@@ -11,6 +11,9 @@ const bookingPage = readFileSync("src/app/book/strategy-session/page.tsx", "utf8
 const googleOauth = readFileSync("src/lib/scheduling/google-oauth.ts", "utf8");
 const authorizeRoute = readFileSync("src/app/api/google/oauth/authorize/route.ts", "utf8");
 const callbackRoute = readFileSync("src/app/api/google/oauth/callback/route.ts", "utf8");
+const diagnosticsRoute = readFileSync("src/app/api/google/oauth/diagnostics/route.ts", "utf8");
+const envExample = readFileSync(".env.example", "utf8");
+const readme = readFileSync("README.md", "utf8");
 
 assert.match(email, /Hi \$\{escapeHtml\(props\.clientName\)\}/);
 assert.match(email, /appointmentEmailTemplateProps/);
@@ -46,7 +49,7 @@ assert.match(email, /clientNameForEmail/);
 assert.match(email, /isInternalSchedulingLabel/);
 assert.match(email, /Calendar event created and Meet link ready/);
 assert.match(email, /Meet generation pending/);
-assert.match(email, /Google OAuth configuration incomplete/);
+assert.match(email, /Google OAuth configuration missing or invalid/);
 assert.match(email, /sendMeetLinkAvailableEmail/);
 assert.match(email, /Your Google Meet Link for Your Opzix Strategy Session/);
 assert.doesNotMatch(email, /Calendar details will be included in the invite when configured/);
@@ -91,6 +94,14 @@ assert.match(callbackRoute, /Google did not return a refresh token/);
 assert.match(callbackRoute, /isValidGoogleOAuthState/);
 assert.doesNotMatch(callbackRoute, /GOOGLE_CLIENT_SECRET/);
 
+assert.match(diagnosticsRoute, /isValidGoogleOAuthSetupSecret/);
+assert.match(diagnosticsRoute, /redactedEnvValue/);
+assert.match(diagnosticsRoute, /fingerprint/);
+assert.match(diagnosticsRoute, /GOOGLE_REFRESH_TOKEN/);
+assert.match(diagnosticsRoute, /Set the missing variables/);
+assert.doesNotMatch(diagnosticsRoute, /process\.env\.GOOGLE_CLIENT_SECRET[^?]/);
+assert.doesNotMatch(diagnosticsRoute, /process\.env\.GOOGLE_REFRESH_TOKEN[^?]/);
+
 assert.match(calendar, /google\.calendar\(\{/);
 assert.match(calendar, /attendees:\s*\[\s*\{\s*email:\s*appointment\.email/);
 assert.match(calendar, /sendUpdates:\s*"all"/);
@@ -120,5 +131,15 @@ assert.match(appointments, /service_requested/);
 assert.match(appointments, /conference_pending/);
 assert.match(appointments, /meet_link_email_sent_at/);
 assert.match(bookingPage, /serviceRequested/);
+
+assert.match(envExample, /GOOGLE_REFRESH_TOKEN=replace-with-google-refresh-token/);
+assert.match(envExample, /GOOGLE_OAUTH_REDIRECT_URI=https:\/\/opzix\.io\/api\/google\/oauth\/callback/);
+assert.match(envExample, /GOOGLE_CALENDAR_TIMEZONE=America\/New_York/);
+assert.match(envExample, /GOOGLE_CALENDAR_CREATE_MEET_LINK=true/);
+assert.doesNotMatch(envExample, /GOOGLE_OAUTH_REDIRECT_URI=\[/);
+assert.doesNotMatch(envExample, /GOCSPX-|apps\.googleusercontent\.com/);
+assert.match(readme, /Use the redirect URI as a plain string/);
+assert.match(readme, /Vercel Production/);
+assert.match(readme, /\/api\/google\/oauth\/diagnostics\?secret=YOUR_SETUP_SECRET/);
 
 console.log("Scheduling OAuth, email, and Calendar smoke tests passed.");

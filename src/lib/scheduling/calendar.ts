@@ -280,7 +280,7 @@ export async function fetchGoogleMeetUrlForEvent(
     });
     return {
       ok: false,
-      error: `Google Calendar configuration incomplete: ${missing.join(", ")}`,
+      error: `Google Calendar configuration missing or invalid: ${missing.join(", ")}`,
       conferenceStatus: "config_incomplete",
     };
   }

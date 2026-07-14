@@ -137,8 +137,8 @@ export async function createAppointment(input: ValidatedAppointmentInput) {
         calendar_sync_status: "oauth_config_incomplete",
         calendar_sync_error:
           missing.length > 0
-            ? `Google Calendar configuration incomplete: ${missing.join(", ")}`
-            : "Google Calendar environment variables are missing or incomplete.",
+            ? `Google Calendar configuration missing or invalid: ${missing.join(", ")}`
+            : "Google Calendar environment variables are missing or invalid.",
       })) || appointment;
   } else {
     appointment =

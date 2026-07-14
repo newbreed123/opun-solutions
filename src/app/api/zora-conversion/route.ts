@@ -10,6 +10,7 @@ type ZoraConversionRequest = {
 };
 
 const allowedEvents = new Set([
+  "conversation_started",
   "audit_clicked",
   "strategy_call_clicked",
   "ask_question_clicked",
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
     {
       ok: result.ok,
       skipped: result.skipped,
+      error: result.ok ? undefined : result.error,
     },
     { status: 200 },
   );
