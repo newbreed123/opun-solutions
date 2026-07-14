@@ -17,6 +17,8 @@ export type GoogleOAuthConfig = {
   calendarTimezone: string;
 };
 
+const PRODUCTION_REDIRECT_URI = "https://opzix.io/api/google/oauth/callback";
+
 export function getGoogleOAuthConfig(): GoogleOAuthConfig {
   return {
     clientId: process.env.GOOGLE_CLIENT_ID?.trim() || "",
@@ -35,7 +37,11 @@ export function getGoogleOAuthConfig(): GoogleOAuthConfig {
 
 export function createGoogleOAuthClient(options: { requireRefreshToken?: boolean } = {}) {
   const config = getGoogleOAuthConfig();
-  const missing = missingGoogleOAuthConfig(config, options.requireRefreshToken ?? false);
+  const missing = missingGoogleOAuthConfig(
+    config,
+    options.requireRefreshToken ?? false,
+    isProductionRuntime(),
+  );
 
   if (missing.length > 0) {
     return { ok: false as const, missing, config };
@@ -54,6 +60,11 @@ export function createGoogleOAuthClient(options: { requireRefreshToken?: boolean
   }
 
   return { ok: true as const, oauth2Client, config };
+}
+
+export function validateGoogleCalendarProductionConfig() {
+  const config = getGoogleOAuthConfig();
+  return missingGoogleOAuthConfig(config, true, true);
 }
 
 export function googleOAuthSetupSecret() {
@@ -91,12 +102,30 @@ export function isValidGoogleOAuthSetupSecret(value: string | null) {
   }
 }
 
-function missingGoogleOAuthConfig(config: GoogleOAuthConfig, requireRefreshToken: boolean) {
+function missingGoogleOAuthConfig(
+  config: GoogleOAuthConfig,
+  requireRefreshToken: boolean,
+  validateProductionValues = false,
+) {
   return [
     config.clientId ? "" : "GOOGLE_CLIENT_ID",
     config.clientSecret ? "" : "GOOGLE_CLIENT_SECRET",
     config.redirectUri ? "" : "GOOGLE_OAUTH_REDIRECT_URI",
     requireRefreshToken && !config.refreshToken ? "GOOGLE_REFRESH_TOKEN" : "",
     config.calendarId ? "" : "GOOGLE_CALENDAR_ID",
+    config.calendarTimezone ? "" : "GOOGLE_CALENDAR_TIMEZONE",
+    validateProductionValues && config.redirectUri !== PRODUCTION_REDIRECT_URI
+      ? "GOOGLE_OAUTH_REDIRECT_URI"
+      : "",
+    validateProductionValues && config.calendarId !== "hello@opzix.io"
+      ? "GOOGLE_CALENDAR_ID"
+      : "",
+    validateProductionValues && config.calendarTimezone !== "America/New_York"
+      ? "GOOGLE_CALENDAR_TIMEZONE"
+      : "",
   ].filter(Boolean);
+}
+
+function isProductionRuntime() {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 }

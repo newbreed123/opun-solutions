@@ -1,7 +1,17 @@
 import { logConversionEvent } from "@/lib/conversion-event-log";
 import { recordFounderEvent } from "@/lib/founder-dashboard/events";
-import { getAppointmentById, listAppointments, updateAppointment } from "./appointments";
-import { sendReminder1h, sendReminder24h } from "./email";
+import {
+  getAppointmentById,
+  listAppointments,
+  listPendingConferenceAppointments,
+  updateAppointment,
+} from "./appointments";
+import { fetchGoogleMeetUrlForEvent } from "./calendar";
+import {
+  sendMeetLinkAvailableEmail,
+  sendReminder1h,
+  sendReminder24h,
+} from "./email";
 import type { AppointmentRecord } from "./types";
 
 type ReminderType = "appointment_24h" | "appointment_1h";
@@ -42,6 +52,7 @@ const REMINDER_CONFIGS: ReminderConfig[] = [
 
 export async function processSchedulingReminders(now = new Date()) {
   schedulingReminderLog("scan started", { now: now.toISOString() });
+  const pendingConferenceResult = await processPendingConferenceLinks(now);
   const horizon = new Date(now.getTime() + 25 * 60 * 60 * 1000).toISOString();
   const result = await listAppointments({
     from: now.toISOString(),
@@ -53,11 +64,15 @@ export async function processSchedulingReminders(now = new Date()) {
       result: "failed",
       error: "appointment_query_failed",
     });
-    return { ok: false as const, processed: 0, error: result.error };
+    return {
+      ok: false as const,
+      processed: pendingConferenceResult.processed,
+      error: result.error,
+    };
   }
 
-  let processed = 0;
-  const errors: string[] = [];
+  let processed = pendingConferenceResult.processed;
+  const errors: string[] = [...pendingConferenceResult.errors];
 
   for (const appointment of result.data) {
     for (const config of REMINDER_CONFIGS) {
@@ -163,6 +178,122 @@ export async function processSchedulingReminders(now = new Date()) {
     processed,
     errors,
   };
+}
+
+async function processPendingConferenceLinks(now: Date) {
+  const result = await listPendingConferenceAppointments(now);
+  const errors: string[] = [];
+  let processed = 0;
+
+  if (!result.ok) {
+    schedulingReminderLog("send failed", {
+      reminderType: "meet_link_retry",
+      result: "pending_conference_query_failed",
+    });
+    return { processed, errors: [result.error] };
+  }
+
+  for (const appointment of result.data) {
+    const latestAppointment = await getAppointmentById(appointment.id);
+    if (
+      !latestAppointment ||
+      latestAppointment.status !== "confirmed" ||
+      latestAppointment.cancelled_at ||
+      new Date(latestAppointment.start_at).getTime() <= now.getTime()
+    ) {
+      schedulingReminderLog("reminder skipped", {
+        appointmentId: appointment.id,
+        reminderType: "meet_link_retry",
+        scheduledStartAt: appointment.start_at,
+        result: "not_eligible",
+      });
+      continue;
+    }
+
+    if (latestAppointment.google_meet_url || latestAppointment.meeting_url) {
+      continue;
+    }
+
+    const meet = await fetchGoogleMeetUrlForEvent(latestAppointment);
+
+    if (!meet.ok) {
+      if (meet.conferenceStatus === "config_incomplete") {
+        await updateAppointment(latestAppointment.id, {
+          calendar_sync_status: "oauth_config_incomplete",
+          calendar_sync_error: meet.error,
+        });
+      }
+      errors.push(meet.error);
+      schedulingReminderLog("send failed", {
+        appointmentId: latestAppointment.id,
+        reminderType: "meet_link_retry",
+        scheduledStartAt: latestAppointment.start_at,
+        result: "calendar_fetch_failed",
+      });
+      continue;
+    }
+
+    if (!meet.meetingUrl) {
+      if (meet.conferenceStatus === "failure") {
+        await updateAppointment(latestAppointment.id, {
+          calendar_sync_status: "failed",
+          calendar_sync_error: "Google Calendar reported Meet conference creation failed.",
+        });
+      }
+      schedulingReminderLog("reminder skipped", {
+        appointmentId: latestAppointment.id,
+        reminderType: "meet_link_retry",
+        scheduledStartAt: latestAppointment.start_at,
+        result: meet.conferenceStatus === "failure" ? "conference_failed" : "still_pending",
+      });
+      continue;
+    }
+
+    const updated = await updateAppointment(latestAppointment.id, {
+      meeting_url: meet.meetingUrl,
+      google_meet_url: meet.meetingUrl,
+      calendar_sync_status: "synced",
+      calendar_sync_error: null,
+    });
+
+    if (!updated) {
+      errors.push("Meet link found but appointment update failed.");
+      continue;
+    }
+
+    if (updated.meet_link_email_sent_at) {
+      processed += 1;
+      continue;
+    }
+
+    const sent = await sendMeetLinkAvailableEmail(updated);
+    if (!sent.ok) {
+      errors.push(sent.error);
+      schedulingReminderLog("send failed", {
+        appointmentId: updated.id,
+        reminderType: "meet_link_retry",
+        scheduledStartAt: updated.start_at,
+        result: "meet_link_email_failed",
+      });
+      continue;
+    }
+
+    if (!sent.skipped) {
+      await updateAppointment(updated.id, {
+        meet_link_email_sent_at: new Date().toISOString(),
+      });
+    }
+
+    processed += 1;
+    schedulingReminderLog("reminder sent", {
+      appointmentId: updated.id,
+      reminderType: "meet_link_retry",
+      scheduledStartAt: updated.start_at,
+      result: "meet_link_sent",
+    });
+  }
+
+  return { processed, errors };
 }
 
 function reminderEligibility(

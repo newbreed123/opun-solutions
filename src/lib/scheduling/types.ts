@@ -65,9 +65,17 @@ export type AppointmentRecord = {
   google_calendar_event_id: string | null;
   meeting_url: string | null;
   google_meet_url: string | null;
-  calendar_sync_status: "pending" | "synced" | "failed" | "skipped" | null;
+  calendar_sync_status:
+    | "pending"
+    | "synced"
+    | "failed"
+    | "skipped"
+    | "conference_pending"
+    | "oauth_config_incomplete"
+    | null;
   calendar_sync_error: string | null;
   confirmation_sent_at: string | null;
+  meet_link_email_sent_at: string | null;
   reminder_24h_sent_at: string | null;
   reminder_24h_start_at: string | null;
   reminder_1h_sent_at: string | null;

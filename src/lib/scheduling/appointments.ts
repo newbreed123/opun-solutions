@@ -19,8 +19,12 @@ type AppointmentQuery = {
   to?: string;
 };
 
-const APPOINTMENT_SELECT =
-  "id,public_token,idempotency_key,created_at,updated_at,appointment_type,status,start_at,end_at,timezone,name,email,phone,business_name,website_domain,business_type,challenge,service_requested,industry,message,source,scan_id,session_id,utm_source,utm_medium,utm_campaign,gclid,google_calendar_event_id,meeting_url,google_meet_url,calendar_sync_status,calendar_sync_error,confirmation_sent_at,reminder_24h_sent_at,reminder_24h_start_at,reminder_1h_sent_at,reminder_1h_start_at,cancelled_at,rescheduled_from_id";
+const APPOINTMENT_SELECT_STABLE =
+  "id,public_token,idempotency_key,created_at,updated_at,appointment_type,status,start_at,end_at,timezone,name,email,phone,business_name,website_domain,business_type,challenge,industry,message,source,scan_id,session_id,utm_source,utm_medium,utm_campaign,gclid,google_calendar_event_id,meeting_url,google_meet_url,calendar_sync_status,calendar_sync_error,confirmation_sent_at,reminder_24h_sent_at,reminder_1h_sent_at,cancelled_at,rescheduled_from_id";
+const APPOINTMENT_SELECT_BASE =
+  "id,public_token,idempotency_key,created_at,updated_at,appointment_type,status,start_at,end_at,timezone,name,email,phone,business_name,website_domain,business_type,challenge,service_requested,industry,message,source,scan_id,session_id,utm_source,utm_medium,utm_campaign,gclid,google_calendar_event_id,meeting_url,google_meet_url,calendar_sync_status,calendar_sync_error,confirmation_sent_at,meet_link_email_sent_at,reminder_24h_sent_at,reminder_1h_sent_at,cancelled_at,rescheduled_from_id";
+const APPOINTMENT_SELECT_WITH_REMINDER_START =
+  "id,public_token,idempotency_key,created_at,updated_at,appointment_type,status,start_at,end_at,timezone,name,email,phone,business_name,website_domain,business_type,challenge,service_requested,industry,message,source,scan_id,session_id,utm_source,utm_medium,utm_campaign,gclid,google_calendar_event_id,meeting_url,google_meet_url,calendar_sync_status,calendar_sync_error,confirmation_sent_at,meet_link_email_sent_at,reminder_24h_sent_at,reminder_24h_start_at,reminder_1h_sent_at,reminder_1h_start_at,cancelled_at,rescheduled_from_id";
 
 export async function createAppointment(input: ValidatedAppointmentInput) {
   const idempotent = await findAppointmentByIdempotencyKey(input.idempotencyKey);
@@ -70,14 +74,31 @@ export async function createAppointment(input: ValidatedAppointmentInput) {
     calendar_sync_status: "pending",
     updated_at: now,
   };
-  const created = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+  let created = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
     method: "POST",
     body: record,
     prefer: "return=representation",
-    query: { select: APPOINTMENT_SELECT },
+    query: { select: APPOINTMENT_SELECT_BASE },
   });
 
+  if (!created.ok && isMissingServiceRequestedColumnError(created.error)) {
+    const { service_requested, ...recordWithoutServiceRequested } = record;
+    console.warn("Opzix scheduling service_requested unavailable; retrying insert without optional field.", {
+      status: created.status,
+    });
+    created = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+      method: "POST",
+      body: recordWithoutServiceRequested,
+      prefer: "return=representation",
+      query: { select: APPOINTMENT_SELECT_STABLE },
+    });
+  }
+
   if (!created.ok || !created.data[0]) {
+    console.error("Opzix scheduling appointment insert failed:", {
+      status: created.status,
+      error: created.ok ? "No appointment returned after insert." : created.error,
+    });
     await logSafeEvent("strategy_call_booking_failed", input, {
       failureReason: "database_conflict",
     });
@@ -91,7 +112,7 @@ export async function createAppointment(input: ValidatedAppointmentInput) {
     };
   }
 
-  let appointment = created.data[0];
+  let appointment = normalizeAppointmentRecord(created.data[0]) || created.data[0];
   const calendar = await createGoogleCalendarEvent(appointment);
 
   if (!calendar.ok) {
@@ -102,6 +123,7 @@ export async function createAppointment(input: ValidatedAppointmentInput) {
     });
     appointment =
       (await updateAppointment(appointment.id, {
+        google_calendar_event_id: calendar.eventId || appointment.google_calendar_event_id,
         calendar_sync_status: "failed",
         calendar_sync_error: calendar.error,
       })) || appointment;
@@ -109,11 +131,14 @@ export async function createAppointment(input: ValidatedAppointmentInput) {
       failureReason: "calendar_failed",
     });
   } else if (calendar.skipped) {
+    const missing = "missing" in calendar ? calendar.missing ?? [] : [];
     appointment =
       (await updateAppointment(appointment.id, {
-        calendar_sync_status: "skipped",
+        calendar_sync_status: "oauth_config_incomplete",
         calendar_sync_error:
-          "Google Calendar environment variables are missing or incomplete.",
+          missing.length > 0
+            ? `Google Calendar configuration incomplete: ${missing.join(", ")}`
+            : "Google Calendar environment variables are missing or incomplete.",
       })) || appointment;
   } else {
     appointment =
@@ -121,10 +146,16 @@ export async function createAppointment(input: ValidatedAppointmentInput) {
         google_calendar_event_id: calendar.eventId,
         meeting_url: calendar.meetingUrl,
         google_meet_url: calendar.meetingUrl,
-        calendar_sync_status: calendar.meetingUrl ? "synced" : "failed",
+        calendar_sync_status: calendar.meetingUrl
+          ? "synced"
+          : calendar.pending
+            ? "conference_pending"
+            : "failed",
         calendar_sync_error: calendar.meetingUrl
           ? null
-          : "Google Calendar event was created without a Google Meet URL.",
+          : calendar.pending
+            ? "Google Calendar event was created; Meet link is still being generated."
+            : "Google Calendar event was created without a Google Meet URL.",
       })) || appointment;
   }
 
@@ -157,7 +188,9 @@ export async function getPublicAppointmentSummary(id: string, token: string) {
 
   if (!result.ok || !result.data[0]) return null;
 
-  const appointment = result.data[0];
+  const appointment = normalizeAppointmentRecord(result.data[0]);
+  if (!appointment) return null;
+
   return {
     id: appointment.id,
     startAt: appointment.start_at,
@@ -176,7 +209,7 @@ export async function getPublicAppointmentSummary(id: string, token: string) {
 
 export async function listAppointments(query: AppointmentQuery = {}) {
   const filters: Record<string, string | number> = {
-    select: APPOINTMENT_SELECT,
+    select: APPOINTMENT_SELECT_WITH_REMINDER_START,
     order: "start_at.asc",
     limit: 500,
   };
@@ -190,44 +223,219 @@ export async function listAppointments(query: AppointmentQuery = {}) {
     query: filters,
   });
 
+  if (!result.ok && isMissingOptionalAppointmentColumnError(result.error)) {
+    const fallbackSelect = isMissingServiceRequestedColumnError(result.error)
+      ? APPOINTMENT_SELECT_STABLE
+      : APPOINTMENT_SELECT_BASE;
+    const fallback = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+      query: { ...filters, select: fallbackSelect },
+    });
+
+    if (!fallback.ok && isMissingServiceRequestedColumnError(fallback.error)) {
+      const stable = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+        query: { ...filters, select: APPOINTMENT_SELECT_STABLE },
+      });
+
+      return stable.ok
+        ? { ok: true as const, data: normalizeAppointmentRecords(stable.data) }
+        : { ok: false as const, data: [] as AppointmentRecord[], error: stable.error };
+    }
+
+    return fallback.ok
+      ? { ok: true as const, data: normalizeAppointmentRecords(fallback.data) }
+      : { ok: false as const, data: [] as AppointmentRecord[], error: fallback.error };
+  }
+
   return result.ok
-    ? { ok: true as const, data: result.data }
+    ? { ok: true as const, data: normalizeAppointmentRecords(result.data) }
     : { ok: false as const, data: [] as AppointmentRecord[], error: result.error };
 }
 
 export async function getAppointmentById(id: string) {
   const result = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
     query: {
-      select: APPOINTMENT_SELECT,
+      select: APPOINTMENT_SELECT_WITH_REMINDER_START,
       id: `eq.${id}`,
       limit: 1,
     },
   });
 
-  return result.ok ? result.data[0] || null : null;
+  if (!result.ok && isMissingOptionalAppointmentColumnError(result.error)) {
+    const fallbackSelect = isMissingServiceRequestedColumnError(result.error)
+      ? APPOINTMENT_SELECT_STABLE
+      : APPOINTMENT_SELECT_BASE;
+    const fallback = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+      query: {
+        select: fallbackSelect,
+        id: `eq.${id}`,
+        limit: 1,
+      },
+    });
+
+    if (!fallback.ok && isMissingServiceRequestedColumnError(fallback.error)) {
+      const stable = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+        query: {
+          select: APPOINTMENT_SELECT_STABLE,
+          id: `eq.${id}`,
+          limit: 1,
+        },
+      });
+
+      return stable.ok ? normalizeAppointmentRecord(stable.data[0]) || null : null;
+    }
+
+    return fallback.ok ? normalizeAppointmentRecord(fallback.data[0]) || null : null;
+  }
+
+  return result.ok ? normalizeAppointmentRecord(result.data[0]) || null : null;
+}
+
+export async function listPendingConferenceAppointments(now = new Date()) {
+  const result = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+    query: {
+      select: APPOINTMENT_SELECT_BASE,
+      and: `(status.eq.confirmed,start_at.gt.${now.toISOString()},google_calendar_event_id.not.is.null,google_meet_url.is.null,calendar_sync_status.eq.conference_pending)`,
+      order: "start_at.asc",
+      limit: 100,
+    },
+  });
+
+  if (!result.ok && isMissingOptionalAppointmentColumnError(result.error)) {
+    const fallback = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+      query: {
+        select: APPOINTMENT_SELECT_STABLE,
+        and: `(status.eq.confirmed,start_at.gt.${now.toISOString()},google_calendar_event_id.not.is.null,google_meet_url.is.null,calendar_sync_status.eq.conference_pending)`,
+        order: "start_at.asc",
+        limit: 100,
+      },
+    });
+
+    return fallback.ok
+      ? { ok: true as const, data: normalizeAppointmentRecords(fallback.data) }
+      : { ok: false as const, data: [] as AppointmentRecord[], error: fallback.error };
+  }
+
+  return result.ok
+    ? { ok: true as const, data: normalizeAppointmentRecords(result.data) }
+    : { ok: false as const, data: [] as AppointmentRecord[], error: result.error };
 }
 
 export async function updateAppointment(id: string, patch: Partial<AppointmentRecord>) {
   const result = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
     method: "PATCH",
-    query: { id: `eq.${id}`, select: APPOINTMENT_SELECT },
+    query: { id: `eq.${id}`, select: APPOINTMENT_SELECT_BASE },
     body: { ...patch, updated_at: new Date().toISOString() },
     prefer: "return=representation",
   });
 
-  return result.ok ? result.data[0] : null;
+  if (!result.ok && isMissingServiceRequestedColumnError(result.error)) {
+    const fallback = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+      method: "PATCH",
+      query: { id: `eq.${id}`, select: APPOINTMENT_SELECT_STABLE },
+      body: { ...patchWithoutOptionalSchemaColumns(patch), updated_at: new Date().toISOString() },
+      prefer: "return=representation",
+    });
+
+    return fallback.ok ? normalizeAppointmentRecord(fallback.data[0]) || null : null;
+  }
+
+  if (!result.ok && hasReminderStartPatch(patch)) {
+    const { reminder_24h_start_at, reminder_1h_start_at, ...fallbackPatch } = patch;
+    const fallback = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+      method: "PATCH",
+      query: { id: `eq.${id}`, select: APPOINTMENT_SELECT_BASE },
+      body: { ...fallbackPatch, updated_at: new Date().toISOString() },
+      prefer: "return=representation",
+    });
+
+    return fallback.ok ? normalizeAppointmentRecord(fallback.data[0]) || null : null;
+  }
+
+  return result.ok ? normalizeAppointmentRecord(result.data[0]) || null : null;
 }
 
 async function findAppointmentByIdempotencyKey(key: string) {
   const result = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
     query: {
-      select: APPOINTMENT_SELECT,
+      select: APPOINTMENT_SELECT_BASE,
       idempotency_key: `eq.${key}`,
       limit: 1,
     },
   });
 
-  return result.ok ? result.data[0] || null : null;
+  if (!result.ok && isMissingServiceRequestedColumnError(result.error)) {
+    const fallback = await supabaseAdminFetch<AppointmentRecord[]>("appointments", {
+      query: {
+        select: APPOINTMENT_SELECT_STABLE,
+        idempotency_key: `eq.${key}`,
+        limit: 1,
+      },
+    });
+
+    return fallback.ok ? normalizeAppointmentRecord(fallback.data[0]) || null : null;
+  }
+
+  return result.ok ? normalizeAppointmentRecord(result.data[0]) || null : null;
+}
+
+function normalizeAppointmentRecord(
+  appointment: AppointmentRecord | undefined,
+): AppointmentRecord | undefined {
+  if (!appointment) return undefined;
+
+  return {
+    ...appointment,
+    service_requested: appointment.service_requested ?? null,
+    meet_link_email_sent_at: appointment.meet_link_email_sent_at ?? null,
+    reminder_24h_start_at: appointment.reminder_24h_start_at ?? null,
+    reminder_1h_start_at: appointment.reminder_1h_start_at ?? null,
+  } as AppointmentRecord;
+}
+
+function normalizeAppointmentRecords(appointments: AppointmentRecord[]) {
+  return appointments
+    .map(normalizeAppointmentRecord)
+    .filter((appointment): appointment is AppointmentRecord => Boolean(appointment));
+}
+
+function isMissingReminderStartColumnError(error: string) {
+  return (
+    /reminder_24h_start_at|reminder_1h_start_at/i.test(error) &&
+    /column|schema cache|could not find/i.test(error)
+  );
+}
+
+function isMissingServiceRequestedColumnError(error: string) {
+  return (
+    /service_requested|meet_link_email_sent_at/i.test(error) &&
+    /column|schema cache|could not find/i.test(error)
+  );
+}
+
+function isMissingOptionalAppointmentColumnError(error: string) {
+  return (
+    isMissingReminderStartColumnError(error) ||
+    isMissingServiceRequestedColumnError(error)
+  );
+}
+
+function hasReminderStartPatch(patch: Partial<AppointmentRecord>) {
+  return (
+    Object.prototype.hasOwnProperty.call(patch, "reminder_24h_start_at") ||
+    Object.prototype.hasOwnProperty.call(patch, "reminder_1h_start_at")
+  );
+}
+
+function patchWithoutOptionalSchemaColumns(patch: Partial<AppointmentRecord>) {
+  const {
+    reminder_24h_start_at,
+    reminder_1h_start_at,
+    service_requested,
+    meet_link_email_sent_at,
+    ...stablePatch
+  } = patch;
+
+  return stablePatch;
 }
 
 async function logSafeEvent(

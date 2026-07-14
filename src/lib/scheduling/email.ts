@@ -48,12 +48,12 @@ export async function sendFounderNotification(appointment: AppointmentRecord) {
   const auditUrl = appointment.scan_id ? internalAuditUrl(appointment.scan_id) : "";
   const formattedPhone = formatPhoneForDisplay(appointment.phone);
   const missingBusinessFields = missingBusinessInformation(appointment);
+  const calendarStatus = calendarStatusLabel(appointment);
   const calendarWarning = meetUrl
     ? ""
-    : [
-        "Calendar/Meet attention required.",
-        appointment.calendar_sync_error || "No Google Meet link was returned.",
-      ].join(" ");
+    : calendarStatus.needsAttention
+      ? calendarStatus.message
+      : "";
   const contactRows = [
     ["Client name", appointment.name],
     ["Email address", appointment.email],
@@ -63,12 +63,12 @@ export async function sendFounderNotification(appointment: AppointmentRecord) {
     ["Date", appointmentLabel.date],
     ["Time", appointmentLabel.timeRange],
     ["Timezone", appointmentLabel.timezone],
-    ["Google Meet", meetUrl ? "Ready" : "Not available"],
+    ["Google Meet", meetUrl ? "Ready" : calendarStatus.meetLabel],
   ];
   const systemRows = [
     ["Appointment ID", appointment.id],
     ["Status", cleanLabel(appointment.status)],
-    ["Calendar sync status", appointment.calendar_sync_status || "pending"],
+    ["Calendar sync status", calendarStatus.systemLabel],
     ["Reschedule/cancel status", appointment.cancelled_at ? "Cancelled" : "Active"],
   ];
   const businessRows = [
@@ -154,6 +154,65 @@ export async function sendReminder1h(appointment: AppointmentRecord) {
       appointment,
       "Your Opzix Strategy Session Starts in 1 Hour",
       "Your Opzix strategy session starts in one hour. We'll focus on the challenge and context you shared.",
+    ),
+  });
+}
+
+export async function sendMeetLinkAvailableEmail(appointment: AppointmentRecord) {
+  const meetUrl = appointment.google_meet_url || appointment.meeting_url || "";
+  if (!meetUrl) {
+    return {
+      ok: false as const,
+      skipped: false as const,
+      error: "Appointment does not have a Google Meet URL.",
+    };
+  }
+
+  const parts = appointmentDisplayParts(
+    appointment.start_at,
+    appointment.timezone,
+    appointment.end_at,
+  );
+  const rescheduleLink = mailtoHref(
+    "Reschedule Opzix Strategy Session",
+    `Hi Opzix,\n\nI need to reschedule appointment ${appointment.id}.`,
+  );
+  const cancelLink = mailtoHref(
+    "Cancel Opzix Strategy Session",
+    `Hi Opzix,\n\nI need to cancel appointment ${appointment.id}.`,
+  );
+
+  return sendEmail({
+    to: appointment.email,
+    subject: "Your Google Meet Link for Your Opzix Strategy Session",
+    text: [
+      `Hi ${appointment.name},`,
+      "Your Google Meet link for your Opzix strategy session is ready.",
+      "",
+      "Your meeting",
+      parts.date,
+      `${parts.timeRange} ${parts.timezone}`,
+      `Join Google Meet: ${meetUrl}`,
+      `Reschedule: ${rescheduleLink}`,
+      `Cancel: ${cancelLink}`,
+      `Questions: reply to this email or contact ${OPZIX_CONTACT_EMAIL}.`,
+    ].join("\n\n"),
+    html: emailFrame(
+      "Your Google Meet Link Is Ready",
+      `
+      <p>Hi ${escapeHtml(appointment.name)},</p>
+      <p>Your Google Meet link for your Opzix strategy session is ready.</p>
+      <h2 style="font-size:18px;margin-top:24px;">Your meeting</h2>
+      ${appointmentHero(parts.date, parts.timeRange, parts.timezone)}
+      ${button(meetUrl, "Join Google Meet", "primary")}
+      ${secondaryLink(meetUrl, meetUrl)}
+      <p>
+        <a href="${escapeHtml(rescheduleLink)}">Reschedule</a>
+        &nbsp;|&nbsp;
+        <a href="${escapeHtml(cancelLink)}">Cancel</a>
+      </p>
+      <p>Questions? Reply to this email or contact ${mailto(OPZIX_CONTACT_EMAIL)}.</p>
+      `,
     ),
   });
 }
@@ -378,6 +437,60 @@ function missingBusinessInformation(appointment: AppointmentRecord) {
     appointment.business_type ? "" : "Business type",
     appointment.challenge ? "" : "Main challenge",
   ].filter(Boolean);
+}
+
+function calendarStatusLabel(appointment: AppointmentRecord) {
+  const status = appointment.calendar_sync_status || "pending";
+  const labels: Record<string, { systemLabel: string; meetLabel: string; message: string; needsAttention: boolean }> = {
+    synced: {
+      systemLabel: "Calendar event created and Meet link ready",
+      meetLabel: "Ready",
+      message: "",
+      needsAttention: false,
+    },
+    conference_pending: {
+      systemLabel: "Calendar event created; Meet generation pending",
+      meetLabel: "Meet generation pending",
+      message:
+        "Calendar event was created; Google Meet generation is still pending and will be retried automatically.",
+      needsAttention: false,
+    },
+    failed: {
+      systemLabel: "Calendar event creation or Meet generation failed",
+      meetLabel: "Failed",
+      message:
+        appointment.calendar_sync_error ||
+        "Calendar event creation or Meet generation failed.",
+      needsAttention: true,
+    },
+    oauth_config_incomplete: {
+      systemLabel: "Google OAuth configuration incomplete",
+      meetLabel: "Configuration incomplete",
+      message:
+        appointment.calendar_sync_error ||
+        "Google OAuth configuration is incomplete.",
+      needsAttention: true,
+    },
+    skipped: {
+      systemLabel: "Calendar sync skipped",
+      meetLabel: "Skipped",
+      message: appointment.calendar_sync_error || "Calendar sync was skipped.",
+      needsAttention: true,
+    },
+    pending: {
+      systemLabel: "Calendar sync pending",
+      meetLabel: "Pending",
+      message: "Calendar sync is pending.",
+      needsAttention: false,
+    },
+  };
+
+  return labels[status] || {
+    systemLabel: cleanLabel(status),
+    meetLabel: cleanLabel(status),
+    message: appointment.calendar_sync_error || "",
+    needsAttention: Boolean(appointment.calendar_sync_error),
+  };
 }
 
 function preparationChecklist(appointment: AppointmentRecord) {
