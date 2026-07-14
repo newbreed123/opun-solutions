@@ -10,8 +10,15 @@ const migration = readFileSync(
   "utf8",
 );
 const vercel = readFileSync("vercel.json", "utf8");
+const envExample = readFileSync(".env.example", "utf8");
+const readme = readFileSync("README.md", "utf8");
 
 assert.match(reminders, /type ReminderType = "appointment_24h" \| "appointment_1h"/);
+assert.match(reminders, /APPOINTMENT_REMINDERS_ENABLED/);
+assert.match(reminders, /DISABLED_REMINDERS_RESPONSE/);
+assert.match(reminders, /Branded appointment reminders are currently disabled/);
+assert.match(reminders, /appointmentRemindersEnabled\(\)/);
+assert.match(reminders, /processed:\s*0/);
 assert.match(reminders, /windowStartMinutes:\s*23 \* 60/);
 assert.match(reminders, /windowEndMinutes:\s*25 \* 60/);
 assert.match(reminders, /windowStartMinutes:\s*45/);
@@ -47,6 +54,8 @@ assert.match(reminderRoute, /OPZIX_SCHEDULING_CRON_SECRET/);
 assert.match(reminderRoute, /CRON_SECRET/);
 assert.match(reminderRoute, /authorization/);
 assert.match(reminderRoute, /status:\s*401/);
+assert.match(reminderRoute, /DISABLED_REMINDERS_RESPONSE/);
+assert.match(reminderRoute, /appointmentRemindersEnabled/);
 assert.match(reminderRoute, /errorCount/);
 assert.doesNotMatch(reminderRoute, /errors:\s*"errors" in result \? result\.errors/);
 
@@ -61,7 +70,11 @@ assert.match(types, /reminder_1h_start_at: string \| null/);
 assert.match(types, /meet_link_email_sent_at: string \| null/);
 assert.match(migration, /add column if not exists reminder_24h_start_at timestamptz/);
 assert.match(migration, /add column if not exists reminder_1h_start_at timestamptz/);
-assert.match(vercel, /"path": "\/api\/scheduling\/reminders"/);
-assert.match(vercel, /"schedule": "0 \* \* \* \*"/);
+assert.doesNotMatch(vercel, /"crons"/);
+assert.doesNotMatch(vercel, /\/api\/scheduling\/reminders/);
+assert.doesNotMatch(vercel, /0 \* \* \* \*/);
+assert.match(envExample, /APPOINTMENT_REMINDERS_ENABLED=false/);
+assert.match(readme, /Vercel Hobby does not support hourly cron schedules/);
+assert.match(readme, /APPOINTMENT_REMINDERS_ENABLED=true/);
 
 console.log("Scheduling reminder smoke tests passed.");

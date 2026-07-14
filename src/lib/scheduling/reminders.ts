@@ -50,7 +50,36 @@ const REMINDER_CONFIGS: ReminderConfig[] = [
   },
 ];
 
+export const DISABLED_REMINDERS_RESPONSE = {
+  status: "disabled",
+  message: "Branded appointment reminders are currently disabled.",
+};
+
+// Branded Opzix appointment reminders are currently disabled in production
+// because Vercel Hobby does not support hourly cron schedules. Google Calendar
+// invitations and attendee notifications are used temporarily. Re-enable the
+// hourly cron after upgrading to Vercel Pro or moving reminder execution to
+// another scheduler.
+export function appointmentRemindersEnabled() {
+  const value = process.env.APPOINTMENT_REMINDERS_ENABLED?.trim().toLowerCase();
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production";
+}
+
 export async function processSchedulingReminders(now = new Date()) {
+  if (!appointmentRemindersEnabled()) {
+    schedulingReminderLog("scan completed", {
+      result: "disabled",
+    });
+    return {
+      ok: true as const,
+      processed: 0,
+      disabled: true as const,
+      ...DISABLED_REMINDERS_RESPONSE,
+    };
+  }
+
   schedulingReminderLog("scan started", { now: now.toISOString() });
   const pendingConferenceResult = await processPendingConferenceLinks(now);
   const horizon = new Date(now.getTime() + 25 * 60 * 60 * 1000).toISOString();

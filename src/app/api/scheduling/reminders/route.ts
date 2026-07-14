@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processSchedulingReminders } from "@/lib/scheduling/reminders";
+import {
+  DISABLED_REMINDERS_RESPONSE,
+  appointmentRemindersEnabled,
+  processSchedulingReminders,
+} from "@/lib/scheduling/reminders";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +27,14 @@ async function handleReminderRequest(request: NextRequest) {
 
   if (secret ? provided !== secret : !vercelCron) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  if (!appointmentRemindersEnabled()) {
+    return NextResponse.json({
+      ok: true,
+      processed: 0,
+      ...DISABLED_REMINDERS_RESPONSE,
+    });
   }
 
   const result = await processSchedulingReminders();
