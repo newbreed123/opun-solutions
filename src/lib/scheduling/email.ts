@@ -19,6 +19,20 @@ type EmailPayload = {
   html: string;
 };
 
+export type AppointmentEmailTemplateProps = {
+  title: string;
+  intro: string;
+  clientName: string;
+  clientEmail: string;
+  googleMeetUrl: string | null;
+  appointmentDate: string;
+  appointmentTime: string;
+  timezone: string;
+  rescheduleUrl: string;
+  cancelUrl: string;
+  preparationItems: string[];
+};
+
 const DEFAULT_FROM = "Opzix <onboarding@resend.dev>";
 const OPZIX_CONTACT_EMAIL = "hello@opzix.io";
 const MEET_PENDING_MESSAGE =
@@ -265,24 +279,22 @@ async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
 }
 
 function prospectEmail(appointment: AppointmentRecord, title: string, intro: string) {
+  return renderProspectEmail(
+    appointmentEmailTemplateProps(appointment, title, intro),
+  );
+}
+
+export function appointmentEmailTemplateProps(
+  appointment: AppointmentRecord,
+  title: string,
+  intro: string,
+): AppointmentEmailTemplateProps {
   const parts = appointmentDisplayParts(
     appointment.start_at,
     appointment.timezone,
     appointment.end_at,
   );
-  const checklist = preparationChecklist(appointment);
   const meetUrl = appointment.google_meet_url || appointment.meeting_url || "";
-  const meetingLine = meetUrl ? `Google Meet: ${meetUrl}` : MEET_PENDING_MESSAGE;
-  const context = [
-    appointment.website_domain ? `Website: ${appointment.website_domain}` : "",
-    appointment.business_type
-      ? `Business type: ${formatBusinessTypeLabel(appointment.business_type)}`
-      : "",
-    appointment.service_requested
-      ? `Service requested: ${cleanLabel(appointment.service_requested)}`
-      : "",
-    appointment.challenge ? `Challenge: ${appointment.challenge}` : "",
-  ].filter(Boolean);
   const rescheduleLink = mailtoHref(
     "Reschedule Opzix Strategy Session",
     `Hi Opzix,\n\nI need to reschedule appointment ${appointment.id}.`,
@@ -293,49 +305,59 @@ function prospectEmail(appointment: AppointmentRecord, title: string, intro: str
   );
 
   return {
+    title,
+    intro,
+    clientName: clientNameForEmail(appointment.name),
+    clientEmail: appointment.email,
+    googleMeetUrl: meetUrl || null,
+    appointmentDate: parts.date,
+    appointmentTime: parts.timeRange,
+    timezone: parts.timezone,
+    rescheduleUrl: rescheduleLink,
+    cancelUrl: cancelLink,
+    preparationItems: preparationChecklist(appointment),
+  };
+}
+
+export function renderProspectEmail(props: AppointmentEmailTemplateProps) {
+  const meetingLine = props.googleMeetUrl
+    ? `Google Meet: ${props.googleMeetUrl}`
+    : MEET_PENDING_MESSAGE;
+
+  return {
     text: [
-      `Hi ${appointment.name},`,
-      intro,
+      `Hi ${props.clientName},`,
+      props.intro,
       "",
       "Your meeting",
-      parts.date,
-      `${parts.timeRange} ${parts.timezone}`,
+      props.appointmentDate,
+      `${props.appointmentTime} ${props.timezone}`,
       meetingLine,
-      meetUrl ? `Join Google Meet: ${meetUrl}` : "",
-      context.length > 0
-        ? `Based on the information you shared, we'll be prepared to discuss: ${context.join(", ")}.`
-        : "",
+      props.googleMeetUrl ? `Join Google Meet: ${props.googleMeetUrl}` : "",
       "Before the call:",
-      ...checklist.map((item) => `- ${item}`),
-      `Reschedule: ${rescheduleLink}`,
-      `Cancel: ${cancelLink}`,
+      ...props.preparationItems.map((item) => `- ${item}`),
+      `Reschedule: ${props.rescheduleUrl}`,
+      `Cancel: ${props.cancelUrl}`,
       `Questions: reply to this email or contact ${OPZIX_CONTACT_EMAIL}.`,
     ].filter(Boolean).join("\n\n"),
     html: emailFrame(
-      title,
+      props.title,
       `
-      <p>Hi ${escapeHtml(appointment.name)},</p>
-      <p>${escapeHtml(intro)}</p>
+      <p>Hi ${escapeHtml(props.clientName)},</p>
+      <p>${escapeHtml(props.intro)}</p>
       <h2 style="font-size:18px;margin-top:24px;">Your meeting</h2>
-      ${appointmentHero(parts.date, parts.timeRange, parts.timezone)}
+      ${appointmentHero(props.appointmentDate, props.appointmentTime, props.timezone)}
       ${
-        meetUrl
-          ? `${button(meetUrl, "Join Google Meet", "primary")}${secondaryLink(meetUrl, meetUrl)}`
+        props.googleMeetUrl
+          ? `${button(props.googleMeetUrl, "Join Google Meet", "primary")}${secondaryLink(props.googleMeetUrl, props.googleMeetUrl)}`
           : `<p><strong>Meeting:</strong> ${escapeHtml(MEET_PENDING_MESSAGE)}</p>`
       }
-      ${
-        context.length > 0
-          ? `<p>Based on the information you shared, we'll be prepared to discuss ${escapeHtml(
-              context.join(", "),
-            )}.</p>`
-          : ""
-      }
       <h2 style="font-size:18px;margin-top:24px;">Before the call</h2>
-      <ul>${checklist.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      <ul>${props.preparationItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
       <p>
-        <a href="${escapeHtml(rescheduleLink)}">Reschedule</a>
+        <a href="${escapeHtml(props.rescheduleUrl)}">Reschedule</a>
         &nbsp;|&nbsp;
-        <a href="${escapeHtml(cancelLink)}">Cancel</a>
+        <a href="${escapeHtml(props.cancelUrl)}">Cancel</a>
       </p>
       <p>Questions? Reply to this email or contact ${mailto(OPZIX_CONTACT_EMAIL)}.</p>
       `,
@@ -541,6 +563,22 @@ function preparationChecklist(appointment: AppointmentRecord) {
     "Existing audit report.",
     "What success should look like.",
   ];
+}
+
+function clientNameForEmail(value: string | null | undefined) {
+  const cleaned = value?.trim();
+
+  if (!cleaned || isInternalSchedulingLabel(cleaned)) {
+    return "there";
+  }
+
+  return cleaned;
+}
+
+function isInternalSchedulingLabel(value: string) {
+  return /^(schedule time|selected time|choose time|timezone|context|appointment summary|final review)$/i.test(
+    value,
+  );
 }
 
 function quickActionMailto(action: string, appointment: AppointmentRecord) {

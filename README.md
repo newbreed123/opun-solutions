@@ -28,6 +28,14 @@ Required operational setup:
 - Configure `RESEND_API_KEY`, `CONTACT_FROM_EMAIL`, and `CONTACT_NOTIFICATION_EMAIL`.
 - Configure `OPZIX_SCHEDULING_CRON_SECRET` for manual cron calls. Vercel Cron calls
   can use the `x-vercel-cron` header.
+- `APPOINTMENT_REMINDERS_ENABLED=false` disables branded Opzix reminder delivery.
+
+Branded Opzix appointment reminders are currently disabled in production because
+Vercel Hobby does not support hourly cron schedules. A once-daily
+`/api/scheduling/reminders` cron is registered at `0 8 * * *` only as a
+Hobby-compatible placeholder. Google Calendar invitations and attendee
+notifications are used temporarily. Re-enable the hourly cron after upgrading to
+Vercel Pro or moving reminder execution to another scheduler.
 
 Google Calendar setup:
 
@@ -58,6 +66,23 @@ If Google OAuth credentials are not configured, bookings are still recorded and
 emails still send, but the internal notification is marked for Calendar/Meet
 attention and the client receives a safe "meeting link is being prepared"
 fallback.
+
+Reminder reactivation:
+
+1. Upgrade to Vercel Pro or choose another hourly scheduler.
+2. Add back this `vercel.json` cron entry:
+
+   ```json
+   {
+     "path": "/api/scheduling/reminders",
+     "schedule": "0 * * * *"
+   }
+   ```
+
+3. Set `APPOINTMENT_REMINDERS_ENABLED=true`.
+4. Confirm `CRON_SECRET` or `OPZIX_SCHEDULING_CRON_SECRET` is configured.
+5. Redeploy.
+6. Test 24-hour and 1-hour reminders.
 
 ## Google Ads Appointment Conversion Tracking
 

@@ -64,7 +64,7 @@ export function createGoogleOAuthClient(options: { requireRefreshToken?: boolean
 
 export function validateGoogleCalendarProductionConfig() {
   const config = getGoogleOAuthConfig();
-  return missingGoogleOAuthConfig(config, true, true);
+  return missingGoogleOAuthConfig(config, true, isProductionRuntime());
 }
 
 export function googleOAuthSetupSecret() {

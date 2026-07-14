@@ -70,11 +70,13 @@ assert.match(types, /reminder_1h_start_at: string \| null/);
 assert.match(types, /meet_link_email_sent_at: string \| null/);
 assert.match(migration, /add column if not exists reminder_24h_start_at timestamptz/);
 assert.match(migration, /add column if not exists reminder_1h_start_at timestamptz/);
-assert.doesNotMatch(vercel, /"crons"/);
-assert.doesNotMatch(vercel, /\/api\/scheduling\/reminders/);
+assert.match(vercel, /"crons"/);
+assert.match(vercel, /\/api\/scheduling\/reminders/);
+assert.match(vercel, /"schedule": "0 8 \* \* \*"/);
 assert.doesNotMatch(vercel, /0 \* \* \* \*/);
 assert.match(envExample, /APPOINTMENT_REMINDERS_ENABLED=false/);
 assert.match(readme, /Vercel Hobby does not support hourly cron schedules/);
+assert.match(readme, /0 8 \* \* \*/);
 assert.match(readme, /APPOINTMENT_REMINDERS_ENABLED=true/);
 
 console.log("Scheduling reminder smoke tests passed.");
