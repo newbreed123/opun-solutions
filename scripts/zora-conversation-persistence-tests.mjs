@@ -17,8 +17,10 @@ assert.match(zoraChatRoute, /const conversationLog = await logZoraConversation/)
 assert.doesNotMatch(zoraChatRoute, /void logZoraConversation/);
 assert.match(zoraChatRoute, /Zora conversation persistence failed/);
 
-assert.match(zoraConversationLog, /supabaseAdminFetch<null>\("zora_conversations"/);
-assert.match(zoraConversationLog, /latest_user_message: userMessage\.slice\(0, 1000\)/);
-assert.match(zoraConversationLog, /latest_assistant_message: assistantMessage\.slice\(0, 1200\)/);
+assert.match(zoraConversationLog, /supabaseAdminFetch<Array<\{ id: string \}>>\(\s*"zora_conversations"/);
+assert.match(zoraConversationLog, /const safeUserMessage = truncateForStorage\(userMessage, 1000\)/);
+assert.match(zoraConversationLog, /const safeAssistantMessage = truncateForStorage\(assistantMessage, 1200\)/);
+assert.match(zoraConversationLog, /supabaseAdminFetch<null>\("zora_messages"/);
+assert.match(zoraConversationLog, /logZoraPersistenceFailure/);
 
 console.log("Zora conversation persistence smoke tests passed.");

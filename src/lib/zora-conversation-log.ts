@@ -2,6 +2,7 @@ import {
   hasSupabaseAdminConfig,
   supabaseAdminFetch,
 } from "@/lib/supabase-admin";
+import { truncateForStorage } from "@/lib/privacy-redaction";
 import {
   scoreZoraLead,
   scoreZoraLeadTemperature,
@@ -41,6 +42,18 @@ export type ZoraConversationMetadata = {
   action?: ZoraResponse["action"] | null;
   recommendedActions?: ZoraResponse["recommendedActions"];
   contextEngine?: unknown;
+  visitorSessionId?: string | null;
+  landingPage?: string | null;
+  pageUrl?: string | null;
+  referrer?: string | null;
+  source?: string | null;
+  medium?: string | null;
+  campaign?: string | null;
+  promptVersion?: string | null;
+  conversationFlowVersion?: string | null;
+  modelVersion?: string | null;
+  experimentId?: string | null;
+  claritySessionId?: string | null;
 };
 
 export type ZoraConversationRow = {
@@ -87,6 +100,20 @@ export type ZoraConversationRow = {
   contact_requested: boolean;
   live_agent_requested: boolean;
   email_submitted: boolean;
+  visitor_session_id?: string | null;
+  landing_page?: string | null;
+  page_url?: string | null;
+  referrer?: string | null;
+  source?: string | null;
+  medium?: string | null;
+  campaign?: string | null;
+  prompt_version?: string | null;
+  conversation_flow_version?: string | null;
+  model_version?: string | null;
+  experiment_id?: string | null;
+  clarity_session_id?: string | null;
+  persistence_error?: string | null;
+  updated_at?: string;
 };
 
 export async function logZoraConversation(
@@ -122,66 +149,107 @@ export async function logZoraConversation(
       profile,
       metadata.eventType || undefined,
     );
-    const result = await supabaseAdminFetch<null>("zora_conversations", {
-      method: "POST",
-      body: {
-        session_id: metadata.sessionId || null,
-        business_type: profile.businessType || null,
-        challenge: profile.challenge || null,
-        website_url: profile.websiteUrl || null,
-        platform_hint: profile.platform || null,
-        industry: profile.industryProfile?.industry || profile.industry || null,
-        inferred_industry: profile.inferredIndustry || null,
-        inferred_business_model: profile.inferredBusinessModel || null,
-        inferred_funnel_type: profile.inferredFunnelType || null,
-        industry_confidence: profile.industryProfile?.confidence || profile.industryConfidence || null,
-        industry_confidence_score: zoraIndustryConfidenceScore(profile.industryConfidence),
-        industry_evidence:
-          profile.industryProfile?.evidence || profile.industryEvidence || null,
-        buyer_journey: profile.industryProfile?.buyerJourney || profile.buyerJourney || null,
-        primary_bottlenecks:
-          profile.industryProfile?.primaryBottlenecks || profile.primaryBottlenecks || null,
-        recommended_focus_areas:
-          profile.industryProfile?.recommendedFocusAreas ||
-          profile.recommendedFocusAreas ||
-          null,
-        optional_revenue_mention: profile.annualRevenueText || profile.revenueRange || null,
-        current_step: metadata.currentStep || metadata.eventType || null,
-        intent: detectedIntent,
-        conversation_stage:
-          metadata.conversationStage || profile.conversationStage || null,
-        current_topic: metadata.currentTopic || profile.currentTopic || null,
-        current_subtopic: metadata.currentSubtopic || null,
-        detected_concept: metadata.detectedConcept || profile.detectedConcept || null,
-        concept_confidence: metadata.conceptConfidence || profile.conceptConfidence || null,
-        recent_talking_point:
-          metadata.recentTalkingPoint ||
-          profile.detectedConcept ||
-          profile.currentSubtopic ||
-          null,
-        recommended_next_step: profile.recommendedNextStep || null,
-        recommendation_roadmap: profile.recommendationRoadmap || null,
-        cta_clicked: ctaClicked || null,
-        conversation_outcome: conversationOutcome,
-        lead_score: scoreZoraLead(profile),
-        lead_temperature: leadTemperature,
-        latest_user_message: userMessage.slice(0, 1000),
-        latest_assistant_message: assistantMessage.slice(0, 1200),
-        source_path: metadata.sourcePath || null,
-        user_agent: metadata.userAgent || null,
-        ask_question_clicked: metadata.eventType === "ask_question_clicked",
-        faq_opened: metadata.eventType === "faq_opened",
-        contact_requested: metadata.eventType === "contact_requested",
-        live_agent_requested: metadata.eventType === "live_agent_requested",
-        email_submitted: Boolean(profile.email),
-      },
-      prefer: "returning=minimal",
-    });
+    const conversationId =
+      metadata.visitorSessionId || metadata.sessionId || createFallbackConversationId();
+    const safeUserMessage = truncateForStorage(userMessage, 1000);
+    const safeAssistantMessage = truncateForStorage(assistantMessage, 1200);
+    const baseBody = {
+      session_id: metadata.sessionId || null,
+      business_type: profile.businessType || null,
+      challenge: profile.challenge || null,
+      website_url: profile.websiteUrl || null,
+      platform_hint: profile.platform || null,
+      industry: profile.industryProfile?.industry || profile.industry || null,
+      inferred_industry: profile.inferredIndustry || null,
+      inferred_business_model: profile.inferredBusinessModel || null,
+      inferred_funnel_type: profile.inferredFunnelType || null,
+      industry_confidence: profile.industryProfile?.confidence || profile.industryConfidence || null,
+      industry_confidence_score: zoraIndustryConfidenceScore(profile.industryConfidence),
+      industry_evidence:
+        profile.industryProfile?.evidence || profile.industryEvidence || null,
+      buyer_journey: profile.industryProfile?.buyerJourney || profile.buyerJourney || null,
+      primary_bottlenecks:
+        profile.industryProfile?.primaryBottlenecks || profile.primaryBottlenecks || null,
+      recommended_focus_areas:
+        profile.industryProfile?.recommendedFocusAreas ||
+        profile.recommendedFocusAreas ||
+        null,
+      optional_revenue_mention: profile.annualRevenueText || profile.revenueRange || null,
+      current_step: metadata.currentStep || metadata.eventType || null,
+      intent: detectedIntent,
+      conversation_stage:
+        metadata.conversationStage || profile.conversationStage || null,
+      current_topic: metadata.currentTopic || profile.currentTopic || null,
+      current_subtopic: metadata.currentSubtopic || null,
+      detected_concept: metadata.detectedConcept || profile.detectedConcept || null,
+      concept_confidence: metadata.conceptConfidence || profile.conceptConfidence || null,
+      recent_talking_point:
+        metadata.recentTalkingPoint ||
+        profile.detectedConcept ||
+        profile.currentSubtopic ||
+        null,
+      recommended_next_step: profile.recommendedNextStep || null,
+      recommendation_roadmap: profile.recommendationRoadmap || null,
+      cta_clicked: ctaClicked || null,
+      conversation_outcome: conversationOutcome,
+      lead_score: scoreZoraLead(profile),
+      lead_temperature: leadTemperature,
+      latest_user_message: safeUserMessage,
+      latest_assistant_message: safeAssistantMessage,
+      source_path: metadata.sourcePath || null,
+      user_agent: metadata.userAgent || null,
+      ask_question_clicked: metadata.eventType === "ask_question_clicked",
+      faq_opened: metadata.eventType === "faq_opened",
+      contact_requested: metadata.eventType === "contact_requested",
+      live_agent_requested: metadata.eventType === "live_agent_requested",
+      email_submitted: Boolean(profile.email),
+    };
+    const enhancedBody = {
+      ...baseBody,
+      visitor_session_id: metadata.visitorSessionId || metadata.sessionId || null,
+      landing_page: metadata.landingPage || metadata.sourcePath || null,
+      page_url: metadata.pageUrl || metadata.sourcePath || null,
+      referrer: metadata.referrer || null,
+      source: metadata.source || null,
+      medium: metadata.medium || null,
+      campaign: metadata.campaign || null,
+      prompt_version: metadata.promptVersion || null,
+      conversation_flow_version: metadata.conversationFlowVersion || null,
+      model_version: metadata.modelVersion || null,
+      experiment_id: metadata.experimentId || null,
+      clarity_session_id: metadata.claritySessionId || null,
+      redaction_applied: true,
+    };
+    const result = await insertZoraConversationRow(enhancedBody, baseBody);
 
     if (!result.ok) {
-      warnInDevelopment("Zora lead logging failed:", result.error);
+      logZoraPersistenceFailure({
+        stage: "conversation_row",
+        sessionId: metadata.sessionId,
+        eventType: metadata.eventType,
+        sourcePath: metadata.sourcePath,
+        error: result.error,
+      });
       return { ok: false as const, skipped: false, error: result.error };
     }
+
+    const rowId = Array.isArray(result.data) ? result.data[0]?.id : undefined;
+
+    void insertZoraMessages({
+      conversationId,
+      rowId,
+      sessionId: metadata.sessionId || null,
+      visitorSessionId: metadata.visitorSessionId || metadata.sessionId || null,
+      userMessage: safeUserMessage,
+      assistantMessage: safeAssistantMessage,
+      sourcePath: metadata.sourcePath || null,
+      pageUrl: metadata.pageUrl || metadata.sourcePath || null,
+      source: metadata.source || null,
+      medium: metadata.medium || null,
+      campaign: metadata.campaign || null,
+      promptVersion: metadata.promptVersion || null,
+      modelVersion: metadata.modelVersion || null,
+    });
 
     void logZoraLearningExample({
       intent: detectedIntent,
@@ -226,6 +294,140 @@ export async function logZoraConversation(
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+type ConversationInsertBody = Record<string, unknown>;
+
+async function insertZoraConversationRow(
+  enhancedBody: ConversationInsertBody,
+  baseBody: ConversationInsertBody,
+) {
+  const enhanced = await supabaseAdminFetch<Array<{ id: string }>>(
+    "zora_conversations",
+    {
+      method: "POST",
+      body: enhancedBody,
+      prefer: "return=representation",
+      query: {
+        select: "id",
+      },
+    },
+  );
+
+  if (enhanced.ok) {
+    return enhanced;
+  }
+
+  const fallback = await supabaseAdminFetch<Array<{ id: string }>>(
+    "zora_conversations",
+    {
+      method: "POST",
+      body: baseBody,
+      prefer: "return=representation",
+      query: {
+        select: "id",
+      },
+    },
+  );
+
+  if (!fallback.ok) {
+    return fallback;
+  }
+
+  logZoraPersistenceFailure({
+    stage: "conversation_enhanced_columns",
+    error: enhanced.error,
+  });
+
+  return fallback;
+}
+
+async function insertZoraMessages({
+  conversationId,
+  rowId,
+  sessionId,
+  visitorSessionId,
+  userMessage,
+  assistantMessage,
+  sourcePath,
+  pageUrl,
+  source,
+  medium,
+  campaign,
+  promptVersion,
+  modelVersion,
+}: {
+  conversationId: string;
+  rowId?: string;
+  sessionId: string | null;
+  visitorSessionId: string | null;
+  userMessage: string;
+  assistantMessage: string;
+  sourcePath: string | null;
+  pageUrl: string | null;
+  source: string | null;
+  medium: string | null;
+  campaign: string | null;
+  promptVersion: string | null;
+  modelVersion: string | null;
+}) {
+  if (!userMessage && !assistantMessage) return;
+
+  const common = {
+    conversation_row_id: rowId || null,
+    conversation_id: conversationId,
+    visitor_session_id: visitorSessionId,
+    session_id: sessionId,
+    page_url: pageUrl,
+    source_path: sourcePath,
+    source,
+    medium,
+    campaign,
+    prompt_version: promptVersion,
+    model_version: modelVersion,
+    redaction_applied: true,
+  };
+  const userCreatedAt = new Date();
+  const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1);
+
+  const rows = [
+    userMessage
+      ? {
+          ...common,
+          role: "user",
+          message_text: userMessage,
+          created_at: userCreatedAt.toISOString(),
+          updated_at: userCreatedAt.toISOString(),
+        }
+      : null,
+    assistantMessage
+      ? {
+          ...common,
+          role: "assistant",
+          message_text: assistantMessage,
+          created_at: assistantCreatedAt.toISOString(),
+          updated_at: assistantCreatedAt.toISOString(),
+        }
+      : null,
+  ].filter(Boolean);
+
+  const result = await supabaseAdminFetch<null>("zora_messages", {
+    method: "POST",
+    body: rows,
+    prefer: "returning=minimal",
+  });
+
+  if (!result.ok) {
+    logZoraPersistenceFailure({
+      stage: "message_rows",
+      sessionId,
+      error: result.error,
+    });
+  }
+}
+
+function createFallbackConversationId() {
+  return `zora-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export async function updateZoraConversion(
@@ -393,4 +595,23 @@ function warnInDevelopment(...args: unknown[]) {
   if (process.env.NODE_ENV !== "production") {
     console.warn(...args);
   }
+}
+
+function logZoraPersistenceFailure(context: {
+  stage: string;
+  sessionId?: string | null;
+  eventType?: string | null;
+  sourcePath?: string | null;
+  error: unknown;
+}) {
+  console.error("Zora persistence failed", {
+    stage: context.stage,
+    sessionId: context.sessionId || undefined,
+    eventType: context.eventType || undefined,
+    sourcePath: context.sourcePath || undefined,
+    error:
+      context.error instanceof Error
+        ? context.error.message
+        : String(context.error || "unknown-error"),
+  });
 }

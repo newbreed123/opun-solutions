@@ -30,6 +30,11 @@ import {
   type FounderDateRangePreset,
 } from "@/lib/founder-dashboard/date-ranges";
 import { calculateFunnelRates, percentage } from "@/lib/founder-dashboard/metrics";
+import { FounderZoraIntelligence } from "@/components/admin/FounderZoraIntelligence";
+import {
+  getFounderConversationDashboard,
+  type ConversationQuery,
+} from "@/lib/founder-dashboard/conversations";
 import { listAppointments } from "@/lib/scheduling/appointments";
 import { formatTimezoneLabel } from "@/lib/scheduling/display";
 import type { AppointmentRecord } from "@/lib/scheduling/types";
@@ -121,6 +126,8 @@ export default async function FounderDashboardPage({
     from: dateRange.from,
     to: dateRange.to,
   });
+  const conversationQuery = conversationQueryFromParams(params, dateRange);
+  const conversationDashboard = await getFounderConversationDashboard(conversationQuery);
   const appointmentsData = await listAppointments({
     from: dateRange.from,
     to: dateRange.to,
@@ -204,6 +211,12 @@ export default async function FounderDashboardPage({
       />
 
       <div className="mt-6 space-y-8">
+        <FounderZoraIntelligence
+          data={conversationDashboard}
+          query={conversationQuery}
+          passcode={providedPasscode}
+        />
+
         {!hasRealEvents ? (
           <AnalyticsPanel
             eyebrow="Live Event Visibility"
@@ -1008,6 +1021,30 @@ function dashboardRangeHref(
   }
 
   return `/admin/founder-dashboard?${params.toString()}`;
+}
+
+function conversationQueryFromParams(
+  params: Record<string, string | string[] | undefined>,
+  dateRange: FounderDateRange,
+): ConversationQuery {
+  return {
+    from: dateRange.from,
+    to: dateRange.to,
+    q: getParam(params, "q"),
+    source: getParam(params, "source"),
+    campaign: getParam(params, "campaign"),
+    industry: getParam(params, "industry"),
+    qualified: getParam(params, "qualified"),
+    website: getParam(params, "website"),
+    audit: getParam(params, "audit"),
+    booking: getParam(params, "booking"),
+    outcome: getParam(params, "outcome"),
+    minScore: getParam(params, "minScore"),
+    maxScore: getParam(params, "maxScore"),
+    hasErrors: getParam(params, "hasErrors"),
+    unanswered: getParam(params, "unanswered"),
+    transcript: getParam(params, "transcript"),
+  };
 }
 
 function dateInputValue(value: string) {

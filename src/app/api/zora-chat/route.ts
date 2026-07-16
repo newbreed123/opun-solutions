@@ -55,6 +55,10 @@ type OpenAiChatResponse = {
 };
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const ZORA_PROMPT_VERSION =
+  process.env.ZORA_PROMPT_VERSION?.trim() || "zora-founder-intelligence-2026-07-16";
+const ZORA_CONVERSATION_FLOW_VERSION =
+  process.env.ZORA_CONVERSATION_FLOW_VERSION?.trim() || "guided-qualification-v1";
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -64,6 +68,19 @@ function stringArrayValue(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
     : undefined;
+}
+
+function attributionFromSourcePath(sourcePath: string) {
+  const path = sourcePath || "/";
+  const url = new URL(path, "https://opzix.local");
+
+  return {
+    pageUrl: `${url.pathname}${url.search}`,
+    landingPage: `${url.pathname}${url.search}`,
+    source: url.searchParams.get("utm_source") || undefined,
+    medium: url.searchParams.get("utm_medium") || undefined,
+    campaign: url.searchParams.get("utm_campaign") || undefined,
+  };
 }
 
 function auditContextValue(value: unknown) {
@@ -339,6 +356,7 @@ export async function POST(request: NextRequest) {
     const message = typeof body.message === "string" ? body.message.trim() : "";
     const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : "";
     const sourcePath = typeof body.sourcePath === "string" ? body.sourcePath.trim() : "";
+    const attribution = attributionFromSourcePath(sourcePath);
     const hasWebsite = typeof body.hasWebsite === "boolean" ? body.hasWebsite : undefined;
     const structuredMessages = Array.isArray(body.messages) ? body.messages : undefined;
     const structuredRecentTalkingPoints = stringArrayValue(body.recentTalkingPoints);
@@ -503,6 +521,18 @@ export async function POST(request: NextRequest) {
       sessionId,
       sourcePath,
       userAgent: request.headers.get("user-agent"),
+      visitorSessionId: sessionId,
+      landingPage: attribution.landingPage,
+      pageUrl: attribution.pageUrl,
+      referrer: request.headers.get("referer"),
+      source: attribution.source || "zora",
+      medium: attribution.medium,
+      campaign: attribution.campaign,
+      promptVersion: ZORA_PROMPT_VERSION,
+      conversationFlowVersion: ZORA_CONVERSATION_FLOW_VERSION,
+      modelVersion: process.env.ZORA_OPENAI_MODEL?.trim() || "local-diagnosis",
+      experimentId: process.env.ZORA_EXPERIMENT_ID?.trim() || null,
+      claritySessionId: request.headers.get("x-clarity-session-id"),
       currentStep: stringValue(body.currentStep) || fallback.responseMode,
       intent: learningIntent,
       conversationStage: resolvedLeadProfile.conversationStage,
