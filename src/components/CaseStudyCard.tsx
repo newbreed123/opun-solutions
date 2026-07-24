@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
 
 interface CaseStudyCardProps {
   image: string;
@@ -8,6 +11,7 @@ interface CaseStudyCardProps {
   resultBadge?: string;
   result: string;
   href: string;
+  ctaLabel?: string;
 }
 
 export default function CaseStudyCard({
@@ -17,11 +21,22 @@ export default function CaseStudyCard({
   resultBadge,
   result,
   href,
+  ctaLabel = "View Case Study",
 }: CaseStudyCardProps) {
   return (
-    <Link href={href}>
-      <div className="group cursor-pointer rounded-3xl overflow-hidden border border-dark-border bg-dark-card shadow-lg backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-brand-cyan/70 hover:shadow-card-glow">
-        <div className="relative w-full h-64 md:h-72 overflow-hidden">
+    <Link
+      href={href}
+      onClick={() => {
+        trackEvent("case_study_clicked", {
+          case_study: headline,
+          industry,
+          href,
+          page_path: window.location.pathname,
+        });
+      }}
+    >
+      <div className="group cursor-pointer overflow-hidden rounded-xl border border-dark-border bg-dark-card shadow-lg backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-brand-cyan/70 hover:shadow-card-glow">
+        <div className="relative h-64 w-full overflow-hidden md:h-72">
           <Image
             src={image}
             alt={headline}
@@ -29,12 +44,12 @@ export default function CaseStudyCard({
             sizes="(min-width: 1280px) 384px, (min-width: 768px) 33vw, 100vw"
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
+          <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/20" />
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="space-y-4 p-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-brand-cyan text-xs font-semibold uppercase tracking-[0.25em]">
+            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-cyan">
               {industry}
             </span>
             {resultBadge ? (
@@ -44,15 +59,15 @@ export default function CaseStudyCard({
             ) : null}
           </div>
 
-          <h3 className="heading-4 group-hover:text-brand-cyan transition-colors">
+          <h3 className="heading-4 transition-colors group-hover:text-brand-cyan">
             {headline}
           </h3>
 
-          <p className="body-md text-secondary leading-7">{result}</p>
+          <p className="body-md leading-7 text-secondary">{result}</p>
 
           <div className="pt-2">
-            <span className="text-brand-cyan font-semibold inline-flex items-center gap-2 transition-transform duration-300 group-hover:translate-x-1">
-              View Case Study <span>→</span>
+            <span className="inline-flex items-center gap-2 font-semibold text-brand-cyan transition-transform duration-300 group-hover:translate-x-1">
+              {ctaLabel} <span>-&gt;</span>
             </span>
           </div>
         </div>

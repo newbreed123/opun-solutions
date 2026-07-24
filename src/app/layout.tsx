@@ -11,9 +11,21 @@ const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 const GOOGLE_TAG_ID = GOOGLE_ADS_ID || GA_MEASUREMENT_ID;
 
 export const metadata: Metadata = {
-  title: "Opzix - Commerce Systems Consultancy",
+  metadataBase: new URL("https://opzix.io"),
+  title: "Opzix | AI-Powered Business Systems",
   description:
-    "Opzix audits customer journeys, conversion paths, tracking gaps, and operational bottlenecks, then builds the ecommerce systems, websites, AI assistants, and automations to solve them.",
+    "Opzix builds AI-powered business systems for leads, sales, customer experience, and operations across ecommerce, service businesses, and real estate.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Opzix | AI-Powered Business Systems",
+    description:
+      "Opzix builds connected websites, AI assistants, analytics, automation, scheduling, dashboards, and integrations for modern businesses.",
+    url: "/",
+    siteName: "Opzix",
+    type: "website",
+  },
   icons: {
     icon: [
       {

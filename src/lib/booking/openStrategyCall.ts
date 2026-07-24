@@ -15,6 +15,8 @@ export type StrategyCallSource =
   | "audit_assistant"
   | "contact_page"
   | "services_page"
+  | "real_estate_page"
+  | "platform_page"
   | "pricing"
   | "footer";
 
@@ -441,6 +443,8 @@ function isStrategyCallSource(value: unknown): value is StrategyCallSource {
     value === "audit_assistant" ||
     value === "contact_page" ||
     value === "services_page" ||
+    value === "real_estate_page" ||
+    value === "platform_page" ||
     value === "pricing" ||
     value === "footer"
   );

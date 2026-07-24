@@ -40,8 +40,9 @@ export default function CaseStudies() {
           </h1>
           <p className="body-lg mx-auto max-w-3xl text-secondary">
             Practical examples of improved websites, ecommerce journeys,
-            inquiry flows, and operational systems without inflated claims or
-            generic redesign language.
+            inquiry flows, operational systems, and in-development platform
+            implementations without inflated claims or generic redesign
+            language.
           </p>
         </div>
       </Section>
@@ -186,6 +187,34 @@ export default function CaseStudies() {
               result="A complete ecommerce system overhaul focused on clearer conversion paths, more reliable order flow, and better analytics."
               href="/case-studies/ecommerce-system-success"
             />
+          </div>
+
+          <div className="mt-16">
+            <div className="mx-auto mb-10 max-w-3xl text-center">
+              <p className="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-brand-cyan">
+                In Development
+              </p>
+              <h2 className="heading-2 mb-4">
+                Platform Implementations Being Prepared for Future Proof
+              </h2>
+              <p className="body-lg mx-auto text-secondary">
+                These are not published case studies yet. They are active or
+                planned implementations that can become measurable proof after
+                launch, approval, and verified baseline and outcome data.
+              </p>
+            </div>
+
+            <div className="mx-auto max-w-xl">
+              <CaseStudyCard
+                image="https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&h=400&fit=crop"
+                industry="Real Estate"
+                headline="Brittany Flannigan Real Estate Platform"
+                resultBadge="In Development"
+                result="A premium real estate platform designed around community intelligence, buyer and seller conversion journeys, lead capture, analytics, and licensed MLS data integration planning."
+                href="/industries/real-estate"
+                ctaLabel="View Platform Direction"
+              />
+            </div>
           </div>
         </div>
       </Section>

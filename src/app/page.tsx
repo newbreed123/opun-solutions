@@ -2,7 +2,9 @@ import Button from "@/components/Button";
 import CaseStudyCard from "@/components/CaseStudyCard";
 import Section from "@/components/Section";
 import ServiceCard from "@/components/ServiceCard";
+import TrackedLink from "@/components/TrackedLink";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
+import { homepageIndustryCards } from "@/content/industries";
 import {
   AuditPreviewMockup,
   ChatbotPreviewMockup,
@@ -133,24 +135,24 @@ export default function Home() {
           <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="min-w-0">
               <p className="mb-5 text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-                Commerce Systems Consultancy
+                AI-Powered Business Systems
               </p>
               <h1 className="heading-1 mb-6">
-                <span className="block">Find What&apos;s Holding</span>
-                <span className="block">Your Business Back.</span>
-                <span className="block">Then Fix It.</span>
+                <span className="block">Business Systems for Leads,</span>
+                <span className="block">Sales, and Operational Control</span>
               </h1>
               <p className="body-lg mb-8 text-secondary">
-                Opzix audits customer journeys, conversion paths, tracking gaps,
-                and operational bottlenecks, then builds the websites,
-                ecommerce systems, AI assistants, and automations to solve them.
+                Opzix designs and builds connected websites, AI assistants,
+                analytics, automation, scheduling, and operational tools that
+                help businesses convert more opportunities and work more
+                efficiently.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button href="/tools/ecommerce-audit-scanner" variant="primary" size="lg">
-                  Run Free Audit
+                <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
+                  Book a Strategy Session
                 </Button>
-                <Button href={STRATEGY_CALL_URL} variant="secondary" size="lg">
-                  Book Strategy Call
+                <Button href="/platform" variant="secondary" size="lg">
+                  Explore the Opzix Platform
                 </Button>
               </div>
             </div>
@@ -169,6 +171,64 @@ export default function Home() {
       </section>
 
       <Section bgColor="primary">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
+            Industry Solutions
+          </p>
+          <h2 className="heading-2 mt-4">
+            Industries We Build For
+          </h2>
+          <p className="body-lg mx-auto mt-5 text-secondary">
+            Opzix combines reusable platform capabilities with
+            industry-specific workflows, customer journeys, and operational
+            needs.
+          </p>
+        </div>
+        <div className="mt-10 grid gap-5 md:grid-cols-3">
+          {homepageIndustryCards.map((industry) => {
+            const Icon = industry.icon;
+
+            return (
+              <div key={industry.slug} className="card flex h-full flex-col p-6">
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                  {industry.name}
+                </p>
+                <h3 className="heading-4">{industry.headline}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-secondary">
+                  {industry.copy}
+                </p>
+                <div className="mt-5 grid gap-2">
+                  {industry.capabilities.slice(0, 5).map((capability) => (
+                    <div
+                      key={capability}
+                      className="flex gap-2 text-sm text-secondary"
+                    >
+                      <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
+                      <span>{capability}</span>
+                    </div>
+                  ))}
+                </div>
+                <TrackedLink
+                  href={industry.href}
+                  eventName="industry_card_clicked"
+                  payload={{
+                    industry: industry.slug,
+                    cta_location: "homepage_industries",
+                  }}
+                  className="mt-6 inline-flex min-h-11 items-center font-semibold text-brand-cyan hover:text-primary"
+                >
+                  {industry.cta} <span className="ml-2">-&gt;</span>
+                </TrackedLink>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section bgColor="deep">
         <div className="mx-auto max-w-4xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
             Who Opzix Serves

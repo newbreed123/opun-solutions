@@ -8,7 +8,7 @@ export default function Footer() {
     <footer className="bg-dark-deep border-t border-dark-border">
       <div className="container-wide py-16 md:py-20">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -18,34 +18,57 @@ export default function Footer() {
               <span className="text-xl font-bold text-primary">Opzix</span>
             </div>
             <p className="body-sm text-secondary">
-              Helping service businesses and ecommerce brands grow through
-              websites, AI tools, automation, and backend systems.
+              AI-powered business systems for leads, sales, customer
+              experience, and operations.
             </p>
           </div>
 
-          {/* Services */}
+          {/* Solutions */}
           <div>
-            <h3 className="font-semibold text-primary mb-4">Services</h3>
+            <h3 className="font-semibold text-primary mb-4">Solutions</h3>
             <ul className="space-y-2">
+              <li>
+                <Link
+                  href="/services"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
+                >
+                  Business Systems
+                </Link>
+              </li>
               <li>
                 <Link
                   href="/services/ai-chatbots-automation"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  Web Design
+                  AI Assistants
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/services"
+                  href="/solutions/lead-generation-systems"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  AI Business Assistants
+                  Lead Generation
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/services"
+                  href="/platform"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
+                >
+                  Platform
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Industries */}
+          <div>
+            <h3 className="font-semibold text-primary mb-4">Industries</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  href="/services/ecommerce-solutions"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Ecommerce
@@ -53,10 +76,18 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services"
+                  href="/industries"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  Integrations
+                  Service Businesses
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/industries/real-estate"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
+                >
+                  Real Estate
                 </Link>
               </li>
             </ul>

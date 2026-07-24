@@ -7,17 +7,16 @@ import { strategyCallBookingHref } from "@/lib/booking";
 import { openStrategyCall } from "@/lib/booking/openStrategyCall";
 
 const navLinks = [
-  { label: "Home", href: "/" },
   {
     label: "Solutions",
     href: "/services",
     children: [
       {
-        label: "Ecommerce Systems",
-        href: "/services/ecommerce-solutions",
+        label: "Business Systems",
+        href: "/services",
       },
       {
-        label: "AI Business Assistants",
+        label: "AI Assistants & Automation",
         href: "/services/ai-chatbots-automation",
       },
       {
@@ -25,8 +24,16 @@ const navLinks = [
         href: "/solutions/lead-generation-systems",
       },
       {
-        label: "Audit Scanner",
-        href: "/tools/ecommerce-audit-scanner",
+        label: "Ecommerce Systems",
+        href: "/services/ecommerce-solutions",
+      },
+      {
+        label: "Websites & Digital Experiences",
+        href: "/services",
+      },
+      {
+        label: "Analytics & Tracking",
+        href: "/platform#analytics-and-event-tracking",
       },
     ],
   },
@@ -34,14 +41,47 @@ const navLinks = [
     label: "Industries",
     href: "/industries",
     children: [
-      { label: "Ecommerce Brands", href: "/services/ecommerce-solutions" },
-      { label: "Care Agencies", href: "/industries" },
-      { label: "Coaches & Consultants", href: "/industries" },
-      { label: "Local Service Businesses", href: "/industries" },
+      { label: "Ecommerce", href: "/services/ecommerce-solutions" },
+      { label: "Service Businesses", href: "/industries" },
+      { label: "Real Estate", href: "/industries/real-estate" },
+    ],
+  },
+  {
+    label: "Platform",
+    href: "/platform",
+    children: [
+      {
+        label: "Platform Overview",
+        href: "/platform",
+      },
+      {
+        label: "Zora AI",
+        href: "/services/ai-chatbots-automation",
+      },
+      {
+        label: "Audit Scanner",
+        href: "/tools/ecommerce-audit-scanner",
+      },
+      {
+        label: "Scheduling",
+        href: "/platform#native-scheduling",
+      },
+      {
+        label: "Analytics",
+        href: "/platform#analytics-and-event-tracking",
+      },
+      {
+        label: "Founder Dashboard",
+        href: "/platform#founder-and-operational-dashboards",
+      },
+      {
+        label: "Integrations",
+        href: "/platform#backend-integrations",
+      },
     ],
   },
   { label: "Case Studies", href: "/case-studies" },
-  { label: "Insights", href: "/insights" },
+  { label: "Resources", href: "/insights" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
@@ -71,7 +111,7 @@ export default function Header() {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden lg:flex items-center gap-8">
+        <div className="hidden lg:flex items-center gap-5 xl:gap-8">
           {navLinks.map((link) => (
             <div
               key={link.href}
@@ -85,12 +125,12 @@ export default function Header() {
               </Link>
 
               {link.children && (
-                <div className="absolute left-0 top-full mt-3 hidden min-w-[220px] rounded-[1.75rem] border border-dark-border bg-dark-card p-4 shadow-xl group-hover:block">
+                <div className="absolute left-0 top-full mt-3 hidden min-w-[260px] rounded-xl border border-dark-border bg-dark-card p-3 shadow-xl group-hover:block">
                   {link.children.map((child) => (
                     <Link
                       key={`${child.label}-${child.href}`}
                       href={child.href}
-                      className="block rounded-2xl px-4 py-3 text-secondary hover:bg-white/5 hover:text-brand-cyan transition-colors"
+                      className="block rounded-lg px-4 py-3 text-secondary hover:bg-white/5 hover:text-brand-cyan transition-colors"
                     >
                       {child.label}
                     </Link>
