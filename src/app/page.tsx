@@ -1,531 +1,333 @@
+import Image from "next/image";
 import Button from "@/components/Button";
-import CaseStudyCard from "@/components/CaseStudyCard";
 import Section from "@/components/Section";
-import ServiceCard from "@/components/ServiceCard";
 import TrackedLink from "@/components/TrackedLink";
 import { STRATEGY_CALL_URL } from "@/lib/booking";
 import { homepageIndustryCards } from "@/content/industries";
-import {
-  AuditPreviewMockup,
-  ChatbotPreviewMockup,
-  FunnelArchitectureDiagram,
-  LeadSystemDashboardMockup,
-  OperationsDashboardMockup,
-  WorkflowMapMockup,
-} from "@/components/VisualMockups";
-import {
-  BarChart3,
-  Check,
-  Globe,
-  LayoutGrid,
-  MessageSquare,
-  ServerCog,
-  Settings,
-  ShoppingCart,
-  Zap,
-} from "lucide-react";
+import { BarChart3, Check, Network, Sparkles, Workflow } from "lucide-react";
 
-const trustPoints = [
-  "Customer journey audits",
-  "Conversion path review",
-  "Tracking and operations diagnosis",
-  "Implementation roadmap",
-];
-
-const systemNodes = [
-  { label: "Website building", icon: Globe },
-  { label: "Ecommerce storefront", icon: ShoppingCart },
-  { label: "AI assistant", icon: MessageSquare },
-  { label: "CRM / email", icon: ServerCog },
-  { label: "Booking / intake", icon: Check },
-  { label: "Analytics / tracking", icon: BarChart3 },
-  { label: "Backend integrations", icon: Settings },
-  { label: "Client dashboard", icon: LayoutGrid },
-  { label: "Support / ticket flow", icon: Zap },
-];
-
-const audienceSegments = [
+const coreIdeas = [
   {
-    label: "Storefront",
-    title: "Ecommerce Brands",
-    copy: "Improve product discovery, storefront clarity, tracking, conversion paths, and customer confidence.",
+    title: "Connected Experiences",
+    question: "How do customers move from interest to action?",
+    copy: "Opzix connects customer journeys, storefronts, lead paths, booking flows, and industry workflows so the public experience works as part of the platform.",
+    icon: Network,
   },
   {
-    label: "Lead Flow",
-    title: "Service Businesses",
-    copy: "Turn website visitors into booked calls, qualified leads, intake submissions, and follow-up workflows.",
+    title: "AI Guidance",
+    question: "What happens when visitors need help?",
+    copy: "AI assistants guide questions, capture intent, and route people toward the right next step without replacing human judgment.",
+    icon: Sparkles,
   },
   {
-    label: "Operations",
-    title: "Operations-Heavy Teams",
-    copy: "Connect forms, CRM, dashboards, email, AI assistants, support flows, and backend systems into one clear process.",
+    title: "Automation",
+    question: "What happens after the lead appears?",
+    copy: "Intake, scheduling, CRM handoff, notifications, and follow-up can work together instead of living in separate tools.",
+    icon: Workflow,
+  },
+  {
+    title: "Business Intelligence",
+    question: "How do teams know what is working?",
+    copy: "Analytics and dashboards turn conversations, leads, bookings, and operational signals into clearer decisions.",
+    icon: BarChart3,
   },
 ];
 
-const proofItems = [
-  "Ecommerce audit scanner live",
-  "AI audit assistant live",
-  "PDF roadmap reports generated",
-  "Supabase-backed scan insights",
-  "BigCommerce / Shopify / custom storefront review logic",
-  "Conversion, tracking, UX, and operations scoring",
+const differences = [
+  "Starts with the business platform, not a redesign checklist.",
+  "Connects AI, analytics, automation, and operations around business growth.",
+  "Builds reusable platform capabilities that can adapt by industry.",
 ];
 
-const auditFunnelSteps = [
+const platformFoundations = [
+  "AI-first Architecture",
+  "API-driven Platform",
+  "MLS Grid Data Consumer",
+  "RESO Web API",
+  "Operational Intelligence",
+  "Industry-specific Workflows",
+];
+
+const heroAudienceLinks = [
   {
-    title: "Diagnose",
-    copy: "Run a free audit to identify conversion, UX, tracking, and operational gaps.",
+    label: "Real Estate",
+    href: "/industries/real-estate",
+    industry: "real-estate",
   },
   {
-    title: "Prioritize",
-    copy: "Get a roadmap with recommended fixes, estimated effort, and business impact.",
+    label: "Service Businesses",
+    href: "/solutions/lead-generation-systems",
+    industry: "service-businesses",
   },
   {
-    title: "Build",
-    copy: "Opzix helps implement the systems: storefront, AI assistant, CRM, booking, dashboard, integrations, and support flow.",
+    label: "Ecommerce",
+    href: "/services/ecommerce-solutions",
+    industry: "ecommerce",
   },
 ];
 
-const typicalAgency = [
-  "Starts with a redesign",
-  "Treats each tool separately",
-  "Leaves tracking gaps unclear",
-  "Hands off before operations improve",
+const heroPlatformSignals = [
+  "AI Systems",
+  "Analytics",
+  "Automation",
+  "Integrations",
+  "Operational Workflows",
 ];
-
-const opzixDifference = [
-  "Starts with the customer journey",
-  "Prioritizes the highest-impact gaps",
-  "Connects website, AI, automation, and backend workflows",
-  "Builds around real operations",
-];
-
-function SystemsMap() {
-  return (
-    <div className="relative mx-auto mt-12 max-w-6xl">
-      <div className="absolute inset-x-8 top-1/2 hidden h-px bg-gradient-to-r from-transparent via-brand-blue/50 to-transparent lg:block" />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {systemNodes.map((node, index) => {
-          const Icon = node.icon;
-          return (
-            <div
-              key={node.label}
-              className={`card relative p-5 ${index === 4 ? "lg:scale-105 lg:border-brand-cyan/60" : ""}`}
-            >
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-dark-border bg-brand-blue/10 text-brand-cyan">
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="text-lg font-bold text-primary">{node.label}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-secondary">
-                Connected into the same customer and operations flow.
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export default function Home() {
   return (
     <>
-      <section className="hero-atmosphere py-14 sm:py-16 md:py-24">
-        <div className="container-wide">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="min-w-0">
-              <p className="mb-5 text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-                AI-Powered Business Systems
-              </p>
-              <h1 className="heading-1 mb-6">
-                <span className="block">Business Systems for Leads,</span>
-                <span className="block">Sales, and Operational Control</span>
-              </h1>
-              <p className="body-lg mb-8 text-secondary">
-                Opzix designs and builds connected websites, AI assistants,
-                analytics, automation, scheduling, and operational tools that
-                help businesses convert more opportunities and work more
-                efficiently.
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
-                  Book a Strategy Session
-                </Button>
-                <Button href="/platform" variant="secondary" size="lg">
-                  Explore the Opzix Platform
-                </Button>
-              </div>
-            </div>
-            <LeadSystemDashboardMockup />
-          </div>
+      <section className="relative min-h-[calc(100svh-4rem)] overflow-hidden border-b border-dark-border bg-dark-deep md:min-h-[calc(100svh-5rem)]">
+        <Image
+          src="/opzix-command-center-hero-v2.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[82%_center] md:object-[75%_center]"
+          style={{
+            filter: "brightness(0.78) contrast(1.06) saturate(0.98)",
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(3, 12, 31, 0.97) 0%, rgba(3, 12, 31, 0.88) 30%, rgba(3, 12, 31, 0.52) 58%, rgba(3, 12, 31, 0.22) 82%, rgba(3, 12, 31, 0.10) 100%)",
+          }}
+        />
 
-          <div className="mt-12 grid gap-3 border-t border-dark-border pt-6 sm:grid-cols-2 lg:grid-cols-4">
-            {trustPoints.map((point) => (
-              <div key={point} className="flex items-start gap-3 text-sm text-secondary">
-                <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
-                <span>{point}</span>
-              </div>
-            ))}
+        <div className="container-wide relative flex min-h-[calc(100svh-4rem)] items-center py-16 md:min-h-[calc(100svh-5rem)] md:py-20">
+          <div className="max-w-2xl">
+            <p className="mb-5 text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
+              AI-Powered Business Platforms
+            </p>
+            <h1 className="heading-1">
+              Build the Platform Behind a Smarter Business
+            </h1>
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-secondary md:text-xl">
+              Opzix builds reusable operating platforms that connect customer
+              experience, AI, automation, analytics, integrations, and
+              operational workflows into one system.
+            </p>
+            <p className="mt-4 max-w-xl text-xs font-semibold uppercase tracking-[0.12em] text-secondary/85 md:text-sm md:tracking-[0.18em]">
+              One platform. Multiple industries. Endless possibilities.
+            </p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row md:mt-8">
+              <Button href={STRATEGY_CALL_URL} variant="primary" size="lg">
+                Book a Strategy Session
+              </Button>
+              <Button href="/platform" variant="secondary" size="lg">
+                See How It Works
+              </Button>
+            </div>
+            <div className="mt-8 grid gap-3 border-t border-white/15 pt-5 sm:grid-cols-3 md:mt-12 md:gap-4 md:pt-6">
+              {heroAudienceLinks.map((item) => (
+                <TrackedLink
+                  key={item.label}
+                  href={item.href}
+                  eventName="industry_card_clicked"
+                  payload={{
+                    industry: item.industry,
+                    cta_location: "homepage_hero_audience",
+                  }}
+                  className="group inline-flex min-h-9 items-center text-sm font-semibold uppercase tracking-[0.16em] text-secondary hover:text-brand-cyan"
+                >
+                  {item.label}
+                  <span className="ml-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    -&gt;
+                  </span>
+                </TrackedLink>
+              ))}
+            </div>
+          </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute right-6 top-[27%] hidden w-[18rem] rounded-2xl border border-white/14 bg-slate-950/28 p-5 text-primary shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl lg:block xl:right-12"
+          >
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-secondary">
+                Platform Status
+              </p>
+              <span className="h-2.5 w-2.5 rounded-full bg-brand-cyan shadow-[0_0_18px_rgba(6,182,212,0.85)]" />
+            </div>
+            <div className="space-y-3">
+              {heroPlatformSignals.map((signal) => (
+                <div key={signal} className="flex items-center gap-3 text-sm text-secondary">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-cyan/35 bg-brand-cyan/10 text-brand-cyan">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{signal}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       <Section bgColor="primary">
-        <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Industry Solutions
+            What Opzix Connects
           </p>
           <h2 className="heading-2 mt-4">
-            Industries We Build For
+            Four ideas, one connected business platform.
           </h2>
           <p className="body-lg mx-auto mt-5 text-secondary">
-            Opzix combines reusable platform capabilities with
-            industry-specific workflows, customer journeys, and operational
-            needs.
+            Customers see the experience. Your team gets the system behind it:
+            AI, automation, analytics, and workflows working together.
           </p>
         </div>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {homepageIndustryCards.map((industry) => {
-            const Icon = industry.icon;
+        <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {coreIdeas.map((idea) => {
+            const Icon = idea.icon;
 
             return (
-              <div key={industry.slug} className="card flex h-full flex-col p-6">
+              <article key={idea.title} className="card p-6">
                 <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
                   <Icon className="h-5 w-5" />
                 </div>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
-                  {industry.name}
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                  {idea.question}
                 </p>
-                <h3 className="heading-4">{industry.headline}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-secondary">
-                  {industry.copy}
+                <h3 className="mt-3 text-xl font-bold text-primary">
+                  {idea.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-secondary">
+                  {idea.copy}
                 </p>
-                <div className="mt-5 grid gap-2">
-                  {industry.capabilities.slice(0, 5).map((capability) => (
-                    <div
-                      key={capability}
-                      className="flex gap-2 text-sm text-secondary"
-                    >
-                      <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
-                      <span>{capability}</span>
-                    </div>
-                  ))}
-                </div>
-                <TrackedLink
-                  href={industry.href}
-                  eventName="industry_card_clicked"
-                  payload={{
-                    industry: industry.slug,
-                    cta_location: "homepage_industries",
-                  }}
-                  className="mt-6 inline-flex min-h-11 items-center font-semibold text-brand-cyan hover:text-primary"
-                >
-                  {industry.cta} <span className="ml-2">-&gt;</span>
-                </TrackedLink>
-              </div>
+              </article>
             );
           })}
         </div>
       </Section>
 
-      <Section bgColor="deep">
-        <div className="mx-auto max-w-4xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Who Opzix Serves
-          </p>
-          <h2 className="heading-2 mt-4">
-            Built for businesses where the customer journey is too important to
-            guess.
-          </h2>
-        </div>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {audienceSegments.map((segment) => (
-            <div key={segment.title} className="card p-6">
-              <p className="mb-4 inline-flex rounded-full border border-brand-cyan/30 bg-brand-blue/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
-                {segment.label}
-              </p>
-              <h3 className="heading-4">{segment.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-secondary">
-                {segment.copy}
-              </p>
-            </div>
-          ))}
+      <Section bgColor="secondary">
+        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
+              Who It Helps
+            </p>
+            <h2 className="heading-2 mt-4">
+              One platform philosophy, adapted by industry.
+            </h2>
+            <p className="body-lg mt-5 text-secondary">
+              Opzix adapts the same platform thinking to industries with
+              different customer journeys.
+            </p>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {homepageIndustryCards.map((industry) => {
+              const Icon = industry.icon;
+
+              return (
+                <article key={industry.slug} className="card flex h-full flex-col p-6">
+                  <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                    {industry.name}
+                  </p>
+                  <h3 className="text-xl font-bold text-primary">
+                    {industry.headline}
+                  </h3>
+                  <p className="mt-3 flex-1 text-sm leading-6 text-secondary">
+                    {industry.copy}
+                  </p>
+                  <TrackedLink
+                    href={industry.href}
+                    eventName="industry_card_clicked"
+                    payload={{
+                      industry: industry.slug,
+                      cta_location: "homepage_industries",
+                    }}
+                    className="mt-6 inline-flex min-h-11 items-center font-semibold text-brand-cyan hover:text-primary"
+                  >
+                    {industry.cta} <span className="ml-2">-&gt;</span>
+                  </TrackedLink>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </Section>
 
-      <Section bgColor="deep">
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+      <Section bgColor="primary">
+        <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-              Honest Proof
+              Platform Foundations
             </p>
-            <h2 className="heading-2 mt-4">
-              Built from real ecommerce and operations problems.
-            </h2>
+            <h2 className="heading-2 mt-4">Built on Trusted Technology</h2>
             <p className="body-lg mt-5 text-secondary">
-              Opzix Audit Beta is already being used to diagnose storefront,
-              tracking, product discovery, and operational workflow gaps.
+              The credibility behind Opzix is architectural: connected systems,
+              reusable platform modules, and industry-specific workflows built
+              for serious business operations.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {proofItems.map((item) => (
-              <div key={item} className="flex gap-3 rounded-2xl border border-dark-border bg-white/[0.035] px-4 py-3 text-sm text-secondary">
-                <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
-                <span>{item}</span>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {platformFoundations.map((item) => (
+              <div
+                key={item}
+                className="flex min-h-16 items-center gap-3 rounded-lg border border-dark-border bg-white/[0.035] px-4 py-3"
+              >
+                <Check className="h-4 w-4 flex-none text-brand-cyan" />
+                <p className="text-sm font-semibold leading-6 text-primary">
+                  {item}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </Section>
 
-      <Section bgColor="secondary">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Main Funnel
-          </p>
-          <h2 className="heading-2 mt-4">From audit to implementation.</h2>
-        </div>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {auditFunnelSteps.map((step, index) => (
-            <div key={step.title} className="card p-6">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 text-lg font-bold text-brand-cyan">
-                {index + 1}
-              </div>
-              <h3 className="heading-4">{step.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-secondary">
-                {step.copy}
-              </p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-10 text-center">
-          <Button href="/tools/ecommerce-audit-scanner" size="lg">
-            Run Free Audit
-          </Button>
-        </div>
-      </Section>
-
-      <Section bgColor="secondary">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Connected Systems
-          </p>
-          <h2 className="heading-2 mt-4">
-            One operating system for leads, sales, and fulfillment.
-          </h2>
-          <p className="body-lg mx-auto mt-5 text-secondary">
-            The storefront, website, AI assistant, CRM, booking flow,
-            analytics, and support handoff should all move in the same customer
-            and operations flow.
-          </p>
-        </div>
-        <SystemsMap />
-        <div className="mt-10 text-center">
-          <Button href="/tools/ecommerce-audit-scanner" size="lg">
-            Run Free Audit
-          </Button>
-        </div>
-      </Section>
-
       <Section bgColor="deep">
-        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+        <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-              Why Opzix Is Different
+              Why It Feels Different
             </p>
             <h2 className="heading-2 mt-4">
-              Start with the gap, not the tool.
+              Most agencies deliver websites. Opzix delivers operating
+              platforms.
             </h2>
             <p className="body-lg mt-5 text-secondary">
-              A modern customer journey touches your storefront, website, AI
-              assistant, CRM, booking flow, tracking, and internal team. Opzix
-              starts by finding the weak points, then builds around the full
-              path.
+              Opzix is designed for founders and operators who need customer
+              experience, AI, automation, analytics, and operations to move
+              together.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="card p-6">
-              <h3 className="heading-4 mb-5 text-red-200">Typical Agency</h3>
-              <div className="space-y-3">
-                {typicalAgency.map((item) => (
-                  <p key={item} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-secondary">
-                    {item}
-                  </p>
-                ))}
-              </div>
-            </div>
-            <div className="card-elevated p-6 lg:-mt-5">
-              <h3 className="heading-4 mb-5 text-brand-cyan">Opzix</h3>
-              <div className="space-y-3">
-                {opzixDifference.map((item) => (
-                  <div key={item} className="flex gap-3 rounded-2xl border border-brand-cyan/30 bg-brand-blue/10 px-4 py-3 text-sm text-primary">
-                    <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
+          <div className="card p-6 md:p-8">
+            <div className="grid gap-4">
+              {differences.map((item) => (
+                <div key={item} className="flex gap-3 rounded-lg border border-dark-border bg-white/[0.035] p-4 text-secondary">
+                  <Check className="mt-1 h-4 w-4 flex-none text-brand-cyan" />
+                  <p className="leading-7">{item}</p>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-        <div className="mt-10 text-center">
-          <Button href={STRATEGY_CALL_URL} size="lg">
-            Book Strategy Call
-          </Button>
-        </div>
-      </Section>
-
-      <Section bgColor="primary">
-        <div className="mb-12 max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Visual System Proof
-          </p>
-          <h2 className="heading-2 mt-4">
-            See the journey before you rebuild it.
-          </h2>
-          <p className="body-lg mt-5 text-secondary">
-            Audit previews, lead-flow diagrams, dashboard interfaces, and AI
-            assistant mockups make complex operations visible before they become
-            expensive implementation decisions.
-          </p>
-        </div>
-        <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-          <FunnelArchitectureDiagram />
-          <div className="grid gap-5">
-            <AuditPreviewMockup />
-            <ChatbotPreviewMockup />
-          </div>
-        </div>
-        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-          <OperationsDashboardMockup />
-          <WorkflowMapMockup />
-        </div>
-      </Section>
-
-      <Section bgColor="secondary">
-        <div className="mb-12 text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Core Services
-          </p>
-          <h2 className="heading-2 mt-4">
-            Services connected into the same customer and operations flow.
-          </h2>
-          <p className="body-lg mx-auto mt-5 max-w-3xl text-secondary">
-            Opzix can improve one part of the journey or build the connected
-            system around it: storefront, lead flow, tracking, automation,
-            dashboards, and backend handoff.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <ServiceCard
-            icon={Globe}
-            title="Website Building"
-            description="Clearer pages, stronger positioning, and conversion paths connected to the rest of the customer journey."
-            href="/services"
-          />
-          <ServiceCard
-            icon={ShoppingCart}
-            title="Ecommerce Storefront"
-            description="Product discovery, category flow, checkout confidence, tracking, and storefront UX reviewed as one system."
-            href="/services/ecommerce-solutions"
-          />
-          <ServiceCard
-            icon={MessageSquare}
-            title="AI Assistant"
-            description="Assistants that answer questions, qualify intent, route inquiries, and support human follow-up."
-            href="/services/ai-chatbots-automation"
-          />
-          <ServiceCard
-            icon={ServerCog}
-            title="CRM / Email"
-            description="Lead, customer, and follow-up workflows connected to the same intake, sales, and support path."
-            href="/services"
-          />
-          <ServiceCard
-            icon={Check}
-            title="Booking / Intake"
-            description="Forms, calls, consultations, and intake steps shaped around cleaner qualification and handoff."
-            href="/services"
-          />
-          <ServiceCard
-            icon={BarChart3}
-            title="Analytics / Tracking"
-            description="Measurement foundations that show which journeys, campaigns, and customer actions are working."
-            href="/services"
-          />
-          <ServiceCard
-            icon={Settings}
-            title="Backend Integrations"
-            description="Ecommerce, CRM, email, booking, payments, ERP, and automation workflows connected with intent."
-            href="/services"
-          />
-          <ServiceCard
-            icon={LayoutGrid}
-            title="Client Dashboard"
-            description="Internal and client-facing views for status, intake, documents, requests, and performance visibility."
-            href="/services"
-          />
-          <ServiceCard
-            icon={Zap}
-            title="Support / Ticket Flow"
-            description="Support requests, order questions, handoffs, and customer communication routed into a clearer process."
-            href="/services"
-          />
-        </div>
-      </Section>
-
-      <Section bgColor="primary">
-        <div className="mb-12 text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Case Study Foundation
-          </p>
-          <h2 className="heading-2 mt-4">How We Help Businesses Improve the Journey</h2>
-          <p className="body-lg mx-auto mt-5 text-secondary">
-            No inflated claims. Just practical improvements to inquiry flow,
-            operations, and customer experience.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <CaseStudyCard
-            image="https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=300&fit=crop"
-            industry="Professional Services"
-            headline="Sales Coach Website Improved Lead Flow"
-            result="A clearer website and inquiry path helped improve prospect quality and conversion visibility."
-            href="/case-studies/sales-coach"
-          />
-          <CaseStudyCard
-            image="https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=500&h=300&fit=crop"
-            industry="Care Agency"
-            headline="Care Agency Growth System"
-            result="A stronger inquiry, intake, and service presentation foundation for care agency growth."
-            href="/case-studies/care-agency-growth"
-          />
-          <CaseStudyCard
-            image="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=500&h=300&fit=crop"
-            industry="Ecommerce"
-            headline="Ecommerce System Success"
-            result="A stronger storefront, checkout, and operations system built to reduce friction."
-            href="/case-studies/ecommerce-system-success"
-          />
         </div>
       </Section>
 
       <section className="hero-atmosphere py-16 md:py-20">
         <div className="container-wide mx-auto max-w-4xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-brand-cyan">
-            Start Here
+            Next Step
           </p>
-          <h2 className="heading-2 mt-4">Start with a free Opzix Audit.</h2>
+          <h2 className="heading-2 mt-4">
+            See where a connected platform would change the business.
+          </h2>
           <p className="body-lg mx-auto mt-5 max-w-3xl text-secondary">
-            Before rebuilding a website or adding more tools, find out where
-            the journey is breaking. Run a free audit and get a practical
-            roadmap.
+            Start with a strategy session or explore the platform before going
+            deeper into a specific industry.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button href="/tools/ecommerce-audit-scanner" size="lg">
-              Run Free Audit
+            <Button href={STRATEGY_CALL_URL} size="lg">
+              Book a Strategy Session
             </Button>
-            <Button href={STRATEGY_CALL_URL} variant="secondary" size="lg">
-              Book Strategy Call
+            <Button href="/platform" variant="secondary" size="lg">
+              Explore the Platform
             </Button>
           </div>
         </div>

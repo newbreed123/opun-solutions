@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Opzix | AI-Powered Business Systems",
-    description:
-      "Opzix builds connected websites, AI assistants, analytics, automation, scheduling, dashboards, and integrations for modern businesses.",
+  description:
+      "Opzix builds AI-powered business platforms that connect customer experience, automation, analytics, scheduling, dashboards, and integrations for modern businesses.",
     url: "/",
     siteName: "Opzix",
     type: "website",

@@ -1,26 +1,23 @@
 import type { Metadata } from "next";
 import Section from "@/components/Section";
-import TrackedLink from "@/components/TrackedLink";
 import PageViewTracker from "@/components/PageViewTracker";
 import StrategyCallTrackedButton from "@/components/StrategyCallTrackedButton";
+import TrackedLink from "@/components/TrackedLink";
+import VisibilityTracker from "@/components/VisibilityTracker";
 import { realEstateIndustry } from "@/content/industries";
-import {
-  ArrowDownRight,
-  Building2,
-  Check,
-  GitBranch,
-  LayoutGrid,
-} from "lucide-react";
+import { BarChart3, Check, Home, MessageSquare, TrendingUp, Users } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: realEstateIndustry.metadata.title,
-  description: realEstateIndustry.metadata.description,
+  title: "Real Estate Operating Platform | MLS, AI, CRM and Analytics | Opzix",
+  description:
+    "Opzix builds MLS-powered real estate operating platforms that connect property search, buyer and seller experiences, AI guidance, CRM, analytics, automation, and operational intelligence.",
   alternates: {
     canonical: "/industries/real-estate",
   },
   openGraph: {
-    title: realEstateIndustry.metadata.title,
-    description: realEstateIndustry.metadata.description,
+    title: "Real Estate Operating Platform | Opzix",
+    description:
+      "Build a smarter real estate business platform with MLS-powered property search, AI guidance, CRM, analytics, automation, and operational intelligence.",
     url: "/industries/real-estate",
     siteName: "Opzix",
     type: "website",
@@ -40,17 +37,96 @@ const breadcrumbs = {
     {
       "@type": "ListItem",
       position: 2,
-      name: "Industries",
-      item: "https://opzix.io/industries",
-    },
-    {
-      "@type": "ListItem",
-      position: 3,
       name: "Real Estate",
       item: "https://opzix.io/industries/real-estate",
     },
   ],
 };
+
+const outcomePillars = [
+  {
+    slug: "attract",
+    label: "Attract",
+    title: "Make Property Discovery Part of Your Platform",
+    copy: "Give buyers and sellers useful reasons to stay with your brand instead of scattering across disconnected portals and pages.",
+    items: ["MLS-powered search", "Community guides", "SEO", "Property discovery"],
+    icon: TrendingUp,
+  },
+  {
+    slug: "qualify",
+    label: "Qualify",
+    title: "Understand Buyer and Seller Intent Earlier",
+    copy: "Use AI guidance and customer intelligence to turn anonymous browsing into clearer lead context.",
+    items: ["AI Buyer Advisor", "Lead scoring", "Buyer preferences", "Saved searches"],
+    icon: MessageSquare,
+  },
+  {
+    slug: "convert",
+    label: "Convert",
+    title: "Turn High-Intent Moments Into Conversations",
+    copy: "Connect the moments when people raise their hand to the booking, follow-up, and seller paths that move business forward.",
+    items: ["Showing requests", "Consultation booking", "Seller funnels", "Lead capture"],
+    icon: Users,
+  },
+  {
+    slug: "operate",
+    label: "Operate",
+    title: "Run the Business With Better Visibility",
+    copy: "Give agents, teams, and brokerages a clearer operating picture across leads, activity, reporting, and automation.",
+    items: ["CRM", "Analytics", "Dashboard", "Automation"],
+    icon: BarChart3,
+  },
+];
+
+const disconnectedStack = [
+  "Website",
+  "CRM",
+  "Forms",
+  "Calendly",
+  "Email",
+  "IDX",
+  "Analytics",
+];
+
+const connectedStack = [
+  "Property search",
+  "AI guidance",
+  "Lead intelligence",
+  "Booking",
+  "CRM workflows",
+  "Analytics",
+  "Automation",
+];
+
+const platformFoundation = [
+  "MLS Grid data",
+  "RESO Web API",
+  "AI workflows",
+  "Customer intelligence",
+  "Operational dashboards",
+  "Automation",
+];
+
+const planPreview = [
+  {
+    slug: "problem",
+    name: "Business Problem",
+    tagline: "Disconnected tools lose opportunities.",
+    bestFor: "Agents, teams, and brokerages trying to turn attention into real conversations while managing too many separate systems.",
+    outcome:
+      "Real estate needs a connected customer journey where search, AI guidance, lead intelligence, CRM, automation, analytics, and follow-up work together.",
+    cta: "See How the Platform Works",
+  },
+  {
+    slug: "platform",
+    name: "Platform Solution",
+    tagline: "The operating platform connects the journey.",
+    bestFor: "Real estate professionals who want to understand how Opzix turns the buyer and seller journey into an operational platform.",
+    outcome:
+      "The next step is the platform page, where the journey becomes MLS-powered search, Community Intelligence, AI Buyer Advisor, Lead Intelligence, CRM, automation, analytics, and Business Intelligence.",
+    cta: "Explore the Platform",
+  },
+];
 
 export default function RealEstateIndustryPage() {
   return (
@@ -65,314 +141,314 @@ export default function RealEstateIndustryPage() {
       />
 
       <Section bgColor="secondary" padded className="hero-atmosphere">
-        <div className="grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
-          <div>
-            <p className="mb-5 text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              {realEstateIndustry.eyebrow}
-            </p>
-            <h1 className="heading-1 max-w-5xl">
-              {realEstateIndustry.headline}
-            </h1>
-            <p className="mt-6 max-w-3xl text-lg leading-relaxed text-secondary md:text-xl">
-              {realEstateIndustry.summary}
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <StrategyCallTrackedButton
-                source="real_estate_page"
-                serviceRequested="Real Estate Growth Platform"
-                industry="real_estate"
-                eventName="real_estate_strategy_call_clicked"
-                eventPayload={{ cta_location: "hero" }}
-              >
-                Discuss Your Real Estate Platform
-              </StrategyCallTrackedButton>
-              <TrackedLink
-                href="/platform"
-                eventName="industry_card_clicked"
-                payload={{
-                  industry: "real_estate",
-                  cta_location: "real_estate_hero_platform",
-                }}
-                className="btn btn-secondary sm:px-8 sm:py-4 px-6 py-3 text-base sm:text-lg w-full max-w-[calc(100vw-2rem)] sm:w-auto sm:max-w-none"
-              >
-                Explore Platform Capabilities
-              </TrackedLink>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-dark-border bg-dark-card p-6 shadow-card-glow">
-            <div className="mb-6 flex items-center justify-between border-b border-dark-border pb-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-cyan">
-                  Platform Architecture
-                </p>
-                <h2 className="mt-2 text-2xl font-bold text-primary">
-                  Property journey to operations
-                </h2>
-              </div>
-              <Building2 className="h-8 w-8 text-brand-cyan" />
-            </div>
-            <div className="grid gap-3">
-              {[
-                "Community and property discovery",
-                "Buyer and seller AI guidance",
-                "Lead capture and consultation booking",
-                "Analytics, CRM, and follow-up visibility",
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="flex gap-3 rounded-lg border border-dark-border bg-white/[0.035] p-4 text-secondary"
-                >
-                  <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-5 text-sm leading-6 text-muted">
-              MLS data usage depends on licensing, attribution, compliance, and
-              implementation scope for each project.
-            </p>
+        <VisibilityTracker
+          eventName="feature_section_viewed"
+          payload={{ section: "real_estate_hero", industry: "real_estate" }}
+        />
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="mb-5 text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
+            {realEstateIndustry.eyebrow}
+          </p>
+          <h1 className="heading-1">
+            The Platform Behind Modern Real Estate Businesses
+          </h1>
+          <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-secondary md:text-xl">
+            MLS-powered property search, buyer and seller experiences, AI
+            guidance, CRM, analytics, automation, and operational intelligence
+            all in one connected platform.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <StrategyCallTrackedButton
+              source="real_estate_page"
+              serviceRequested="Real Estate Operating Platform"
+              industry="real_estate"
+              eventName="real_estate_strategy_call_clicked"
+              eventPayload={{ cta_location: "hero" }}
+            >
+              Book a Strategy Session
+            </StrategyCallTrackedButton>
+            <TrackedLink
+              href="/real-estate/platform"
+              eventName="real_estate_platform_clicked"
+              payload={{
+                cta_location: "hero",
+                industry: "real_estate",
+              }}
+              className="btn btn-secondary sm:px-8 sm:py-4 px-6 py-3 text-base sm:text-lg w-full max-w-[calc(100vw-2rem)] sm:w-auto sm:max-w-none"
+            >
+              Explore the Platform
+            </TrackedLink>
           </div>
         </div>
       </Section>
 
       <Section bgColor="primary">
-        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              The Problem
+              Disconnected to Connected
             </p>
             <h2 className="heading-2 mt-4">
-              A Website Alone Is Not a Real Estate Growth System
+              Stop running a real estate business through scattered tools.
             </h2>
-            <p className="mt-5 text-lg leading-8 text-secondary">
-              Many real estate sites create a polished first impression but
-              leave the actual growth system disconnected: property discovery,
-              seller intent, AI guidance, scheduling, follow-up, and analytics
-              all live in separate places.
+            <p className="body-lg mt-5 text-secondary">
+              Most agents are forced to stitch together a website, IDX, forms,
+              calendar links, CRM, email, and analytics. Opzix turns those
+              pieces into one operating platform.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {realEstateIndustry.challenges.map((challenge) => (
-              <div key={challenge} className="card p-5">
-                <p className="text-sm leading-6 text-secondary">{challenge}</p>
+          <div className="grid gap-5 md:grid-cols-[1fr_auto_1fr] md:items-center">
+            <div className="rounded-xl border border-dark-border bg-white/[0.035] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
+                Before Opzix
+              </p>
+              <div className="mt-5 grid gap-2">
+                {disconnectedStack.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-lg border border-dark-border bg-dark-card px-4 py-3 text-sm font-semibold text-secondary"
+                  >
+                    {item}
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <div className="hidden text-2xl font-bold text-brand-cyan md:block">
+              -&gt;
+            </div>
+            <div className="rounded-xl border border-brand-cyan/35 bg-brand-blue/10 p-5 shadow-[0_24px_80px_rgba(56,189,248,0.12)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-cyan">
+                With Opzix
+              </p>
+              <div className="mt-5 grid gap-2">
+                {connectedStack.map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 rounded-lg border border-brand-cyan/20 bg-dark-card/70 px-4 py-3 text-sm font-semibold text-primary"
+                  >
+                    <Check className="h-4 w-4 flex-none text-brand-cyan" />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </Section>
 
-      <Section bgColor="secondary">
-        <SectionIntro
-          eyebrow="Platform Capabilities"
-          title="Real estate growth infrastructure, not a generic template."
-          description="Each capability is designed to connect prospect intent with the next useful action for the agent, team, or brokerage."
+      <Section bgColor="secondary" id="outcomes">
+        <VisibilityTracker
+          eventName="feature_section_viewed"
+          payload={{ section: "four_pillars", industry: "real_estate" }}
         />
-        <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {realEstateIndustry.capabilities.map((capability) => {
-            const Icon = capability.icon;
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
+            Platform Outcomes
+          </p>
+          <h2 className="heading-2 mt-4">
+            Built around the real customer journey.
+          </h2>
+        </div>
+        <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {outcomePillars.map((pillar) => {
+            const Icon = pillar.icon;
 
             return (
-              <div key={capability.title} className="card p-6">
+              <article key={pillar.slug} className="card p-6">
                 <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-brand-cyan/30 bg-brand-blue/10 text-brand-cyan">
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="text-xl font-bold text-primary">
-                  {capability.title}
-                </h3>
-                <p className="mt-3 leading-7 text-secondary">
-                  {capability.description}
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                  {pillar.label}
                 </p>
-              </div>
+                <h3 className="mt-3 text-xl font-bold text-primary">
+                  {pillar.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-secondary">
+                  {pillar.copy}
+                </p>
+                <ul className="mt-5 space-y-2">
+                  {pillar.items.map((item) => (
+                    <li key={item} className="flex gap-2 text-sm text-secondary">
+                      <Check className="mt-0.5 h-4 w-4 flex-none text-brand-cyan" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
             );
           })}
         </div>
       </Section>
 
-      <Section bgColor="deep">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            Built on the Opzix Platform
-          </p>
-          <h2 className="heading-2 mt-4">
-            Shared technology adapted to real estate workflows.
-          </h2>
-          <p className="body-lg mx-auto mt-5 text-secondary">
-            The real estate solution uses reusable Opzix modules for AI,
-            analytics, scheduling, lead capture, automation, dashboards,
-            integrations, and content systems.
-          </p>
-        </div>
-        <div className="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-4">
-          {realEstateIndustry.platformComponents.map((component, index) => (
-            <div
-              key={component}
-              className="rounded-lg border border-dark-border bg-dark-card p-5 text-center"
-            >
-              <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-brand-blue/10 text-sm font-bold text-brand-cyan">
-                {index + 1}
-              </div>
-              <p className="font-semibold text-primary">{component}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
       <Section bgColor="primary">
-        <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+        <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              Who It Is For
+              Platform Foundation
             </p>
-            <h2 className="heading-2 mt-4">
-              Built for professionals who need a stronger digital operating
-              layer.
-            </h2>
+            <h2 className="heading-2 mt-4">Built on MLS Grid + RESO</h2>
+            <p className="body-lg mt-5 text-secondary">
+              Opzix combines approved listing-data infrastructure, AI workflows,
+              customer intelligence, dashboards, and automation into one
+              connected real estate platform with clear data paths and
+              operational visibility.
+            </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {realEstateIndustry.audience.map((audience) => (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {platformFoundation.map((item) => (
               <div
-                key={audience}
-                className="flex min-h-11 items-center gap-3 rounded-lg border border-dark-border bg-white/[0.035] px-4 py-3 text-secondary"
+                key={item}
+                className="flex min-h-16 items-center gap-3 rounded-lg border border-dark-border bg-white/[0.035] px-4 py-3"
               >
                 <Check className="h-4 w-4 flex-none text-brand-cyan" />
-                <span className="font-semibold">{audience}</span>
+                <p className="text-sm font-semibold leading-6 text-primary">
+                  {item}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </Section>
 
-      <Section bgColor="secondary">
-        <SectionIntro
-          eyebrow="Example Customer Journey"
-          title="From discovery to booked consultation."
-          description="The goal is to connect attention, intent, qualification, scheduling, and follow-up into one visible path."
+      <Section bgColor="primary" id="platform-next-step">
+        <VisibilityTracker
+          eventName="feature_section_viewed"
+          payload={{ section: "platform_next_step", industry: "real_estate" }}
         />
-        <div className="mx-auto mt-12 max-w-5xl">
-          {realEstateIndustry.journey.map((step, index) => (
-            <div key={step}>
-              <div className="grid gap-4 rounded-lg border border-dark-border bg-dark-card p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-blue/10 text-sm font-bold text-brand-cyan">
-                  {index + 1}
-                </div>
-                <p className="font-semibold text-primary">{step}</p>
-                <ArrowDownRight className="hidden h-5 w-5 text-brand-cyan sm:block" />
-              </div>
-              {index < realEstateIndustry.journey.length - 1 ? (
-                <div className="ml-5 h-5 w-px bg-brand-cyan/30" />
-              ) : null}
-            </div>
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
+            Next Step
+          </p>
+          <h2 className="heading-2 mt-4">
+            See how the operating platform connects the journey.
+          </h2>
+          <p className="body-lg mx-auto mt-5 text-secondary">
+            This page explains why real estate needs a connected platform. The
+            platform page shows how MLS-powered Search, Community Intelligence,
+            AI Buyer Advisor, Lead Intelligence, CRM, Automation, Analytics, and
+            Business Intelligence work as one operating system.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-5 md:grid-cols-2">
+          {planPreview.map((plan) => (
+            <article key={plan.slug} className="card flex h-full flex-col p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-cyan">
+                {plan.name}
+              </p>
+              <h3 className="mt-3 text-xl font-bold text-primary">{plan.tagline}</h3>
+              <p className="mt-4 text-sm font-semibold text-primary">Best for</p>
+              <p className="mt-2 text-sm leading-6 text-secondary">{plan.bestFor}</p>
+              <p className="mt-4 text-sm font-semibold text-primary">
+                What it helps you do
+              </p>
+              <p className="mt-2 flex-1 text-sm leading-6 text-secondary">
+                {plan.outcome}
+              </p>
+              <TrackedLink
+                href="/real-estate/platform"
+                eventName="real_estate_platform_clicked"
+                payload={{
+                  cta_location: "real_estate_next_step",
+                  industry: "real_estate",
+                }}
+                className="mt-6 inline-flex min-h-11 items-center font-semibold text-brand-cyan hover:text-primary"
+              >
+                {plan.cta} <span className="ml-2">-&gt;</span>
+              </TrackedLink>
+            </article>
           ))}
         </div>
-      </Section>
-
-      <Section bgColor="primary">
-        <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              Implementation Approach
-            </p>
-            <h2 className="heading-2 mt-4">
-              Staged around strategy, compliance awareness, and operational
-              rollout.
-            </h2>
-            <p className="mt-5 text-lg leading-8 text-secondary">
-              Opzix maps the customer journey and implementation architecture.
-              Brokerage, advertising, fair housing, MLS, and legal compliance
-              decisions remain with the client and their qualified advisors or
-              licensing partners.
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {realEstateIndustry.process.map((step, index) => (
-              <div key={step} className="card p-5">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-brand-blue/10 text-sm font-bold text-brand-cyan">
-                  {index + 1}
-                </div>
-                <h3 className="text-lg font-bold text-primary">{step}</h3>
-              </div>
-            ))}
-          </div>
+        <div className="mt-8 text-center">
+          <TrackedLink
+            href="/real-estate/platform"
+            eventName="real_estate_platform_clicked"
+            payload={{
+              cta_location: "platform_next_step",
+              industry: "real_estate",
+            }}
+            className="btn btn-secondary px-6 py-3 text-base w-full max-w-[calc(100vw-2rem)] sm:w-auto sm:max-w-none"
+          >
+            Explore the Platform
+          </TrackedLink>
         </div>
       </Section>
 
-      <Section bgColor="deep">
-        <div className="grid gap-8 rounded-xl border border-brand-cyan/30 bg-brand-blue/10 p-6 md:p-8 lg:grid-cols-[auto_1fr] lg:items-start">
+      <Section bgColor="secondary" id="flagship">
+        <VisibilityTracker
+          eventName="feature_section_viewed"
+          payload={{ section: "brittany_flagship", industry: "real_estate" }}
+        />
+        <div className="grid gap-8 rounded-xl border border-brand-cyan/30 bg-brand-blue/10 p-6 md:p-8 lg:grid-cols-[auto_1fr_auto] lg:items-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-brand-cyan/30 bg-dark-card text-brand-cyan">
-            <GitBranch className="h-7 w-7" />
+            <Home className="h-7 w-7" />
           </div>
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              Flagship Implementation
+              Product Preview
             </p>
             <h2 className="heading-2 mt-4">
-              {realEstateIndustry.flagship.title}
+              Example Real Estate Platform Implementation
             </h2>
             <p className="mt-5 max-w-4xl text-lg leading-8 text-secondary">
-              {realEstateIndustry.flagship.description}
+              BrittanyFlannigan.com is an in-progress example implementation of
+              the Opzix Real Estate Platform, showing how buyer and seller
+              journeys, community intelligence, lead capture, scheduling,
+              analytics, and IDX property search planning can work together.
             </p>
-            <p className="mt-5 text-sm leading-6 text-muted">
-              This is not yet presented as a completed case study. Published
-              results should wait until launch status, approval, baseline
-              metrics, and outcome data are verifiable.
+            <p className="mt-4 text-sm leading-6 text-muted">
+              Published performance claims should wait until launch status,
+              approval, baseline metrics, and measurable outcomes are available.
             </p>
           </div>
+          <TrackedLink
+            href="/case-studies"
+            eventName="brittany_implementation_clicked"
+            payload={{
+              cta_location: "flagship_section",
+              industry: "real_estate",
+            }}
+            className="btn btn-secondary px-6 py-3 text-base w-full max-w-[calc(100vw-2rem)] sm:w-auto sm:max-w-none"
+          >
+            View the Preview
+          </TrackedLink>
         </div>
       </Section>
 
       <section className="hero-atmosphere py-16 md:py-20">
         <div className="container-wide mx-auto max-w-4xl text-center">
-          <LayoutGrid className="mx-auto mb-5 h-9 w-9 text-brand-cyan" />
-          <h2 className="heading-2">Build More Than a Real Estate Website</h2>
+          <h2 className="heading-2">
+            Find the platform that matches where your business is going.
+          </h2>
           <p className="body-lg mx-auto mt-5 text-secondary">
-            Create a connected real estate platform designed to attract, guide,
-            qualify, and convert buyers and sellers.
+            Compare the plan paths or book a strategy session to choose the
+            right foundation for more buyers, more listings, and better
+            follow-up.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <StrategyCallTrackedButton
               source="real_estate_page"
-              serviceRequested="Real Estate Growth Platform"
+              serviceRequested="Real Estate Operating Platform"
               industry="real_estate"
               eventName="real_estate_strategy_call_clicked"
               eventPayload={{ cta_location: "final_cta" }}
             >
-              Book a Real Estate Strategy Session
+              Book a Strategy Session
             </StrategyCallTrackedButton>
             <TrackedLink
-              href="/contact?source=services"
-              eventName="industry_card_clicked"
+              href="/real-estate/platform"
+              eventName="real_estate_platform_clicked"
               payload={{
+                cta_location: "final_cta",
                 industry: "real_estate",
-                cta_location: "final_contact",
               }}
               className="btn btn-secondary sm:px-8 sm:py-4 px-6 py-3 text-base sm:text-lg w-full max-w-[calc(100vw-2rem)] sm:w-auto sm:max-w-none"
             >
-              Contact Opzix
+              Explore the Platform
             </TrackedLink>
           </div>
         </div>
       </section>
     </>
-  );
-}
-
-function SectionIntro({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="mx-auto max-w-3xl text-center">
-      <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-        {eyebrow}
-      </p>
-      <h2 className="heading-2 mt-4">{title}</h2>
-      <p className="body-lg mx-auto mt-5 text-secondary">{description}</p>
-    </div>
   );
 }

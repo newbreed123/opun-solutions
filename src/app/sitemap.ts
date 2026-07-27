@@ -11,6 +11,8 @@ const publicRoutes = [
   "/solutions/lead-generation-systems",
   "/industries",
   "/industries/real-estate",
+  "/real-estate/plans",
+  "/real-estate/platform",
   "/platform",
   "/case-studies",
   "/case-studies/sales-coach",

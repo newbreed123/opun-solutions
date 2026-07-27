@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Section from "@/components/Section";
 import PageViewTracker from "@/components/PageViewTracker";
 import StrategyCallTrackedButton from "@/components/StrategyCallTrackedButton";
 import TrackedLink from "@/components/TrackedLink";
 import { platformModules } from "@/content/industries";
-import { Check, GitBranch, Layers3 } from "lucide-react";
+import { Check, GitBranch } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "The Opzix Platform | AI, Analytics, Scheduling and Automation",
@@ -44,16 +45,16 @@ const breadcrumbs = {
 
 const architecture = [
   {
-    label: "Solutions",
-    copy: "AI assistants, lead generation systems, analytics, ecommerce systems, scheduling, dashboards, websites, and integrations.",
+    label: "Customer Experience",
+    copy: "Public journeys, lead paths, ecommerce flows, booking moments, and customer-facing AI designed to work as one platform experience.",
   },
   {
-    label: "Industries",
-    copy: "Ecommerce, service businesses, and real estate implementations shaped around their customer journeys.",
+    label: "Operational Workflows",
+    copy: "Automation, scheduling, CRM handoff, notifications, dashboards, and integrations shaped around how the business actually runs.",
   },
   {
-    label: "Platform",
-    copy: "Reusable modules available within Opzix implementations, not a claim that every module is a standalone SaaS product.",
+    label: "Industry Adaptation",
+    copy: "The same platform architecture adapts across ecommerce, service businesses, real estate, and future verticals.",
   },
 ];
 
@@ -67,20 +68,20 @@ export default function PlatformPage() {
       />
 
       <Section bgColor="secondary" padded className="hero-atmosphere">
-        <div className="grid items-center gap-10 lg:grid-cols-[1.06fr_0.94fr]">
+        <div className="grid items-center gap-10 lg:grid-cols-[0.85fr_1.15fr]">
           <div>
             <p className="mb-5 text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-              The Opzix Platform
+              Software-first platform thinking
             </p>
             <h1 className="heading-1 max-w-5xl">
-              One Connected Foundation for Customer Experience and Business
-              Operations
+              Most agencies build websites.
+              <br />
+              Opzix builds business platforms.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-secondary md:text-xl">
-              The Opzix Platform brings together AI, analytics, scheduling,
-              lead capture, automation, dashboards, and integrations so
-              businesses can operate through connected systems instead of
-              disconnected tools.
+              The Opzix Platform connects customer experience, AI, analytics,
+              automation, scheduling, integrations, and operational workflows
+              into one system that helps businesses grow with confidence.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <StrategyCallTrackedButton
@@ -97,51 +98,62 @@ export default function PlatformPage() {
                 payload={{ module: "module_overview", cta_location: "hero" }}
                 className="btn btn-secondary sm:px-8 sm:py-4 px-6 py-3 text-base sm:text-lg w-full max-w-[calc(100vw-2rem)] sm:w-auto sm:max-w-none"
               >
-                View Modules
+                Explore Capabilities
               </TrackedLink>
             </div>
           </div>
 
-          <div className="rounded-xl border border-dark-border bg-dark-card p-6 shadow-card-glow">
-            <div className="mb-6 flex items-center gap-4 border-b border-dark-border pb-4">
-              <Layers3 className="h-9 w-9 text-brand-cyan" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-cyan">
-                  Platform Model
-                </p>
-                <h2 className="mt-1 text-2xl font-bold text-primary">
-                  Shared modules, custom implementation
-                </h2>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {architecture.map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-lg border border-dark-border bg-white/[0.035] p-4"
-                >
-                  <p className="font-bold text-primary">{item.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-secondary">
-                    {item.copy}
-                  </p>
-                </div>
-              ))}
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -inset-5 rounded-[2rem] bg-brand-blue/20 opacity-45 blur-3xl"
+            />
+            <div className="relative min-h-[22rem] overflow-hidden rounded-xl border border-brand-cyan/25 bg-dark-deep shadow-card-glow md:min-h-[30rem]">
+              <Image
+                src="/opzix-platform-command-center.png"
+                alt=""
+                fill
+                priority
+                sizes="(min-width: 1024px) 55vw, 100vw"
+                className="object-cover object-[58%_center]"
+                style={{
+                  filter: "brightness(0.82) contrast(1.04) saturate(0.96)",
+                }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(7,16,36,0.38)_0%,rgba(7,16,36,0.16)_45%,rgba(7,16,36,0.04)_100%)]" />
             </div>
           </div>
+        </div>
+      </Section>
+
+      <Section bgColor="primary">
+        <div className="grid gap-5 md:grid-cols-3">
+          {architecture.map((item) => (
+            <div
+              key={item.label}
+              className="rounded-xl border border-dark-border bg-white/[0.035] p-5"
+            >
+              <p className="font-bold text-primary">{item.label}</p>
+              <p className="mt-2 text-sm leading-6 text-secondary">
+                {item.copy}
+              </p>
+            </div>
+          ))}
         </div>
       </Section>
 
       <Section bgColor="primary" id="modules">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.28em] text-brand-cyan">
-            Platform Modules
+            Platform Capabilities
           </p>
           <h2 className="heading-2 mt-4">
-            Reusable systems available within Opzix implementations.
+            Reusable platform capabilities for connected business growth.
           </h2>
           <p className="body-lg mx-auto mt-5 text-secondary">
-            Each module solves a specific business problem and can be adapted
-            across ecommerce, service business, and real estate solutions.
+            Each capability solves a specific business problem and can be
+            adapted across ecommerce, service business, real estate, and future
+            industry solutions.
           </p>
         </div>
 
@@ -214,7 +226,7 @@ export default function PlatformPage() {
             {[
               "Ecommerce systems connect audits, storefront UX, analytics, AI shopping assistance, and operations workflows.",
               "Service business systems connect lead pages, intake, AI qualification, scheduling, CRM, and dashboards.",
-              "Real estate systems connect community content, property search infrastructure, buyer and seller journeys, scheduling, analytics, and follow-up.",
+              "Real estate systems connect IDX property search, buyer and seller journeys, community intelligence, scheduling, analytics, lead management, and follow-up.",
             ].map((item) => (
               <div
                 key={item}
@@ -241,7 +253,8 @@ export default function PlatformPage() {
             <p className="mt-4 max-w-3xl leading-7 text-secondary">
               The platform is the reusable foundation behind Opzix business
               systems: AI, analytics, scheduling, lead capture, automation,
-              dashboards, web infrastructure, diagnostics, and integrations.
+              dashboards, customer experience infrastructure, diagnostics, and
+              integrations.
             </p>
           </div>
           <TrackedLink

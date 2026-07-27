@@ -15,6 +15,10 @@ type StrategyCallTrackedButtonProps = {
   industry?: string;
   eventName?: string;
   eventPayload?: AnalyticsPayload;
+  additionalEvents?: Array<{
+    eventName: string;
+    payload?: AnalyticsPayload;
+  }>;
   variant?: "primary" | "secondary";
   size?: "md" | "lg";
   className?: string;
@@ -27,6 +31,7 @@ export default function StrategyCallTrackedButton({
   industry,
   eventName,
   eventPayload = {},
+  additionalEvents = [],
   variant = "primary",
   size = "lg",
   className = "",
@@ -57,6 +62,17 @@ export default function StrategyCallTrackedButton({
             ...eventPayload,
           });
         }
+
+        additionalEvents.forEach((additionalEvent) => {
+          trackEvent(additionalEvent.eventName, {
+            page_path: window.location.pathname,
+            cta_location:
+              additionalEvent.payload?.cta_location ||
+              eventPayload.cta_location ||
+              "primary",
+            ...additionalEvent.payload,
+          });
+        });
 
         openStrategyCall(payload);
       }}

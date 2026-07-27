@@ -25,16 +25,16 @@ const defaultProjects: ProjectType[] = [
       "Customers completed more orders. Operations team stopped manual handoffs.",
   },
   {
-    title: "Sales Coach Website & Lead Flow",
+    title: "Sales Coach Lead System",
     challenge:
       "Needed a way to capture qualified leads and automatically qualify incoming prospects.",
     improvement:
-      "Built conversion-focused website with AI assistant to pre-qualify inquiries.",
+      "Built a conversion-focused customer experience with AI assistance to pre-qualify inquiries.",
     value:
       "More qualified leads reached the sales team. Sales team spent less time on initial screening.",
   },
   {
-    title: "Care Agency Website & Inquiry Flow",
+    title: "Care Agency Inquiry System",
     challenge:
       "Booking process was manual. Clients couldn't get information without calling.",
     improvement:

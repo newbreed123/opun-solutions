@@ -42,15 +42,28 @@ Google Calendar setup:
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REFRESH_TOKEN`
-- `GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/google/oauth/callback`
+- `GOOGLE_OAUTH_REDIRECT_URI`
 - `GOOGLE_CALENDAR_ID=hello@opzix.io`
 - `GOOGLE_CALENDAR_TIMEZONE=America/New_York`
 - `GOOGLE_CALENDAR_CREATE_MEET_LINK=true`
 - `GOOGLE_OAUTH_SETUP_SECRET`
 
-For production, set:
+For local development, set:
+
+- `GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/google/oauth/callback`
+
+For Vercel Production, set every Google Calendar variable in Project Settings →
+Environment Variables for the Production environment, then redeploy:
 
 - `GOOGLE_OAUTH_REDIRECT_URI=https://opzix.io/api/google/oauth/callback`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REFRESH_TOKEN`
+- `GOOGLE_CALENDAR_ID=hello@opzix.io`
+- `GOOGLE_CALENDAR_TIMEZONE=America/New_York`
+
+Use the redirect URI as a plain string. Do not wrap it in quotes, brackets, or
+JSON array syntax.
 
 Do not expose OAuth credentials through `NEXT_PUBLIC_*` variables and do not
 commit downloaded OAuth client JSON files.
@@ -61,6 +74,13 @@ Local OAuth setup:
 2. Visit `/api/google/oauth/authorize?secret=YOUR_SETUP_SECRET`.
 3. Approve Calendar access.
 4. Copy the returned `GOOGLE_REFRESH_TOKEN` into `.env.local`.
+
+Production diagnostics:
+
+1. Deploy the latest code.
+2. Visit `/api/google/oauth/diagnostics?secret=YOUR_SETUP_SECRET`.
+3. Confirm `ok: true`. If any variable is listed under `missing`, set it in
+   the Vercel Production environment and redeploy.
 
 If Google OAuth credentials are not configured, bookings are still recorded and
 emails still send, but the internal notification is marked for Calendar/Meet

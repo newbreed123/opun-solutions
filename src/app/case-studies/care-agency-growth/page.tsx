@@ -14,7 +14,7 @@ import {
 
 const problemPoints = [
   "Families needed clearer service information before reaching out",
-  "The path from website visitor to inquiry was too easy to abandon",
+  "The path from visitor to inquiry was too easy to abandon",
   "Intake questions were not structured around the real decision journey",
   "Follow-up depended too much on manual coordination",
   "The online experience did not fully reflect the care and professionalism of the agency",
@@ -42,7 +42,7 @@ const improvements = [
   {
     title: "Operational Handoff",
     description:
-      "Mapped how inquiries should move from the website into team review, response, and follow-up without losing important details.",
+      "Mapped how inquiries should move from the customer experience into team review, response, and follow-up without losing important details.",
     icon: Route,
   },
 ];
@@ -59,7 +59,7 @@ const systemBuilt = [
 const lessons = [
   "Care decisions require clarity before persuasion",
   "Small intake improvements can reduce back-and-forth for families and staff",
-  "A website should support the real operating process, not sit outside it",
+  "The public experience should support the real operating process, not sit outside it",
   "AI and automation are most useful when they make human follow-up easier",
 ];
 
@@ -147,8 +147,8 @@ export default function CareAgencyGrowthCaseStudy() {
             This Was Not Just a Website Issue. It Was a Client Journey Issue.
           </h2>
           <p className="body-lg mx-auto mt-5 text-secondary">
-            The website needed to explain services, build trust, capture useful
-            context, and support internal follow-up. The goal was to make the
+            The public experience needed to explain services, build trust,
+            capture useful context, and support internal follow-up. The goal was to make the
             digital journey feel calmer and more organized for families while
             giving the team better inquiry information.
           </p>
@@ -260,7 +260,7 @@ export default function CareAgencyGrowthCaseStudy() {
               More Clarity, Better Intake, Stronger Path to Inquiry
             </h2>
             <p className="body-lg mt-5 text-secondary">
-              The project helped improve how prospective clients moved through
+              The work helped improve how prospective clients moved through
               the digital journey. Families had a clearer understanding of the
               services, and the agency had a more organized foundation for
               inquiry handling and follow-up.

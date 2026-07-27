@@ -248,14 +248,14 @@ export default function Contact() {
               Get Started
             </p>
             <h1 className="heading-1 mb-6 leading-tight">
-              <span className="block">Start Your Project</span>
-              <span className="block">or Book an</span>
+              <span className="block">Start Your Platform</span>
+              <span className="block">Roadmap or Book an</span>
               <span className="block">Ecommerce Audit</span>
             </h1>
 
             <p className="mb-8 max-w-[32ch] text-base leading-7 text-secondary md:max-w-3xl md:text-lg">
-              Whether you need a free audit or want to explore our services,
-              tell us what you're looking for.
+              Whether you need a free audit or want to map a connected business
+              platform, tell us what you want to improve.
             </p>
           </div>
         </div>
@@ -284,7 +284,7 @@ export default function Contact() {
                 <span className="block">help with?</span>
               </h2>
               <p className="mx-auto max-w-[32ch] text-base leading-7 text-secondary md:max-w-2xl md:text-lg">
-                Choose your path and tell us about your project
+                Choose the path that matches the business system you want to improve.
               </p>
             </div>
 
@@ -320,7 +320,7 @@ export default function Contact() {
                 </div>
               </button>
 
-              {/* Card 2: Other Services */}
+              {/* Card 2: Platform Services */}
               <button
                 onClick={() => {
                   setFormError("");
@@ -335,12 +335,12 @@ export default function Contact() {
                   <div className="w-12 h-12 bg-brand-blue/10 rounded-lg flex items-center justify-center group-hover:bg-brand-blue/20 transition-colors">
                     <Zap size={24} className="text-brand-blue" />
                   </div>
-                  <h3 className="heading-4 mb-0">Other Services</h3>
+                  <h3 className="heading-4 mb-0">Platform Services</h3>
                 </div>
 
                 <p className="mb-6 max-w-[28ch] text-base leading-7 text-secondary">
-                  Website design, ecommerce setup, AI chatbots, integrations —
-                  tell us what you need.
+                  Customer experience platforms, ecommerce systems, AI
+                  assistants, automation, analytics, and integrations.
                 </p>
 
                 <div className="flex items-center gap-2 text-brand-blue font-semibold">
@@ -773,7 +773,9 @@ export default function Contact() {
               ← Back to selection
             </button>
 
-            <h2 className="heading-3 mb-8">Tell Us About Your Project</h2>
+            <h2 className="heading-3 mb-8">
+              Tell Us About the System You Want to Improve
+            </h2>
 
             {servicesSubmitted ? (
               <div className="rounded-[2rem] border border-brand-blue/20 bg-brand-blue/5 p-8">
@@ -888,7 +890,7 @@ export default function Contact() {
                     htmlFor="services-serviceNeeded"
                     className="block font-semibold text-primary mb-2"
                   >
-                    What Service Do You Need?
+                    What Platform Support Do You Need?
                   </label>
                   <select
                     id="services-serviceNeeded"
@@ -900,7 +902,7 @@ export default function Contact() {
                   >
                     <option value="">Select a service</option>
                     <option value="website-design">
-                      Website Design & Development
+                      Customer Experience Platform
                     </option>
                     <option value="ecommerce-setup" id="contact-options">
                       Ecommerce Setup
@@ -920,7 +922,7 @@ export default function Contact() {
                     htmlFor="services-projectDescription"
                     className="block font-semibold text-primary mb-2"
                   >
-                    Tell Us About Your Project
+                    Tell Us About the System You Want to Improve
                   </label>
                   <textarea
                     id="services-projectDescription"
@@ -930,7 +932,7 @@ export default function Contact() {
                     rows={6}
                     required
                     className="w-full px-4 py-3 bg-dark-secondary border border-dark-border rounded-lg text-primary focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue resize-none"
-                    placeholder="What are your goals? What challenges are you facing? What timeline do you have in mind?"
+                    placeholder="What are your goals? What feels disconnected today? What timeline do you have in mind?"
                   />
                 </div>
 

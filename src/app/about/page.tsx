@@ -8,7 +8,7 @@ export default function About() {
       {/* Hero */}
       <HeroSection
         headline="About Opzix Solutions"
-        subheadline="We help local service businesses grow by building websites, AI systems, and automations that actually work."
+        subheadline="Opzix builds AI-powered business platforms that connect customer experience, automation, analytics, integrations, and operational workflows."
       />
 
       {/* Our Story */}
@@ -18,25 +18,25 @@ export default function About() {
           <div className="space-y-6 text-secondary body-lg">
             <p>
               Opzix Solutions was founded on a simple observation: most service
-              businesses are leaving money on the table. Their websites don't
-              convert, they're drowning in manual work, and they're missing the
-              tools that would let them scale.
+              businesses are leaving money on the table because their customer
+              journey, follow-up, analytics, and operations are disconnected.
             </p>
             <p>
-              We started by helping a handful of local businesses build better
-              digital presence. We'd create a website, add an AI chatbot, set up
-              some automations, and watch their business grow. What started as
-              side projects became our mission.
+              Opzix focuses on the platform behind growth: customer experience,
+              AI, automation, analytics, integrations, dashboards, and the
+              workflows that help teams respond faster and operate with more
+              visibility.
             </p>
             <p>
-              Today, we work with dozens of service businesses—from sales
-              coaches to care agencies to ecommerce operators—helping them
-              capture more leads, convert them faster, and scale without chaos.
+              Today, that platform thinking can support ecommerce brands,
+              service businesses, real estate professionals, and future
+              industries with customer journeys shaped around their market.
             </p>
             <p>
               Our approach is simple: understand your business, identify the
               biggest friction points, and build solutions that actually drive
-              revenue. We don't do vanity projects. We do results.
+              revenue. We do not build disconnected deliverables. We build
+              systems that move the business forward.
             </p>
           </div>
         </div>
@@ -49,9 +49,9 @@ export default function About() {
           <div>
             <h3 className="heading-3 mb-4">Our Mission</h3>
             <p className="body-lg text-secondary">
-              To empower local service businesses with the digital tools,
-              systems, and expertise they need to grow faster, capture more
-              leads, and scale with confidence.
+              To empower businesses with the platform systems and expertise they
+              need to grow faster, capture more leads, and scale with
+              confidence.
             </p>
           </div>
 
@@ -97,7 +97,7 @@ export default function About() {
         <h2 className="heading-2 text-center mb-12">Our Expertise</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {[
-            "Website Design & Development",
+            "Customer Experience Platforms",
             "Ecommerce Platforms",
             "AI Chatbots & Lead Generation",
             "Google Ads & PPC",
@@ -123,7 +123,7 @@ export default function About() {
       {/* CTA */}
       <CTASection
         headline="Let's work together"
-        subheadline="Whether you need a new website, AI automation, or a complete digital overhaul, we're here to help."
+        subheadline="Whether you need AI, automation, analytics, integrations, customer experience improvements, or a connected platform roadmap, we're here to help."
         buttonLabel="Get In Touch"
         buttonHref="/contact"
       />

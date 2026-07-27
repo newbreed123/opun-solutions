@@ -49,9 +49,9 @@ const buildCards: Array<{
     icon: LayoutGrid,
   },
   {
-    title: "Conversion-Focused Websites",
+    title: "Conversion-Focused Customer Experiences",
     description:
-      "Website experiences structured to help visitors understand fit and move toward action.",
+      "Customer journeys structured to help visitors understand fit and move toward action.",
     icon: Globe,
   },
   {
@@ -128,7 +128,7 @@ const useCases = [
   {
     title: "Professional Services",
     description:
-      "Turn website interest into structured inquiries with better context, cleaner handoff, and more visible lead sources.",
+      "Turn digital interest into structured inquiries with better context, cleaner handoff, and more visible lead sources.",
   },
 ];
 
@@ -137,7 +137,7 @@ const comparison = [
     title: "Typical Agency",
     points: [
       "Focuses mostly on traffic",
-      "Basic forms and websites",
+      "Basic forms and landing pages",
       "Generic landing pages",
       "Limited operational thinking",
       "Disconnected tools",
@@ -404,7 +404,7 @@ export default function LeadGenerationSystemsPage() {
 
       <CTASection
         headline="Ready to Build a Smarter Lead Generation System?"
-        subheadline="Let's map how your website, AI, automation, tracking, and customer journey can work together to generate more qualified opportunities."
+        subheadline="Let's map how your customer experience, AI, automation, tracking, and lead journey can work together to generate more qualified opportunities."
         buttonLabel="Book Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
         trackingSource="services_page"

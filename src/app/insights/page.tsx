@@ -86,7 +86,7 @@ export default function InsightsIndex() {
             Want to Turn These Ideas Into a System?
           </h2>
           <p className="body-lg mx-auto mb-8 text-secondary">
-            Opzix can review your current website, ecommerce workflow,
+            Opzix can review your customer journey, ecommerce workflow,
             automation, and tracking foundation.
           </p>
           <Button href={STRATEGY_CALL_URL} size="lg">

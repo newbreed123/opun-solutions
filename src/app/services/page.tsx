@@ -16,14 +16,14 @@ import {
 const coreServices = [
   {
     icon: Globe,
-    title: "Website Design & Development",
+    title: "Customer Experience Platforms",
     description:
-      "High-converting websites built for service businesses and ecommerce brands. Every experience is fast, polished, and conversion-focused.",
+      "Customer-facing platform experiences for service businesses and ecommerce brands, built to connect lead capture, sales paths, analytics, and follow-up.",
     bullets: [
-      "Landing pages optimized for lead capture",
-      "Responsive mobile-first design",
+      "Landing paths optimized for lead capture",
+      "Responsive customer experience design",
       "SEO fundamentals and performance",
-      "Content editing and launch support",
+      "Content workflows and launch support",
     ],
   },
   {
@@ -66,9 +66,9 @@ const coreServices = [
     icon: Zap,
     title: "Client Portals & Dashboards",
     description:
-      "Custom portals that give your clients visibility into projects, results, invoices, and progress without manual updates.",
+      "Custom portals that give your clients visibility into status, results, invoices, and progress without manual updates.",
     bullets: [
-      "Client access to project status",
+      "Client access to status and next steps",
       "Performance dashboards",
       "Document and payment management",
       "Automated progress notifications",
@@ -99,12 +99,12 @@ export default function Services() {
               Services
             </p>
             <h1 className="heading-1 mb-6 leading-tight">
-              Services Built to Help Your Business Grow Online
+              Platform Services Built to Help Your Business Grow
             </h1>
             <p className="body-lg text-secondary max-w-3xl mb-8">
-              From high-converting websites and ecommerce systems to AI
+              From customer experience platforms and ecommerce systems to AI
               assistants, automation, and backend integrations — we build
-              digital systems that help businesses capture leads, sell online,
+              connected systems that help businesses capture leads, sell online,
               and operate with confidence.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -113,7 +113,7 @@ export default function Services() {
                 variant="primary"
                 size="lg"
                 trackingSource="services_page"
-                serviceRequested="Website Design & Digital Systems"
+                serviceRequested="Business Platform Services"
               >
                 Book Strategy Call
               </Button>
@@ -132,12 +132,12 @@ export default function Services() {
                 Built for service brands and ecommerce teams
               </h2>
               <p className="body-md text-secondary">
-                A modern digital operations stack combining website, ecommerce,
+                A modern digital operations stack combining customer experience, ecommerce,
                 AI, analytics, and backend automation.
               </p>
               <div className="mt-8 space-y-3">
                 {[
-                  "Website systems",
+                  "Customer experience systems",
                   "Ecommerce operations",
                   "AI lead capture",
                   "Backend integrations",
@@ -188,7 +188,7 @@ export default function Services() {
                   ))}
                 </ul>
                 <Button href="/contact?source=services" variant="ghost" size="sm">
-                  Learn More
+                  See How It Works
                 </Button>
               </div>
             ))}
@@ -288,12 +288,12 @@ export default function Services() {
               {
                 title: "Audit & Strategy",
                 description:
-                  "We review your current website, customer journey, and operations to identify the highest-impact improvements.",
+                  "We review your customer journey, lead flow, analytics, automation, and operations to identify the highest-impact improvements.",
               },
               {
                 title: "Build the System",
                 description:
-                  "We design and develop the website, ecommerce workflows, AI tools, and integrations needed for consistent growth.",
+                  "We design and develop the customer experience, ecommerce workflows, AI tools, dashboards, and integrations needed for consistent growth.",
               },
               {
                 title: "Launch & Track",
@@ -337,9 +337,9 @@ export default function Services() {
               {
                 name: "Launch",
                 description:
-                  "Best for businesses that need a professional website and lead capture foundation.",
+                  "Best for businesses that need a professional customer experience and lead capture foundation.",
                 features: [
-                  "Website build",
+                  "Customer experience build",
                   "Contact forms",
                   "Basic SEO setup",
                   "Mobile optimization",
@@ -401,11 +401,11 @@ export default function Services() {
       {/* Final CTA */}
       <CTASection
         headline="Ready to build a system that grows with your business?"
-        subheadline="Let’s review your current website, customer journey, and operations — then map the fastest path to more leads, better systems, and stronger growth."
+        subheadline="Let’s review your customer journey, lead flow, analytics, automation, and operations — then map the fastest path to more leads, better systems, and stronger growth."
         buttonLabel="Book Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
         trackingSource="services_page"
-        serviceRequested="Website Design & Digital Systems"
+        serviceRequested="Business Platform Services"
       />
     </>
   );

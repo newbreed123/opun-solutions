@@ -39,10 +39,9 @@ export default function CaseStudies() {
             Case Studies Built Around Real Business Systems
           </h1>
           <p className="body-lg mx-auto max-w-3xl text-secondary">
-            Practical examples of improved websites, ecommerce journeys,
+            Practical examples of improved customer journeys, ecommerce systems,
             inquiry flows, operational systems, and in-development platform
-            implementations without inflated claims or generic redesign
-            language.
+            implementations without inflated claims or website-first language.
           </p>
         </div>
       </Section>
@@ -57,7 +56,7 @@ export default function CaseStudies() {
               A Care Agency Growth System Built Around Inquiry, Intake, and Client Journey Clarity
             </h2>
             <p className="body-lg mx-auto text-secondary">
-              This project focused on helping families understand services,
+              This system focused on helping families understand services,
               submit better inquiries, and giving the team a clearer operational
               path for follow-up.
             </p>
@@ -70,7 +69,7 @@ export default function CaseStudies() {
                   title: "Problem",
                   points: [
                     "Families needed clearer service information before making contact.",
-                    "The path from website visitor to inquiry was too easy to abandon.",
+                    "The path from visitor to inquiry was too easy to abandon.",
                     "Intake details and follow-up depended on manual coordination.",
                   ],
                 },
@@ -79,7 +78,7 @@ export default function CaseStudies() {
                   points: [
                     "Service pages were not fully aligned with how families make care decisions.",
                     "Inquiry forms did not collect enough useful context for a strong first response.",
-                    "Website flow and internal follow-up were not connected as a single client acquisition system.",
+                    "Customer journey and internal follow-up were not connected as a single client acquisition system.",
                   ],
                 },
                 {
@@ -154,7 +153,7 @@ export default function CaseStudies() {
 
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <p className="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-brand-cyan">
-              Project Examples
+              System Examples
             </p>
             <h2 className="heading-2 mb-4">
               Conversion-Focused Case Studies Across Industries
@@ -169,14 +168,14 @@ export default function CaseStudies() {
             <CaseStudyCard
               image="https://images.unsplash.com/photo-1552664730-d307ca884978?w=600&h=400&fit=crop"
               industry="Professional Services"
-              headline="Sales Coach Website & Lead Flow"
+              headline="Sales Coach Lead System"
               result="Refined messaging, improved service pages, and a cleaner inquiry funnel for more qualified client conversations."
               href="/case-studies/sales-coach"
             />
             <CaseStudyCard
               image="https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=400&fit=crop"
               industry="Care Services"
-              headline="Care Agency Website & Client Journey"
+              headline="Care Agency Client Journey System"
               result="Streamlined service discovery, contact flow, and booking logic so care clients could reach out faster."
               href="/case-studies/care-agency-growth"
             />
@@ -199,7 +198,7 @@ export default function CaseStudies() {
               </h2>
               <p className="body-lg mx-auto text-secondary">
                 These are not published case studies yet. They are active or
-                planned implementations that can become measurable proof after
+                planned platform implementations that can become measurable proof after
                 launch, approval, and verified baseline and outcome data.
               </p>
             </div>
@@ -208,9 +207,9 @@ export default function CaseStudies() {
               <CaseStudyCard
                 image="https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&h=400&fit=crop"
                 industry="Real Estate"
-                headline="Brittany Flannigan Real Estate Platform"
+                headline="Real Estate Platform Preview"
                 resultBadge="In Development"
-                result="A premium real estate platform designed around community intelligence, buyer and seller conversion journeys, lead capture, analytics, and licensed MLS data integration planning."
+                result="An example real estate platform implementation designed around community intelligence, buyer and seller journeys, lead capture, analytics, and IDX property search planning."
                 href="/industries/real-estate"
                 ctaLabel="View Platform Direction"
               />
@@ -223,7 +222,7 @@ export default function CaseStudies() {
 
       <CTASection
         headline="Want to Improve Your Customer Journey?"
-        subheadline="Book a strategy call and let us map the highest-impact improvements for your website, customer journey, and operations."
+        subheadline="Book a strategy call and let us map the highest-impact improvements across your customer journey, lead flow, analytics, automation, and operations."
         buttonLabel="Book Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
       />

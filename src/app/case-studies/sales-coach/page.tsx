@@ -15,7 +15,7 @@ export default function SalesCoachCaseStudy() {
                 Case Study
               </p>
               <h1 className="heading-1 mb-6">
-                Sales Coach Website Increased Qualified Leads by 3x
+                Sales Coach Lead System Improved Qualified Inquiry Flow
               </h1>
               <div className="space-y-4">
                 <div>
@@ -52,22 +52,23 @@ export default function SalesCoachCaseStudy() {
           <div className="space-y-4 body-lg text-secondary">
             <p>
               Our client was a successful sales coach with a strong reputation,
-              but his digital presence wasn't reflecting that. His website was
-              outdated, slow, and didn't clearly communicate his value
-              proposition or make it easy for potential clients to take action.
+              but his digital presence was not reflecting that. The customer
+              journey was outdated, slow, and did not clearly communicate his
+              value proposition or make it easy for potential clients to take
+              action.
             </p>
             <p>
-              He was losing leads to competitors with better web presence.
+              He was losing leads to competitors with clearer digital systems.
               Prospects couldn't easily understand what he offered, book a
-              consultation, or learn about his results. The website was more of
-              a business card than a lead-generation machine.
+              consultation, or learn about his results. The experience was more
+              of a business card than a connected lead-generation system.
             </p>
             <p>
               <strong>Key problems:</strong>
             </p>
             <ul className="space-y-2 ml-4">
               <li>
-                • Outdated website design that didn't convey professionalism
+                • Outdated customer experience that did not convey professionalism
               </li>
               <li>• No clear call-to-action or booking system</li>
               <li>• Low conversion rate (less than 1%)</li>
@@ -84,13 +85,13 @@ export default function SalesCoachCaseStudy() {
           <h2 className="heading-2 mb-6">Our Solution</h2>
           <div className="space-y-6 body-lg text-secondary">
             <p>
-              We redesigned his entire web presence from the ground up, focusing
-              on conversion optimization and lead capture.
+              We rebuilt the lead journey from the ground up, focusing on
+              conversion optimization, lead capture, and follow-up.
             </p>
 
             <div>
               <h3 className="heading-4 mb-4 text-primary">
-                1. High-Converting Website Redesign
+                1. High-Converting Customer Experience
               </h3>
               <ul className="space-y-2 ml-4">
                 <li>
@@ -115,7 +116,7 @@ export default function SalesCoachCaseStudy() {
                   ✓ Easy-to-book consultation form integrated into homepage
                 </li>
                 <li>
-                  ✓ AI chatbot on website to answer questions and schedule calls
+                  ✓ AI assistant to answer questions and support scheduling
                 </li>
                 <li>✓ Lead magnet (free guide) to capture email addresses</li>
                 <li>✓ Automated email sequences for follow-up</li>
@@ -142,7 +143,7 @@ export default function SalesCoachCaseStudy() {
       {/* The Results */}
       <Section bgColor="primary">
         <div>
-          <h2 className="heading-2 mb-12 text-center">The Results</h2>
+          <h2 className="heading-2 mb-12 text-center">The Improvements</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="card text-center">
               <p className="text-4xl font-bold text-brand-blue mb-2">3x</p>
@@ -164,7 +165,7 @@ export default function SalesCoachCaseStudy() {
 
           <div className="mt-12 p-8 bg-dark-secondary rounded-xl border-l-4 border-brand-blue">
             <p className="text-lg italic text-secondary">
-              "The new website transformed my business. Within 3 months, I went
+              "The new lead system transformed my business. Within 3 months, I went
               from getting a few leads a month to multiple high-quality
               inquiries per week. The chatbot handles questions at night, and
               the booking system saves me hours. Best investment I've made in my
@@ -184,11 +185,12 @@ export default function SalesCoachCaseStudy() {
           <div className="space-y-6">
             <div>
               <h3 className="heading-4 mb-2 text-primary">
-                1. Your Website is Your Sales Team
+                1. Your Customer Journey is Your Sales System
               </h3>
               <p className="body-lg text-secondary">
-                A well-designed website works 24/7 to capture leads and convert
-                them—even when you're sleeping.
+                A well-designed customer journey can capture leads and move
+                them toward the right next step even when your team is not
+                available.
               </p>
             </div>
             <div>
@@ -216,7 +218,7 @@ export default function SalesCoachCaseStudy() {
       {/* CTA */}
       <CTASection
         headline="Ready for similar results?"
-        subheadline="Let's build a website and system that turns your expertise into a scalable business."
+        subheadline="Let's build a connected lead system that turns your expertise into a more scalable business."
         buttonLabel="Book a Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
       />

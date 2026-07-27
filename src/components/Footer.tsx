@@ -32,7 +32,7 @@ export default function Footer() {
                   href="/services"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  Business Systems
+                  Solutions Overview
                 </Link>
               </li>
               <li>
@@ -45,18 +45,18 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/solutions/lead-generation-systems"
-                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
-                >
-                  Lead Generation
-                </Link>
-              </li>
-              <li>
-                <Link
                   href="/platform"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Platform
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/real-estate/plans"
+                  className="body-sm text-secondary hover:text-brand-cyan transition-colors"
+                >
+                  Platform Editions
                 </Link>
               </li>
             </ul>
@@ -76,7 +76,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/industries"
+                  href="/solutions/lead-generation-systems"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
                   Service Businesses

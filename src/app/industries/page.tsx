@@ -214,7 +214,7 @@ export default function Industries() {
 
       <CTASection
         headline="Not sure which industry system fits your business?"
-        subheadline="Book a strategy call and we will map the highest-impact improvements across your website, lead flow, analytics, automation, and operations."
+        subheadline="Book a strategy call and we will map the highest-impact improvements across your customer journey, lead flow, analytics, automation, and operations."
         buttonLabel="Book Strategy Call"
         buttonHref={STRATEGY_CALL_URL}
         trackingSource="services_page"

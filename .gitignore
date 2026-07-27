@@ -5,6 +5,9 @@ dist
 .env
 .env.local
 .vercel
+client_secret*.json
+google-oauth*.json
+oauth-client*.json
 .DS_Store
 debug.log
 scan-output.json

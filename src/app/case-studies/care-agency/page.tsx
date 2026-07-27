@@ -20,7 +20,7 @@ export default function CareAgencyCaseStudy() {
                 inquiries into bookings consistently.
               </p>
               <Button href="/contact" size="lg">
-                Start Your Project
+                Start Your Platform Roadmap
               </Button>
             </div>
             <div className="relative w-full h-96 rounded-xl overflow-hidden">
@@ -61,7 +61,7 @@ export default function CareAgencyCaseStudy() {
               </li>
               <li className="flex items-start">
                 <span className="text-brand-blue mr-3">•</span>
-                Website that doesn't convert visitors into leads
+                Customer journey that does not convert visitors into leads
               </li>
               <li className="flex items-start">
                 <span className="text-brand-blue mr-3">•</span>
@@ -112,11 +112,11 @@ export default function CareAgencyCaseStudy() {
           <div className="space-y-12">
             <div>
               <h3 className="heading-3 mb-4 text-brand-blue">
-                Website & Messaging
+                Customer Experience & Messaging
               </h3>
               <p className="body-lg text-secondary mb-4">
-                Create a website that clearly communicates your value and makes
-                it easy for families to understand your services.
+                Create a customer experience that clearly communicates your
+                value and makes it easy for families to understand your services.
               </p>
               <ul className="space-y-2 ml-4 body-md text-secondary">
                 <li>
@@ -289,7 +289,7 @@ export default function CareAgencyCaseStudy() {
       <CTASection
         headline="Ready to Build Your Client Acquisition System?"
         subheadline="Let's create processes that turn inquiries into clients consistently."
-        buttonLabel="Start Your Project"
+        buttonLabel="Start Your Platform Roadmap"
         buttonHref="/contact"
       />
     </>
