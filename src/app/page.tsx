@@ -241,9 +241,10 @@ export default function Home() {
                       industry: industry.slug,
                       cta_location: "homepage_industries",
                     }}
-                    className="mt-6 inline-flex min-h-11 items-center font-semibold text-brand-cyan hover:text-primary"
+                    className="mt-6 inline-block min-h-11 font-semibold leading-6 text-brand-cyan hover:text-primary"
                   >
-                    {industry.cta} <span className="ml-2">-&gt;</span>
+                    {industry.cta}
+                    <span className="whitespace-nowrap"> -&gt;</span>
                   </TrackedLink>
                 </article>
               );

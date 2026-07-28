@@ -10,7 +10,7 @@ export type NavDropdown = {
 
 export type NavLink = NavChild | NavDropdown;
 
-const realEstatePlansLabel = "Platform Editions";
+const realEstatePlansLabel = "Real Estate Plans";
 
 export const navLinks: NavLink[] = [
   {

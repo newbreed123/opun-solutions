@@ -56,7 +56,7 @@ export default function Footer() {
                   href="/real-estate/plans"
                   className="body-sm text-secondary hover:text-brand-cyan transition-colors"
                 >
-                  Platform Editions
+                  Real Estate Plans
                 </Link>
               </li>
             </ul>
