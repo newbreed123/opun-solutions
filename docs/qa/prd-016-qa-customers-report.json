@@ -1,0 +1,411 @@
+{
+  "generatedAt": "2026-07-29T03:49:32.035Z",
+  "status": "passed",
+  "seedMethod": "npm run seed:qa-customers",
+  "activationMethod": "QA users are created or reused through Supabase Admin Auth. The seed sets locally configured QA passwords for those exact QA emails and does not send invitation email by default.",
+  "authMethod": "Password sessions use POST /auth/v1/token?grant_type=password. The prior failure came from POST /auth/v1/admin/generate_link type=magiclink followed by POST /auth/v1/verify; generate_link does not send email.",
+  "initialAudit": [
+    {
+      "key": "agentA",
+      "label": "Test Agent A",
+      "authUser": {
+        "id": "db5030ba-d7e4-4156-9afe-16a0fb1c4c8b",
+        "countByNormalizedEmail": 1,
+        "emailConfirmedAt": "2026-07-29T02:47:15.685342Z",
+        "bannedUntil": null,
+        "userMetadataKeys": [
+          "email_verified",
+          "full_name",
+          "prd",
+          "qa_customer"
+        ],
+        "passwordIdentityDetected": false
+      },
+      "records": {
+        "authUsersByNormalizedEmail": 1,
+        "profile": 1,
+        "organizationsBySlug": 1,
+        "membership": 1,
+        "subscription": 1,
+        "onboarding": 1,
+        "onboardingData": 6
+      }
+    },
+    {
+      "key": "agentB",
+      "label": "Test Agent B",
+      "authUser": {
+        "id": "f12e5aef-65d0-466e-a959-10d8ee110285",
+        "countByNormalizedEmail": 1,
+        "emailConfirmedAt": "2026-07-29T02:47:18.708334Z",
+        "bannedUntil": null,
+        "userMetadataKeys": [
+          "email_verified",
+          "full_name",
+          "prd",
+          "qa_customer"
+        ],
+        "passwordIdentityDetected": false
+      },
+      "records": {
+        "authUsersByNormalizedEmail": 1,
+        "profile": 1,
+        "organizationsBySlug": 1,
+        "membership": 1,
+        "subscription": 1,
+        "onboarding": 1,
+        "onboardingData": 6
+      }
+    }
+  ],
+  "customers": [
+    {
+      "key": "agentA",
+      "label": "Test Agent A",
+      "authUserId": "db5030ba-d7e4-4156-9afe-16a0fb1c4c8b",
+      "authUserCreated": false,
+      "authUserAudit": {
+        "id": "db5030ba-d7e4-4156-9afe-16a0fb1c4c8b",
+        "emailConfirmedAt": "2026-07-29T03:49:23.151013629Z",
+        "bannedUntil": null,
+        "userMetadataKeys": [
+          "email_verified",
+          "full_name",
+          "prd",
+          "qa_customer"
+        ],
+        "passwordIdentityDetected": true
+      },
+      "organizationId": "65b9b089-b5f9-449b-b2e2-cf84d40eaef4",
+      "membershipId": "90bfb7e0-f491-4f01-ace5-be24b77eb34b",
+      "assignedPlanCode": "launch",
+      "subscriptionStatus": "active",
+      "onboardingPercent": 35,
+      "entitlements": {
+        "idx_property_search": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "crm": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "ai_property_assistant": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "analytics": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "automated_follow_up": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "advanced_crm": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "ai_isa": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "internal_ai": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "team_management": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "lead_routing": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "brokerage_reporting": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        }
+      },
+      "activation": {
+        "status": "existing_user_reused",
+        "safeAction": "Use the local QA password configured for this exact QA email. No invitation email is sent by default.",
+        "emailSentBySeed": false
+      },
+      "stageStatus": {
+        "authUser": "reused",
+        "credentials": "password_set_by_admin",
+        "profile": "upserted",
+        "organization": "upserted",
+        "membership": "upserted",
+        "subscription": "assigned",
+        "onboarding": "upserted",
+        "onboardingData": "upserted",
+        "verificationSession": "passed",
+        "isolationChecks": "reported separately"
+      }
+    },
+    {
+      "key": "agentB",
+      "label": "Test Agent B",
+      "authUserId": "f12e5aef-65d0-466e-a959-10d8ee110285",
+      "authUserCreated": false,
+      "authUserAudit": {
+        "id": "f12e5aef-65d0-466e-a959-10d8ee110285",
+        "emailConfirmedAt": "2026-07-29T03:49:26.142534946Z",
+        "bannedUntil": null,
+        "userMetadataKeys": [
+          "email_verified",
+          "full_name",
+          "prd",
+          "qa_customer"
+        ],
+        "passwordIdentityDetected": true
+      },
+      "organizationId": "19895348-727b-43c2-b112-9c65f4574b5e",
+      "membershipId": "a620405e-d0ee-4284-9b49-afb75fd7024f",
+      "assignedPlanCode": "growth",
+      "subscriptionStatus": "active",
+      "onboardingPercent": 65,
+      "entitlements": {
+        "idx_property_search": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "crm": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "ai_property_assistant": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "analytics": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "automated_follow_up": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "advanced_crm": {
+          "expectedEnabled": true,
+          "actualEnabled": true,
+          "accessLevel": "available",
+          "passed": true
+        },
+        "ai_isa": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "internal_ai": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "team_management": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "lead_routing": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        },
+        "brokerage_reporting": {
+          "expectedEnabled": false,
+          "actualEnabled": false,
+          "accessLevel": "unavailable",
+          "passed": true
+        }
+      },
+      "activation": {
+        "status": "existing_user_reused",
+        "safeAction": "Use the local QA password configured for this exact QA email. No invitation email is sent by default.",
+        "emailSentBySeed": false
+      },
+      "stageStatus": {
+        "authUser": "reused",
+        "credentials": "password_set_by_admin",
+        "profile": "upserted",
+        "organization": "upserted",
+        "membership": "upserted",
+        "subscription": "assigned",
+        "onboarding": "upserted",
+        "onboardingData": "upserted",
+        "verificationSession": "passed",
+        "isolationChecks": "reported separately"
+      }
+    }
+  ],
+  "tenantIsolation": [
+    {
+      "name": "Agent A can read Agent A organization",
+      "passed": true,
+      "details": {
+        "rowsReturned": 1
+      }
+    },
+    {
+      "name": "Agent A cannot read Agent B organization",
+      "passed": true,
+      "details": {
+        "rowsReturned": 0
+      }
+    },
+    {
+      "name": "Agent A cannot read or update Agent B onboarding",
+      "passed": true,
+      "details": {
+        "readRowsReturned": 0,
+        "updateRowsReturned": 0,
+        "unchangedCompletionPercent": 65
+      }
+    },
+    {
+      "name": "Agent A cannot read Agent B profile through customer APIs",
+      "passed": true,
+      "details": {
+        "rowsReturned": 0
+      }
+    },
+    {
+      "name": "Agent A cannot access Agent B entitlements",
+      "passed": true,
+      "details": {
+        "subscriptionRowsReturned": 0
+      }
+    },
+    {
+      "name": "Agent B cannot access Agent A records",
+      "passed": true,
+      "details": {
+        "organizationRowsReturned": 0,
+        "onboardingRowsReturned": 0,
+        "profileRowsReturned": 0
+      }
+    },
+    {
+      "name": "Changing organization_id in a browser request does not bypass server authorization",
+      "passed": true,
+      "details": {
+        "rowsReturned": 0
+      }
+    },
+    {
+      "name": "Launch-only restricted features remain blocked for Agent A",
+      "passed": true,
+      "details": {
+        "features": [
+          {
+            "featureCode": "automated_follow_up",
+            "allowed": false
+          },
+          {
+            "featureCode": "advanced_crm",
+            "allowed": false
+          },
+          {
+            "featureCode": "ai_isa",
+            "allowed": false
+          },
+          {
+            "featureCode": "internal_ai",
+            "allowed": false
+          },
+          {
+            "featureCode": "team_management",
+            "allowed": false
+          },
+          {
+            "featureCode": "lead_routing",
+            "allowed": false
+          },
+          {
+            "featureCode": "brokerage_reporting",
+            "allowed": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "Growth entitlements are available to Agent B",
+      "passed": true,
+      "details": {
+        "features": [
+          {
+            "featureCode": "idx_property_search",
+            "allowed": true
+          },
+          {
+            "featureCode": "crm",
+            "allowed": true
+          },
+          {
+            "featureCode": "ai_property_assistant",
+            "allowed": true
+          },
+          {
+            "featureCode": "analytics",
+            "allowed": true
+          },
+          {
+            "featureCode": "automated_follow_up",
+            "allowed": true
+          },
+          {
+            "featureCode": "advanced_crm",
+            "allowed": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Server-side authorization blocks restricted features even when manually constructed",
+      "passed": true,
+      "details": {
+        "crossTenantAllowed": false,
+        "ownLaunchRestrictedAllowed": false
+      }
+    }
+  ],
+  "failure": null
+}

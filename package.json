@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit --pretty false",
+    "seed:qa-customers": "node scripts/seed-qa-customers.mjs",
     "test:scheduling-emails": "node scripts/scheduling-email-tests.mjs",
     "test:scheduling-email-render": "node scripts/scheduling-email-render-tests.mjs",
     "test:scheduling-reminders": "node scripts/scheduling-reminder-tests.mjs",

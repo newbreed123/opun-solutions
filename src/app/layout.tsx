@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import OpzixAIAssistant from "@/components/OpzixAIAssistant";
-import StrategyCallBookingTracker from "@/components/StrategyCallBookingTracker";
+import SiteChrome from "@/components/SiteChrome";
 import "./globals.css";
 
 const GA_MEASUREMENT_ID = "G-YKPQJ3XSRE";
@@ -61,11 +58,7 @@ export default function RootLayout({
             ${GOOGLE_ADS_ID ? `gtag('config', '${GOOGLE_ADS_ID}');` : ""}
           `}
         </Script>
-        <Header />
-        <main>{children}</main>
-        <Footer />
-        <OpzixAIAssistant />
-        <StrategyCallBookingTracker />
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

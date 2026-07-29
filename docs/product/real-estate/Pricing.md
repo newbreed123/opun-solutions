@@ -12,8 +12,8 @@ The offer should be framed as "Choose Your Growth Platform," not "Plans & Pricin
 
 ## Revenue Model
 
-- One-time onboarding
-- Monthly platform subscription
+- Setup fee
+- Monthly subscription
 
 Recurring revenue reflects:
 
@@ -30,79 +30,69 @@ Recurring revenue reflects:
 
 ## Platform Paths
 
-### Essentials: Build Your Foundation
+### Launch: Start Getting More Calls
 
-Ideal customer: new agents.
+Ideal customer: independent agents starting their business.
 
-Setup: $750-$1,250
+Setup Fee: $500
 
-Monthly: $249/month
+Monthly: $200/month
 
 Core value:
 
-- Professional website foundation
-- MLS-ready structure
+- MLS Home Search
+- AI Assistant
 - Lead capture
-- Scheduling
-- AI assistant
-- Hosting and maintenance
-
-### Professional: Generate More Buyers and Sellers
-
-Ideal customer: growing agents.
-
-Setup: $1,500-$2,500
-
-Monthly: $499/month
-
-Core value:
-
-- Everything in Essentials
-- SEO
-- Seller funnels
-- Buyer funnels
-- Automation
-- Analytics
 - CRM
-- Lead routing
+- Community Guides
 
-### Performance: Dominate Your Market
+### Growth: Turn Interest Into Clients
 
-Ideal customer: top-producing agents, luxury agents, and small teams.
+Ideal customer: agents with steady traffic and lead flow.
 
-Setup: starting around $5,000+
+Setup Fee: $750
 
-Monthly: $899-$1,499/month
+Monthly: $275/month
 
 Core value:
 
-- Everything in Professional
-- Community intelligence
-- Market reports
-- Advanced AI
-- Advanced analytics
-- Operational intelligence
-- Custom workflows
-- Brand customization
+- Everything in Launch
+- AI Lead Advisor
+- Marketing Automation
+- Lead Intelligence
+- Advanced Analytics
 
-### Brokerage: Power Your Brokerage
+### Performance: Scale Your Business With Confidence
+
+Ideal customer: high-performing agents and teams.
+
+Setup Fee: Custom
+
+Monthly: Custom
+
+Core value:
+
+- Everything in Growth
+- Market Intelligence
+- AI Content
+- Advanced Reporting
+- Custom workflows
+
+### Brokerage: Power Your Entire Brokerage
 
 Ideal customer: teams, brokerages, and large organizations.
 
-Setup: custom proposal
+Setup Fee: Custom
 
-Monthly: contact sales
+Monthly: Custom
 
 Core value:
 
-- Everything in Performance
-- Brokerage back office
-- Operational dashboards
-- Internal AI
-- Team analytics
-- Role-based workflows
-- Custom integrations
-- Custom deployment
+- Team Management
+- Agent Routing
+- Brokerage Dashboard
+- Reporting
+- Multi-Agent Platform
 
 ## CTA
 

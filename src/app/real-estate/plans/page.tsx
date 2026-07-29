@@ -55,13 +55,14 @@ const plans = [
     name: "Launch",
     audience: "Best for independent agents starting their business.",
     headline: "Start Getting More Calls",
-    copy: "Build the foundation for a connected real estate business.",
+    copy: "Build the foundation for a professional real estate business that helps you generate leads and convert more visitors into clients.",
     launchPrice: "$500",
-    platformPrice: "$269/month",
+    platformPrice: "$200/month",
     bullets: [
       "MLS Home Search",
-      "CRM",
+      "AI Assistant",
       "Lead Capture",
+      "CRM",
       "Community Guides",
     ],
   },
@@ -70,45 +71,48 @@ const plans = [
     name: "Growth",
     audience: "Best for agents with steady traffic and lead flow.",
     headline: "Turn Interest Into Clients",
-    copy: "Turn consistent interest into consistent client conversations.",
-    launchPrice: "Starting at $1,500",
-    platformPrice: "Starting at $449/month",
+    copy: "Everything in Launch, plus more automation, AI, and marketing tools to help you consistently grow your business.",
+    launchPrice: "$750",
+    platformPrice: "$275/month",
     featured: true,
     bullets: [
-      "Everything in Launch Edition",
-      "AI Buyer Advisor",
+      "Everything in Launch",
+      "AI Lead Advisor",
+      "Marketing Automation",
       "Lead Intelligence",
-      "Automation",
+      "Advanced Analytics",
     ],
   },
   {
     slug: "performance",
     name: "Performance",
     audience: "Best for top producers scaling market presence.",
-    headline: "Let AI Work While You Sleep",
-    copy: "Add intelligence, content, analytics, and dashboards to grow with more visibility.",
-    launchPrice: "Starting at $5,000",
-    platformPrice: "Starting at $899/month",
+    headline: "Scale Your Business With Confidence",
+    copy: "Advanced AI, analytics, and business intelligence designed for high-performing agents and teams.",
+    launchPrice: "Custom",
+    platformPrice: "Custom",
     bullets: [
-      "Everything in Growth Edition",
+      "Everything in Growth",
       "Market Intelligence",
-      "Advanced Analytics",
-      "Content Engine",
+      "AI Content",
+      "Advanced Reporting",
+      "Custom Workflows",
     ],
   },
   {
     slug: "brokerage",
     name: "Brokerage",
     audience: "Best for teams and brokerages with shared operations.",
-    headline: "Everything in One Place",
-    copy: "Run team management, routing, reporting, and brokerage operations from one platform.",
+    headline: "Power Your Entire Brokerage",
+    copy: "Manage agents, operations, reporting, and business growth from one centralized platform.",
     launchPrice: "Custom",
     platformPrice: "Custom",
     bullets: [
       "Team Management",
-      "Routing",
-      "Dashboards",
-      "Brokerage Operations",
+      "Agent Routing",
+      "Brokerage Dashboard",
+      "Reporting",
+      "Multi-Agent Platform",
     ],
   },
 ];
@@ -410,7 +414,7 @@ export default function RealEstatePlansPage() {
               <div className="mt-6 rounded-lg border border-brand-cyan/25 bg-brand-cyan/10 p-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
-                    Platform Launch
+                    Setup Fee
                   </p>
                   <p className="mt-1 text-lg font-bold text-primary">
                     {plan.launchPrice}
@@ -418,7 +422,7 @@ export default function RealEstatePlansPage() {
                 </div>
                 <div className="mt-4 border-t border-brand-cyan/20 pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
-                    Monthly Platform
+                    Monthly
                   </p>
                   <p className="mt-1 text-lg font-bold text-primary">
                     {plan.platformPrice}

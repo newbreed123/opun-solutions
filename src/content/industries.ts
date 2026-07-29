@@ -371,10 +371,10 @@ export const realEstateGrowthPlatformTiers: RealEstateGrowthPlatformTier[] = [
     goal: "Build the platform foundation for a real estate business that needs property discovery, booking, CRM, and analytics connected from the start.",
     implementation:
       "Launch Edition connects the public experience to the core operating tools needed to attract and qualify early opportunities.",
-    launchLabel: "Platform Launch Fee",
+    launchLabel: "Setup Fee",
     launchPrice: "$500",
-    platformLabel: "Monthly Platform Subscription",
-    platformPrice: "$269/month",
+    platformLabel: "Monthly",
+    platformPrice: "$200/month",
     investmentNote: "Approachable deployment path with sustainable recurring platform support.",
     ctaLabel: "Book a Strategy Session",
     modules: [
@@ -399,11 +399,11 @@ export const realEstateGrowthPlatformTiers: RealEstateGrowthPlatformTier[] = [
     goal: "Turn consistent lead flow into consistent client conversations with AI guidance, Lead Intelligence, automation, follow-up, and performance visibility.",
     implementation:
       "Growth Edition builds on the Launch foundation and deepens the qualification and conversion systems around real buyer and seller intent.",
-    launchLabel: "Platform Launch Fee",
-    launchPrice: "Starting at $1,500",
-    platformLabel: "Monthly Platform Subscription",
-    platformPrice: "Starting at $449/month",
-    investmentNote: "Starting pricing reflects variable deployment scope and platform depth.",
+    launchLabel: "Setup Fee",
+    launchPrice: "$750",
+    platformLabel: "Monthly",
+    platformPrice: "$275/month",
+    investmentNote: "Approachable pricing for agents ready to grow with more automation, AI, and marketing tools.",
     recommendationLabel: "Recommended Platform",
     recommendationSummary:
       "Ideal for agents ready to manage more buyer and seller demand through a long-term operating platform.",
@@ -433,11 +433,11 @@ export const realEstateGrowthPlatformTiers: RealEstateGrowthPlatformTier[] = [
     goal: "Scale your market presence with intelligence by connecting market insight, advanced analytics, reputation, content, and expanded AI capabilities.",
     implementation:
       "Performance Edition expands the operating platform from lead conversion into market authority, deeper intelligence, and long-term visibility.",
-    launchLabel: "Platform Launch Fee",
-    launchPrice: "Starting at $5,000",
-    platformLabel: "Monthly Platform Subscription",
-    platformPrice: "Starting at $899/month",
-    investmentNote: "Monthly platform investment scales with strategy, data, AI, and support needs.",
+    launchLabel: "Setup Fee",
+    launchPrice: "Custom",
+    platformLabel: "Monthly",
+    platformPrice: "Custom",
+    investmentNote: "Scoped through consultation around strategy, data, AI, and support needs.",
     inspirationNote: "Inspired by an in-progress reference design.",
     ctaLabel: "Book a Strategy Session",
     modules: [
@@ -463,10 +463,10 @@ export const realEstateGrowthPlatformTiers: RealEstateGrowthPlatformTier[] = [
     goal: "Operate an entire real estate business from one platform with team management, routing, dashboards, reporting, and brokerage operations.",
     implementation:
       "Brokerage Edition extends the platform into organization-level workflows, team visibility, operational reporting, and brokerage management.",
-    launchLabel: "Platform Launch Fee",
+    launchLabel: "Setup Fee",
     launchPrice: "Custom",
-    platformLabel: "Monthly Platform Subscription",
-    platformPrice: "Contact Sales",
+    platformLabel: "Monthly",
+    platformPrice: "Custom",
     investmentNote: "Brokerage pricing is scoped privately around deployment complexity and operating needs.",
     ctaLabel: "Book a Strategy Session",
     modules: [
