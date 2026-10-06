@@ -21,7 +21,7 @@ import type {
 type FounderZoraIntelligenceProps = {
   data: FounderConversationDashboard;
   query: ConversationQuery;
-  passcode: string;
+  passcode?: string;
 };
 
 export function FounderZoraIntelligence({
@@ -241,7 +241,7 @@ function ConversationFilters({
   passcode,
 }: {
   query: ConversationQuery;
-  passcode: string;
+  passcode?: string;
 }) {
   return (
     <form className="mt-6 grid gap-3 rounded-xl border border-dark-border bg-dark-deep/60 p-4 lg:grid-cols-[1.4fr_repeat(5,minmax(0,1fr))_auto]">
@@ -277,7 +277,7 @@ function ConversationTable({
   passcode,
 }: {
   rows: ConversationSummary[];
-  passcode: string;
+  passcode?: string;
 }) {
   if (rows.length === 0) {
     return (
@@ -354,7 +354,7 @@ function LostOpportunityTable({
   passcode,
 }: {
   rows: LostOpportunity[];
-  passcode: string;
+  passcode?: string;
 }) {
   if (!rows.length) {
     return <p className="text-sm text-muted">No supported lost-opportunity rows yet.</p>;
@@ -581,7 +581,7 @@ function transcriptStatusLabel(status: ConversationSummary["transcriptStatus"]) 
   return "analytics-only";
 }
 
-function conversationHref(id: string, passcode: string) {
+function conversationHref(id: string, passcode?: string) {
   const params = new URLSearchParams();
   if (passcode) params.set("passcode", passcode);
   const suffix = params.toString();

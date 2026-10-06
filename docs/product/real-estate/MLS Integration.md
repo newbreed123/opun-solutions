@@ -33,6 +33,8 @@ Potential data areas:
 - Do not scrape listing data from public sites as a substitute for licensed integration.
 - Data models should support future markets without hardcoding one agent or one MLS.
 - MLS availability, usage rights, and implementation cost should be confirmed per customer.
+- Legacy IDX Broker integrations should be deprecated and removed only after the MLS Grid-powered search experience reaches production readiness.
+- Do not remove, cancel, or conflate the MLS Grid IDX data-use subscription. It remains required for Brittany's public listing display.
 
 ## Open Questions
 

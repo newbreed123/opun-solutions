@@ -9,9 +9,13 @@ import StrategyCallBookingTracker from "@/components/StrategyCallBookingTracker"
 
 export default function SiteChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isCustomerApp = pathname?.startsWith("/app") ?? false;
+  const isInternalApp =
+    pathname?.startsWith("/app") ||
+    pathname?.startsWith("/opzix-admin") ||
+    pathname?.startsWith("/admin") ||
+    false;
 
-  if (isCustomerApp) {
+  if (isInternalApp) {
     return <>{children}</>;
   }
 

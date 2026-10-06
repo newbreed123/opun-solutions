@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Preview two story home">
+  <defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#bfdbfe"/><stop offset="1" stop-color="#eff6ff"/></linearGradient></defs>
+  <rect width="1200" height="900" fill="url(#sky)"/>
+  <rect y="630" width="1200" height="270" fill="#365314"/>
+  <rect x="210" y="315" width="760" height="390" rx="10" fill="#f1e7d0"/>
+  <path d="M170 330 590 115 1010 330Z" fill="#1f2937"/>
+  <rect x="310" y="420" width="120" height="105" fill="#bfdbfe"/>
+  <rect x="520" y="415" width="120" height="110" fill="#bfdbfe"/>
+  <rect x="735" y="420" width="120" height="105" fill="#bfdbfe"/>
+  <rect x="515" y="570" width="130" height="135" fill="#6b3f2a"/>
+  <rect x="850" y="555" width="165" height="120" fill="#e2e8f0"/>
+  <circle cx="125" cy="610" r="90" fill="#15803d"/>
+  <circle cx="1070" cy="590" r="110" fill="#166534"/>
+</svg>

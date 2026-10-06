@@ -25,6 +25,10 @@ type ResendResponse = {
   error?: string;
 };
 
+type SendLeadNotificationOptions = {
+  recipient?: string;
+};
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -40,10 +44,18 @@ function leadRows(lead: NormalizedLead) {
     ["Source", lead.sourcePage],
     ["Name", lead.name],
     ["Email", lead.email],
+    ["Phone", lead.phone],
+    ["Preferred contact", lead.preferredContactMethod],
     ["Business type", lead.businessType],
     ["Service needed", lead.serviceNeeded],
     ["Website", lead.website],
     ["Message", lead.message],
+    ["Inquiry type", lead.inquiryType],
+    ["Listing key", lead.listingKey],
+    ["MLS number", lead.listingId],
+    ["Listing address", lead.listingAddress],
+    ["Listing price", lead.listingPrice],
+    ["Page URL", lead.pageUrl],
     ["Scan ID", lead.scanId],
     ["Scanned URL", lead.scannedUrl],
     ["Audit score", lead.auditScore],
@@ -57,6 +69,8 @@ function buildLeadEmail(lead: NormalizedLead) {
   const subject =
     lead.leadType === "ecommerce-audit"
       ? `Opzix Audit lead: ${lead.website || lead.scannedUrl || lead.email}`
+      : lead.leadType === "real-estate-inquiry"
+        ? `Real estate home inquiry: ${lead.listingAddress || lead.email || lead.phone}`
       : `Opzix contact lead: ${lead.serviceNeeded || lead.email}`;
   const rows = leadRows(lead);
   const text = rows.map(([label, value]) => `${label}: ${value}`).join("\n");
@@ -88,8 +102,9 @@ function getContactFromEmail() {
 
 export async function sendLeadNotification(
   lead: NormalizedLead,
+  options: SendLeadNotificationOptions = {},
 ): Promise<LeadNotificationResult> {
-  const recipient = getContactNotificationEmail();
+  const recipient = options.recipient?.trim() || getContactNotificationEmail();
   const testMode = process.env.CONTACT_EMAIL_TEST_MODE === "true";
 
   const email = buildLeadEmail(lead);
@@ -132,7 +147,7 @@ export async function sendLeadNotification(
     body: JSON.stringify({
       from,
       to: [recipient],
-      reply_to: lead.email,
+      reply_to: lead.email || undefined,
       subject: email.subject,
       text: email.text,
       html: email.html,

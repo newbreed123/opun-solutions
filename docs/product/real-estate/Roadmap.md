@@ -13,6 +13,7 @@ Priorities:
 - BrittanyFlannigan.com as an in-progress reference design
 - MLS Grid integration planning
 - IDX module planning
+- Legacy IDX Broker deprecation planning after MLS Grid search production readiness
 - Community Intelligence
 - Native scheduling
 - Zora AI real estate behavior
@@ -64,3 +65,5 @@ Priorities:
 - Configure for Brittany instead of hardcoding for Brittany.
 - Do not overbuild full SaaS tenancy before the platform has enough customer pressure to justify it.
 - Prioritize recurring customer value and operational efficiency.
+- Remove legacy IDX Broker only after MLS Grid-powered search is production-ready.
+- Keep the MLS Grid IDX data-use subscription active for Brittany's public listing display.

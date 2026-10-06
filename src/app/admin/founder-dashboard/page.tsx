@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { AdminPasscodeForm } from "@/components/admin/AdminPasscodeForm";
+import {
+  isAdminAuthenticated,
+  logoutAdminAction,
+} from "@/lib/admin-auth";
 import {
   demoFounderDashboardMetrics,
   demoIndustryCategories,
@@ -106,17 +111,25 @@ export default async function FounderDashboardPage({
   searchParams,
 }: FounderDashboardPageProps) {
   const params = (await searchParams) ?? {};
-  const passcode = process.env.OPZIX_ADMIN_PASSCODE?.trim();
-  const providedPasscode = getParam(params, "passcode");
+  const configuredPasscode = process.env.OPZIX_ADMIN_PASSCODE?.trim();
+  const isAuthenticated = await isAdminAuthenticated();
   const dateRange = getFounderDateRange(
     getParam(params, "preset") || "today",
     getParam(params, "from"),
     getParam(params, "to"),
   );
 
-  if (passcode && providedPasscode !== passcode) {
+  if (!configuredPasscode) {
     return (
-      <DashboardShell>
+      <DashboardShell showLogout={false}>
+        <LockedState title="Admin is not configured" />
+      </DashboardShell>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <DashboardShell showLogout={false}>
         <LockedState />
       </DashboardShell>
     );
@@ -190,17 +203,7 @@ export default async function FounderDashboardPage({
         </div>
       </div>
 
-      {!passcode ? (
-        <WarningPanel
-          icon={ShieldAlert}
-          message="Internal dashboard prototype. Add authentication before production use."
-        />
-      ) : null}
-
-      <DateRangeControls
-        dateRange={dateRange}
-        passcode={providedPasscode}
-      />
+      <DateRangeControls dateRange={dateRange} />
 
       <DashboardDataStatus
         dateRange={dateRange}
@@ -214,7 +217,7 @@ export default async function FounderDashboardPage({
         <FounderZoraIntelligence
           data={conversationDashboard}
           query={conversationQuery}
-          passcode={providedPasscode}
+          passcode=""
         />
 
         {!hasRealEvents ? (
@@ -797,37 +800,49 @@ function labelForEvent(eventName: FounderDashboardEvent["eventName"]) {
   return labels[eventName];
 }
 
-function DashboardShell({ children }: { children: ReactNode }) {
+function DashboardShell({
+  children,
+  showLogout = true,
+}: {
+  children: ReactNode;
+  showLogout?: boolean;
+}) {
   return (
     <main className="min-h-screen bg-dark-bg py-8 md:py-10">
+      <header className="container-wide mb-6 flex items-center justify-between rounded-2xl border border-dark-border bg-dark-card px-5 py-4">
+        <div>
+          <p className="text-lg font-black tracking-[0.22em] text-primary">OPZIX</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-cyan">
+            Admin
+          </p>
+        </div>
+        {showLogout ? (
+          <form action={logoutAdminAction}>
+            <button
+              type="submit"
+              className="rounded-full border border-dark-border bg-white/[0.04] px-3 py-2 text-sm font-semibold text-secondary transition hover:border-brand-cyan hover:text-primary"
+            >
+              Logout
+            </button>
+          </form>
+        ) : null}
+      </header>
       <div className="container-wide">{children}</div>
     </main>
   );
 }
 
-function LockedState() {
+function LockedState({ title = "Passcode required" }: { title?: string }) {
   return (
     <div className="mx-auto max-w-xl rounded-2xl border border-dark-border bg-dark-card p-8">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
         Opzix Admin
       </p>
-      <h1 className="mt-3 text-3xl font-bold text-primary">Passcode required</h1>
+      <h1 className="mt-3 text-3xl font-bold text-primary">{title}</h1>
       <p className="mt-3 leading-relaxed text-secondary">
         Enter the internal passcode to view the Opzix Founder Dashboard.
       </p>
-      <form className="mt-6 space-y-3">
-        <label className="block text-sm font-semibold text-secondary">
-          Passcode
-          <input
-            type="password"
-            name="passcode"
-            className="mt-2 min-h-12 w-full rounded-xl border border-dark-border bg-dark-deep px-4 text-primary outline-none focus:border-brand-cyan"
-          />
-        </label>
-        <button type="submit" className="btn btn-primary w-full">
-          View Founder Dashboard
-        </button>
-      </form>
+      <AdminPasscodeForm submitLabel="View Founder Dashboard" />
     </div>
   );
 }
@@ -851,10 +866,8 @@ function WarningPanel({
 
 function DateRangeControls({
   dateRange,
-  passcode,
 }: {
   dateRange: FounderDateRange;
-  passcode: string;
 }) {
   return (
     <section className="rounded-2xl border border-dark-border bg-dark-card p-5 md:p-6">
@@ -872,14 +885,14 @@ function DateRangeControls({
           {dateFilterOptions.map((option) => (
             <a
               key={option.preset}
-              href={dashboardRangeHref(passcode, option.preset)}
+              href={dashboardRangeHref(option.preset)}
               className={dateRangeButtonClass(dateRange.preset === option.preset)}
             >
               {option.label}
             </a>
           ))}
           <a
-            href={dashboardRangeHref(passcode, "custom", dateRange.from, dateRange.to)}
+            href={dashboardRangeHref("custom", dateRange.from, dateRange.to)}
             className={dateRangeButtonClass(dateRange.preset === "custom")}
           >
             Custom
@@ -891,7 +904,6 @@ function DateRangeControls({
         action="/admin/founder-dashboard"
         className="mt-5 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
       >
-        {passcode ? <input type="hidden" name="passcode" value={passcode} /> : null}
         <input type="hidden" name="preset" value="custom" />
         <label className="block text-sm font-semibold text-secondary">
           From
@@ -1005,14 +1017,12 @@ function dateRangeButtonClass(active: boolean) {
 }
 
 function dashboardRangeHref(
-  passcode: string,
   preset: FounderDateRangePreset,
   from?: string,
   to?: string,
 ) {
   const params = new URLSearchParams();
 
-  if (passcode) params.set("passcode", passcode);
   params.set("preset", preset);
 
   if (preset === "custom") {

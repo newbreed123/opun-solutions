@@ -5,11 +5,12 @@ export const leadSourcePages = [
   "ai-chatbot",
   "services",
   "homepage",
+  "real-estate-homes",
 ] as const;
 
 export type LeadSourcePage = (typeof leadSourcePages)[number];
 
-export type LeadType = "contact" | "ecommerce-audit";
+export type LeadType = "contact" | "ecommerce-audit" | "real-estate-inquiry";
 
 export type NormalizedLead = {
   leadType: LeadType;
@@ -18,6 +19,8 @@ export type NormalizedLead = {
   businessType: string;
   website: string;
   email: string;
+  phone: string;
+  preferredContactMethod: string;
   message: string;
   sourcePage: LeadSourcePage;
   scanId: string;
@@ -25,6 +28,12 @@ export type NormalizedLead = {
   auditScore: string;
   auditStatus: string;
   primaryConcern: string;
+  listingKey: string;
+  listingId: string;
+  listingAddress: string;
+  listingPrice: string;
+  inquiryType: string;
+  pageUrl: string;
   createdAt: string;
 };
 
@@ -44,6 +53,8 @@ export function normalizeLead(
     businessType: values.businessType ?? "",
     website: values.website ?? "",
     email: values.email ?? "",
+    phone: values.phone ?? "",
+    preferredContactMethod: values.preferredContactMethod ?? "",
     message: values.message || values.projectDescription || values.biggestIssue || "",
     sourcePage: normalizeLeadSourcePage(
       values.sourcePage || values.source || "",
@@ -54,6 +65,12 @@ export function normalizeLead(
     auditScore: values.auditScore || values.score || "",
     auditStatus: values.auditStatus || values.status || "",
     primaryConcern: values.primaryConcern ?? "",
+    listingKey: values.listingKey ?? "",
+    listingId: values.listingId ?? "",
+    listingAddress: values.listingAddress ?? "",
+    listingPrice: values.listingPrice ?? "",
+    inquiryType: values.inquiryType ?? "",
+    pageUrl: values.pageUrl ?? "",
     createdAt: new Date().toISOString(),
   };
 }

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Preview home exterior">
+  <defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#bde7ff"/><stop offset="1" stop-color="#f8fbff"/></linearGradient></defs>
+  <rect width="1200" height="900" fill="url(#sky)"/>
+  <rect y="640" width="1200" height="260" fill="#446b45"/>
+  <rect x="170" y="390" width="730" height="300" rx="8" fill="#f5f0e8"/>
+  <path d="M120 420 540 190 960 420Z" fill="#334155"/>
+  <rect x="255" y="480" width="120" height="120" fill="#93c5fd"/>
+  <rect x="700" y="480" width="120" height="120" fill="#93c5fd"/>
+  <rect x="470" y="515" width="140" height="175" fill="#7c3f2c"/>
+  <path d="M520 190h110l55 160H465Z" fill="#475569"/>
+  <circle cx="1015" cy="620" r="95" fill="#2f855a"/>
+  <rect x="996" y="620" width="38" height="170" fill="#8b5e34"/>
+  <path d="M150 755c210-85 450-80 720 0" fill="none" stroke="#e5e7eb" stroke-width="70" stroke-linecap="round"/>
+</svg>

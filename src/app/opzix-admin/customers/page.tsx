@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { AdminPasscodeForm } from "@/components/admin/AdminPasscodeForm";
+import {
+  isAdminAuthenticated,
+  logoutAdminAction,
+} from "@/lib/admin-auth";
 import {
   listCustomerOrganizations,
 } from "@/lib/customer-platform/store";
@@ -13,16 +18,13 @@ type CustomersAdminPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function CustomersAdminPage({
-  searchParams,
-}: CustomersAdminPageProps) {
-  const params = (await searchParams) ?? {};
-  const passcode = process.env.OPZIX_ADMIN_PASSCODE?.trim();
-  const providedPasscode = getParam(params, "passcode");
+export default async function CustomersAdminPage() {
+  const configuredPasscode = process.env.OPZIX_ADMIN_PASSCODE?.trim();
+  const isAuthenticated = await isAdminAuthenticated();
 
-  if (!passcode) {
+  if (!configuredPasscode) {
     return (
-      <AdminShell>
+      <AdminShell showLogout={false}>
         <LockedState
           title="Customer admin is not configured"
           message="Set OPZIX_ADMIN_PASSCODE before viewing customer accounts."
@@ -31,13 +33,10 @@ export default async function CustomersAdminPage({
     );
   }
 
-  if (providedPasscode !== passcode) {
+  if (!isAuthenticated) {
     return (
-      <AdminShell>
-        <LockedState
-          title="Passcode required"
-          message="Enter the internal passcode to view customer accounts."
-        />
+      <AdminShell showLogout={false}>
+        <LockedState />
       </AdminShell>
     );
   }
@@ -76,7 +75,6 @@ export default async function CustomersAdminPage({
           be connected before production invite sending.
         </p>
         <form action={createAssistedOnboardingAction} className="mt-5 grid gap-4 lg:grid-cols-6">
-          <input type="hidden" name="passcode" value={providedPasscode} />
           <Field name="organization_name" label="Organization" />
           <Field name="slug" label="Slug" />
           <Field name="email" label="Customer email" type="email" />
@@ -176,9 +174,7 @@ export default async function CustomersAdminPage({
 async function createAssistedOnboardingAction(formData: FormData) {
   "use server";
 
-  const passcode = process.env.OPZIX_ADMIN_PASSCODE?.trim();
-  const providedPasscode = stringField(formData, "passcode");
-  if (!passcode || providedPasscode !== passcode) {
+  if (!(await isAdminAuthenticated())) {
     throw new Error("Unauthorized customer admin action.");
   }
 
@@ -189,7 +185,7 @@ async function createAssistedOnboardingAction(formData: FormData) {
   const planCode = (stringField(formData, "plan_code") || "launch") as PlanCode;
 
   if (!name || !email || !slug) {
-    redirect(`/opzix-admin/customers?passcode=${encodeURIComponent(providedPasscode)}`);
+    redirect("/opzix-admin/customers");
   }
 
   const plan = await supabaseAdminFetch<PlanRow[]>("plans", {
@@ -264,18 +260,60 @@ async function createAssistedOnboardingAction(formData: FormData) {
   });
 
   revalidatePath("/opzix-admin/customers");
-  redirect(`/opzix-admin/customers?passcode=${encodeURIComponent(providedPasscode)}`);
+  redirect("/opzix-admin/customers");
 }
 
-function AdminShell({ children }: { children: ReactNode }) {
-  return <main className="min-h-screen bg-dark px-4 py-8 text-primary">{children}</main>;
-}
-
-function LockedState({ title, message }: { title: string; message: string }) {
+function AdminShell({
+  children,
+  showLogout = true,
+}: {
+  children: ReactNode;
+  showLogout?: boolean;
+}) {
   return (
-    <div className="mx-auto max-w-xl rounded-2xl border border-dark-border bg-dark-card p-8 text-center">
-      <h1 className="text-2xl font-bold text-primary">{title}</h1>
+    <main className="min-h-screen bg-dark px-4 py-6 text-primary">
+      <header className="mx-auto mb-6 flex max-w-7xl items-center justify-between rounded-2xl border border-dark-border bg-dark-card px-5 py-4">
+        <div>
+          <p className="text-lg font-black tracking-[0.22em] text-primary">OPZIX</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-cyan">
+            Admin
+          </p>
+        </div>
+        {showLogout ? (
+          <form action={logoutAdminAction}>
+            <button
+              type="submit"
+              className="rounded-full border border-dark-border bg-white/[0.04] px-3 py-2 text-sm font-semibold text-secondary transition hover:border-brand-cyan hover:text-primary"
+            >
+              Logout
+            </button>
+          </form>
+        ) : null}
+      </header>
+      {children}
+    </main>
+  );
+}
+
+function LockedState({
+  title = "Customer Management",
+  message = "Enter the internal passcode to view customer accounts.",
+}: {
+  title?: string;
+  message?: string;
+}) {
+  return (
+    <div className="mx-auto max-w-xl rounded-2xl border border-dark-border bg-dark-card p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
+        OPZIX ADMIN
+      </p>
+      <h1 className="mt-3 text-3xl font-bold text-primary">{title}</h1>
       <p className="mt-3 text-secondary">{message}</p>
+      <AdminPasscodeForm
+        title="Internal Passcode"
+        description="Enter the internal passcode to view customer accounts."
+        submitLabel="Continue"
+      />
     </div>
   );
 }

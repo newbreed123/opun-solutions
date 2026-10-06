@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Preview craftsman home">
+  <defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#fde68a"/><stop offset="1" stop-color="#fff7ed"/></linearGradient></defs>
+  <rect width="1200" height="900" fill="url(#sky)"/>
+  <rect y="635" width="1200" height="265" fill="#4d7c0f"/>
+  <rect x="190" y="360" width="770" height="330" rx="10" fill="#fef3c7"/>
+  <path d="M145 375 575 150 1005 375Z" fill="#7c2d12"/>
+  <rect x="250" y="495" width="140" height="115" fill="#93c5fd"/>
+  <rect x="750" y="495" width="140" height="115" fill="#93c5fd"/>
+  <rect x="495" y="530" width="145" height="160" fill="#78350f"/>
+  <rect x="165" y="635" width="820" height="45" fill="#92400e"/>
+  <rect x="250" y="600" width="35" height="110" fill="#92400e"/>
+  <rect x="870" y="600" width="35" height="110" fill="#92400e"/>
+  <path d="M120 765c260-65 570-65 900 0" fill="none" stroke="#fed7aa" stroke-width="62" stroke-linecap="round"/>
+</svg>

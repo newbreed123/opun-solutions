@@ -34,6 +34,9 @@ The IDX Module turns licensed listing data into branded property discovery exper
 - Search behavior should not assume every market has the same fields.
 - Property inquiry should preserve listing context for follow-up.
 - Platform-specific improvements should be implemented as reusable IDX capabilities, not Brittany-only components.
+- MLS Grid IDX is the required data-use path for Brittany's public listing display.
+- Any legacy IDX Broker integration is a temporary fallback only. Deprecate and remove it after MLS Grid-powered search reaches production readiness.
+- Do not treat removal of legacy IDX Broker as cancellation or removal of the MLS Grid IDX subscription.
 
 ## Metrics
 

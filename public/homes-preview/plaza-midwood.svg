@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Preview condo exterior">
+  <defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#ddd6fe"/><stop offset="1" stop-color="#f5f3ff"/></linearGradient></defs>
+  <rect width="1200" height="900" fill="url(#sky)"/>
+  <rect y="675" width="1200" height="225" fill="#334155"/>
+  <rect x="250" y="240" width="700" height="455" rx="12" fill="#e2e8f0"/>
+  <rect x="305" y="305" width="115" height="95" fill="#60a5fa"/>
+  <rect x="465" y="305" width="115" height="95" fill="#60a5fa"/>
+  <rect x="625" y="305" width="115" height="95" fill="#60a5fa"/>
+  <rect x="785" y="305" width="115" height="95" fill="#60a5fa"/>
+  <rect x="305" y="455" width="115" height="95" fill="#60a5fa"/>
+  <rect x="465" y="455" width="115" height="95" fill="#60a5fa"/>
+  <rect x="625" y="455" width="115" height="95" fill="#60a5fa"/>
+  <rect x="785" y="455" width="115" height="95" fill="#60a5fa"/>
+  <rect x="525" y="585" width="150" height="110" fill="#475569"/>
+  <path d="M175 760h850" stroke="#94a3b8" stroke-width="70" stroke-linecap="round"/>
+</svg>

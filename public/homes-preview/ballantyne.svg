@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Preview brick home">
+  <defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#cffafe"/><stop offset="1" stop-color="#f0fdfa"/></linearGradient></defs>
+  <rect width="1200" height="900" fill="url(#sky)"/>
+  <rect y="650" width="1200" height="250" fill="#166534"/>
+  <rect x="180" y="380" width="810" height="310" rx="8" fill="#b45309"/>
+  <path d="M140 390 585 165 1030 390Z" fill="#374151"/>
+  <g fill="#d97706"><rect x="220" y="415" width="60" height="34"/><rect x="330" y="415" width="60" height="34"/><rect x="440" y="415" width="60" height="34"/><rect x="660" y="415" width="60" height="34"/><rect x="770" y="415" width="60" height="34"/><rect x="880" y="415" width="60" height="34"/></g>
+  <rect x="300" y="510" width="130" height="105" fill="#bae6fd"/>
+  <rect x="735" y="510" width="130" height="105" fill="#bae6fd"/>
+  <rect x="520" y="540" width="135" height="150" fill="#422006"/>
+  <circle cx="1050" cy="610" r="100" fill="#14532d"/>
+</svg>

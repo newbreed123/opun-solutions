@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Preview kitchen">
+  <rect width="1200" height="900" fill="#f8fafc"/>
+  <rect y="610" width="1200" height="290" fill="#d6d3d1"/>
+  <rect x="120" y="170" width="960" height="210" fill="#e5e7eb"/>
+  <rect x="170" y="210" width="160" height="125" fill="#ffffff"/>
+  <rect x="380" y="210" width="160" height="125" fill="#ffffff"/>
+  <rect x="660" y="210" width="160" height="125" fill="#ffffff"/>
+  <rect x="870" y="210" width="160" height="125" fill="#ffffff"/>
+  <rect x="260" y="510" width="680" height="165" rx="20" fill="#475569"/>
+  <rect x="315" y="465" width="570" height="70" rx="18" fill="#f8fafc"/>
+  <circle cx="430" cy="725" r="38" fill="#334155"/>
+  <circle cx="770" cy="725" r="38" fill="#334155"/>
+</svg>
