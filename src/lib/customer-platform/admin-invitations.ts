@@ -667,6 +667,9 @@ async function recordInvitationEvent({
 
 function configuredInviteRedirect() {
   const value = process.env.OPZIX_AUTH_REDIRECT_URL?.trim();
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production";
   if (!value) {
     return {
       ok: false as const,
@@ -683,9 +686,12 @@ function configuredInviteRedirect() {
       url.hash ||
       url.username ||
       url.password ||
-      (process.env.NODE_ENV === "production" &&
-        value !== "https://opzix.io/accept-invite") ||
-      (process.env.NODE_ENV !== "production" &&
+      (isProduction &&
+        (url.protocol !== "https:" ||
+          url.hostname !== "opzix.io" ||
+          url.host !== "opzix.io" ||
+          value !== "https://opzix.io/accept-invite")) ||
+      (!isProduction &&
         !["https:", "http:"].includes(url.protocol))
     ) {
       throw new Error("invalid redirect");

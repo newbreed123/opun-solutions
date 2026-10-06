@@ -39,6 +39,9 @@ production customer delivery requires custom SMTP. In the Supabase dashboard:
    - Sender name/address: Opzix and an address on a verified sending domain
 4. Configure the Supabase Auth **Invite user** email template:
    - Subject: `You're invited to Opzix`
+   - Use the explicit production URL below rather than `.SiteURL` or
+     `.ConfirmationURL`. `/accept-invite` verifies the supplied token hash
+     itself and must receive the invitation ID.
    - HTML:
 
 ```html
@@ -47,7 +50,7 @@ production customer delivery requires custom SMTP. In the Supabase dashboard:
   <p>Your account for <strong>{{ .Data.business_name }}</strong> is ready.</p>
   <p>Complete your account setup to begin onboarding your real estate platform.</p>
   <p>
-    <a href="{{ .SiteURL }}/accept-invite?token_hash={{ .TokenHash }}&amp;type=invite&amp;invitation_id={{ .Data.organization_invitation_id }}"
+    <a href="https://opzix.io/accept-invite?token_hash={{ .TokenHash }}&amp;type=invite&amp;invitation_id={{ .Data.organization_invitation_id }}"
        style="display:inline-block;background:#13b8d4;color:#06202a;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">
       Complete Account Setup
     </a>
@@ -59,6 +62,10 @@ production customer delivery requires custom SMTP. In the Supabase dashboard:
 The application sends invitations with Supabase Auth Admin's supported
 `inviteUserByEmail` operation (the server-side Auth Admin `POST /auth/v1/invite`
 endpoint), using the service-role credential and an explicit `redirect_to`.
+That redirect comes only from `OPZIX_AUTH_REDIRECT_URL`; production rejects a
+missing value or any URL other than `https://opzix.io/accept-invite`, including
+localhost, non-HTTPS, another host, and another path. The same validated
+redirect is used for the Auth Admin replacement-link flow.
 The service-role secret is never returned to the browser. Invitation tokens are
 never displayed in Customer Hub or logged; a one-time token is present only in
 the intended recipient's emailed link and is submitted to the server for
