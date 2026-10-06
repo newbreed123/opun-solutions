@@ -104,6 +104,55 @@ export async function supabaseAdminFetch<T>(
   };
 }
 
+export async function supabaseAdminRpc<T>(
+  functionName: string,
+  args: Record<string, unknown>,
+): Promise<SupabaseFetchResult<T>> {
+  const config = getSupabaseAdminConfig();
+
+  if (!config) {
+    return {
+      ok: false,
+      error: "Supabase admin environment variables are not configured.",
+      status: 0,
+    };
+  }
+
+  const response = await fetch(`${config.url}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(args),
+  }).catch((error: unknown) => ({
+    ok: false as const,
+    error:
+      error instanceof Error && error.message
+        ? error.message
+        : "Supabase RPC request failed before a response was received.",
+    status: 0,
+  }));
+
+  if (!("text" in response)) return response;
+
+  const text = await response.text();
+  const data = text ? safeParseJson<T>(text) : (null as T);
+  if (!response.ok) {
+    return {
+      ok: false,
+      error:
+        getSupabaseErrorMessage(data) ||
+        `Supabase RPC failed with status ${response.status}.`,
+      status: response.status,
+    };
+  }
+
+  return { ok: true, data, status: response.status };
+}
+
 function safeParseJson<T>(text: string) {
   try {
     return JSON.parse(text) as T;

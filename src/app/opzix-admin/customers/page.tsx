@@ -1,16 +1,19 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminPasscodeForm } from "@/components/admin/AdminPasscodeForm";
 import {
   isAdminAuthenticated,
   logoutAdminAction,
 } from "@/lib/admin-auth";
 import {
-  listCustomerOrganizations,
-} from "@/lib/customer-platform/store";
+  createCustomerOnboarding,
+  sendCustomerInvitation,
+} from "@/lib/customer-platform/admin-invitations";
+import { listCustomerAdminOrganizations } from "@/lib/customer-platform/admin-store";
 import { supabaseAdminFetch } from "@/lib/supabase-admin";
-import type { OrganizationRow, PlanCode, PlanRow } from "@/lib/customer-platform/types";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +21,10 @@ type CustomersAdminPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function CustomersAdminPage() {
+export default async function CustomersAdminPage({
+  searchParams,
+}: CustomersAdminPageProps) {
+  const params = (await searchParams) ?? {};
   const configuredPasscode = process.env.OPZIX_ADMIN_PASSCODE?.trim();
   const isAuthenticated = await isAdminAuthenticated();
 
@@ -41,7 +47,10 @@ export default async function CustomersAdminPage() {
     );
   }
 
-  const organizations = await listCustomerOrganizations();
+  const organizations = await listCustomerAdminOrganizations();
+  const requestedId = stringParam(params.request);
+  const requestId = isUuid(requestedId) ? requestedId : crypto.randomUUID();
+  const createError = stringParam(params.error) === "create";
 
   return (
     <AdminShell>
@@ -51,13 +60,8 @@ export default async function CustomersAdminPage() {
             Customer Accounts
           </p>
           <h1 className="mt-3 text-4xl font-bold text-primary">
-            Opzix Customer Hub
+            Customer Management
           </h1>
-          <p className="mt-3 max-w-3xl leading-relaxed text-secondary">
-            Focused customer/account management for subscriptions, onboarding,
-            plan assignment, and review status. This stays separate from the
-            Founder Dashboard.
-          </p>
         </div>
         <p className="rounded-full border border-dark-border bg-white/[0.04] px-4 py-2 text-sm font-semibold text-secondary">
           {organizations.data.length} organization
@@ -66,66 +70,87 @@ export default async function CustomersAdminPage() {
       </div>
 
       <section className="mb-8 rounded-2xl border border-dark-border bg-dark-card p-5">
-        <h2 className="text-xl font-bold text-primary">
-          Create assisted onboarding record
-        </h2>
+        <h2 className="text-xl font-bold text-primary">Onboard a customer</h2>
         <p className="mt-2 text-sm leading-6 text-secondary">
-          This creates the organization, assigned plan, onboarding shell, and
-          invitation audit record. Email delivery through Supabase Auth should
-          be connected before production invite sending.
+          Enter the customer and commercial details. Opzix creates their
+          organization and sends a secure account setup invitation.
         </p>
-        <form action={createAssistedOnboardingAction} className="mt-5 grid gap-4 lg:grid-cols-6">
-          <Field name="organization_name" label="Organization" />
-          <Field name="slug" label="Slug" />
-          <Field name="email" label="Customer email" type="email" />
-          <label className="text-sm font-semibold text-secondary">
-            Type
-            <select
-              name="organization_type"
-              className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
-            >
-              <option value="agent">Agent</option>
-              <option value="team">Team</option>
-              <option value="brokerage">Brokerage</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label className="text-sm font-semibold text-secondary">
-            Plan
-            <select
-              name="plan_code"
-              className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
-            >
-              <option value="launch">Launch</option>
-              <option value="growth">Growth</option>
-              <option value="performance">Performance</option>
-              <option value="brokerage">Brokerage</option>
-            </select>
-          </label>
+        {createError ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100"
+          >
+            Customer creation did not complete. The request is safe to retry
+            using the same form.
+          </p>
+        ) : null}
+        <form
+          action={createCustomerAction}
+          className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        >
+          <input type="hidden" name="request_id" value={requestId} />
+          <Field name="customer_name" label="Customer Name" required />
+          <Field name="business_name" label="Business Name" required />
+          <Field name="email" label="Customer Email" type="email" required />
+          <SelectField name="organization_type" label="Account Type">
+            <option value="agent">Agent</option>
+            <option value="team">Team</option>
+            <option value="brokerage">Brokerage</option>
+            <option value="other">Other</option>
+          </SelectField>
+          <SelectField name="plan_code" label="Plan">
+            <option value="launch">Launch</option>
+            <option value="growth">Growth</option>
+            <option value="performance">Performance</option>
+            <option value="brokerage">Brokerage</option>
+            <option value="custom">Custom</option>
+          </SelectField>
+          <Field
+            name="setup_fee"
+            label="Setup Fee (USD)"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue="0"
+            required
+          />
+          <Field
+            name="monthly_subscription"
+            label="Monthly Subscription (USD)"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue="0"
+            required
+          />
           <div className="flex items-end">
             <button type="submit" className="btn btn-primary min-h-11 w-full">
-              Create
+              Send Onboarding Invite
             </button>
           </div>
         </form>
       </section>
 
       {!organizations.ok ? (
-        <div className="rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100">
+        <div
+          role="alert"
+          className="rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100"
+        >
           {organizations.error}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-dark-border bg-dark-card">
-          <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
             <thead className="border-b border-dark-border bg-white/[0.035] text-xs uppercase tracking-[0.16em] text-muted">
               <tr>
                 <th className="px-4 py-3">Organization</th>
-                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Customer</th>
                 <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Subscription</th>
                 <th className="px-4 py-3">Onboarding</th>
-                <th className="px-4 py-3">Members</th>
-                <th className="px-4 py-3">Timezone</th>
+                <th className="px-4 py-3">Invite Status</th>
+                <th className="px-4 py-3">Last Activity</th>
+                <th className="px-4 py-3">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -138,28 +163,41 @@ export default async function CustomersAdminPage() {
                     <p className="font-bold text-primary">
                       {summary.organization.name}
                     </p>
-                    <p className="mt-1 font-mono text-xs text-muted">
-                      {summary.organization.slug}
-                    </p>
+                    {summary.isQa ? (
+                      <span className="mt-1 inline-flex rounded-full border border-amber-300/30 bg-amber-400/10 px-2 py-0.5 text-xs font-semibold text-amber-100">
+                        QA / Test
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-4 text-secondary">
-                    {summary.organization.organization_type}
+                    {summary.customerName}
                   </td>
                   <td className="px-4 py-4 text-secondary">
                     {summary.plan?.name ?? "Unassigned"}
                   </td>
                   <td className="px-4 py-4 text-secondary">
-                    {summary.organization.status}
+                    {formatMoney(summary.terms?.monthly_subscription)}
+                    <span className="block text-xs text-muted">per month</span>
                   </td>
                   <td className="px-4 py-4 text-secondary">
                     {summary.onboarding?.completion_percent ?? 0}% -{" "}
                     {summary.onboarding?.status ?? "not_started"}
                   </td>
                   <td className="px-4 py-4 text-secondary">
-                    {summary.activeMembers}
+                    {inviteStatus(summary.invitation?.invitation_state)}
                   </td>
                   <td className="px-4 py-4 text-secondary">
-                    {summary.organization.timezone}
+                    {summary.lastActivity
+                      ? formatDate(summary.lastActivity.created_at)
+                      : "No activity"}
+                  </td>
+                  <td className="px-4 py-4">
+                    <Link
+                      href={`/opzix-admin/customers/${summary.organization.id}`}
+                      className="font-semibold text-brand-cyan hover:underline"
+                    >
+                      View Customer
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -171,127 +209,69 @@ export default async function CustomersAdminPage() {
   );
 }
 
-async function createAssistedOnboardingAction(formData: FormData) {
+async function createCustomerAction(formData: FormData) {
   "use server";
 
   if (!(await isAdminAuthenticated())) {
     throw new Error("Unauthorized customer admin action.");
   }
 
-  const name = stringField(formData, "organization_name");
-  const email = stringField(formData, "email");
-  const slug = slugify(stringField(formData, "slug") || name);
-  const organizationType = stringField(formData, "organization_type") || "agent";
-  const planCode = (stringField(formData, "plan_code") || "launch") as PlanCode;
-
-  if (!name || !email || !slug) {
-    redirect("/opzix-admin/customers");
-  }
-
-  const plan = await supabaseAdminFetch<PlanRow[]>("plans", {
-    query: { select: "id,code,name,status", code: `eq.${planCode}`, limit: 1 },
-  });
-  const planRow = plan.ok ? plan.data[0] : null;
-  if (!planRow) {
-    throw new Error("Plan assignment failed because the plan code was not found.");
-  }
-
-  const organizationResult = await supabaseAdminFetch<OrganizationRow[]>(
-    "organizations",
-    {
-      method: "POST",
-      body: {
-        name,
-        slug,
-        organization_type: organizationType,
-        status: "onboarding",
-      },
-      prefer: "return=representation",
-    },
+  const requestId = stringField(formData, "request_id");
+  const customerName = stringField(formData, "customer_name");
+  const businessName = stringField(formData, "business_name");
+  const email = stringField(formData, "email").toLowerCase();
+  const organizationType = stringField(formData, "organization_type");
+  const planCode = stringField(formData, "plan_code");
+  const setupFee = parseMoney(stringField(formData, "setup_fee"));
+  const monthlySubscription = parseMoney(
+    stringField(formData, "monthly_subscription"),
   );
-  if (!organizationResult.ok || !organizationResult.data[0]) {
-    throw new Error(organizationResult.ok ? "Organization was not returned." : organizationResult.error);
+
+  if (
+    !isUuid(requestId) ||
+    customerName.length < 2 ||
+    customerName.length > 160 ||
+    businessName.length < 2 ||
+    businessName.length > 160 ||
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+    !["agent", "team", "brokerage", "other"].includes(organizationType) ||
+    !["launch", "growth", "performance", "brokerage", "custom"].includes(
+      planCode,
+    ) ||
+    setupFee === null ||
+    monthlySubscription === null
+  ) {
+    const safeRequestId = isUuid(requestId) ? requestId : crypto.randomUUID();
+    redirect(
+      `/opzix-admin/customers?error=create&request=${encodeURIComponent(safeRequestId)}`,
+    );
   }
-  const organization = organizationResult.data[0];
 
-  await supabaseAdminFetch<null>("organization_subscriptions", {
-    method: "POST",
-    body: {
-      organization_id: organization.id,
-      plan_id: planRow.id,
-      status: "active",
-    },
-    prefer: "returning=minimal",
+  const created = await createCustomerOnboarding({
+    requestId,
+    customerName,
+    businessName,
+    email,
+    organizationType,
+    planCode,
+    setupFee,
+    monthlySubscription,
   });
+  if (!created.ok) {
+    console.error("Customer onboarding record creation failed.", {
+      error: created.error,
+    });
+    redirect(
+      `/opzix-admin/customers?error=create&request=${encodeURIComponent(requestId)}`,
+    );
+  }
 
-  await supabaseAdminFetch<null>("organization_onboarding", {
-    method: "POST",
-    body: {
-      organization_id: organization.id,
-      current_step: "account",
-      completion_percent: 0,
-      status: "not_started",
-    },
-    prefer: "returning=minimal",
-  });
-
-  await supabaseAdminFetch<null>("organization_invitations", {
-    method: "POST",
-    body: {
-      organization_id: organization.id,
-      email,
-      role: "owner",
-      plan_code: planCode,
-      status: "pending",
-      metadata: { source: "opzix-admin/customers" },
-    },
-    prefer: "returning=minimal",
-  });
-
-  await supabaseAdminFetch<null>("customer_account_audit_events", {
-    method: "POST",
-    body: {
-      organization_id: organization.id,
-      event_name: "customer_invited",
-      target_type: "organization_invitation",
-      metadata: { email, planCode },
-    },
-    prefer: "returning=minimal",
-  });
-
+  const invitation = await sendCustomerInvitation(created.invitationId);
   revalidatePath("/opzix-admin/customers");
-  redirect("/opzix-admin/customers");
-}
-
-function AdminShell({
-  children,
-  showLogout = true,
-}: {
-  children: ReactNode;
-  showLogout?: boolean;
-}) {
-  return (
-    <main className="min-h-screen bg-dark px-4 py-6 text-primary">
-      <header className="mx-auto mb-6 flex max-w-7xl items-center justify-between rounded-2xl border border-dark-border bg-dark-card px-5 py-4">
-        <div>
-          <p className="text-lg font-black tracking-[0.22em] text-primary">OPZIX</p>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-cyan">
-            Admin
-          </p>
-        </div>
-        {showLogout ? (
-          <form action={logoutAdminAction}>
-            <button
-              type="submit"
-              className="rounded-full border border-dark-border bg-white/[0.04] px-3 py-2 text-sm font-semibold text-secondary transition hover:border-brand-cyan hover:text-primary"
-            >
-              Logout
-            </button>
-          </form>
-        ) : null}
-      </header>
-      {children}
-    </main>
+  revalidatePath(`/opzix-admin/customers/${created.organizationId}`);
+  redirect(
+    `/opzix-admin/customers/${created.organizationId}?invite=${invitation.ok ? "sent" : "failed"}`,
   );
 }
 
@@ -322,10 +302,18 @@ function Field({
   name,
   label,
   type = "text",
+  required = false,
+  defaultValue,
+  min,
+  step,
 }: {
   name: string;
   label: string;
   type?: string;
+  required?: boolean;
+  defaultValue?: string;
+  min?: string;
+  step?: string;
 }) {
   return (
     <label className="text-sm font-semibold text-secondary">
@@ -333,17 +321,39 @@ function Field({
       <input
         name={name}
         type={type}
+        required={required}
+        min={min}
+        step={step}
+        defaultValue={defaultValue}
         className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none placeholder:text-muted focus:border-brand-cyan"
       />
     </label>
   );
 }
 
-function getParam(
-  params: Record<string, string | string[] | undefined>,
-  key: string,
-) {
-  const value = params[key];
+function SelectField({
+  name,
+  label,
+  children,
+}: {
+  name: string;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="text-sm font-semibold text-secondary">
+      {label}
+      <select
+        name={name}
+        className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function stringParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
@@ -352,10 +362,50 @@ function stringField(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 72);
+function parseMoney(value: string) {
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(value)) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function inviteStatus(
+  state: string | undefined,
+) {
+  switch (state) {
+    case "draft":
+      return "Draft";
+    case "invite_pending":
+      return "Sending";
+    case "invited":
+      return "Invite sent";
+    case "activated":
+      return "Activated";
+    case "invite_failed":
+      return "Invite failed";
+    default:
+      return "Not invited";
+  }
+}
+
+function formatMoney(value: number | undefined) {
+  if (value === undefined) return "Not set";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(date);
 }

@@ -443,6 +443,11 @@ async function seedCustomer(config, customer) {
     organization_type: customer.organization.organizationType,
     timezone: customer.organization.timezone,
     status: customer.organization.status,
+    metadata: {
+      source: "prd-016-qa-seed",
+      is_qa: true,
+      qa_key: customer.key,
+    },
     updated_at: now,
   });
 

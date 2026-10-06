@@ -44,6 +44,19 @@ export async function getCustomerContextForUser(
 ) {
   if (!hasSupabaseAdminConfig()) return null;
 
+  const acceptedInvitations = await supabaseAdminFetch<
+    { organization_id: string; accepted_at: string | null }[]
+  >("organization_invitations", {
+    query: {
+      select: "organization_id,accepted_at",
+      auth_user_id: `eq.${user.id}`,
+      invitation_state: "eq.activated",
+      order: "accepted_at.desc",
+      limit: 1,
+    },
+  });
+  if (!acceptedInvitations.ok) return null;
+  const acceptedInvitation = acceptedInvitations.data[0];
   const memberships = await supabaseAdminFetch<OrganizationMemberRow[]>(
     "organization_members",
     {
@@ -51,6 +64,10 @@ export async function getCustomerContextForUser(
         select: "id,organization_id,user_id,role,status,invited_at,joined_at",
         user_id: `eq.${user.id}`,
         status: "eq.active",
+        ...(acceptedInvitation
+          ? { organization_id: `eq.${acceptedInvitation.organization_id}` }
+          : {}),
+        order: "joined_at.desc",
         limit: 1,
       },
     },
@@ -93,7 +110,7 @@ export async function getCustomerContextForUser(
   ]);
 
   const organization = organizations.ok ? organizations.data[0] : null;
-  if (!organization) return null;
+  if (!organization || organization.status === "archived") return null;
 
   const subscription = await activeSubscription(organization.id);
   const plan = subscription ? await planById(subscription.plan_id) : null;

@@ -2,7 +2,12 @@ export type OrganizationType = "agent" | "team" | "brokerage" | "other";
 export type OrganizationStatus = "active" | "onboarding" | "suspended" | "archived";
 export type MemberRole = "owner" | "admin" | "agent" | "staff" | "viewer";
 export type MemberStatus = "invited" | "active" | "suspended" | "removed";
-export type PlanCode = "launch" | "growth" | "performance" | "brokerage";
+export type PlanCode =
+  | "launch"
+  | "growth"
+  | "performance"
+  | "brokerage"
+  | "custom";
 export type FeatureAccessLevel =
   | "available"
   | "unavailable"
@@ -37,6 +42,37 @@ export type OrganizationRow = {
   organization_type: OrganizationType;
   timezone: string;
   status: OrganizationStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CustomerInvitationRow = {
+  id: string;
+  organization_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  auth_user_id: string | null;
+  plan_code: PlanCode | null;
+  status: string;
+  invitation_state:
+    | "draft"
+    | "invite_pending"
+    | "invited"
+    | "activated"
+    | "invite_failed";
+  invited_at: string;
+  accepted_at: string | null;
+  last_error: string | null;
+  metadata: Record<string, unknown>;
+  updated_at: string;
+};
+
+export type OrganizationCommercialTermsRow = {
+  organization_id: string;
+  setup_fee: number;
+  monthly_subscription: number;
+  currency: "USD";
   created_at: string;
   updated_at: string;
 };

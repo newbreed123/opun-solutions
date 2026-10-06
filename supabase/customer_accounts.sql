@@ -151,7 +151,8 @@ values
   ('launch', 'Launch', 'active'),
   ('growth', 'Growth', 'active'),
   ('performance', 'Performance', 'active'),
-  ('brokerage', 'Brokerage', 'active')
+  ('brokerage', 'Brokerage', 'active'),
+  ('custom', 'Custom', 'active')
 on conflict (code) do update
 set name = excluded.name,
     status = excluded.status,

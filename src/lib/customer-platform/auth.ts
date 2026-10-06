@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdminConfig } from "@/lib/supabase-admin";
+import { activateCustomerInvitation } from "./admin-invitations";
 import type { CustomerUser } from "./types";
 
 const ACCESS_COOKIE = "opzix_customer_access_token";
@@ -18,12 +19,14 @@ type SupabaseAuthSession = {
   user?: {
     id?: string;
     email?: string;
+    user_metadata?: Record<string, unknown>;
   };
 };
 
 type SupabaseAuthUserResponse = {
   id?: string;
   email?: string;
+  user_metadata?: Record<string, unknown>;
 };
 
 export function getSupabaseAuthConfig(): SupabaseAuthConfig | null {
@@ -106,7 +109,17 @@ export async function requestPasswordReset(email: string) {
       };
 }
 
-export async function verifyInviteToken(tokenHash: string, password: string) {
+export async function verifyInviteToken({
+  tokenHash,
+  password,
+  invitationId,
+  verificationType,
+}: {
+  tokenHash: string;
+  password: string;
+  invitationId: string;
+  verificationType: "invite" | "magiclink";
+}) {
   const config = getSupabaseAuthConfig();
   if (!config) {
     return {
@@ -118,7 +131,7 @@ export async function verifyInviteToken(tokenHash: string, password: string) {
   const verified = await fetch(`${config.url}/auth/v1/verify`, {
     method: "POST",
     headers: authHeaders(config.anonKey),
-    body: JSON.stringify({ type: "invite", token_hash: tokenHash }),
+    body: JSON.stringify({ type: verificationType, token_hash: tokenHash }),
   }).catch((error: unknown) => authFetchError(error));
 
   if (!("json" in verified)) return verified;
@@ -130,6 +143,50 @@ export async function verifyInviteToken(tokenHash: string, password: string) {
     return {
       ok: false as const,
       error: authErrorMessage(session) || "Invitation could not be verified.",
+    };
+  }
+
+  const verifiedSession = session as SupabaseAuthSession;
+  let authUser = verifiedSession.user;
+  if (!authUser?.id || !authUser.email) {
+    const userResponse = await fetch(`${config.url}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        ...authHeaders(config.anonKey),
+        Authorization: `Bearer ${verifiedSession.access_token}`,
+      },
+      cache: "no-store",
+    }).catch((error: unknown) => authFetchError(error));
+
+    if (!("json" in userResponse) || !userResponse.ok) {
+      return {
+        ok: false as const,
+        error: "The verified customer account could not be loaded.",
+      };
+    }
+    authUser = (await userResponse.json().catch(() => ({}))) as
+      | SupabaseAuthUserResponse
+      | undefined;
+  }
+
+  if (!authUser?.id || !authUser.email) {
+    return {
+      ok: false as const,
+      error: "The verified customer account did not include an account identifier.",
+    };
+  }
+
+  const metadataInvitationId =
+    typeof authUser.user_metadata?.organization_invitation_id === "string"
+      ? authUser.user_metadata.organization_invitation_id
+      : "";
+  if (
+    verificationType === "invite" &&
+    metadataInvitationId !== invitationId
+  ) {
+    return {
+      ok: false as const,
+      error: "This invitation link is not associated with the submitted invitation.",
     };
   }
 
@@ -152,7 +209,14 @@ export async function verifyInviteToken(tokenHash: string, password: string) {
     };
   }
 
-  await persistAuthSession(session as SupabaseAuthSession);
+  const activation = await activateCustomerInvitation({
+    invitationId,
+    userId: authUser.id,
+    email: authUser.email,
+  });
+  if (!activation.ok) return activation;
+
+  await persistAuthSession(verifiedSession);
   return { ok: true as const };
 }
 

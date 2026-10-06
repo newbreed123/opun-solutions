@@ -15,6 +15,9 @@ export default async function AcceptInvitePage({
 }: AcceptInvitePageProps) {
   const params = (await searchParams) ?? {};
   const tokenHash = stringParam(params.token_hash);
+  const invitationId = stringParam(params.invitation_id);
+  const verificationType =
+    stringParam(params.type) === "magiclink" ? "magiclink" : "invite";
   const error = stringParam(params.error);
 
   return (
@@ -34,9 +37,9 @@ export default async function AcceptInvitePage({
           </p>
           {!tokenHash ? (
             <div className="mt-5 rounded-xl border border-dark-border bg-white/[0.035] p-3 text-sm text-secondary">
-              Open this page from your Opzix invitation email. If your invite
-              already opened the Supabase confirmation page, return to login
-              after setting your password.
+              Open this page using the secure link in your Opzix invitation
+              email. If the link has expired, ask your Opzix contact to resend
+              the invitation.
             </div>
           ) : null}
           {error ? (
@@ -46,6 +49,16 @@ export default async function AcceptInvitePage({
           ) : null}
           <form action={acceptInviteAction} className="mt-6 grid gap-4">
             <input type="hidden" name="token_hash" value={tokenHash ?? ""} />
+            <input
+              type="hidden"
+              name="invitation_id"
+              value={invitationId ?? ""}
+            />
+            <input
+              type="hidden"
+              name="verification_type"
+              value={verificationType}
+            />
             <label className="text-sm font-semibold text-secondary">
               New password
               <input
