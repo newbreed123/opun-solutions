@@ -57,6 +57,15 @@ export type InvitationResult =
   | { ok: true; state: "invited" }
   | { ok: false; error: string; state: "invite_failed" };
 
+export type InvitationActivationValidationResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      status: number | null;
+      code: "invitation_record_invalid" | "supabase_api_key_invalid";
+    };
+
 const INVITATION_SELECT =
   "id,organization_id,email,first_name,last_name,auth_user_id,invitation_state";
 
@@ -384,6 +393,88 @@ export async function activateCustomerInvitation({
     };
   }
   return { ok: true as const };
+}
+
+export async function validateCustomerInvitationForActivation({
+  invitationId,
+  userId,
+  email,
+}: {
+  invitationId: string;
+  userId: string;
+  email: string;
+}): Promise<InvitationActivationValidationResult> {
+  const inviteResult = await supabaseAdminFetch<CustomerInvitationRow[]>(
+    "organization_invitations",
+    {
+      query: {
+        select: INVITATION_SELECT,
+        id: `eq.${invitationId}`,
+        limit: 1,
+      },
+    },
+  );
+  if (!inviteResult.ok) {
+    return {
+      ok: false,
+      error: "The customer invitation could not be loaded.",
+      status: inviteResult.status,
+      code: /invalid api key/i.test(inviteResult.error)
+        ? "supabase_api_key_invalid"
+        : "invitation_record_invalid",
+    };
+  }
+
+  const invitation = inviteResult.data[0];
+  if (
+    !invitation ||
+    invitation.auth_user_id !== userId ||
+    invitation.email.toLowerCase() !== email.toLowerCase() ||
+    invitation.invitation_state === "activated" ||
+    !["invite_pending", "invited", "invite_failed"].includes(
+      invitation.invitation_state,
+    )
+  ) {
+    return {
+      ok: false,
+      error: "This invitation is not eligible for activation.",
+      status: inviteResult.status,
+      code: "invitation_record_invalid",
+    };
+  }
+
+  const organizationResult = await supabaseAdminFetch<OrganizationRow[]>(
+    "organizations",
+    {
+      query: {
+        select: "id,status",
+        id: `eq.${invitation.organization_id}`,
+        limit: 1,
+      },
+    },
+  );
+  if (!organizationResult.ok) {
+    return {
+      ok: false,
+      error: "The customer's organization could not be loaded.",
+      status: organizationResult.status,
+      code: /invalid api key/i.test(organizationResult.error)
+        ? "supabase_api_key_invalid"
+        : "invitation_record_invalid",
+    };
+  }
+
+  const organization = organizationResult.data[0];
+  if (!organization || organization.status === "archived") {
+    return {
+      ok: false,
+      error: "This invitation is not eligible for activation.",
+      status: organizationResult.status,
+      code: "invitation_record_invalid",
+    };
+  }
+
+  return { ok: true };
 }
 
 async function inviteWithSupabase({
