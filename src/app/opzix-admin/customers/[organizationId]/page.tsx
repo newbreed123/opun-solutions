@@ -161,10 +161,20 @@ export default async function CustomerDetailPage({
                 ? `Last sent ${formatDate(invitation.invited_at)}`
                 : "No invite has been sent"}
             </p>
-            {invitation?.last_error ? (
-              <p className="mt-1 text-xs text-amber-100">
-                Delivery reference: {invitation.last_error}
-              </p>
+            {invitation?.invitation_state === "invite_failed" ? (
+              <div
+                role="alert"
+                className="mt-3 rounded-lg border border-amber-300/25 bg-amber-400/[0.06] p-3 text-sm text-amber-100"
+              >
+                <p className="font-bold">Invitation failed</p>
+                {invitation.auth_user_id ? (
+                  <p className="mt-1">
+                    An Auth account already exists for this email.
+                  </p>
+                ) : null}
+                <p className="mt-2 font-semibold">Reason</p>
+                <p>{invitationFailureReason(invitation.last_error)}</p>
+              </div>
             ) : null}
           </DetailCard>
           <DetailCard
@@ -213,7 +223,9 @@ export default async function CustomerDetailPage({
                     value={invitation.id}
                   />
                   <button type="submit" className="btn btn-primary min-h-11">
-                    Resend Invite
+                    {invitation.auth_user_id
+                      ? "Send Account Setup Link"
+                      : "Retry Invitation"}
                   </button>
                 </form>
               ) : (
@@ -649,5 +661,31 @@ function inviteLabel(state: string | undefined) {
       return "Invite failed";
     default:
       return "Not invited";
+  }
+}
+
+function invitationFailureReason(code: string | null) {
+  switch (code) {
+    case "resend_not_configured":
+      return "Account setup email delivery is not configured. Configure the server-side RESEND_API_KEY and OPZIX_AUTH_FROM_EMAIL settings, then send a new account setup link.";
+    case "invite_redirect_not_configured":
+      return "The server-side invitation redirect is missing. Set OPZIX_AUTH_REDIRECT_URL to the approved invitation URL before retrying.";
+    case "invite_redirect_invalid":
+      return "The server-side invitation redirect is not an approved URL. Correct OPZIX_AUTH_REDIRECT_URL before retrying.";
+    case "supabase_auth_transport_error":
+      return "Supabase Auth could not be reached. Check Supabase service availability before retrying.";
+    case "supabase_link_transport_error":
+      return "Supabase Auth could not create the account setup link. Check Supabase Auth availability before retrying.";
+    default: {
+      const authStatus = /^supabase_auth_http_(\d{3})$/.exec(code ?? "");
+      if (authStatus) {
+        return `Supabase Auth rejected the invitation (HTTP ${authStatus[1]}). Check the Supabase Auth logs and delivery configuration before retrying.`;
+      }
+      const linkStatus = /^supabase_link_http_(\d{3})$/.exec(code ?? "");
+      if (linkStatus) {
+        return `Supabase Auth could not create the account setup link (HTTP ${linkStatus[1]}). Check the Supabase Auth logs before retrying.`;
+      }
+      return "The invitation provider could not complete the request. Check the Supabase Auth and email-delivery logs before retrying.";
+    }
   }
 }

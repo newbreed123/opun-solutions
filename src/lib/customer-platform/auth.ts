@@ -132,17 +132,36 @@ export async function verifyInviteToken({
     method: "POST",
     headers: authHeaders(config.anonKey),
     body: JSON.stringify({ type: verificationType, token_hash: tokenHash }),
-  }).catch((error: unknown) => authFetchError(error));
-
-  if (!("json" in verified)) return verified;
+  }).catch(() => null);
+  if (!verified) {
+    console.warn("customer_invitation_verification_failed", {
+      stage: "token_verification",
+      verificationType,
+      status: null,
+      code: "auth_transport_error",
+      message: "Supabase Auth request failed before a response was received.",
+    });
+    return {
+      ok: false as const,
+      error:
+        "The activation link could not be verified. Ask Opzix to send a fresh link.",
+    };
+  }
   const session = (await verified.json().catch(() => ({}))) as
     | SupabaseAuthSession
     | Record<string, unknown>;
 
   if (!verified.ok || !("access_token" in session)) {
+    const failure = invitationVerificationFailure(
+      verified.status,
+      verificationType,
+      session,
+    );
+    console.warn("customer_invitation_verification_failed", failure);
     return {
       ok: false as const,
-      error: authErrorMessage(session) || "Invitation could not be verified.",
+      error:
+        "The activation link could not be verified. Ask Opzix to send a fresh link.",
     };
   }
 
@@ -311,6 +330,33 @@ function authErrorMessage(payload: unknown) {
       (value): value is string => typeof value === "string" && Boolean(value),
     )
     .join(" ");
+}
+
+function invitationVerificationFailure(
+  status: number,
+  verificationType: "invite" | "magiclink",
+  payload: unknown,
+) {
+  const record =
+    typeof payload === "object" && payload !== null
+      ? (payload as Record<string, unknown>)
+      : {};
+  const candidate = record.error_code ?? record.code;
+  const code =
+    typeof candidate === "string" && /^[a-z0-9_-]{1,80}$/i.test(candidate)
+      ? candidate
+      : "auth_verification_failed";
+  const message =
+    code === "otp_expired"
+      ? "Supabase rejected the one-time token as expired or already used."
+      : "Supabase rejected one-time token verification.";
+  return {
+    stage: "token_verification",
+    verificationType,
+    status,
+    code,
+    message,
+  };
 }
 
 function siteUrl() {

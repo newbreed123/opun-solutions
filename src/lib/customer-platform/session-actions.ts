@@ -42,9 +42,16 @@ export async function acceptInviteAction(formData: FormData) {
   const invitationId = stringField(formData, "invitation_id");
   const requestedType = stringField(formData, "verification_type");
   const verificationType =
-    requestedType === "magiclink" ? "magiclink" : "invite";
+    requestedType === "invite" || requestedType === "magiclink"
+      ? requestedType
+      : null;
 
-  if (!tokenHash || password.length < 8 || !isUuid(invitationId)) {
+  if (
+    !tokenHash ||
+    password.length < 8 ||
+    !isUuid(invitationId) ||
+    !verificationType
+  ) {
     redirect("/accept-invite?error=missing-fields");
   }
 

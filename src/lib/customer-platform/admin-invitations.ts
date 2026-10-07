@@ -526,7 +526,7 @@ async function sendResendInvitation({
   const link = new URL(redirectTo.url);
   link.searchParams.set("token_hash", tokenHash);
   link.searchParams.set("type", "magiclink");
-  link.searchParams.set("invitation_id", invitationId);
+  link.searchParams.set("organization_invitation_id", invitationId);
   const name = escapeHtml(firstName || "there");
   const business = escapeHtml(businessName);
   const url = link.toString();

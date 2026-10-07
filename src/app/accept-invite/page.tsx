@@ -15,9 +15,11 @@ export default async function AcceptInvitePage({
 }: AcceptInvitePageProps) {
   const params = (await searchParams) ?? {};
   const tokenHash = stringParam(params.token_hash);
-  const invitationId = stringParam(params.invitation_id);
-  const verificationType =
-    stringParam(params.type) === "magiclink" ? "magiclink" : "invite";
+  const invitationId = resolveInvitationId(
+    stringParam(params.invitation_id),
+    stringParam(params.organization_invitation_id),
+  );
+  const verificationType = stringParam(params.type);
   const error = stringParam(params.error);
 
   return (
@@ -92,4 +94,18 @@ export default async function AcceptInvitePage({
 
 function stringParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function resolveInvitationId(
+  invitationId: string | undefined,
+  organizationInvitationId: string | undefined,
+) {
+  if (
+    invitationId &&
+    organizationInvitationId &&
+    invitationId !== organizationInvitationId
+  ) {
+    return "";
+  }
+  return invitationId || organizationInvitationId || "";
 }
