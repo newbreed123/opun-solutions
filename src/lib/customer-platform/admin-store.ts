@@ -65,7 +65,7 @@ const ORGANIZATION_SELECT =
 const INVITATION_SELECT =
   "id,organization_id,email,first_name,last_name,auth_user_id,plan_code,status,invitation_state,invited_at,accepted_at,last_error,metadata,updated_at";
 const ONBOARDING_SELECT =
-  "organization_id,current_step,completion_percent,status,submitted_at,reviewed_at,created_at,updated_at";
+  "organization_id,current_step,completion_percent,status,submitted_at,submitted_by_user_id,reviewed_at,created_at,updated_at";
 
 export async function listCustomerAdminOrganizations(): Promise<
   Result<CustomerAdminSummary[]>

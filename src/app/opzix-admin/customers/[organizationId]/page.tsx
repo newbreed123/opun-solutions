@@ -7,6 +7,14 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { sendCustomerInvitation } from "@/lib/customer-platform/admin-invitations";
 import { getCustomerAdminDetail } from "@/lib/customer-platform/admin-store";
+import {
+  defaultProgressForStage,
+  getOrganizationLaunchProgress,
+  isLaunchStage,
+  launchStageLabel,
+  launchStages,
+  saveOrganizationLaunchUpdate,
+} from "@/lib/customer-platform/launch-progress";
 import { supabaseAdminFetch, supabaseAdminRpc } from "@/lib/supabase-admin";
 import type {
   CustomerInvitationRow,
@@ -55,6 +63,7 @@ export default async function CustomerDetailPage({
   if (!isUuid(organizationId)) notFound();
   const customer = await getCustomerAdminDetail(organizationId);
   if (!customer) notFound();
+  const launchProgress = await getOrganizationLaunchProgress(organizationId);
 
   const invitation = customer.invitation;
   const displayName = customer.customerName;
@@ -97,12 +106,12 @@ export default async function CustomerDetailPage({
               </span>
             ) : null}
           </div>
-          <a
-            href="#onboarding"
+          <Link
+            href={`/opzix-admin/customers/${customer.organization.id}/onboarding`}
             className="rounded-full border border-dark-border px-4 py-2 text-sm font-semibold text-secondary hover:border-brand-cyan hover:text-primary"
           >
             View Onboarding
-          </a>
+          </Link>
         </div>
 
         {inviteNotice === "failed" ? (
@@ -325,6 +334,123 @@ export default async function CustomerDetailPage({
           )}
         </section>
 
+        <section className="mt-8 rounded-2xl border border-dark-border bg-dark-card p-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-primary">
+                Platform Launch
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-secondary">
+                Customer-facing launch progress is separate from onboarding
+                completion. Keep language focused on the launch journey.
+              </p>
+            </div>
+            <div className="rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 px-4 py-3 text-sm">
+              <span className="font-bold text-primary">
+                {launchProgress.status.progress_percent}%
+              </span>{" "}
+              <span className="text-secondary">
+                {launchStageLabel(launchProgress.status.current_stage)}
+              </span>
+            </div>
+          </div>
+          <form action={saveLaunchProgressAction} className="mt-5 grid gap-4 lg:grid-cols-2">
+            <input
+              type="hidden"
+              name="organization_id"
+              value={customer.organization.id}
+            />
+            <label className="text-sm font-semibold text-secondary">
+              Current stage
+              <select
+                name="current_stage"
+                defaultValue={launchProgress.status.current_stage}
+                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+              >
+                {launchStages.map((stage) => (
+                  <option key={stage.code} value={stage.code}>
+                    {stage.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-semibold text-secondary">
+              Progress %
+              <input
+                name="progress_percent"
+                type="number"
+                min="0"
+                max="100"
+                defaultValue={launchProgress.status.progress_percent}
+                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+              />
+            </label>
+            <label className="text-sm font-semibold text-secondary lg:col-span-2">
+              Customer-facing status
+              <input
+                name="customer_status"
+                defaultValue={
+                  launchProgress.status.customer_status ??
+                  launchStageLabel(launchProgress.status.current_stage)
+                }
+                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+              />
+            </label>
+            <label className="text-sm font-semibold text-secondary lg:col-span-2">
+              Latest update from Opzix
+              <textarea
+                name="latest_update"
+                rows={4}
+                defaultValue={launchProgress.status.latest_update ?? ""}
+                className="mt-2 w-full rounded-xl border border-dark-border bg-dark-deep px-3 py-2 text-primary outline-none focus:border-brand-cyan"
+              />
+            </label>
+            <label className="text-sm font-semibold text-secondary">
+              Next customer action
+              <input
+                name="next_customer_action"
+                defaultValue={launchProgress.status.next_customer_action ?? ""}
+                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+              />
+            </label>
+            <label className="text-sm font-semibold text-secondary">
+              Estimated launch window
+              <input
+                name="estimated_launch_window"
+                defaultValue={launchProgress.status.estimated_launch_window ?? ""}
+                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+              />
+            </label>
+            <button type="submit" className="btn btn-primary min-h-11 lg:col-span-2">
+              Save Launch Update
+            </button>
+          </form>
+          {launchProgress.updates.length ? (
+            <div className="mt-6">
+              <h3 className="text-sm font-bold text-primary">Update history</h3>
+              <ul className="mt-2 divide-y divide-dark-border">
+                {launchProgress.updates.slice(0, 5).map((update) => (
+                  <li key={update.id} className="py-3 text-sm">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <span className="font-semibold text-primary">
+                        {launchStageLabel(update.stage)} · {update.progress_percent}%
+                      </span>
+                      <time className="text-muted">
+                        {formatDateTime(update.created_at)}
+                      </time>
+                    </div>
+                    {update.customer_message ? (
+                      <p className="mt-1 text-secondary">
+                        {update.customer_message}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+
         <section
           id="onboarding"
           className="mt-8 rounded-2xl border border-dark-border bg-dark-card p-5"
@@ -335,6 +461,12 @@ export default async function CustomerDetailPage({
             Status: {customer.onboarding?.status ?? "not_started"} · Completion:{" "}
             {customer.onboarding?.completion_percent ?? 0}%
           </p>
+          <Link
+            href={`/opzix-admin/customers/${customer.organization.id}/onboarding`}
+            className="mt-4 inline-flex text-sm font-semibold text-brand-cyan hover:underline"
+          >
+            Open complete onboarding review
+          </Link>
           <h3 className="mt-5 text-sm font-bold text-primary">
             Recent activity
           </h3>
@@ -491,6 +623,49 @@ async function saveFeatureAccessAction(formData: FormData) {
     enabledCount: String(enabledCodes.size),
   });
   revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}`);
+}
+
+async function saveLaunchProgressAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized customer admin action.");
+  }
+
+  const organizationId = stringField(formData, "organization_id");
+  const stage = stringField(formData, "current_stage");
+  if (!isUuid(organizationId) || !isLaunchStage(stage)) {
+    throw new Error("Invalid launch progress update.");
+  }
+  const progressInput = Number(stringField(formData, "progress_percent"));
+  const progressPercent = Number.isFinite(progressInput)
+    ? Math.min(100, Math.max(0, Math.round(progressInput)))
+    : defaultProgressForStage(stage);
+  const customerStatus =
+    stringField(formData, "customer_status") || launchStageLabel(stage);
+  const latestUpdate = stringField(formData, "latest_update");
+  const nextCustomerAction =
+    stringField(formData, "next_customer_action") ||
+    "No action needed right now.";
+  const estimatedLaunchWindow = stringField(formData, "estimated_launch_window");
+
+  const result = await saveOrganizationLaunchUpdate({
+    organizationId,
+    stage,
+    progressPercent,
+    customerStatus,
+    latestUpdate,
+    nextCustomerAction,
+    estimatedLaunchWindow,
+  });
+  if (!result.ok) throw new Error(result.error);
+
+  await recordAdminEvent(organizationId, "platform_launch_status_updated", {
+    stage,
+    progressPercent: String(progressPercent),
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app");
   redirect(`/opzix-admin/customers/${organizationId}`);
 }
 

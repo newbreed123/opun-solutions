@@ -1,5 +1,5 @@
 type SupabaseFetchOptions = {
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
   prefer?: string;

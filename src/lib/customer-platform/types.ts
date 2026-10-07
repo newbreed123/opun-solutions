@@ -132,6 +132,7 @@ export type OnboardingRow = {
   completion_percent: number;
   status: OnboardingStatus;
   submitted_at: string | null;
+  submitted_by_user_id?: string | null;
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;

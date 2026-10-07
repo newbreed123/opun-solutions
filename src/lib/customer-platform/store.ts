@@ -9,6 +9,10 @@ import {
   normalizeOnboardingStep,
   onboardingCompletionPercent,
 } from "./onboarding";
+import {
+  recordOnboardingNotificationResult,
+  sendOnboardingSubmittedNotification,
+} from "./onboarding-notifications";
 import type {
   CustomerContext,
   Entitlement,
@@ -95,7 +99,7 @@ export async function getCustomerContextForUser(
     supabaseAdminFetch<OnboardingRow[]>("organization_onboarding", {
       query: {
         select:
-          "organization_id,current_step,completion_percent,status,submitted_at,reviewed_at,created_at,updated_at",
+          "organization_id,current_step,completion_percent,status,submitted_at,submitted_by_user_id,reviewed_at,created_at,updated_at",
         organization_id: `eq.${membership.organization_id}`,
         limit: 1,
       },
@@ -173,20 +177,41 @@ export async function canAccessFeature({
 
 export async function saveOnboardingSection({
   organizationId,
+  submittedByUserId,
   section,
   data,
   submit,
 }: {
   organizationId: string;
+  submittedByUserId?: string;
   section: OnboardingStepCode;
   data: Record<string, string | string[]>;
   submit?: boolean;
 }) {
   const currentStep = normalizeOnboardingStep(section);
-  const status = submit ? "submitted" : "in_progress";
+  const existingOnboarding = await supabaseAdminFetch<OnboardingRow[]>(
+    "organization_onboarding",
+    {
+      query: {
+        select:
+          "organization_id,current_step,completion_percent,status,submitted_at,submitted_by_user_id,reviewed_at,created_at,updated_at",
+        organization_id: `eq.${organizationId}`,
+        limit: 1,
+      },
+    },
+  );
+  const existing = existingOnboarding.ok
+    ? existingOnboarding.data[0] ?? null
+    : null;
+  const wasSubmitted =
+    existing?.status === "submitted" || existing?.status === "reviewed";
+  const status = submit ? "submitted" : wasSubmitted ? existing.status : "in_progress";
   const completionPercent = submit
     ? 100
-    : onboardingCompletionPercent(currentStep);
+    : wasSubmitted
+      ? Math.max(existing?.completion_percent ?? 0, onboardingCompletionPercent(currentStep))
+      : onboardingCompletionPercent(currentStep);
+  const now = new Date().toISOString();
 
   const dataResult = await supabaseAdminFetch<null>(
     "organization_onboarding_data",
@@ -197,7 +222,7 @@ export async function saveOnboardingSection({
         organization_id: organizationId,
         section,
         data_json: data,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       },
       prefer: "resolution=merge-duplicates,returning=minimal",
     },
@@ -205,23 +230,30 @@ export async function saveOnboardingSection({
 
   if (!dataResult.ok) return dataResult;
 
+  const onboardingBody: Record<string, unknown> = {
+    organization_id: organizationId,
+    current_step: currentStep,
+    completion_percent: completionPercent,
+    status,
+    updated_at: now,
+  };
+  if (submit && !existing?.submitted_at) {
+    onboardingBody.submitted_at = now;
+    onboardingBody.submitted_by_user_id = submittedByUserId ?? null;
+  }
+
   const onboardingResult = await supabaseAdminFetch<null>("organization_onboarding", {
     method: "POST",
     query: { on_conflict: "organization_id" },
-    body: {
-      organization_id: organizationId,
-      current_step: currentStep,
-      completion_percent: completionPercent,
-      status,
-      submitted_at: submit ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    },
+    body: onboardingBody,
     prefer: "resolution=merge-duplicates,returning=minimal",
   });
 
   if (onboardingResult.ok) {
     const eventName = submit
-      ? "onboarding_completed"
+      ? "customer_onboarding_submitted"
+      : wasSubmitted
+        ? "onboarding_customer_updated"
       : section === defaultOnboardingStep
         ? "onboarding_started"
         : "onboarding_step_completed";
@@ -231,8 +263,16 @@ export async function saveOnboardingSection({
       eventName,
       targetType: "organization_onboarding",
       targetId: section,
-      metadata: { section, completionPercent },
+      metadata: { section, completionPercent, submittedByUserId },
     });
+
+    if (submit) {
+      await ensureLaunchStatusStarted(organizationId);
+      await attemptOnboardingSubmittedNotification({
+        organizationId,
+        submittedByUserId,
+      });
+    }
 
     if (section === "mls_idx") {
       await recordCustomerAccountEvent({
@@ -256,6 +296,111 @@ export async function saveOnboardingSection({
   }
 
   return onboardingResult;
+}
+
+async function ensureLaunchStatusStarted(organizationId: string) {
+  await supabaseAdminFetch<null>("organization_launch_status", {
+    method: "POST",
+    query: { on_conflict: "organization_id" },
+    body: {
+      organization_id: organizationId,
+      current_stage: "onboarding_received",
+      progress_percent: 10,
+      customer_status: "Onboarding received",
+      latest_update:
+        "Opzix has received your onboarding information and will review it.",
+      next_customer_action: "No action needed right now.",
+      updated_at: new Date().toISOString(),
+    },
+    prefer: "resolution=ignore-duplicates,returning=minimal",
+  });
+}
+
+async function attemptOnboardingSubmittedNotification({
+  organizationId,
+  submittedByUserId,
+}: {
+  organizationId: string;
+  submittedByUserId?: string;
+}) {
+  const [organizations, invitations, profiles] = await Promise.all([
+    supabaseAdminFetch<OrganizationRow[]>("organizations", {
+      query: {
+        select:
+          "id,name,slug,organization_type,timezone,status,created_at,updated_at",
+        id: `eq.${organizationId}`,
+        limit: 1,
+      },
+    }),
+    supabaseAdminFetch<{ first_name: string | null; last_name: string | null }[]>(
+      "organization_invitations",
+      {
+        query: {
+          select: "first_name,last_name",
+          organization_id: `eq.${organizationId}`,
+          order: "updated_at.desc",
+          limit: 1,
+        },
+      },
+    ),
+    submittedByUserId
+      ? supabaseAdminFetch<ProfileRow[]>("profiles", {
+          query: {
+            select:
+              "user_id,first_name,last_name,preferred_name,phone,avatar_url,timezone,created_at,updated_at",
+            user_id: `eq.${submittedByUserId}`,
+            limit: 1,
+          },
+        })
+      : Promise.resolve({ ok: true as const, data: [], status: 200 }),
+  ]);
+
+  const organization = organizations.ok ? organizations.data[0] : null;
+  if (!organization) return;
+
+  const profile = profiles.ok ? profiles.data[0] : null;
+  const invitation = invitations.ok ? invitations.data[0] : null;
+  const customerName =
+    profile?.preferred_name ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    [invitation?.first_name, invitation?.last_name].filter(Boolean).join(" ") ||
+    "A customer";
+
+  const result = await sendOnboardingSubmittedNotification({
+    organizationId,
+    organizationName: organization.name,
+    customerName,
+  });
+  await recordOnboardingNotificationResult({ organizationId, result });
+}
+
+export type OnboardingInformationRequest = {
+  id: string;
+  organization_id: string;
+  status: "open" | "resolved" | "cancelled";
+  requested_items: unknown;
+  message: string | null;
+  created_at: string;
+  resolved_at: string | null;
+};
+
+export async function listOpenOnboardingInformationRequests(
+  organizationId: string,
+) {
+  const result = await supabaseAdminFetch<OnboardingInformationRequest[]>(
+    "organization_onboarding_information_requests",
+    {
+      query: {
+        select:
+          "id,organization_id,status,requested_items,message,created_at,resolved_at",
+        organization_id: `eq.${organizationId}`,
+        status: "eq.open",
+        order: "created_at.desc",
+      },
+    },
+  );
+
+  return result.ok ? result.data : [];
 }
 
 export async function listCustomerOrganizations(): Promise<
@@ -291,7 +436,7 @@ export async function listCustomerOrganizations(): Promise<
         supabaseAdminFetch<OnboardingRow[]>("organization_onboarding", {
           query: {
             select:
-              "organization_id,current_step,completion_percent,status,submitted_at,reviewed_at,created_at,updated_at",
+              "organization_id,current_step,completion_percent,status,submitted_at,submitted_by_user_id,reviewed_at,created_at,updated_at",
             organization_id: `eq.${organization.id}`,
             limit: 1,
           },

@@ -17,6 +17,19 @@ import {
   onboardingSteps,
 } from "@/lib/customer-platform/onboarding";
 import {
+  fieldGroupsForStep,
+  type OnboardingFieldConfig,
+} from "@/lib/customer-platform/onboarding-schema";
+import {
+  isPreviewableImage,
+  listSignedOnboardingAssets,
+  removeOnboardingAsset,
+  uploadOnboardingAsset,
+  type OnboardingAssetType,
+  type SignedOnboardingAsset,
+} from "@/lib/customer-platform/onboarding-assets";
+import {
+  listOpenOnboardingInformationRequests,
   requireCustomerContext,
   saveOnboardingSection,
 } from "@/lib/customer-platform/store";
@@ -63,6 +76,13 @@ export default async function OnboardingPage({
   const feedback = feedbackFromParams(params);
   const mlsData = onboardingDataForStep(context.onboardingData, "mls_idx");
   const connectionData = onboardingDataForStep(context.onboardingData, "connections");
+  const informationRequests = await listOpenOnboardingInformationRequests(
+    context.organization.id,
+  );
+  const assets =
+    selectedStep === "brand"
+      ? await listSignedOnboardingAssets(context.organization.id)
+      : [];
 
   return (
     <div className="grid gap-6 lg:gap-8">
@@ -126,6 +146,50 @@ export default async function OnboardingPage({
         />
       </section>
 
+      {informationRequests.length ? (
+        <section className="rounded-xl border border-amber-300/35 bg-amber-400/10 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-100">
+            Action Needed
+          </p>
+          <h2 className="mt-2 text-xl font-bold text-primary">
+            Opzix needs a little more information to continue your launch.
+          </h2>
+          <div className="mt-4 grid gap-3">
+            {informationRequests.map((request) => {
+              const items = requestedItems(request.requested_items);
+              const targetStep = items[0]?.section ?? selectedStep;
+              return (
+                <div
+                  key={request.id}
+                  className="rounded-xl border border-amber-300/25 bg-dark-card/60 p-4"
+                >
+                  {request.message ? (
+                    <p className="text-sm leading-6 text-amber-50">
+                      {request.message}
+                    </p>
+                  ) : null}
+                  {items.length ? (
+                    <ul className="mt-3 grid gap-2 text-sm text-secondary">
+                      {items.map((item, index) => (
+                        <li key={`${request.id}-${index}`}>
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <Link
+                    href={`/app/onboarding?step=${targetStep}`}
+                    className="mt-4 inline-flex text-sm font-semibold text-brand-cyan"
+                  >
+                    Update requested information
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-6 xl:grid-cols-[20rem_minmax(0,1fr)]">
         <aside className="rounded-xl border border-dark-border bg-dark-card p-5 xl:sticky xl:top-32 xl:self-start">
           <h2 className="text-lg font-bold text-primary">Steps</h2>
@@ -172,7 +236,11 @@ export default async function OnboardingPage({
           ) : null}
           {feedback === "submitted" ? (
             <div className="mb-6 rounded-lg border border-brand-cyan/30 bg-brand-cyan/10 p-4 text-sm leading-6 text-brand-cyan">
-              Your onboarding details have been submitted for review.
+              <p className="font-bold text-primary">Onboarding submitted</p>
+              <p className="mt-1">
+                Opzix has received your information and will review it. Your
+                website launch progress and any next steps will appear here.
+              </p>
             </div>
           ) : null}
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
@@ -188,6 +256,7 @@ export default async function OnboardingPage({
             stepCode={selectedStep}
             data={data}
             feedback={feedback}
+            assets={assets.filter((asset) => asset.section === selectedStep)}
           />
         </article>
       </section>
@@ -226,41 +295,188 @@ function OnboardingStepForm({
   stepCode,
   data,
   feedback,
+  assets,
 }: {
   stepCode: OnboardingStepCode;
   data: Record<string, unknown>;
   feedback?: "saved" | "submitted" | "error";
+  assets: SignedOnboardingAsset[];
 }) {
   return (
-    <form action={saveStepAction} className="mt-8 grid gap-8">
-      <input type="hidden" name="section" value={stepCode} />
-      {fieldGroupsForStep(stepCode).map((group) => (
-        <section key={group.title} className="grid gap-5">
+    <div className="mt-8 grid gap-8">
+      {stepCode === "brand" ? <BrandAssetUploads assets={assets} /> : null}
+      <form action={saveStepAction} className="grid gap-8">
+        <input type="hidden" name="section" value={stepCode} />
+        {fieldGroupsForStep(stepCode).map((group) => (
+          <section key={group.title} className="grid gap-5">
+            <div>
+              <h3 className="text-lg font-bold text-primary">{group.title}</h3>
+              <p className="mt-1 text-sm leading-6 text-secondary">
+                {group.helper}
+              </p>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              {group.fields.map((field) => (
+                <FormField key={field.name} field={field} data={data} />
+              ))}
+            </div>
+          </section>
+        ))}
+        {stepCode === "mls_idx" ? (
+          <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
+            IDX activation is subject to applicable MLS, brokerage, attribution,
+            display, and licensing approval. Submitting onboarding does not
+            guarantee MLS approval.
+          </div>
+        ) : null}
+        {stepCode === "review" ? (
+          <input type="hidden" name="submit_onboarding" value="1" />
+        ) : null}
+        <OnboardingFormActions isReviewStep={stepCode === "review"} feedback={feedback} />
+      </form>
+    </div>
+  );
+}
+
+function BrandAssetUploads({ assets }: { assets: SignedOnboardingAsset[] }) {
+  const logo = assets.find((asset) => asset.asset_type === "logo");
+  const headshot = assets.find((asset) => asset.asset_type === "headshot");
+  const photos = assets.filter((asset) => asset.asset_type === "brand_photo");
+
+  return (
+    <section className="grid gap-5">
+      <div>
+        <h3 className="text-lg font-bold text-primary">Brand Assets</h3>
+        <p className="mt-1 text-sm leading-6 text-secondary">
+          Upload your logo, professional headshot, and additional brand photos
+          directly. Files are stored privately for your Opzix launch team.
+        </p>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AssetUploadCard
+          title="Logo"
+          helper="PNG, JPG, WEBP, or SVG. Replace anytime."
+          assetType="logo"
+          asset={logo}
+        />
+        <AssetUploadCard
+          title="Professional Headshot"
+          helper="Use a clear photo suitable for your website and profile."
+          assetType="headshot"
+          asset={headshot}
+        />
+      </div>
+      <div className="rounded-xl border border-dark-border bg-white/[0.025] p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="text-lg font-bold text-primary">{group.title}</h3>
+            <h4 className="font-bold text-primary">Additional Brand Photos</h4>
             <p className="mt-1 text-sm leading-6 text-secondary">
-              {group.helper}
+              Add website hero candidates, about imagery, community photos, or
+              marketing imagery.
             </p>
           </div>
-          <div className="grid gap-5 md:grid-cols-2">
-            {group.fields.map((field) => (
-              <FormField key={field.name} field={field} data={data} />
+          <form action={uploadBrandAssetAction} className="grid gap-2 md:w-72">
+            <input type="hidden" name="asset_type" value="brand_photo" />
+            <input
+              name="asset_file"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              required
+              className="text-sm text-secondary file:mr-3 file:rounded-full file:border-0 file:bg-brand-cyan file:px-4 file:py-2 file:text-sm file:font-semibold file:text-dark"
+            />
+            <button type="submit" className="btn btn-secondary min-h-10">
+              Upload Photo
+            </button>
+          </form>
+        </div>
+        {photos.length ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {photos.map((asset) => (
+              <AssetPreview key={asset.id} asset={asset} compact />
             ))}
           </div>
-        </section>
-      ))}
-      {stepCode === "mls_idx" ? (
-        <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
-          IDX activation is subject to applicable MLS, brokerage, attribution,
-          display, and licensing approval. Submitting onboarding does not
-          guarantee MLS approval.
-        </div>
+        ) : (
+          <p className="mt-4 text-sm text-muted">No additional photos uploaded yet.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AssetUploadCard({
+  title,
+  helper,
+  assetType,
+  asset,
+}: {
+  title: string;
+  helper: string;
+  assetType: OnboardingAssetType;
+  asset?: SignedOnboardingAsset;
+}) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-white/[0.025] p-4">
+      <h4 className="font-bold text-primary">{title}</h4>
+      <p className="mt-1 text-sm leading-6 text-secondary">{helper}</p>
+      {asset ? <AssetPreview asset={asset} /> : null}
+      <form action={uploadBrandAssetAction} className="mt-4 grid gap-2">
+        <input type="hidden" name="asset_type" value={assetType} />
+        <input
+          name="asset_file"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          required
+          className="text-sm text-secondary file:mr-3 file:rounded-full file:border-0 file:bg-brand-cyan file:px-4 file:py-2 file:text-sm file:font-semibold file:text-dark"
+        />
+        <button type="submit" className="btn btn-secondary min-h-10">
+          {asset ? "Replace" : "Upload"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function AssetPreview({
+  asset,
+  compact = false,
+}: {
+  asset: SignedOnboardingAsset;
+  compact?: boolean;
+}) {
+  return (
+    <div className="mt-3 rounded-lg border border-dark-border bg-dark-deep p-3">
+      {asset.viewUrl && isPreviewableImage(asset.mime_type) ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={asset.viewUrl}
+          alt=""
+          className={`w-full rounded-md border border-dark-border object-contain ${
+            compact ? "max-h-32" : "max-h-48"
+          }`}
+        />
       ) : null}
-      {stepCode === "review" ? (
-        <input type="hidden" name="submit_onboarding" value="1" />
-      ) : null}
-      <OnboardingFormActions isReviewStep={stepCode === "review"} feedback={feedback} />
-    </form>
+      <p className="mt-2 truncate text-sm font-semibold text-primary">
+        {asset.filename ?? "Uploaded file"}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-3 text-sm">
+        {asset.viewUrl ? (
+          <a href={asset.viewUrl} target="_blank" className="font-semibold text-brand-cyan">
+            View
+          </a>
+        ) : null}
+        {asset.downloadUrl ? (
+          <a href={asset.downloadUrl} className="font-semibold text-brand-cyan">
+            Download
+          </a>
+        ) : null}
+        <form action={removeBrandAssetAction}>
+          <input type="hidden" name="asset_id" value={asset.id} />
+          <button type="submit" className="font-semibold text-amber-100">
+            Remove
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -268,7 +484,7 @@ function FormField({
   field,
   data,
 }: {
-  field: FormFieldConfig;
+  field: OnboardingFieldConfig;
   data: Record<string, unknown>;
 }) {
   const className =
@@ -320,6 +536,7 @@ async function saveStepAction(formData: FormData) {
   const submit = stringField(formData, "submit_onboarding") === "1" && !saveForLater;
   const result = await saveOnboardingSection({
     organizationId: context.organization.id,
+    submittedByUserId: context.user.id,
     section,
     data,
     submit,
@@ -346,6 +563,59 @@ async function saveStepAction(formData: FormData) {
       ? "/app/onboarding?step=review&submitted=1"
       : `/app/onboarding?step=${nextOnboardingStep(section)}&saved=1`,
   );
+}
+
+async function uploadBrandAssetAction(formData: FormData) {
+  "use server";
+
+  const context = await requireCustomerContext();
+  const assetType = stringField(formData, "asset_type");
+  const file = formData.get("asset_file");
+
+  if (!isBrandAssetType(assetType) || !(file instanceof File)) {
+    redirect(
+      `/app/onboarding?step=brand&error=${encodeURIComponent(
+        "Choose a supported image file.",
+      )}`,
+    );
+  }
+
+  const result = await uploadOnboardingAsset({
+    organizationId: context.organization.id,
+    userId: context.user.id,
+    assetType,
+    file,
+  });
+
+  if (!result.ok) {
+    redirect(
+      `/app/onboarding?step=brand&error=${encodeURIComponent(result.error)}`,
+    );
+  }
+
+  redirect("/app/onboarding?step=brand&saved=1");
+}
+
+async function removeBrandAssetAction(formData: FormData) {
+  "use server";
+
+  const context = await requireCustomerContext();
+  const assetId = stringField(formData, "asset_id");
+  if (!isUuid(assetId)) {
+    redirect("/app/onboarding?step=brand&error=asset");
+  }
+
+  const result = await removeOnboardingAsset({
+    organizationId: context.organization.id,
+    assetId,
+  });
+  if (!result.ok) {
+    redirect(
+      `/app/onboarding?step=brand&error=${encodeURIComponent(result.error)}`,
+    );
+  }
+
+  redirect("/app/onboarding?step=brand&saved=1");
 }
 
 async function saveAccountProfileFields({
@@ -385,138 +655,6 @@ async function saveAccountProfileFields({
       },
       prefer: "returning=minimal",
     });
-  }
-}
-
-type FormFieldConfig = {
-  name: string;
-  label: string;
-  type: string;
-};
-
-type FormFieldGroup = {
-  title: string;
-  helper: string;
-  fields: FormFieldConfig[];
-};
-
-function fieldGroupsForStep(stepCode: OnboardingStepCode): FormFieldGroup[] {
-  switch (stepCode) {
-    case "account":
-      return [{
-        title: "Your Account",
-        helper: "Confirm how we should address you and which timezone should shape your launch schedule.",
-        fields: [
-          { name: "preferred_name", label: "Preferred name", type: "text" },
-          { name: "timezone", label: "Timezone", type: "text" },
-          { name: "phone", label: "Phone", type: "tel" },
-        ],
-      }];
-    case "business":
-      return [
-        {
-          title: "Your Business",
-          helper: "Tell us the business structure and licensing context for your platform.",
-          fields: [
-            { name: "business_type", label: "Business type", type: "text" },
-            { name: "brokerage_name", label: "Brokerage name", type: "text" },
-            { name: "license_state", label: "License state", type: "text" },
-            { name: "years_in_business", label: "Years in business", type: "text" },
-            { name: "team_size", label: "Team size", type: "text" },
-          ],
-        },
-        {
-          title: "Your Market",
-          helper: "Share the markets and communities your launch experience should emphasize.",
-          fields: [
-            { name: "primary_market", label: "Primary market", type: "text" },
-            { name: "service_areas", label: "Service areas", type: "textarea" },
-          ],
-        },
-        {
-          title: "Your Current Tools",
-          helper: "Help us understand what you already use so launch setup can fit your workflow.",
-          fields: [
-            { name: "current_website_url", label: "Current website", type: "url" },
-            { name: "current_crm", label: "Current CRM", type: "text" },
-          ],
-        },
-        {
-          title: "Your Goals",
-          helper: "Tell us what outcomes should guide the first version of your Opzix platform.",
-          fields: [
-            { name: "primary_goals", label: "Primary goals", type: "textarea" },
-          ],
-        },
-      ];
-    case "brand":
-      return [{
-        title: "Brand Details",
-        helper: "Share the public-facing assets and details your launch team should prepare.",
-        fields: [
-          { name: "logo_status", label: "Logo upload status or link", type: "text" },
-          { name: "headshot_status", label: "Headshot upload status or link", type: "text" },
-          { name: "brand_colors", label: "Brand colors", type: "text" },
-          { name: "biography", label: "Biography", type: "textarea" },
-          { name: "business_phone", label: "Business phone", type: "tel" },
-          { name: "public_email", label: "Public email", type: "email" },
-          { name: "social_links", label: "Social links", type: "textarea" },
-          { name: "domain_details", label: "Domain details", type: "textarea" },
-        ],
-      }];
-    case "connections":
-      return [{
-        title: "Connected Tools",
-        helper: "Let us know which tools are ready, planned, or need launch-team help.",
-        fields: [
-          { name: "google_calendar_status", label: "Google Calendar status", type: "text" },
-          { name: "email_provider_status", label: "Email provider status", type: "text" },
-          { name: "crm_status", label: "Current CRM connection status", type: "text" },
-          { name: "google_business_status", label: "Google Business Profile interest/status", type: "text" },
-          { name: "google_ads_status", label: "Google Ads interest/status", type: "text" },
-          { name: "existing_website_status", label: "Existing website status", type: "text" },
-          { name: "domain_provider", label: "Domain provider", type: "text" },
-        ],
-      }];
-    case "mls_idx":
-      return [{
-        title: "MLS & IDX Setup",
-        helper: "Provide the details needed to begin IDX approval and configuration.",
-        fields: [
-          { name: "mls_organization", label: "MLS organization", type: "text" },
-          { name: "participant_name", label: "Participant or subscriber name", type: "text" },
-          { name: "brokerage", label: "Brokerage", type: "text" },
-          { name: "mls_identifier", label: "MLS identifier", type: "text" },
-          { name: "intended_domain", label: "Intended website domain", type: "text" },
-          { name: "approval_status", label: "Approval status", type: "text" },
-          { name: "authorization_references", label: "Authorization documents or references", type: "textarea" },
-        ],
-      }];
-    case "growth_goals":
-      return [{
-        title: "Growth Priorities",
-        helper: "Help us prioritize the tools and services that will matter most after launch.",
-        fields: [
-          { name: "buyer_leads", label: "Do you need more buyer leads?", type: "text" },
-          { name: "listings", label: "Do you want more listings?", type: "text" },
-          { name: "follow_up", label: "Are you losing leads because follow-up is inconsistent?", type: "text" },
-          { name: "local_visibility", label: "Do you want more local visibility?", type: "text" },
-          { name: "google_ads", label: "Are you interested in Google Ads?", type: "text" },
-          { name: "internal_ai", label: "Do you want an internal AI assistant?", type: "text" },
-          { name: "team_building", label: "Are you building a team?", type: "text" },
-          { name: "success_90_days", label: "What would make the platform successful in the next 90 days?", type: "textarea" },
-        ],
-      }];
-    case "review":
-      return [{
-        title: "Launch Review",
-        helper: "Confirm anything you want the Opzix team to review before launch.",
-        fields: [
-          { name: "requested_growth_services", label: "Requested growth services", type: "textarea" },
-          { name: "missing_fields", label: "Known incomplete fields", type: "textarea" },
-          { name: "next_steps", label: "Next steps to discuss with Opzix", type: "textarea" },
-        ],
-      }];
   }
 }
 
@@ -745,4 +883,38 @@ function customerFacingStringValue(value: unknown) {
 
 function stringRecordValue(value: string | string[] | undefined) {
   return typeof value === "string" ? value : "";
+}
+
+function isBrandAssetType(value: string): value is OnboardingAssetType {
+  return value === "logo" || value === "headshot" || value === "brand_photo";
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function requestedItems(value: unknown): Array<{
+  label: string;
+  section: OnboardingStepCode;
+}> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === "string") {
+        return { label: item, section: "review" as const };
+      }
+      if (typeof item !== "object" || item === null) return null;
+      const record = item as Record<string, unknown>;
+      const label = typeof record.label === "string" ? record.label : "";
+      const section = normalizeOnboardingStep(
+        typeof record.section === "string" ? record.section : "review",
+      );
+      return label ? { label, section } : null;
+    })
+    .filter(
+      (item): item is { label: string; section: OnboardingStepCode } =>
+        item !== null,
+    );
 }
