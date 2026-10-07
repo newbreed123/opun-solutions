@@ -3,6 +3,7 @@ import {
   supabaseAdminFetch,
   supabaseAdminRpc,
 } from "@/lib/supabase-admin";
+import { logCustomerInvitationActivationFailure } from "./activation-diagnostics";
 
 type CreateCustomerResult = {
   organization_id: string;
@@ -359,10 +360,27 @@ export async function activateCustomerInvitation({
     },
   );
   if (!result.ok || result.data !== true) {
+    const providerMessage = result.ok ? "" : result.error;
+    const code = /invalid api key/i.test(providerMessage)
+      ? "supabase_api_key_invalid"
+      : /invitation is not assigned|invitation cannot be linked/i.test(
+            providerMessage,
+          ) || (result.ok && result.data !== true)
+        ? "invitation_record_invalid"
+        : "membership_activation_failed";
+    logCustomerInvitationActivationFailure({
+      stage: "membership_activation",
+      method: "POST",
+      endpoint: "/rest/v1/rpc/activate_customer_invitation",
+      status: result.status,
+      diagnosticCode: code,
+      keySource: "SUPABASE_SERVICE_ROLE_KEY",
+      urlSource: "SUPABASE_URL",
+    });
     return {
       ok: false as const,
       error:
-        "This invitation could not be linked to the authenticated account. Contact Opzix support or request a new invitation.",
+        "Account activation could not be completed. Contact Opzix support.",
     };
   }
   return { ok: true as const };

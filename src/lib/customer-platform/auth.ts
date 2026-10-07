@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdminConfig } from "@/lib/supabase-admin";
+import { logCustomerInvitationActivationFailure } from "./activation-diagnostics";
+import type { ActivationDiagnosticCode } from "./activation-diagnostics";
 import { activateCustomerInvitation } from "./admin-invitations";
 import type { CustomerUser } from "./types";
 
@@ -10,6 +12,8 @@ const REFRESH_COOKIE = "opzix_customer_refresh_token";
 type SupabaseAuthConfig = {
   url: string;
   anonKey: string;
+  urlSource: "SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_URL";
+  keySource: "SUPABASE_ANON_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY";
 };
 
 type SupabaseAuthSession = {
@@ -29,30 +33,54 @@ type SupabaseAuthUserResponse = {
   user_metadata?: Record<string, unknown>;
 };
 
+type AuthFailure = {
+  status: number | null;
+  code: ActivationDiagnosticCode;
+  message: string;
+};
+
 export function getSupabaseAuthConfig(): SupabaseAuthConfig | null {
   const adminConfig = getSupabaseAdminConfig();
-  const url =
-    process.env.SUPABASE_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
-    adminConfig?.url;
-  const anonKey =
-    process.env.SUPABASE_ANON_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const configuredUrl = process.env.SUPABASE_URL?.trim();
+  const publicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const configuredAnonKey = process.env.SUPABASE_ANON_KEY?.trim();
+  const publicAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const url = configuredUrl || publicUrl || adminConfig?.url;
+  const anonKey = configuredAnonKey || publicAnonKey;
 
   if (!url || !anonKey) return null;
 
   return {
     url: url.replace(/\/$/, ""),
     anonKey,
+    urlSource: configuredUrl
+      ? "SUPABASE_URL"
+      : publicUrl
+        ? "NEXT_PUBLIC_SUPABASE_URL"
+        : "SUPABASE_URL",
+    keySource: configuredAnonKey
+      ? "SUPABASE_ANON_KEY"
+      : "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   };
 }
 
 export async function signInWithPassword(email: string, password: string) {
   const config = getSupabaseAuthConfig();
   if (!config) {
+    console.warn({
+      event: "customer_sign_in_failed",
+      stage: "password_sign_in",
+      method: "POST",
+      endpoint: "/auth/v1/token",
+      status: null,
+      diagnosticCode: "supabase_config_missing",
+      keySource: configuredAuthKeySource(),
+      urlSource: configuredAuthUrlSource(),
+    });
     return {
       ok: false as const,
-      error: "Supabase Auth environment variables are not configured.",
+      error:
+        "Account activation is temporarily unavailable. Contact Opzix support.",
     };
   }
 
@@ -122,6 +150,15 @@ export async function verifyInviteToken({
 }) {
   const config = getSupabaseAuthConfig();
   if (!config) {
+    logCustomerInvitationActivationFailure({
+      stage: "token_verification",
+      method: "POST",
+      endpoint: "/auth/v1/verify",
+      status: null,
+      diagnosticCode: "supabase_config_missing",
+      keySource: configuredAuthKeySource(),
+      urlSource: configuredAuthUrlSource(),
+    });
     return {
       ok: false as const,
       error: "Supabase Auth environment variables are not configured.",
@@ -134,12 +171,14 @@ export async function verifyInviteToken({
     body: JSON.stringify({ type: verificationType, token_hash: tokenHash }),
   }).catch(() => null);
   if (!verified) {
-    console.warn("customer_invitation_verification_failed", {
+    logCustomerInvitationActivationFailure({
       stage: "token_verification",
-      verificationType,
+      method: "POST",
+      endpoint: "/auth/v1/verify",
       status: null,
-      code: "auth_transport_error",
-      message: "Supabase Auth request failed before a response was received.",
+      diagnosticCode: "auth_transport_error",
+      urlSource: config.urlSource,
+      keySource: config.keySource,
     });
     return {
       ok: false as const,
@@ -154,19 +193,30 @@ export async function verifyInviteToken({
   if (!verified.ok || !("access_token" in session)) {
     const failure = invitationVerificationFailure(
       verified.status,
-      verificationType,
       session,
     );
-    console.warn("customer_invitation_verification_failed", failure);
+    logCustomerInvitationActivationFailure({
+      stage: "token_verification",
+      method: "POST",
+      endpoint: "/auth/v1/verify",
+      status: failure.status,
+      diagnosticCode: failure.code,
+      urlSource: config.urlSource,
+      keySource: config.keySource,
+    });
     return {
       ok: false as const,
-      error:
-        "The activation link could not be verified. Ask Opzix to send a fresh link.",
+      error: failure.code === "supabase_api_key_invalid"
+        ? "Account activation is temporarily unavailable. Contact Opzix support."
+        : failure.code === "invite_token_expired"
+          ? "This activation link has expired. Ask Opzix to send a fresh link."
+          : "This activation link could not be verified. Ask Opzix to send a fresh link.",
     };
   }
 
   const verifiedSession = session as SupabaseAuthSession;
   let authUser = verifiedSession.user;
+  let authUserLookupStatus: number | null = null;
   if (!authUser?.id || !authUser.email) {
     const userResponse = await fetch(`${config.url}/auth/v1/user`, {
       method: "GET",
@@ -175,20 +225,46 @@ export async function verifyInviteToken({
         Authorization: `Bearer ${verifiedSession.access_token}`,
       },
       cache: "no-store",
-    }).catch((error: unknown) => authFetchError(error));
+    }).catch(() => null);
 
-    if (!("json" in userResponse) || !userResponse.ok) {
+    if (!userResponse || !userResponse.ok) {
+      const failure = userResponse
+        ? authRequestFailure(
+            userResponse.status,
+            await responsePayload(userResponse),
+          )
+        : authTransportFailure();
+      logCustomerInvitationActivationFailure({
+        stage: "auth_user_lookup",
+        method: "GET",
+        endpoint: "/auth/v1/user",
+        status: failure.status,
+        diagnosticCode: failure.code,
+        urlSource: config.urlSource,
+        keySource: config.keySource,
+      });
       return {
         ok: false as const,
-        error: "The verified customer account could not be loaded.",
+        error:
+          "Account activation is temporarily unavailable. Contact Opzix support.",
       };
     }
+    authUserLookupStatus = userResponse.status;
     authUser = (await userResponse.json().catch(() => ({}))) as
       | SupabaseAuthUserResponse
       | undefined;
   }
 
   if (!authUser?.id || !authUser.email) {
+    logCustomerInvitationActivationFailure({
+      stage: "auth_user_lookup",
+      method: "GET",
+      endpoint: "/auth/v1/user",
+      status: authUserLookupStatus,
+      diagnosticCode: "auth_request_failed",
+      urlSource: config.urlSource,
+      keySource: config.keySource,
+    });
     return {
       ok: false as const,
       error: "The verified customer account did not include an account identifier.",
@@ -203,6 +279,15 @@ export async function verifyInviteToken({
     verificationType === "invite" &&
     metadataInvitationId !== invitationId
   ) {
+    logCustomerInvitationActivationFailure({
+      stage: "invitation_validation",
+      method: "POST",
+      endpoint: "/rest/v1/rpc/activate_customer_invitation",
+      status: null,
+      diagnosticCode: "invitation_record_invalid",
+      urlSource: "SUPABASE_URL",
+      keySource: "SUPABASE_SERVICE_ROLE_KEY",
+    });
     return {
       ok: false as const,
       error: "This invitation link is not associated with the submitted invitation.",
@@ -216,15 +301,43 @@ export async function verifyInviteToken({
       Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify({ password }),
-  }).catch((error: unknown) => authFetchError(error));
+  }).catch(() => null);
 
-  if (!("json" in update)) return update;
-  const updatePayload = await update.json().catch(() => ({}));
-
-  if (!update.ok) {
+  if (!update) {
+    logCustomerInvitationActivationFailure({
+      stage: "password_update",
+      method: "PUT",
+      endpoint: "/auth/v1/user",
+      status: null,
+      diagnosticCode: "auth_transport_error",
+      urlSource: config.urlSource,
+      keySource: config.keySource,
+    });
     return {
       ok: false as const,
-      error: authErrorMessage(updatePayload) || "Password could not be saved.",
+      error:
+        "Account activation is temporarily unavailable. Contact Opzix support.",
+    };
+  }
+  const updatePayload = await responsePayload(update);
+
+  if (!update.ok) {
+    const failure = authRequestFailure(update.status, updatePayload);
+    logCustomerInvitationActivationFailure({
+      stage: "password_update",
+      method: "PUT",
+      endpoint: "/auth/v1/user",
+      status: failure.status,
+      diagnosticCode: failure.code,
+      urlSource: config.urlSource,
+      keySource: config.keySource,
+    });
+    return {
+      ok: false as const,
+      error:
+        failure.code === "supabase_api_key_invalid"
+          ? "Account activation is temporarily unavailable. Contact Opzix support."
+          : "The password could not be saved. Please try again or contact Opzix support.",
     };
   }
 
@@ -334,29 +447,116 @@ function authErrorMessage(payload: unknown) {
 
 function invitationVerificationFailure(
   status: number,
-  verificationType: "invite" | "magiclink",
   payload: unknown,
-) {
-  const record =
-    typeof payload === "object" && payload !== null
-      ? (payload as Record<string, unknown>)
-      : {};
-  const candidate = record.error_code ?? record.code;
-  const code =
-    typeof candidate === "string" && /^[a-z0-9_-]{1,80}$/i.test(candidate)
-      ? candidate
-      : "auth_verification_failed";
+): AuthFailure {
+  const failure = authRequestFailure(status, payload);
+  const code = failure.code;
   const message =
-    code === "otp_expired"
-      ? "Supabase rejected the one-time token as expired or already used."
-      : "Supabase rejected one-time token verification.";
+    code === "supabase_api_key_invalid"
+      ? "Supabase rejected the configured API key."
+      : code === "invite_token_expired"
+        ? "Supabase rejected the invitation token as expired or already used."
+        : code === "invite_token_invalid"
+          ? "Supabase rejected the invitation token."
+          : failure.message;
   return {
-    stage: "token_verification",
-    verificationType,
     status,
     code,
     message,
   };
+}
+
+function authRequestFailure(status: number, payload: unknown): AuthFailure {
+  const record =
+    typeof payload === "object" && payload !== null
+      ? (payload as Record<string, unknown>)
+      : {};
+  const candidate = record.error_code ?? record.code ?? record.name;
+  const upstreamCode =
+    typeof candidate === "string" && /^[a-z0-9_-]{1,80}$/i.test(candidate)
+      ? candidate.toLowerCase()
+      : "";
+  const upstreamMessage = [
+    record.message,
+    record.msg,
+    record.error_description,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+
+  if (
+    upstreamCode === "invalid_api_key" ||
+    /invalid api key/i.test(upstreamMessage)
+  ) {
+    return {
+      status,
+      code: "supabase_api_key_invalid",
+      message: "Supabase rejected the configured API key.",
+    };
+  }
+  if (
+    upstreamCode === "otp_expired" ||
+    upstreamCode === "token_expired"
+  ) {
+    return {
+      status,
+      code: "invite_token_expired",
+      message: "Supabase rejected the invitation token as expired or already used.",
+    };
+  }
+  if (
+    upstreamCode === "invalid_token" ||
+    upstreamCode === "otp_not_found" ||
+    /invalid.*(token|link)|token.*invalid/i.test(upstreamMessage)
+  ) {
+    return {
+      status,
+      code: "invite_token_invalid",
+      message: "Supabase rejected the invitation token.",
+    };
+  }
+  return {
+    status,
+    code: "auth_request_failed",
+    message: "Supabase rejected the authentication request.",
+  };
+}
+
+async function responsePayload(response: Response) {
+  return (await response.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+}
+
+function authTransportFailure(): AuthFailure {
+  return {
+    status: null,
+    code: "auth_transport_error",
+    message: "Supabase Auth request failed before a response was received.",
+  };
+}
+
+function configuredAuthKeySource():
+  | "SUPABASE_ANON_KEY"
+  | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+  | null {
+  if (process.env.SUPABASE_ANON_KEY?.trim()) return "SUPABASE_ANON_KEY";
+  if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()) {
+    return "NEXT_PUBLIC_SUPABASE_ANON_KEY";
+  }
+  return null;
+}
+
+function configuredAuthUrlSource():
+  | "SUPABASE_URL"
+  | "NEXT_PUBLIC_SUPABASE_URL"
+  | null {
+  if (process.env.SUPABASE_URL?.trim()) return "SUPABASE_URL";
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()) {
+    return "NEXT_PUBLIC_SUPABASE_URL";
+  }
+  return null;
 }
 
 function siteUrl() {
