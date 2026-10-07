@@ -1,12 +1,14 @@
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getPasswordRecoveryRedirectConfig,
+  PRODUCTION_PASSWORD_RECOVERY_REDIRECT,
+} from "@/lib/customer-platform/password-recovery-redirect";
 
 export const dynamic = "force-dynamic";
 
 const EXPECTED_SUPABASE_PROJECT_REF = "qskrnivgfmymvtuaefmt";
 const EXPECTED_SUPABASE_HOST = `${EXPECTED_SUPABASE_PROJECT_REF}.supabase.co`;
-const EXPECTED_PASSWORD_RESET_REDIRECT =
-  "https://opzix.io/accept-invite?mode=recovery";
 
 type EnvName =
   | "SUPABASE_URL"
@@ -65,11 +67,13 @@ export async function GET(request: NextRequest) {
       keySource: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     }),
   ]);
+  const passwordResetRedirect = describePasswordResetRedirect();
 
   return NextResponse.json({
     ok:
       Boolean(selectedUrl) &&
       Boolean(selectedKeySource) &&
+      passwordResetRedirect.ok &&
       (selectedKeySource === "SUPABASE_ANON_KEY"
         ? serverAnonHealth.valid === true
         : publicAnonHealth.valid === true),
@@ -103,7 +107,7 @@ export async function GET(request: NextRequest) {
       SUPABASE_ANON_KEY: serverAnonHealth,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: publicAnonHealth,
     },
-    passwordResetRedirect: describePasswordResetRedirect(),
+    passwordResetRedirect,
     hint:
       "This endpoint performs read-only GET /auth/v1/settings checks and does not send email, create customers, or change authentication state.",
   });
@@ -272,49 +276,20 @@ function authHealthFailure(status: number, payload: Record<string, unknown>) {
 }
 
 function describePasswordResetRedirect() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "";
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "";
-  const base = siteUrl || appUrl || "";
-  const source = siteUrl
-    ? "NEXT_PUBLIC_SITE_URL"
-    : appUrl
-      ? "NEXT_PUBLIC_APP_URL"
-      : null;
-  const isProduction =
-    process.env.NODE_ENV === "production" ||
-    process.env.VERCEL_ENV === "production";
-  const configured = base
-    ? `${base.replace(/\/$/, "")}/accept-invite?mode=recovery`
-    : isProduction
-      ? ""
-      : "http://localhost:3000/accept-invite?mode=recovery";
+  const config = getPasswordRecoveryRedirectConfig();
 
-  try {
-    const url = new URL(configured);
-    return {
-      source,
-      configured,
-      expectedProduction: EXPECTED_PASSWORD_RESET_REDIRECT,
-      host: url.host,
-      pathname: url.pathname,
-      search: url.search,
-      usesLocalhost: url.hostname === "localhost" || url.hostname === "127.0.0.1",
-      productionSafe:
-        !isProduction ||
-        configured === EXPECTED_PASSWORD_RESET_REDIRECT,
-    };
-  } catch {
-    return {
-      source,
-      configured: configured || null,
-      expectedProduction: EXPECTED_PASSWORD_RESET_REDIRECT,
-      host: null,
-      pathname: null,
-      search: null,
-      usesLocalhost: false,
-      productionSafe: false,
-    };
-  }
+  return {
+    ok: config.ok,
+    source: config.source,
+    configured: config.ok ? config.url : config.configured,
+    expectedProduction: PRODUCTION_PASSWORD_RECOVERY_REDIRECT,
+    host: config.host,
+    pathname: config.pathname,
+    search: config.search,
+    usesLocalhost: config.usesLocalhost,
+    productionSafe: config.productionSafe,
+    error: config.ok ? null : config.error,
+  };
 }
 
 function keyKind(value: string, jwtRole: string | null) {

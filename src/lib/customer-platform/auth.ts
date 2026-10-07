@@ -14,6 +14,7 @@ import {
   activateCustomerInvitation,
   validateCustomerInvitationForActivation,
 } from "./admin-invitations";
+import { getPasswordRecoveryRedirectConfig } from "./password-recovery-redirect";
 import type { CustomerUser } from "./types";
 
 const ACCESS_COOKIE = "opzix_customer_access_token";
@@ -141,14 +142,14 @@ export async function requestPasswordReset(email: string) {
     };
   }
 
-  const redirect = passwordResetRedirect();
+  const redirect = getPasswordRecoveryRedirectConfig();
   if (!redirect.ok) {
     logCustomerAuthFailure({
       stage: "password_recovery",
       method: "POST",
       endpoint: "/auth/v1/recover",
       status: null,
-      diagnosticCode: "supabase_config_missing",
+      diagnosticCode: redirect.code,
       keySource: config.keySource,
       urlSource: config.urlSource,
       requestMetadata: {
@@ -156,7 +157,7 @@ export async function requestPasswordReset(email: string) {
         sameSupabaseHost: isExpectedSupabaseHost(config.url),
         redirectHost: redirect.host,
         redirectPathname: redirect.pathname,
-        normalizedDiagnosticCode: "supabase_config_missing",
+        normalizedDiagnosticCode: redirect.code,
       },
     });
     return {
@@ -166,10 +167,12 @@ export async function requestPasswordReset(email: string) {
     };
   }
 
-  const response = await fetch(`${config.url}/auth/v1/recover`, {
+  const endpoint = new URL(`${config.url}/auth/v1/recover`);
+  endpoint.searchParams.set("redirect_to", redirect.url);
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: authHeaders(config.anonKey),
-    body: JSON.stringify({ email, redirect_to: redirect.url }),
+    body: JSON.stringify({ email }),
   }).catch((error: unknown) => authFetchError(error));
 
   if (!("json" in response)) {
@@ -229,6 +232,116 @@ export async function requestPasswordReset(email: string) {
         ? "Password reset is temporarily unavailable. Contact Opzix support."
         : "Password reset request failed.",
   };
+}
+
+export async function resetRecoveredPassword({
+  accessToken,
+  password,
+}: {
+  accessToken: string;
+  password: string;
+}) {
+  const config = getSupabaseAuthConfig();
+  if (!config) {
+    logCustomerAuthFailure({
+      stage: "password_recovery_update",
+      method: "PUT",
+      endpoint: "/auth/v1/user",
+      status: null,
+      diagnosticCode: "supabase_config_missing",
+      keySource: configuredAuthKeySource(),
+      urlSource: configuredAuthUrlSource(),
+    });
+    return {
+      ok: false as const,
+      error:
+        "Password reset is temporarily unavailable. Contact Opzix support.",
+    };
+  }
+
+  if (!looksLikeJwt(accessToken)) {
+    logCustomerAuthFailure({
+      stage: "password_recovery_update",
+      method: "PUT",
+      endpoint: "/auth/v1/user",
+      status: null,
+      diagnosticCode: "password_recovery_token_invalid",
+      keySource: config.keySource,
+      urlSource: config.urlSource,
+      requestMetadata: {
+        apiKeySource: config.keySource,
+        sameSupabaseHost: isExpectedSupabaseHost(config.url),
+        normalizedDiagnosticCode: "password_recovery_token_invalid",
+      },
+    });
+    return {
+      ok: false as const,
+      error:
+        "This password reset link could not be verified. Request a fresh reset email.",
+    };
+  }
+
+  const response = await fetch(`${config.url}/auth/v1/user`, {
+    method: "PUT",
+    headers: {
+      ...authHeaders(config.anonKey),
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ password }),
+  }).catch(() => null);
+
+  if (!response) {
+    logCustomerAuthFailure({
+      stage: "password_recovery_update",
+      method: "PUT",
+      endpoint: "/auth/v1/user",
+      status: null,
+      diagnosticCode: "auth_transport_error",
+      keySource: config.keySource,
+      urlSource: config.urlSource,
+      requestMetadata: {
+        apiKeySource: config.keySource,
+        sameSupabaseHost: isExpectedSupabaseHost(config.url),
+        normalizedDiagnosticCode: "auth_transport_error",
+      },
+    });
+    return {
+      ok: false as const,
+      error: "Password reset request failed.",
+    };
+  }
+
+  const payload = await responsePayload(response);
+  if (!response.ok) {
+    const failure = authRequestFailure(response.status, payload);
+    const diagnosticCode = recoveryUpdateDiagnosticCode(failure.code);
+    logCustomerAuthFailure({
+      stage: "password_recovery_update",
+      method: "PUT",
+      endpoint: "/auth/v1/user",
+      status: failure.status,
+      diagnosticCode,
+      keySource: config.keySource,
+      urlSource: config.urlSource,
+      requestMetadata: {
+        apiKeySource: config.keySource,
+        sameSupabaseHost: isExpectedSupabaseHost(config.url),
+        upstreamCode: failure.upstreamCode ?? null,
+        upstreamMessage: failure.upstreamMessage ?? null,
+        normalizedDiagnosticCode: diagnosticCode,
+      },
+    });
+    return {
+      ok: false as const,
+      error:
+        diagnosticCode === "supabase_api_key_invalid"
+          ? "Password reset is temporarily unavailable. Contact Opzix support."
+          : "This password reset link could not be verified. Request a fresh reset email.",
+    };
+  }
+
+  await clearCustomerSession();
+  return { ok: true as const };
 }
 
 export async function verifyInviteToken({
@@ -809,6 +922,15 @@ function authTransportFailure(): AuthFailure {
   };
 }
 
+function recoveryUpdateDiagnosticCode(
+  code: ActivationDiagnosticCode,
+): CustomerAuthDiagnosticCode {
+  if (code === "invite_token_expired") return "password_recovery_token_expired";
+  if (code === "invite_token_invalid") return "password_recovery_token_invalid";
+  if (code === "auth_request_failed") return "password_recovery_update_failed";
+  return code;
+}
+
 function configuredAuthKeySource():
   | "SUPABASE_ANON_KEY"
   | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
@@ -860,45 +982,4 @@ function safeAuthDiagnosticMessage(value: string) {
   if (/eyJ[a-z0-9_-]*\./i.test(message)) return null;
   if (/[a-z0-9_-]{32,}/i.test(message)) return null;
   return message;
-}
-
-function passwordResetRedirect() {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    "";
-  const isProduction =
-    process.env.NODE_ENV === "production" ||
-    process.env.VERCEL_ENV === "production";
-  const fallbackBase = isProduction ? "" : "http://localhost:3000";
-  const value = `${(base || fallbackBase).replace(/\/$/, "")}/accept-invite?mode=recovery`;
-
-  try {
-    const url = new URL(value);
-    const isValid =
-      url.pathname === "/accept-invite" &&
-      url.search === "?mode=recovery" &&
-      !url.hash &&
-      !url.username &&
-      !url.password &&
-      (!isProduction ||
-        (url.protocol === "https:" &&
-          url.hostname === "opzix.io" &&
-          url.host === "opzix.io"));
-
-    if (!isValid) throw new Error("invalid password reset redirect");
-
-    return {
-      ok: true as const,
-      url: value,
-      host: url.host,
-      pathname: url.pathname,
-    };
-  } catch {
-    return {
-      ok: false as const,
-      host: null,
-      pathname: null,
-    };
-  }
 }

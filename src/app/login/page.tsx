@@ -14,6 +14,7 @@ type LoginPageProps = {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = (await searchParams) ?? {};
   const error = stringParam(params.error);
+  const message = stringParam(params.message);
 
   return (
     <main className="min-h-screen bg-dark py-16 text-primary">
@@ -32,6 +33,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           {error ? (
             <div className="mt-5 rounded-xl border border-amber-300/35 bg-amber-400/10 p-3 text-sm text-amber-100">
               {loginErrorMessage(error)}
+            </div>
+          ) : null}
+          {message ? (
+            <div className="mt-5 rounded-xl border border-emerald-300/35 bg-emerald-400/10 p-3 text-sm text-emerald-100">
+              {decodeURIComponent(message)}
             </div>
           ) : null}
           <form action={loginAction} className="mt-6 grid gap-4">

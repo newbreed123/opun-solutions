@@ -15,6 +15,7 @@ Set these server-only production values:
   login and token verification
 - `OPZIX_ADMIN_PASSCODE`
 - `OPZIX_AUTH_REDIRECT_URL=https://opzix.io/accept-invite`
+- `OPZIX_PASSWORD_RECOVERY_REDIRECT_URL=https://opzix.io/accept-invite?mode=recovery`
 - `RESEND_API_KEY`
 - `OPZIX_AUTH_FROM_EMAIL` using a sender address on a verified Opzix domain
 
@@ -30,6 +31,8 @@ production customer delivery requires custom SMTP. In the Supabase dashboard:
 1. Set the Auth Site URL to `https://opzix.io`.
 2. Add the exact redirect URL `https://opzix.io/accept-invite` to the Auth
    redirect allowlist. Keep localhost URLs limited to development.
+   Password recovery also requires the exact redirect
+   `https://opzix.io/accept-invite?mode=recovery`.
 3. Enable custom SMTP using the Opzix/Resend transactional account:
    - Host: `smtp.resend.com`
    - Port: `465` (implicit TLS) or `587` (STARTTLS)

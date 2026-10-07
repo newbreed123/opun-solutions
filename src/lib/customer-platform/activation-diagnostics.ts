@@ -12,7 +12,12 @@ export type ActivationDiagnosticCode =
 
 export type CustomerAuthDiagnosticCode =
   | ActivationDiagnosticCode
-  | "password_recovery_failed";
+  | "password_recovery_failed"
+  | "password_recovery_redirect_invalid"
+  | "password_recovery_redirect_missing"
+  | "password_recovery_token_expired"
+  | "password_recovery_token_invalid"
+  | "password_recovery_update_failed";
 
 type ActivationDiagnostic = {
   stage:
@@ -56,8 +61,8 @@ type ActivationDiagnostic = {
 };
 
 type CustomerAuthDiagnostic = {
-  stage: "password_recovery";
-  method: "POST" | null;
+  stage: "password_recovery" | "password_recovery_update";
+  method: "POST" | "PUT" | null;
   endpoint: string;
   status: number | null;
   diagnosticCode: CustomerAuthDiagnosticCode;
