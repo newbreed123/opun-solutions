@@ -2,10 +2,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdminConfig } from "@/lib/supabase-admin";
 import {
+  logCustomerAuthFailure,
   logCustomerInvitationActivationEvent,
   logCustomerInvitationActivationFailure,
 } from "./activation-diagnostics";
-import type { ActivationDiagnosticCode } from "./activation-diagnostics";
+import type {
+  ActivationDiagnosticCode,
+  CustomerAuthDiagnosticCode,
+} from "./activation-diagnostics";
 import {
   activateCustomerInvitation,
   validateCustomerInvitationForActivation,
@@ -44,6 +48,7 @@ type AuthFailure = {
   code: ActivationDiagnosticCode;
   message: string;
   upstreamCode?: string | null;
+  upstreamMessage?: string | null;
 };
 
 export function getSupabaseAuthConfig(): SupabaseAuthConfig | null {
@@ -120,28 +125,110 @@ export async function signInWithPassword(email: string, password: string) {
 export async function requestPasswordReset(email: string) {
   const config = getSupabaseAuthConfig();
   if (!config) {
+    logCustomerAuthFailure({
+      stage: "password_recovery",
+      method: "POST",
+      endpoint: "/auth/v1/recover",
+      status: null,
+      diagnosticCode: "supabase_config_missing",
+      keySource: configuredAuthKeySource(),
+      urlSource: configuredAuthUrlSource(),
+    });
     return {
       ok: false as const,
-      error: "Supabase Auth environment variables are not configured.",
+      error:
+        "Password reset is temporarily unavailable. Contact Opzix support.",
     };
   }
 
-  const redirectTo = `${siteUrl()}/accept-invite?mode=recovery`;
+  const redirect = passwordResetRedirect();
+  if (!redirect.ok) {
+    logCustomerAuthFailure({
+      stage: "password_recovery",
+      method: "POST",
+      endpoint: "/auth/v1/recover",
+      status: null,
+      diagnosticCode: "supabase_config_missing",
+      keySource: config.keySource,
+      urlSource: config.urlSource,
+      requestMetadata: {
+        apiKeySource: config.keySource,
+        sameSupabaseHost: isExpectedSupabaseHost(config.url),
+        redirectHost: redirect.host,
+        redirectPathname: redirect.pathname,
+        normalizedDiagnosticCode: "supabase_config_missing",
+      },
+    });
+    return {
+      ok: false as const,
+      error:
+        "Password reset is temporarily unavailable. Contact Opzix support.",
+    };
+  }
+
   const response = await fetch(`${config.url}/auth/v1/recover`, {
     method: "POST",
     headers: authHeaders(config.anonKey),
-    body: JSON.stringify({ email, redirect_to: redirectTo }),
+    body: JSON.stringify({ email, redirect_to: redirect.url }),
   }).catch((error: unknown) => authFetchError(error));
 
-  if (!("json" in response)) return response;
-  const payload = await response.json().catch(() => ({}));
+  if (!("json" in response)) {
+    logCustomerAuthFailure({
+      stage: "password_recovery",
+      method: "POST",
+      endpoint: "/auth/v1/recover",
+      status: null,
+      diagnosticCode: "auth_transport_error",
+      keySource: config.keySource,
+      urlSource: config.urlSource,
+      requestMetadata: {
+        apiKeySource: config.keySource,
+        redirectHost: redirect.host,
+        redirectPathname: redirect.pathname,
+        sameSupabaseHost: isExpectedSupabaseHost(config.url),
+        normalizedDiagnosticCode: "auth_transport_error",
+      },
+    });
+    return {
+      ok: false as const,
+      error: "Password reset request failed.",
+    };
+  }
+  const payload = await responsePayload(response);
 
-  return response.ok
-    ? { ok: true as const }
-    : {
-        ok: false as const,
-        error: authErrorMessage(payload) || "Password reset request failed.",
-      };
+  if (response.ok) return { ok: true as const };
+
+  const failure = authRequestFailure(response.status, payload);
+  const diagnosticCode: CustomerAuthDiagnosticCode =
+    failure.code === "auth_request_failed"
+      ? "password_recovery_failed"
+      : failure.code;
+  logCustomerAuthFailure({
+    stage: "password_recovery",
+    method: "POST",
+    endpoint: "/auth/v1/recover",
+    status: failure.status,
+    diagnosticCode,
+    keySource: config.keySource,
+    urlSource: config.urlSource,
+    requestMetadata: {
+      apiKeySource: config.keySource,
+      redirectHost: redirect.host,
+      redirectPathname: redirect.pathname,
+      sameSupabaseHost: isExpectedSupabaseHost(config.url),
+      upstreamCode: failure.upstreamCode ?? null,
+      upstreamMessage: failure.upstreamMessage ?? null,
+      normalizedDiagnosticCode: diagnosticCode,
+    },
+  });
+
+  return {
+    ok: false as const,
+    error:
+      diagnosticCode === "supabase_api_key_invalid"
+        ? "Password reset is temporarily unavailable. Contact Opzix support."
+        : "Password reset request failed.",
+  };
 }
 
 export async function verifyInviteToken({
@@ -352,6 +439,7 @@ export async function verifyInviteToken({
         bearerSource: "service_role_key",
         sameSupabaseHost: isExpectedSupabaseHost(config.url),
         upstreamCode: passwordUpdate.upstreamCode,
+        upstreamMessage: passwordUpdate.upstreamMessage,
         normalizedDiagnosticCode: passwordUpdate.code,
       },
     });
@@ -391,6 +479,7 @@ export async function verifyInviteToken({
         bearerSource: "verified_access_token",
         sameSupabaseHost: isExpectedSupabaseHost(config.url),
         upstreamCode: postActivationSession.upstreamCode,
+        upstreamMessage: postActivationSession.upstreamMessage,
         normalizedDiagnosticCode: postActivationSession.code,
       },
     });
@@ -427,6 +516,7 @@ async function setVerifiedUserPassword(userId: string, password: string) {
       status: null,
       code: "supabase_config_missing" as const,
       upstreamCode: null,
+      upstreamMessage: null,
     };
   }
 
@@ -445,6 +535,7 @@ async function setVerifiedUserPassword(userId: string, password: string) {
       status: null,
       code: "auth_transport_error" as const,
       upstreamCode: null,
+      upstreamMessage: null,
     };
   }
 
@@ -456,6 +547,7 @@ async function setVerifiedUserPassword(userId: string, password: string) {
       status: failure.status,
       code: failure.code,
       upstreamCode: failure.upstreamCode ?? null,
+      upstreamMessage: failure.upstreamMessage ?? null,
     };
   }
 
@@ -488,6 +580,7 @@ async function establishPostActivationSession({
       status: null,
       code: "auth_transport_error" as const,
       upstreamCode: null,
+      upstreamMessage: null,
     };
   }
 
@@ -502,6 +595,7 @@ async function establishPostActivationSession({
           ? ("session_establishment_failed" as const)
           : failure.code,
       upstreamCode: failure.upstreamCode ?? null,
+      upstreamMessage: failure.upstreamMessage ?? null,
     };
   }
 
@@ -514,6 +608,7 @@ async function establishPostActivationSession({
       status: response.status,
       code: "session_establishment_failed" as const,
       upstreamCode: null,
+      upstreamMessage: null,
     };
   }
 
@@ -662,6 +757,7 @@ function authRequestFailure(status: number, payload: unknown): AuthFailure {
       code: "supabase_api_key_invalid",
       message: "Supabase rejected the configured API key.",
       upstreamCode,
+      upstreamMessage: safeAuthDiagnosticMessage(upstreamMessage),
     };
   }
   if (
@@ -673,6 +769,7 @@ function authRequestFailure(status: number, payload: unknown): AuthFailure {
       code: "invite_token_expired",
       message: "Supabase rejected the invitation token as expired or already used.",
       upstreamCode,
+      upstreamMessage: safeAuthDiagnosticMessage(upstreamMessage),
     };
   }
   if (
@@ -685,6 +782,7 @@ function authRequestFailure(status: number, payload: unknown): AuthFailure {
       code: "invite_token_invalid",
       message: "Supabase rejected the invitation token.",
       upstreamCode,
+      upstreamMessage: safeAuthDiagnosticMessage(upstreamMessage),
     };
   }
   return {
@@ -692,6 +790,7 @@ function authRequestFailure(status: number, payload: unknown): AuthFailure {
     code: "auth_request_failed",
     message: "Supabase rejected the authentication request.",
     upstreamCode: upstreamCode || null,
+    upstreamMessage: safeAuthDiagnosticMessage(upstreamMessage),
   };
 }
 
@@ -753,10 +852,53 @@ function isExpectedSupabaseHost(value: string) {
   }
 }
 
-function siteUrl() {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000"
-  );
+function safeAuthDiagnosticMessage(value: string) {
+  const message = value.trim().replace(/\s+/g, " ");
+  if (!message) return null;
+  if (message.length > 180) return null;
+  if (/@/.test(message)) return null;
+  if (/eyJ[a-z0-9_-]*\./i.test(message)) return null;
+  if (/[a-z0-9_-]{32,}/i.test(message)) return null;
+  return message;
+}
+
+function passwordResetRedirect() {
+  const base =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    "";
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production";
+  const fallbackBase = isProduction ? "" : "http://localhost:3000";
+  const value = `${(base || fallbackBase).replace(/\/$/, "")}/accept-invite?mode=recovery`;
+
+  try {
+    const url = new URL(value);
+    const isValid =
+      url.pathname === "/accept-invite" &&
+      url.search === "?mode=recovery" &&
+      !url.hash &&
+      !url.username &&
+      !url.password &&
+      (!isProduction ||
+        (url.protocol === "https:" &&
+          url.hostname === "opzix.io" &&
+          url.host === "opzix.io"));
+
+    if (!isValid) throw new Error("invalid password reset redirect");
+
+    return {
+      ok: true as const,
+      url: value,
+      host: url.host,
+      pathname: url.pathname,
+    };
+  } catch {
+    return {
+      ok: false as const,
+      host: null,
+      pathname: null,
+    };
+  }
 }
