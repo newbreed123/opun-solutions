@@ -1,4 +1,5 @@
 import { supabaseAdminFetch } from "@/lib/supabase-admin";
+import { opzixAuthFromAddress, opzixAuthSenderIdentity } from "./email-sender";
 
 type NotificationResult =
   | { ok: true; provider: "resend"; recipient: string; messageId?: string }
@@ -21,12 +22,10 @@ export async function sendOnboardingSubmittedNotification({
 }): Promise<NotificationResult> {
   const recipient = process.env.OPZIX_INTERNAL_NOTIFICATION_EMAIL?.trim() || "";
   const apiKey = process.env.RESEND_API_KEY?.trim() || "";
-  const from =
-    process.env.OPZIX_AUTH_FROM_EMAIL?.trim() ||
-    process.env.CONTACT_FROM_EMAIL?.trim() ||
-    "";
+  const fromAddress = opzixAuthFromAddress();
+  const from = opzixAuthSenderIdentity();
 
-  if (!recipient || !apiKey || !from) {
+  if (!recipient || !apiKey || !fromAddress) {
     return {
       ok: false,
       provider: "not-configured",

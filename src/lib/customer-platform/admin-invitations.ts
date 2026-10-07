@@ -4,6 +4,7 @@ import {
   supabaseAdminRpc,
 } from "@/lib/supabase-admin";
 import { logCustomerInvitationActivationFailure } from "./activation-diagnostics";
+import { opzixAuthFromAddress, opzixAuthSenderIdentity } from "./email-sender";
 
 type CreateCustomerResult = {
   organization_id: string;
@@ -613,8 +614,9 @@ async function sendResendInvitation({
   invitationId: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.OPZIX_AUTH_FROM_EMAIL?.trim();
-  if (!apiKey || !from) {
+  const fromAddress = opzixAuthFromAddress();
+  const from = opzixAuthSenderIdentity();
+  if (!apiKey || !fromAddress) {
     return {
       ok: false as const,
       code: "resend_not_configured",

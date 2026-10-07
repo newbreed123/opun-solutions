@@ -17,7 +17,9 @@ Set these server-only production values:
 - `OPZIX_AUTH_REDIRECT_URL=https://opzix.io/accept-invite`
 - `OPZIX_PASSWORD_RECOVERY_REDIRECT_URL=https://opzix.io/accept-invite?mode=recovery`
 - `RESEND_API_KEY`
-- `OPZIX_AUTH_FROM_EMAIL` using a sender address on a verified Opzix domain
+- `OPZIX_AUTH_FROM_EMAIL=hello@opzix.io` using a sender address on a verified
+  Opzix domain. Application-side Resend emails explicitly format this as
+  `Opzix <hello@opzix.io>`.
 
 The invite action fails closed when the redirect value is missing or incorrect.
 It never falls back to the public homepage.
@@ -39,7 +41,8 @@ production customer delivery requires custom SMTP. In the Supabase dashboard:
    - Username: `resend`
    - Password: the Resend SMTP credential/API key, stored only in the Supabase
      dashboard
-   - Sender name/address: Opzix and an address on a verified sending domain
+  - Sender name: `Opzix`
+  - Sender address: `hello@opzix.io`
 4. Configure the Supabase Auth **Invite user** email template:
    - Subject: `You're invited to Opzix`
    - Use the explicit production URL below rather than `.SiteURL` or
@@ -77,8 +80,12 @@ verification when the recipient sets a password.
 When Supabase reports that the email already has an Auth account, the resend
 path uses Supabase Auth Admin `generateLink` for a one-time magic link and
 delivers the concise invitation through the Resend API. That path requires
-`RESEND_API_KEY` and `OPZIX_AUTH_FROM_EMAIL`. SMTP credentials remain in the
-Supabase dashboard; no SMTP password is stored in this application.
+`RESEND_API_KEY` and `OPZIX_AUTH_FROM_EMAIL`. The application uses
+`OPZIX_AUTH_FROM_EMAIL` as the address only and constructs the customer-facing
+sender explicitly as `Opzix <hello@opzix.io>`; it does not derive the display
+name from the local-part. SMTP credentials and the Supabase Auth sender
+name/address remain in the Supabase dashboard; no SMTP password is stored in
+this application.
 
 Official setup references:
 
