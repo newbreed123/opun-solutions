@@ -8,6 +8,7 @@ import {
   MessageCircle,
   ShieldCheck,
 } from "lucide-react";
+import OnboardingAssetUploadForm from "@/components/customer/OnboardingAssetUploadForm";
 import OnboardingFormActions from "@/components/customer/OnboardingFormActions";
 import { customerGreeting } from "@/lib/customer-platform/greeting";
 import {
@@ -25,9 +26,12 @@ import {
   listSignedOnboardingAssets,
   removeOnboardingAsset,
   uploadOnboardingAsset,
-  type OnboardingAssetType,
   type SignedOnboardingAsset,
 } from "@/lib/customer-platform/onboarding-assets";
+import {
+  isOnboardingAssetType,
+  type OnboardingAssetType,
+} from "@/lib/customer-platform/onboarding-asset-policy";
 import {
   listOpenOnboardingInformationRequests,
   requireCustomerContext,
@@ -74,6 +78,7 @@ export default async function OnboardingPage({
   });
   const currentStepState = stepStates.find((item) => item.code === selectedStep);
   const feedback = feedbackFromParams(params);
+  const assetUploadFeedback = assetUploadFeedbackFromParams(params);
   const mlsData = onboardingDataForStep(context.onboardingData, "mls_idx");
   const connectionData = onboardingDataForStep(context.onboardingData, "connections");
   const informationRequests = await listOpenOnboardingInformationRequests(
@@ -256,6 +261,7 @@ export default async function OnboardingPage({
             stepCode={selectedStep}
             data={data}
             feedback={feedback}
+            assetUploadFeedback={assetUploadFeedback}
             assets={assets.filter((asset) => asset.section === selectedStep)}
           />
         </article>
@@ -295,16 +301,20 @@ function OnboardingStepForm({
   stepCode,
   data,
   feedback,
+  assetUploadFeedback,
   assets,
 }: {
   stepCode: OnboardingStepCode;
   data: Record<string, unknown>;
   feedback?: "saved" | "submitted" | "error";
+  assetUploadFeedback: AssetUploadFeedback | null;
   assets: SignedOnboardingAsset[];
 }) {
   return (
     <div className="mt-8 grid gap-8">
-      {stepCode === "brand" ? <BrandAssetUploads assets={assets} /> : null}
+      {stepCode === "brand" ? (
+        <BrandAssetUploads assets={assets} uploadFeedback={assetUploadFeedback} />
+      ) : null}
       <form action={saveStepAction} className="grid gap-8">
         <input type="hidden" name="section" value={stepCode} />
         {fieldGroupsForStep(stepCode).map((group) => (
@@ -338,10 +348,23 @@ function OnboardingStepForm({
   );
 }
 
-function BrandAssetUploads({ assets }: { assets: SignedOnboardingAsset[] }) {
+type AssetUploadFeedback = {
+  assetType: OnboardingAssetType;
+  message: string;
+};
+
+function BrandAssetUploads({
+  assets,
+  uploadFeedback,
+}: {
+  assets: SignedOnboardingAsset[];
+  uploadFeedback: AssetUploadFeedback | null;
+}) {
   const logo = assets.find((asset) => asset.asset_type === "logo");
   const headshot = assets.find((asset) => asset.asset_type === "headshot");
   const photos = assets.filter((asset) => asset.asset_type === "brand_photo");
+  const errorFor = (assetType: OnboardingAssetType) =>
+    uploadFeedback?.assetType === assetType ? uploadFeedback.message : null;
 
   return (
     <section className="grid gap-5">
@@ -358,12 +381,14 @@ function BrandAssetUploads({ assets }: { assets: SignedOnboardingAsset[] }) {
           helper="PNG, JPG, WEBP, or SVG. Replace anytime."
           assetType="logo"
           asset={logo}
+          uploadError={errorFor("logo")}
         />
         <AssetUploadCard
           title="Professional Headshot"
           helper="Use a clear photo suitable for your website and profile."
           assetType="headshot"
           asset={headshot}
+          uploadError={errorFor("headshot")}
         />
       </div>
       <div className="rounded-xl border border-dark-border bg-white/[0.025] p-4">
@@ -375,19 +400,13 @@ function BrandAssetUploads({ assets }: { assets: SignedOnboardingAsset[] }) {
               marketing imagery.
             </p>
           </div>
-          <form action={uploadBrandAssetAction} className="grid gap-2 md:w-72">
-            <input type="hidden" name="asset_type" value="brand_photo" />
-            <input
-              name="asset_file"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml"
-              required
-              className="text-sm text-secondary file:mr-3 file:rounded-full file:border-0 file:bg-brand-cyan file:px-4 file:py-2 file:text-sm file:font-semibold file:text-dark"
-            />
-            <button type="submit" className="btn btn-secondary min-h-10">
-              Upload Photo
-            </button>
-          </form>
+          <OnboardingAssetUploadForm
+            action={uploadBrandAssetAction}
+            assetType="brand_photo"
+            buttonLabel="Upload Photo"
+            className="grid gap-2 md:w-72"
+            serverError={errorFor("brand_photo")}
+          />
         </div>
         {photos.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -408,30 +427,25 @@ function AssetUploadCard({
   helper,
   assetType,
   asset,
+  uploadError,
 }: {
   title: string;
   helper: string;
   assetType: OnboardingAssetType;
   asset?: SignedOnboardingAsset;
+  uploadError: string | null;
 }) {
   return (
     <div className="rounded-xl border border-dark-border bg-white/[0.025] p-4">
       <h4 className="font-bold text-primary">{title}</h4>
       <p className="mt-1 text-sm leading-6 text-secondary">{helper}</p>
       {asset ? <AssetPreview asset={asset} /> : null}
-      <form action={uploadBrandAssetAction} className="mt-4 grid gap-2">
-        <input type="hidden" name="asset_type" value={assetType} />
-        <input
-          name="asset_file"
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/svg+xml"
-          required
-          className="text-sm text-secondary file:mr-3 file:rounded-full file:border-0 file:bg-brand-cyan file:px-4 file:py-2 file:text-sm file:font-semibold file:text-dark"
-        />
-        <button type="submit" className="btn btn-secondary min-h-10">
-          {asset ? "Replace" : "Upload"}
-        </button>
-      </form>
+      <OnboardingAssetUploadForm
+        action={uploadBrandAssetAction}
+        assetType={assetType}
+        buttonLabel={asset ? "Replace" : "Upload"}
+        serverError={uploadError}
+      />
     </div>
   );
 }
@@ -572,12 +586,16 @@ async function uploadBrandAssetAction(formData: FormData) {
   const assetType = stringField(formData, "asset_type");
   const file = formData.get("asset_file");
 
-  if (!isBrandAssetType(assetType) || !(file instanceof File)) {
+  if (!isOnboardingAssetType(assetType)) {
     redirect(
       `/app/onboarding?step=brand&error=${encodeURIComponent(
         "Choose a supported image file.",
       )}`,
     );
+  }
+
+  if (!(file instanceof File)) {
+    redirectAssetUploadError(assetType, "Choose a file to upload.");
   }
 
   const result = await uploadOnboardingAsset({
@@ -588,9 +606,7 @@ async function uploadBrandAssetAction(formData: FormData) {
   });
 
   if (!result.ok) {
-    redirect(
-      `/app/onboarding?step=brand&error=${encodeURIComponent(result.error)}`,
-    );
+    redirectAssetUploadError(assetType, customerAssetUploadError(result.error));
   }
 
   redirect("/app/onboarding?step=brand&saved=1");
@@ -834,6 +850,42 @@ function feedbackFromParams(
   return undefined;
 }
 
+function assetUploadFeedbackFromParams(
+  params: Record<string, string | string[] | undefined>,
+): AssetUploadFeedback | null {
+  const assetType = stringParam(params.asset_type);
+  const message = stringParam(params.asset_error);
+  if (!assetType || !message || !isOnboardingAssetType(assetType)) {
+    return null;
+  }
+  return {
+    assetType,
+    message: customerAssetUploadError(message),
+  };
+}
+
+function redirectAssetUploadError(
+  assetType: OnboardingAssetType,
+  message: string,
+): never {
+  redirect(
+    `/app/onboarding?step=brand&asset_type=${assetType}&asset_error=${encodeURIComponent(
+      customerAssetUploadError(message),
+    )}`,
+  );
+}
+
+function customerAssetUploadError(message: string) {
+  if (
+    message.startsWith("This image is too large.") ||
+    message.startsWith("This file type isn't supported.") ||
+    message.startsWith("Choose a file")
+  ) {
+    return message;
+  }
+  return "Upload failed. We couldn't upload this image. Please try again.";
+}
+
 function LaunchSupportCard() {
   return (
     <section className="rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
@@ -883,10 +935,6 @@ function customerFacingStringValue(value: unknown) {
 
 function stringRecordValue(value: string | string[] | undefined) {
   return typeof value === "string" ? value : "";
-}
-
-function isBrandAssetType(value: string): value is OnboardingAssetType {
-  return value === "logo" || value === "headshot" || value === "brand_photo";
 }
 
 function isUuid(value: string) {

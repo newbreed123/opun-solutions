@@ -1,9 +1,12 @@
 import { getSupabaseAdminConfig, supabaseAdminFetch } from "@/lib/supabase-admin";
+import {
+  extensionFromFilename,
+  type OnboardingAssetType,
+  validateOnboardingAssetFile,
+} from "./onboarding-asset-policy";
 import type { OnboardingStepCode } from "./types";
 
 export const CUSTOMER_ASSETS_BUCKET = "customer-assets";
-
-export type OnboardingAssetType = "logo" | "headshot" | "brand_photo";
 
 export type OnboardingAssetRow = {
   id: string;
@@ -24,15 +27,6 @@ export type SignedOnboardingAsset = OnboardingAssetRow & {
   viewUrl: string | null;
   downloadUrl: string | null;
 };
-
-const IMAGE_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/svg+xml",
-]);
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "svg"]);
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export async function listSignedOnboardingAssets(organizationId: string) {
   const result = await supabaseAdminFetch<OnboardingAssetRow[]>(
@@ -63,7 +57,7 @@ export async function uploadOnboardingAsset({
   assetType: OnboardingAssetType;
   file: File;
 }) {
-  const validation = validateImageFile(file);
+  const validation = validateOnboardingAssetFile(assetType, file);
   if (!validation.ok) return validation;
 
   const config = getSupabaseAdminConfig();
@@ -86,6 +80,14 @@ export async function uploadOnboardingAsset({
     assetDirectory(assetType),
     `${now.getTime()}-${crypto.randomUUID()}.${extension}`,
   ].join("/");
+
+  console.info("onboarding_asset_upload_attempt", {
+    assetType,
+    fileSizeBytes: file.size,
+    mimeType: file.type || "unknown",
+    pathPattern: `<organization-id>/brand/${assetDirectory(assetType)}/<generated-file>`,
+  });
+
   const upload = await uploadStorageObject({
     url: config.url,
     serviceRoleKey: config.serviceRoleKey,
@@ -93,7 +95,15 @@ export async function uploadOnboardingAsset({
     objectPath,
     file,
   });
-  if (!upload.ok) return upload;
+  if (!upload.ok) {
+    console.warn("onboarding_asset_storage_upload_failed", {
+      assetType,
+      fileSizeBytes: file.size,
+      mimeType: file.type || "unknown",
+      error: upload.error,
+    });
+    return upload;
+  }
 
   const inserted = await supabaseAdminFetch<null>(
     "organization_onboarding_assets",
@@ -114,7 +124,15 @@ export async function uploadOnboardingAsset({
       prefer: "returning=minimal",
     },
   );
-  if (!inserted.ok) return inserted;
+  if (!inserted.ok) {
+    console.warn("onboarding_asset_metadata_insert_failed", {
+      assetType,
+      fileSizeBytes: file.size,
+      mimeType: file.type || "unknown",
+      error: inserted.error,
+    });
+    return inserted;
+  }
 
   return { ok: true as const };
 }
@@ -302,23 +320,6 @@ async function createSignedStorageUrl(bucket: string, objectPath: string) {
     : `${config.url}/storage/v1${signedPath}`;
 }
 
-function validateImageFile(file: File) {
-  if (!file || file.size <= 0) {
-    return { ok: false as const, error: "Choose a file to upload." };
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return { ok: false as const, error: "Upload an image smaller than 8 MB." };
-  }
-  const extension = extensionFromFile(file);
-  if (!IMAGE_EXTENSIONS.has(extension) || !IMAGE_MIME_TYPES.has(file.type)) {
-    return {
-      ok: false as const,
-      error: "Upload a PNG, JPG, WEBP, or SVG image file.",
-    };
-  }
-  return { ok: true as const };
-}
-
 function assetDirectory(assetType: OnboardingAssetType) {
   switch (assetType) {
     case "logo":
@@ -331,9 +332,7 @@ function assetDirectory(assetType: OnboardingAssetType) {
 }
 
 function extensionFromFile(file: File) {
-  const extension = file.name.split(".").pop()?.toLowerCase() || "";
-  if (extension === "jpeg") return "jpg";
-  return extension;
+  return extensionFromFilename(file.name);
 }
 
 function safeFilename(value: string) {
