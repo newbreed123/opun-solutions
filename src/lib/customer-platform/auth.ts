@@ -369,15 +369,16 @@ export async function verifyInviteToken({
   if (!activation.ok) return activation;
 
   const postActivationSession = await establishPostActivationSession({
-    email: authUser.email,
-    password,
+    session: verifiedSession,
+    expectedUserId: authUser.id,
+    expectedEmail: authUser.email,
     config,
   });
   if (!postActivationSession.ok) {
     logCustomerInvitationActivationFailure({
       stage: "session_establishment",
-      method: "POST",
-      endpoint: "/auth/v1/token",
+      method: "GET",
+      endpoint: "/auth/v1/user",
       status: postActivationSession.status,
       diagnosticCode: postActivationSession.code,
       urlSource: config.urlSource,
@@ -385,7 +386,9 @@ export async function verifyInviteToken({
       requestMetadata: {
         ...verificationMetadata,
         hasApiKey: Boolean(config.anonKey),
+        hasAccessToken: true,
         apiKeySource: config.keySource,
+        bearerSource: "verified_access_token",
         sameSupabaseHost: isExpectedSupabaseHost(config.url),
         upstreamCode: postActivationSession.upstreamCode,
         normalizedDiagnosticCode: postActivationSession.code,
@@ -460,22 +463,24 @@ async function setVerifiedUserPassword(userId: string, password: string) {
 }
 
 async function establishPostActivationSession({
-  email,
-  password,
+  session,
+  expectedUserId,
+  expectedEmail,
   config,
 }: {
-  email: string;
-  password: string;
+  session: SupabaseAuthSession;
+  expectedUserId: string;
+  expectedEmail: string;
   config: SupabaseAuthConfig;
 }) {
-  const response = await fetch(
-    `${config.url}/auth/v1/token?grant_type=password`,
-    {
-      method: "POST",
-      headers: authHeaders(config.anonKey),
-      body: JSON.stringify({ email, password }),
+  const response = await fetch(`${config.url}/auth/v1/user`, {
+    method: "GET",
+    headers: {
+      ...authHeaders(config.anonKey),
+      Authorization: `Bearer ${session.access_token}`,
     },
-  ).catch(() => null);
+    cache: "no-store",
+  }).catch(() => null);
 
   if (!response) {
     return {
@@ -486,17 +491,9 @@ async function establishPostActivationSession({
     };
   }
 
-  const payload = (await responsePayload(response)) as
-    | SupabaseAuthSession
-    | Record<string, unknown>;
-  if (!response.ok || !("access_token" in payload)) {
-    const failure = response.ok
-      ? {
-          status: response.status,
-          code: "session_establishment_failed" as const,
-          upstreamCode: null,
-        }
-      : authRequestFailure(response.status, payload);
+  const payload = (await responsePayload(response)) as SupabaseAuthUserResponse;
+  if (!response.ok) {
+    const failure = authRequestFailure(response.status, payload);
     return {
       ok: false as const,
       status: failure.status,
@@ -508,7 +505,19 @@ async function establishPostActivationSession({
     };
   }
 
-  await persistAuthSession(payload as SupabaseAuthSession);
+  if (
+    payload.id !== expectedUserId ||
+    payload.email?.toLowerCase() !== expectedEmail.toLowerCase()
+  ) {
+    return {
+      ok: false as const,
+      status: response.status,
+      code: "session_establishment_failed" as const,
+      upstreamCode: null,
+    };
+  }
+
+  await persistAuthSession(session);
   return { ok: true as const };
 }
 
