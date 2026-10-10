@@ -5,8 +5,37 @@ import { revalidatePath } from "next/cache";
 import { AdminPasscodeForm } from "@/components/admin/AdminPasscodeForm";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
+import {
+  addBillingNote,
+  addInvoiceLineItem,
+  createDraftInvoice,
+  formatCurrency,
+  findSimilarInvoicePayments,
+  getOrganizationBillingSummary,
+  invoiceStatusLabel,
+  invoiceTypeLabel,
+  issueInvoice,
+  paymentMethodLabel,
+  recordInvoicePayment,
+  reverseInvoicePayment,
+  voidInvoice,
+  type InvoiceType,
+  type LineItemType,
+  type PaymentMethod,
+} from "@/lib/customer-platform/billing";
 import { sendCustomerInvitation } from "@/lib/customer-platform/admin-invitations";
 import { getCustomerAdminDetail } from "@/lib/customer-platform/admin-store";
+import {
+  DOCUMENT_ACCEPT,
+  archiveCustomerDocument,
+  createDocumentRequest,
+  documentCategoryLabel,
+  listCustomerDocuments,
+  listDocumentRequests,
+  uploadCustomerDocument,
+  type CustomerDocumentCategory,
+  type CustomerDocumentVisibility,
+} from "@/lib/customer-platform/documents";
 import {
   archiveCustomerOrganization,
   loadCustomerDeletionSummary,
@@ -34,6 +63,38 @@ type CustomerDetailPageProps = {
   params: Promise<{ organizationId: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const invoiceTypes: InvoiceType[] = [
+  "setup_fee",
+  "subscription",
+  "services",
+  "adjustment",
+  "other",
+];
+const lineItemTypes: LineItemType[] = [
+  "setup_fee",
+  "recurring_subscription",
+  "approved_service",
+  "adjustment",
+  "other",
+];
+const paymentMethods: PaymentMethod[] = [
+  "zelle",
+  "bank_transfer",
+  "check",
+  "cash",
+  "card_external",
+  "other",
+];
+const documentCategories: CustomerDocumentCategory[] = [
+  "agreements",
+  "invoices",
+  "receipts",
+  "brand_assets",
+  "mls_brokerage",
+  "business_documents",
+  "other",
+];
 
 export default async function CustomerDetailPage({
   params,
@@ -73,6 +134,14 @@ export default async function CustomerDetailPage({
   const launchProgress = await getOrganizationLaunchProgress(organizationId);
   const deletionSummary = await loadCustomerDeletionSummary(organizationId);
   const planOptions = await loadPlanOptions();
+  const [billing, documents, documentRequests] = await Promise.all([
+    getOrganizationBillingSummary({
+      organizationId,
+      includeInternalNotes: true,
+    }),
+    listCustomerDocuments({ organizationId, includeInternal: true, includeArchived: true }),
+    listDocumentRequests(organizationId),
+  ]);
 
   const invitation = customer.invitation;
   const displayName = customer.customerName;
@@ -168,6 +237,12 @@ export default async function CustomerDetailPage({
           <p className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100">
             Permanent deletion was blocked. Review dependencies and archive
             status below.
+          </p>
+        ) : actionNotice === "payment-review" ? (
+          <p className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100">
+            Payment recorded. A similar payment already existed for that invoice,
+            amount, method, and date, so review the payment history before taking
+            any additional action.
           </p>
         ) : null}
 
@@ -304,6 +379,419 @@ export default async function CustomerDetailPage({
             </section>
           </div>
         ) : null}
+
+        <section className="mt-8 rounded-2xl border border-dark-border bg-dark-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-primary">Billing</h2>
+              <p className="mt-2 text-sm leading-6 text-secondary">
+                Internal ledger records confirmed invoices and payments.
+                Uploaded PDFs are supporting documents, not the source of
+                truth.
+              </p>
+            </div>
+            <div className="grid gap-2 text-right text-sm">
+              <span className="font-bold text-primary">
+                Outstanding {formatCurrency(billing.outstandingBalance)}
+              </span>
+              <span className="text-secondary">
+                Paid {formatCurrency(billing.totalPaid)}
+              </span>
+            </div>
+          </div>
+          {billing.unavailableReason ? (
+            <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+              {billing.unavailableReason}
+            </p>
+          ) : null}
+
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <Dependency label="Setup fee" value={formatCurrency(billing.setupFee)} />
+            <Dependency label="Monthly subscription" value={formatCurrency(billing.monthlySubscription)} />
+            <Dependency label="Open balance" value={formatCurrency(billing.outstandingBalance)} />
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-2">
+            <form action={createInvoiceAction} className="rounded-xl border border-dark-border bg-dark-deep p-4">
+              <input type="hidden" name="organization_id" value={customer.organization.id} />
+              <h3 className="font-bold text-primary">Create Draft Invoice</h3>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-semibold text-secondary">
+                  Type
+                  <select
+                    name="invoice_type"
+                    className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary outline-none"
+                  >
+                    {invoiceTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {invoiceTypeLabel(type)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold text-secondary">
+                  Invoice number
+                  <input
+                    name="invoice_number"
+                    className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary outline-none"
+                    placeholder="Auto-generated if blank"
+                  />
+                </label>
+                <label className="text-sm font-semibold text-secondary">
+                  Issue date
+                  <input
+                    name="issue_date"
+                    type="date"
+                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary outline-none"
+                  />
+                </label>
+                <label className="text-sm font-semibold text-secondary">
+                  Due date
+                  <input
+                    name="due_date"
+                    type="date"
+                    className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary outline-none"
+                  />
+                </label>
+                <label className="text-sm font-semibold text-secondary sm:col-span-2">
+                  Customer-facing description
+                  <textarea
+                    name="customer_description"
+                    rows={3}
+                    className="mt-2 w-full rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-primary outline-none"
+                  />
+                </label>
+                <label className="text-sm font-semibold text-secondary sm:col-span-2">
+                  Due condition
+                  <input
+                    name="due_condition"
+                    className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary outline-none"
+                    placeholder="Example: Balance due after website completion"
+                  />
+                </label>
+                <button type="submit" className="btn btn-primary min-h-11 sm:col-span-2">
+                  Create Draft Invoice
+                </button>
+              </div>
+            </form>
+
+            <form action={addBillingNoteAction} className="rounded-xl border border-dark-border bg-dark-deep p-4">
+              <input type="hidden" name="organization_id" value={customer.organization.id} />
+              <h3 className="font-bold text-primary">Internal Billing Note</h3>
+              <label className="mt-4 block text-sm font-semibold text-secondary">
+                Note
+                <textarea
+                  name="note"
+                  rows={5}
+                  required
+                  className="mt-2 w-full rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-primary outline-none"
+                />
+              </label>
+              <button type="submit" className="btn btn-secondary mt-3 min-h-11">
+                Add Note
+              </button>
+            </form>
+          </div>
+
+          <div className="mt-6 grid gap-4">
+            {billing.invoices.map((invoice) => (
+              <article
+                key={invoice.id}
+                className="rounded-xl border border-dark-border bg-white/[0.025] p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-primary">
+                      {invoice.invoice_number}
+                    </h3>
+                    <p className="mt-1 text-sm text-secondary">
+                      {invoiceTypeLabel(invoice.invoice_type)} ·{" "}
+                      {invoiceStatusLabel(invoice.status)}
+                    </p>
+                    {invoice.customer_description ? (
+                      <p className="mt-2 text-sm leading-6 text-secondary">
+                        {invoice.customer_description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="font-bold text-primary">
+                      Total {formatCurrency(invoice.total)}
+                    </p>
+                    <p className="text-secondary">
+                      Paid {formatCurrency(invoice.amountPaid)}
+                    </p>
+                    <p className="text-secondary">
+                      Open {formatCurrency(invoice.outstandingBalance)}
+                    </p>
+                  </div>
+                </div>
+                {invoice.status === "draft" ? (
+                  <form action={addLineItemAction} className="mt-4 grid gap-3 rounded-lg border border-dark-border bg-dark-deep p-3 md:grid-cols-5">
+                    <input type="hidden" name="organization_id" value={customer.organization.id} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <label className="text-sm font-semibold text-secondary">
+                      Line type
+                      <select name="line_type" className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary">
+                        {lineItemTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-sm font-semibold text-secondary md:col-span-2">
+                      Description
+                      <input name="description" required className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary" />
+                    </label>
+                    <label className="text-sm font-semibold text-secondary">
+                      Quantity
+                      <input name="quantity" type="number" min="0.01" step="0.01" defaultValue="1.00" className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary" />
+                    </label>
+                    <label className="text-sm font-semibold text-secondary">
+                      Amount
+                      <input name="unit_amount" type="number" step="0.01" required className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary" />
+                    </label>
+                    <button type="submit" className="btn btn-secondary min-h-11 md:col-span-5">
+                      Add Line Item
+                    </button>
+                  </form>
+                ) : null}
+                {invoice.lineItems.length ? (
+                  <div className="mt-4 divide-y divide-dark-border text-sm">
+                    {invoice.lineItems.map((item) => (
+                      <div key={item.id} className="flex justify-between gap-3 py-2">
+                        <span className="text-secondary">{item.description}</span>
+                        <span className="font-semibold text-primary">
+                          {formatCurrency(Number(item.quantity) * Number(item.unit_amount))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {invoice.status === "draft" ? (
+                    <form action={issueInvoiceAction}>
+                      <input type="hidden" name="organization_id" value={customer.organization.id} />
+                      <input type="hidden" name="invoice_id" value={invoice.id} />
+                      <input type="hidden" name="payment_idempotency_key" value={crypto.randomUUID()} />
+                      <button type="submit" className="btn btn-primary min-h-10">
+                        Issue Invoice
+                      </button>
+                    </form>
+                  ) : null}
+                  {invoice.status === "issued" || invoice.status === "partially_paid" ? (
+                    <form action={recordPaymentAction} className="grid gap-3 rounded-lg border border-dark-border bg-dark-deep p-3 sm:grid-cols-3 lg:grid-cols-6">
+                      <input type="hidden" name="organization_id" value={customer.organization.id} />
+                      <input type="hidden" name="invoice_id" value={invoice.id} />
+                      <label className="text-sm font-semibold text-secondary">
+                        Amount
+                        <input name="amount" type="number" min="0.01" step="0.01" required className="mt-2 min-h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 text-primary" />
+                      </label>
+                      <label className="text-sm font-semibold text-secondary">
+                        Method
+                        <select name="payment_method" className="mt-2 min-h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 text-primary">
+                          {paymentMethods.map((method) => (
+                            <option key={method} value={method}>
+                              {paymentMethodLabel(method)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-sm font-semibold text-secondary">
+                        Received
+                        <input name="received_on" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="mt-2 min-h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 text-primary" />
+                      </label>
+                      <label className="text-sm font-semibold text-secondary">
+                        Reference
+                        <input name="external_transaction_ref" className="mt-2 min-h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 text-primary" />
+                      </label>
+                      <label className="text-sm font-semibold text-secondary">
+                        Internal note
+                        <input name="internal_note" className="mt-2 min-h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 text-primary" />
+                      </label>
+                      <button type="submit" className="btn btn-primary min-h-10 self-end">
+                        Record Payment
+                      </button>
+                    </form>
+                  ) : null}
+                  {invoice.status === "draft" || invoice.status === "issued" ? (
+                    <form action={voidInvoiceAction}>
+                      <input type="hidden" name="organization_id" value={customer.organization.id} />
+                      <input type="hidden" name="invoice_id" value={invoice.id} />
+                      <button type="submit" className="rounded-full border border-amber-300/40 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/10">
+                        Void Invoice
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+                {invoice.payments.length ? (
+                  <div className="mt-4 rounded-lg border border-dark-border bg-dark-deep p-3">
+                    <h4 className="text-sm font-bold text-primary">Payments</h4>
+                    <div className="mt-2 divide-y divide-dark-border text-sm">
+                      {invoice.payments.map((payment) => (
+                        <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                          <span className="text-secondary">
+                            {payment.payment_kind === "reversal" ? "Reversal" : "Payment"} ·{" "}
+                            {paymentMethodLabel(payment.payment_method)} ·{" "}
+                            {formatDate(payment.received_on)}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-primary">
+                              {payment.payment_kind === "reversal" ? "-" : ""}
+                              {formatCurrency(payment.amount)}
+                            </span>
+                            {payment.payment_kind === "payment" && !isPaymentReversed(invoice.payments, payment.id) ? (
+                              <form action={reversePaymentAction}>
+                                <input type="hidden" name="organization_id" value={customer.organization.id} />
+                                <input type="hidden" name="payment_id" value={payment.id} />
+                                <button type="submit" className="text-xs font-semibold text-amber-100">
+                                  Reverse
+                                </button>
+                              </form>
+                            ) : payment.payment_kind === "payment" ? (
+                              <span className="text-xs font-semibold text-muted">Reversed</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+            {!billing.invoices.length ? (
+              <p className="text-sm text-muted">No invoices have been created.</p>
+            ) : null}
+          </div>
+
+          {billing.notes.length ? (
+            <div className="mt-6 rounded-xl border border-dark-border bg-dark-deep p-4">
+              <h3 className="font-bold text-primary">Internal Billing Notes</h3>
+              <ul className="mt-3 divide-y divide-dark-border text-sm">
+                {billing.notes.map((note) => (
+                  <li key={note.id} className="py-2 text-secondary">
+                    {note.note}
+                    <span className="block text-xs text-muted">
+                      {formatDateTime(note.created_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-dark-border bg-dark-card p-5">
+          <h2 className="text-xl font-bold text-primary">Documents</h2>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Upload private organization-scoped documents and choose whether the
+            customer can see them.
+          </p>
+          <div className="mt-5 grid gap-6 xl:grid-cols-2">
+            <form action={uploadAdminDocumentAction} className="grid gap-3 rounded-xl border border-dark-border bg-dark-deep p-4">
+              <input type="hidden" name="organization_id" value={customer.organization.id} />
+              <label className="text-sm font-semibold text-secondary">
+                Category
+                <select name="category" className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary">
+                  {documentCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {documentCategoryLabel(category)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Visibility
+                <select name="visibility" className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary">
+                  <option value="customer_visible">Customer visible</option>
+                  <option value="internal">Internal only</option>
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Title
+                <input name="title" required className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary" />
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                File
+                <input name="file" type="file" accept={DOCUMENT_ACCEPT} required className="mt-2 block w-full rounded-xl border border-dark-border bg-dark-card px-3 py-3 text-sm text-secondary file:mr-4 file:rounded-lg file:border-0 file:bg-brand-cyan file:px-3 file:py-2 file:font-semibold file:text-slate-950" />
+              </label>
+              <button type="submit" className="btn btn-primary min-h-11">
+                Upload Document
+              </button>
+            </form>
+
+            <form action={requestDocumentAction} className="grid gap-3 rounded-xl border border-dark-border bg-dark-deep p-4">
+              <input type="hidden" name="organization_id" value={customer.organization.id} />
+              <h3 className="font-bold text-primary">Request Customer Document</h3>
+              <label className="text-sm font-semibold text-secondary">
+                Category
+                <select name="category" className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary">
+                  {documentCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {documentCategoryLabel(category)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Request title
+                <input name="title" required className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary" />
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Message
+                <textarea name="message" rows={3} className="mt-2 w-full rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-primary" />
+              </label>
+              <button type="submit" className="btn btn-secondary min-h-11">
+                Request Document
+              </button>
+            </form>
+          </div>
+          <div className="mt-6 grid gap-3">
+            {documents.ok && documents.data.map((document) => (
+              <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dark-border bg-white/[0.025] p-3 text-sm">
+                <div>
+                  <p className="font-semibold text-primary">{document.title}</p>
+                  <p className="text-secondary">
+                    {documentCategoryLabel(document.category)} ·{" "}
+                    {document.visibility === "customer_visible" ? "Customer visible" : "Internal only"} ·{" "}
+                    {document.status === "active" ? "Active" : "Archived"} ·{" "}
+                    {formatDate(document.created_at)}
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  {document.viewUrl ? <a href={document.viewUrl} className="font-semibold text-brand-cyan">View</a> : null}
+                  {document.downloadUrl ? <a href={document.downloadUrl} className="font-semibold text-brand-cyan">Download</a> : null}
+                  {document.status === "active" ? (
+                    <form action={archiveAdminDocumentAction}>
+                      <input type="hidden" name="organization_id" value={customer.organization.id} />
+                      <input type="hidden" name="document_id" value={document.id} />
+                      <button type="submit" className="font-semibold text-amber-100">
+                        Archive
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+            {(!documents.ok || !documents.data.length) ? (
+              <p className="text-sm text-muted">No documents are attached.</p>
+            ) : null}
+          </div>
+          {documentRequests.length ? (
+            <div className="mt-6 rounded-xl border border-dark-border bg-dark-deep p-4">
+              <h3 className="font-bold text-primary">Document Requests</h3>
+              <ul className="mt-3 divide-y divide-dark-border text-sm">
+                {documentRequests.map((request) => (
+                  <li key={request.id} className="py-2 text-secondary">
+                    {request.title} · {documentCategoryLabel(request.category)} · {request.status}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
 
         <section className="mt-8 rounded-2xl border border-dark-border bg-dark-card p-5">
           <div>
@@ -713,6 +1201,9 @@ export default async function CustomerDetailPage({
                 <Dependency label="Notes / info requests" value={deletionSummary.notesAndInformationRequests} />
                 <Dependency label="Subscriptions / entitlements" value={deletionSummary.subscriptionsAndEntitlements} />
                 <Dependency label="Financial dependencies" value={deletionSummary.financialDependencies} />
+                <Dependency label="Billing invoices" value={deletionSummary.billingInvoices} />
+                <Dependency label="Billing payments" value={deletionSummary.billingPayments} />
+                <Dependency label="Documents / requests" value={deletionSummary.documents} />
                 <Dependency label="Audit events" value={deletionSummary.auditEvents} />
               </div>
               <dl className="mt-4 grid gap-3 rounded-lg border border-dark-border bg-white/[0.025] p-3 text-sm text-secondary sm:grid-cols-2">
@@ -1189,6 +1680,262 @@ async function deleteCustomerAction(formData: FormData) {
   redirect("/opzix-admin/customers?filter=archived&action=deleted");
 }
 
+async function createInvoiceAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const invoiceType = stringField(formData, "invoice_type");
+  const issueDate = stringField(formData, "issue_date");
+  if (!isInvoiceType(invoiceType) || !isDateField(issueDate)) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  }
+  const result = await createDraftInvoice({
+    organizationId,
+    invoiceType,
+    invoiceNumber: stringField(formData, "invoice_number"),
+    issueDate,
+    dueDate: dateOrUndefined(stringField(formData, "due_date")),
+    dueCondition: stringField(formData, "due_condition"),
+    customerDescription: stringField(formData, "customer_description"),
+  });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_billing_invoice_created", {
+    invoiceType,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function addLineItemAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const invoiceId = stringField(formData, "invoice_id");
+  const lineType = stringField(formData, "line_type");
+  const quantity = parsePositiveMoney(stringField(formData, "quantity"));
+  const unitAmount = parseSignedMoney(stringField(formData, "unit_amount"));
+  const description = stringField(formData, "description");
+  if (
+    !isUuid(invoiceId) ||
+    !isLineItemType(lineType) ||
+    quantity === null ||
+    unitAmount === null ||
+    description.length < 2
+  ) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  }
+  const result = await addInvoiceLineItem({
+    organizationId,
+    invoiceId,
+    lineType,
+    description,
+    quantity,
+    unitAmount,
+  });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_billing_line_item_added", {
+    invoiceId,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function issueInvoiceAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const invoiceId = stringField(formData, "invoice_id");
+  if (!isUuid(invoiceId)) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  const result = await issueInvoice({ organizationId, invoiceId });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_billing_invoice_issued", {
+    invoiceId,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/billing");
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function recordPaymentAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const invoiceId = stringField(formData, "invoice_id");
+  const amount = parsePositiveMoney(stringField(formData, "amount"));
+  const paymentMethod = stringField(formData, "payment_method");
+  const receivedOn = stringField(formData, "received_on");
+  const idempotencyKey = stringField(formData, "payment_idempotency_key");
+  if (
+    !isUuid(invoiceId) ||
+    amount === null ||
+    !isPaymentMethod(paymentMethod) ||
+    !isDateField(receivedOn) ||
+    !idempotencyKey
+  ) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  }
+  const similarPayments = await findSimilarInvoicePayments({
+    organizationId,
+    invoiceId,
+    amount,
+    paymentMethod,
+    receivedOn,
+  });
+  const result = await recordInvoicePayment({
+    organizationId,
+    invoiceId,
+    amount,
+    paymentMethod,
+    receivedOn,
+    externalTransactionRef: stringField(formData, "external_transaction_ref"),
+    idempotencyKey,
+    internalNote: stringField(formData, "internal_note"),
+  });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_billing_payment_recorded", {
+    invoiceId,
+    amount: String(amount),
+    possibleDuplicatePaymentCount: String(similarPayments.length),
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/billing");
+  redirect(
+    `/opzix-admin/customers/${organizationId}?action=${similarPayments.length ? "payment-review" : "saved"}`,
+  );
+}
+
+async function reversePaymentAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const paymentId = stringField(formData, "payment_id");
+  if (!isUuid(paymentId)) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  const result = await reverseInvoicePayment({
+    organizationId,
+    paymentId,
+    internalNote: "Admin reversal from Customer Hub.",
+  });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_billing_payment_reversed", {
+    paymentId,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/billing");
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function voidInvoiceAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const invoiceId = stringField(formData, "invoice_id");
+  if (!isUuid(invoiceId)) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  const result = await voidInvoice({ organizationId, invoiceId });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_billing_invoice_voided", {
+    invoiceId,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/billing");
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function addBillingNoteAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const note = stringField(formData, "note");
+  if (note.length < 2) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  const result = await addBillingNote({ organizationId, note });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_billing_note_added");
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function uploadAdminDocumentAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized document action.");
+  }
+  const organizationId = validOrganizationId(formData);
+  const category = stringField(formData, "category");
+  const visibility = stringField(formData, "visibility");
+  const title = stringField(formData, "title");
+  const file = formData.get("file");
+  if (
+    !isDocumentCategory(category) ||
+    !isDocumentVisibility(visibility) ||
+    title.length < 2 ||
+    !(file instanceof File)
+  ) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=document`);
+  }
+  const result = await uploadCustomerDocument({
+    organizationId,
+    source: "opzix_admin",
+    title,
+    category,
+    visibility,
+    file,
+  });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_document_uploaded", {
+    category,
+    visibility,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/documents");
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function archiveAdminDocumentAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized document action.");
+  }
+  const organizationId = validOrganizationId(formData);
+  const documentId = stringField(formData, "document_id");
+  if (!isUuid(documentId)) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=document`);
+  }
+  const archived = await archiveCustomerDocument({ organizationId, documentId });
+  if (!archived.ok) throw new Error(archived.error);
+  if (!archived.data.length) throw new Error("Document was not found.");
+  await recordAdminEvent(organizationId, "customer_document_archived", {
+    documentId,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/documents");
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function requestDocumentAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized document action.");
+  }
+  const organizationId = validOrganizationId(formData);
+  const category = stringField(formData, "category");
+  const title = stringField(formData, "title");
+  if (!isDocumentCategory(category) || title.length < 2) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=document`);
+  }
+  const result = await createDocumentRequest({
+    organizationId,
+    category,
+    title,
+    message: stringField(formData, "message"),
+  });
+  if (!result.ok) throw new Error(result.error);
+  await recordAdminEvent(organizationId, "customer_document_requested", {
+    category,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/documents");
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
 async function organizationForInvitation(invitationId: string) {
   if (!isUuid(invitationId)) return null;
   const result = await supabaseAdminFetch<CustomerInvitationRow[]>(
@@ -1272,7 +2019,7 @@ function DetailCard({
   );
 }
 
-function Dependency({ label, value }: { label: string; value: number }) {
+function Dependency({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-lg border border-dark-border bg-white/[0.025] p-3">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
@@ -1335,10 +2082,66 @@ function parseMoney(value: string) {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
+function parsePositiveMoney(value: string) {
+  const amount = parseMoney(value);
+  return amount !== null && amount > 0 ? amount : null;
+}
+
+function parseSignedMoney(value: string) {
+  if (!/^-?\d{1,10}(\.\d{1,2})?$/.test(value)) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function validOrganizationId(formData: FormData) {
+  const organizationId = stringField(formData, "organization_id");
+  if (!isUuid(organizationId)) throw new Error("Invalid organization reference.");
+  return organizationId;
+}
+
+function isDateField(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isPaymentReversed(
+  payments: { payment_kind: string; reversal_of_payment_id: string | null }[],
+  paymentId: string,
+) {
+  return payments.some(
+    (payment) =>
+      payment.payment_kind === "reversal" &&
+      payment.reversal_of_payment_id === paymentId,
+  );
+}
+
+function dateOrUndefined(value: string) {
+  return isDateField(value) ? value : undefined;
+}
+
+function isInvoiceType(value: string): value is InvoiceType {
+  return invoiceTypes.includes(value as InvoiceType);
+}
+
+function isLineItemType(value: string): value is LineItemType {
+  return lineItemTypes.includes(value as LineItemType);
+}
+
+function isPaymentMethod(value: string): value is PaymentMethod {
+  return paymentMethods.includes(value as PaymentMethod);
+}
+
+function isDocumentCategory(value: string): value is CustomerDocumentCategory {
+  return documentCategories.includes(value as CustomerDocumentCategory);
+}
+
+function isDocumentVisibility(value: string): value is CustomerDocumentVisibility {
+  return value === "customer_visible" || value === "internal";
 }
 
 function formatMoney(value: number | undefined) {

@@ -36,6 +36,17 @@ type AssetLifecycleRow = {
   bucket: string;
   object_path: string;
 };
+type DocumentLifecycleRow = {
+  bucket: string;
+  object_path: string;
+};
+type BillingInvoiceLifecycleRow = {
+  id: string;
+  status: string;
+};
+type BillingPaymentLifecycleRow = {
+  id: string;
+};
 type DeletionJobState =
   | "pending"
   | "storage_cleanup"
@@ -67,6 +78,9 @@ export type CustomerDeletionSummary = {
   notesAndInformationRequests: number;
   subscriptionsAndEntitlements: number;
   financialDependencies: number;
+  billingInvoices: number;
+  billingPayments: number;
+  documents: number;
   auditEvents: number;
   activeDeletionJobState: DeletionJobState | null;
   associatedExternalData: string[];
@@ -91,6 +105,10 @@ export async function loadCustomerDeletionSummary(organizationId: string) {
     subscriptions,
     featureOverrides,
     commercialTerms,
+    billingInvoices,
+    billingPayments,
+    documents,
+    documentRequests,
     auditEvents,
     activeDeletionJobs,
   ] = await Promise.all([
@@ -129,6 +147,33 @@ export async function loadCustomerDeletionSummary(organizationId: string) {
     ),
     countRows("organization_feature_overrides", organizationId),
     countRows("organization_commercial_terms", organizationId),
+    supabaseAdminFetch<BillingInvoiceLifecycleRow[]>(
+      "customer_billing_invoices",
+      {
+        query: {
+          select: "id,status",
+          organization_id: `eq.${organizationId}`,
+          status: "neq.void",
+        },
+      },
+    ),
+    supabaseAdminFetch<BillingPaymentLifecycleRow[]>(
+      "customer_billing_payments",
+      {
+        query: {
+          select: "id",
+          organization_id: `eq.${organizationId}`,
+        },
+      },
+    ),
+    supabaseAdminFetch<DocumentLifecycleRow[]>("customer_documents", {
+      query: {
+        select: "bucket,object_path",
+        organization_id: `eq.${organizationId}`,
+        status: "eq.active",
+      },
+    }),
+    countRows("customer_document_requests", organizationId),
     countRows("customer_account_audit_events", organizationId),
     supabaseAdminFetch<DeletionJobRow[]>("customer_organization_deletion_jobs", {
       query: {
@@ -144,6 +189,9 @@ export async function loadCustomerDeletionSummary(organizationId: string) {
   const memberRows = unwrap(members);
   const invitationRows = unwrap(invitations);
   const assetRows = unwrap(assets);
+  const documentRows = documents.ok ? documents.data : [];
+  const billingInvoiceRows = billingInvoices.ok ? billingInvoices.data : [];
+  const billingPaymentRows = billingPayments.ok ? billingPayments.data : [];
   const subscriptionRows = unwrap(subscriptions);
   const authIdentityIds = new Set(
     [
@@ -164,7 +212,7 @@ export async function loadCustomerDeletionSummary(organizationId: string) {
     (subscription) =>
       ["trialing", "active", "past_due"].includes(subscription.status) ||
       Boolean(subscription.external_subscription_id),
-  ).length;
+  ).length + billingInvoiceRows.length + billingPaymentRows.length;
   const protectedReasons = protectedDeletionReasons({
     organization,
     financialDependencies,
@@ -181,12 +229,15 @@ export async function loadCustomerDeletionSummary(organizationId: string) {
     invitations: invitationRows.length,
     onboardingRecords: countValue(onboarding) + countValue(onboardingData),
     onboardingAssets: assetRows.length,
-    storageObjects: assetRows.length,
+    storageObjects: assetRows.length + documentRows.length,
     launchUpdates: countValue(launchStatus) + countValue(launchUpdates),
     notesAndInformationRequests: countValue(notes) + countValue(informationRequests),
     subscriptionsAndEntitlements:
       subscriptionRows.length + countValue(featureOverrides) + countValue(commercialTerms),
     financialDependencies,
+    billingInvoices: billingInvoiceRows.length,
+    billingPayments: billingPaymentRows.length,
+    documents: documentRows.length + countValue(documentRequests),
     auditEvents: countValue(auditEvents),
     activeDeletionJobState,
     associatedExternalData: [
@@ -253,21 +304,35 @@ export async function permanentlyDeleteCustomerOrganization({
   const job = await getOrCreateDeletionJob(summary);
   if (!job.ok) return job;
 
-  const assets = await supabaseAdminFetch<AssetLifecycleRow[]>(
-    "organization_onboarding_assets",
-    {
+  const [assets, documents] = await Promise.all([
+    supabaseAdminFetch<AssetLifecycleRow[]>(
+      "organization_onboarding_assets",
+      {
+        query: {
+          select: "bucket,object_path",
+          organization_id: `eq.${organizationId}`,
+        },
+      },
+    ),
+    supabaseAdminFetch<DocumentLifecycleRow[]>("customer_documents", {
       query: {
         select: "bucket,object_path",
         organization_id: `eq.${organizationId}`,
+        status: "eq.active",
       },
-    },
-  );
+    }),
+  ]);
   if (!assets.ok) {
     await failDeletionJob(job.data.id, assets.error);
     return assets;
   }
+  if (!documents.ok && !/customer_documents/i.test(documents.error)) {
+    await failDeletionJob(job.data.id, documents.error);
+    return documents;
+  }
 
-  const scopedAssets = validateStorageScope(organizationId, assets.data);
+  const storageAssets = [...assets.data, ...(documents.ok ? documents.data : [])];
+  const scopedAssets = validateStorageScope(organizationId, storageAssets);
   if (!scopedAssets.ok) {
     await failDeletionJob(job.data.id, scopedAssets.error);
     return scopedAssets;
@@ -281,7 +346,7 @@ export async function permanentlyDeleteCustomerOrganization({
   });
   if (!storageStarted.ok) return storageStarted;
 
-  const storageDeleted = await deleteStorageObjects(assets.data);
+  const storageDeleted = await deleteStorageObjects(storageAssets);
   if (!storageDeleted.ok) {
     await failDeletionJob(job.data.id, storageDeleted.error);
     await recordLifecycleEvent(
@@ -295,14 +360,14 @@ export async function permanentlyDeleteCustomerOrganization({
   const storageComplete = await updateDeletionJob(job.data.id, {
     state: "storage_complete",
     storage_completed_at: new Date().toISOString(),
-    storage_objects_deleted: assets.data.length,
+    storage_objects_deleted: storageAssets.length,
   });
   if (!storageComplete.ok) return storageComplete;
 
   await recordLifecycleEvent(organizationId, "customer_organization_delete_started", {
     deletionJobId: job.data.id,
     organizationName: summary.organizationName,
-    storageObjects: String(assets.data.length),
+    storageObjects: String(storageAssets.length),
   });
 
   const completed = await supabaseAdminRpc<null>(
@@ -564,6 +629,9 @@ function deletionDependencySnapshot(summary: CustomerDeletionSummary) {
     notesAndInformationRequests: summary.notesAndInformationRequests,
     subscriptionsAndEntitlements: summary.subscriptionsAndEntitlements,
     financialDependencies: summary.financialDependencies,
+    billingInvoices: summary.billingInvoices,
+    billingPayments: summary.billingPayments,
+    documents: summary.documents,
     auditEvents: summary.auditEvents,
     authUsersDeleted: false,
   };

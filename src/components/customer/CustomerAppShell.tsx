@@ -8,6 +8,8 @@ import { EntitlementProvider } from "./EntitlementProvider";
 const navItems = [
   { href: "/app", label: "Home" },
   { href: "/app/onboarding", label: "Onboarding" },
+  { href: "/app/billing", label: "Billing" },
+  { href: "/app/documents", label: "Documents" },
   { href: "/app/settings", label: "Account" },
   { href: "/app/business-profile", label: "Business Profile" },
   { href: "/app/plan-features", label: "Plan & Features" },
