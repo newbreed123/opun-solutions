@@ -12,7 +12,11 @@ import {
   createCustomerOnboarding,
   sendCustomerInvitation,
 } from "@/lib/customer-platform/admin-invitations";
-import { listCustomerAdminOrganizations } from "@/lib/customer-platform/admin-store";
+import {
+  listCustomerAdminOrganizations,
+  type CustomerAdminSummary,
+} from "@/lib/customer-platform/admin-store";
+import { archiveCustomerOrganization } from "@/lib/customer-platform/lifecycle";
 import { supabaseAdminFetch } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -48,9 +52,14 @@ export default async function CustomersAdminPage({
   }
 
   const organizations = await listCustomerAdminOrganizations();
+  const filter = customerFilterFromParam(stringParam(params.filter));
+  const filteredOrganizations = organizations.data.filter((summary) =>
+    summaryMatchesFilter(summary, filter),
+  );
   const requestedId = stringParam(params.request);
   const requestId = isUuid(requestedId) ? requestedId : crypto.randomUUID();
   const createError = stringParam(params.error) === "create";
+  const actionNotice = stringParam(params.action);
 
   return (
     <AdminShell>
@@ -64,8 +73,8 @@ export default async function CustomersAdminPage({
           </h1>
         </div>
         <p className="rounded-full border border-dark-border bg-white/[0.04] px-4 py-2 text-sm font-semibold text-secondary">
-          {organizations.data.length} organization
-          {organizations.data.length === 1 ? "" : "s"}
+          {filteredOrganizations.length} organization
+          {filteredOrganizations.length === 1 ? "" : "s"}
         </p>
       </div>
 
@@ -139,7 +148,38 @@ export default async function CustomersAdminPage({
           {organizations.error}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-dark-border bg-dark-card">
+        <div className="rounded-2xl border border-dark-border bg-dark-card">
+          <div className="flex flex-col gap-4 border-b border-dark-border p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {customerFilters.map((item) => (
+                <Link
+                  key={item.value}
+                  href={`/opzix-admin/customers?filter=${item.value}`}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    filter === item.value
+                      ? "border-brand-cyan bg-brand-cyan/10 text-brand-cyan"
+                      : "border-dark-border text-secondary hover:border-brand-cyan hover:text-primary"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+            {actionNotice === "archived" ? (
+              <p className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
+                Customer archived.
+              </p>
+            ) : actionNotice === "deleted" ? (
+              <p className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
+                Customer permanently deleted.
+              </p>
+            ) : actionNotice === "failed" ? (
+              <p className="rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-100">
+                Customer action failed.
+              </p>
+            ) : null}
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
             <thead className="border-b border-dark-border bg-white/[0.035] text-xs uppercase tracking-[0.16em] text-muted">
               <tr>
@@ -154,7 +194,7 @@ export default async function CustomersAdminPage({
               </tr>
             </thead>
             <tbody>
-              {organizations.data.map((summary) => (
+              {filteredOrganizations.map((summary) => (
                 <tr
                   key={summary.organization.id}
                   className="border-b border-dark-border/70 align-top"
@@ -192,21 +232,96 @@ export default async function CustomersAdminPage({
                       : "No activity"}
                   </td>
                   <td className="px-4 py-4">
-                    <Link
-                      href={`/opzix-admin/customers/${summary.organization.id}`}
-                      className="font-semibold text-brand-cyan hover:underline"
-                    >
-                      View Customer
-                    </Link>
+                    <details className="relative">
+                      <summary className="cursor-pointer rounded-full border border-dark-border px-3 py-1.5 text-xs font-semibold text-secondary hover:border-brand-cyan hover:text-primary">
+                        Actions
+                      </summary>
+                      <div className="absolute right-0 z-20 mt-2 grid min-w-56 gap-1 rounded-xl border border-dark-border bg-dark-deep p-2 shadow-xl">
+                        <Link
+                          href={`/opzix-admin/customers/${summary.organization.id}`}
+                          className="rounded-lg px-3 py-2 font-semibold text-brand-cyan hover:bg-white/[0.04]"
+                        >
+                          View Customer
+                        </Link>
+                        <Link
+                          href={`/opzix-admin/customers/${summary.organization.id}?mode=edit`}
+                          className="rounded-lg px-3 py-2 font-semibold text-secondary hover:bg-white/[0.04] hover:text-primary"
+                        >
+                          Edit Customer
+                        </Link>
+                        {summary.organization.status === "archived" ? null : (
+                          <form action={archiveCustomerAction} className="grid gap-2 rounded-lg px-3 py-2">
+                            <input
+                              type="hidden"
+                              name="organization_id"
+                              value={summary.organization.id}
+                            />
+                            <label className="flex items-start gap-2 text-xs leading-5 text-secondary">
+                              <input
+                                type="checkbox"
+                                name="confirm_archive"
+                                value="yes"
+                                required
+                                className="mt-1"
+                              />
+                              Confirm archive
+                            </label>
+                            <button
+                              type="submit"
+                              className="text-left text-sm font-semibold text-amber-100"
+                            >
+                              Archive Customer
+                            </button>
+                          </form>
+                        )}
+                        <Link
+                          href={`/opzix-admin/customers/${summary.organization.id}#danger-zone`}
+                          className="rounded-lg px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-400/10"
+                        >
+                          Permanently Delete
+                        </Link>
+                      </div>
+                    </details>
                   </td>
                 </tr>
               ))}
+              {!filteredOrganizations.length ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-secondary">
+                    No customers match this filter.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </AdminShell>
   );
+}
+
+async function archiveCustomerAction(formData: FormData) {
+  "use server";
+
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized customer admin action.");
+  }
+
+  const organizationId = stringField(formData, "organization_id");
+  const confirmed = stringField(formData, "confirm_archive") === "yes";
+  if (!isUuid(organizationId) || !confirmed) {
+    redirect("/opzix-admin/customers?action=failed");
+  }
+
+  const result = await archiveCustomerOrganization(organizationId);
+  if (!result.ok) {
+    redirect("/opzix-admin/customers?action=failed");
+  }
+
+  revalidatePath("/opzix-admin/customers");
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect("/opzix-admin/customers?action=archived");
 }
 
 async function createCustomerAction(formData: FormData) {
@@ -408,4 +523,26 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(date);
+}
+
+const customerFilters = [
+  { value: "active", label: "Active" },
+  { value: "onboarding", label: "Onboarding" },
+  { value: "archived", label: "Archived" },
+  { value: "qa", label: "QA / Test" },
+] as const;
+
+type CustomerFilter = (typeof customerFilters)[number]["value"];
+
+function customerFilterFromParam(value: string): CustomerFilter {
+  return customerFilters.some((item) => item.value === value)
+    ? (value as CustomerFilter)
+    : "active";
+}
+
+function summaryMatchesFilter(summary: CustomerAdminSummary, filter: CustomerFilter) {
+  if (filter === "qa") return summary.isQa;
+  if (filter === "archived") return summary.organization.status === "archived";
+  if (filter === "onboarding") return summary.organization.status === "onboarding";
+  return summary.organization.status === "active";
 }

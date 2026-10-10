@@ -8,6 +8,12 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { sendCustomerInvitation } from "@/lib/customer-platform/admin-invitations";
 import { getCustomerAdminDetail } from "@/lib/customer-platform/admin-store";
 import {
+  archiveCustomerOrganization,
+  loadCustomerDeletionSummary,
+  permanentlyDeleteCustomerOrganization,
+  restoreCustomerOrganization,
+} from "@/lib/customer-platform/lifecycle";
+import {
   defaultProgressForStage,
   getOrganizationLaunchProgress,
   isLaunchStage,
@@ -15,10 +21,11 @@ import {
   launchStages,
   saveOrganizationLaunchUpdate,
 } from "@/lib/customer-platform/launch-progress";
-import { supabaseAdminFetch, supabaseAdminRpc } from "@/lib/supabase-admin";
+import { supabaseAdminFetch } from "@/lib/supabase-admin";
 import type {
   CustomerInvitationRow,
   FeatureRow,
+  PlanRow,
 } from "@/lib/customer-platform/types";
 
 export const dynamic = "force-dynamic";
@@ -64,11 +71,15 @@ export default async function CustomerDetailPage({
   const customer = await getCustomerAdminDetail(organizationId);
   if (!customer) notFound();
   const launchProgress = await getOrganizationLaunchProgress(organizationId);
+  const deletionSummary = await loadCustomerDeletionSummary(organizationId);
+  const planOptions = await loadPlanOptions();
 
   const invitation = customer.invitation;
   const displayName = customer.customerName;
   const inviteNotice = stringParam(query.invite);
   const pageError = stringParam(query.error);
+  const actionNotice = stringParam(query.action);
+  const mode = stringParam(query.mode);
   const mlsStatus =
     customer.mlsData && Object.keys(customer.mlsData).length > 0
       ? "Details submitted"
@@ -139,6 +150,24 @@ export default async function CustomerDetailPage({
           >
             The requested customer action could not be completed. Review the
             record and try again.
+          </p>
+        ) : null}
+        {actionNotice === "saved" ? (
+          <p className="mt-6 rounded-xl border border-emerald-300/30 bg-emerald-400/10 p-4 text-emerald-100">
+            Customer changes saved.
+          </p>
+        ) : actionNotice === "archived" ? (
+          <p className="mt-6 rounded-xl border border-emerald-300/30 bg-emerald-400/10 p-4 text-emerald-100">
+            Customer archived. Historical records were preserved.
+          </p>
+        ) : actionNotice === "restored" ? (
+          <p className="mt-6 rounded-xl border border-emerald-300/30 bg-emerald-400/10 p-4 text-emerald-100">
+            Customer restored.
+          </p>
+        ) : actionNotice === "delete-blocked" ? (
+          <p className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100">
+            Permanent deletion was blocked. Review dependencies and archive
+            status below.
           </p>
         ) : null}
 
@@ -334,6 +363,133 @@ export default async function CustomerDetailPage({
           )}
         </section>
 
+        {mode === "edit" ? (
+          <section className="mt-8 rounded-2xl border border-dark-border bg-dark-card p-5">
+            <h2 className="text-xl font-bold text-primary">Edit Customer</h2>
+            <p className="mt-2 text-sm leading-6 text-secondary">
+              Update customer and organization display data. Email changes are
+              intentionally excluded because identity changes require a separate
+              verified workflow.
+            </p>
+            <form action={saveCustomerEditAction} className="mt-5 grid gap-4 lg:grid-cols-2">
+              <input type="hidden" name="organization_id" value={customer.organization.id} />
+              <label className="text-sm font-semibold text-secondary">
+                Customer display name
+                <input
+                  name="customer_display_name"
+                  defaultValue={displayName === "Not invited" ? "" : displayName}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+                />
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Customer email
+                <input
+                  value={invitation?.email ?? ""}
+                  readOnly
+                  className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-muted outline-none"
+                />
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Organization name
+                <input
+                  name="organization_name"
+                  required
+                  defaultValue={customer.organization.name}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+                />
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Business type
+                <select
+                  name="organization_type"
+                  defaultValue={customer.organization.organization_type}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+                >
+                  <option value="agent">Agent</option>
+                  <option value="team">Team</option>
+                  <option value="brokerage">Brokerage</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Contact phone
+                <input
+                  name="phone"
+                  defaultValue={customer.profile?.phone ?? ""}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+                />
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Customer status
+                <select
+                  name="organization_status"
+                  defaultValue={customer.organization.status}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+                >
+                  <option value="active">Active</option>
+                  <option value="onboarding">Onboarding</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-secondary">
+                Plan assignment
+                <select
+                  name="plan_code"
+                  defaultValue={customer.plan?.code ?? "custom"}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+                >
+                  {planOptions.map((plan) => (
+                    <option key={plan.code} value={plan.code}>
+                      {plan.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <MoneyField
+                name="setup_fee"
+                label="Setup Fee (USD)"
+                value={customer.terms?.setup_fee ?? 0}
+              />
+              <MoneyField
+                name="monthly_subscription"
+                label="Monthly Subscription (USD)"
+                value={customer.terms?.monthly_subscription ?? 0}
+              />
+              <label className="flex items-center gap-2 rounded-xl border border-dark-border bg-white/[0.025] p-3 text-sm font-semibold text-secondary lg:col-span-2">
+                <input
+                  type="checkbox"
+                  name="is_test_account"
+                  value="yes"
+                  defaultChecked={customer.isQa}
+                  className="accent-cyan-400"
+                />
+                Mark as confirmed QA / test organization
+              </label>
+              <div className="flex flex-wrap gap-3 lg:col-span-2">
+                <button type="submit" className="btn btn-primary min-h-11">
+                  Save Customer
+                </button>
+                <Link
+                  href={`/opzix-admin/customers/${customer.organization.id}`}
+                  className="btn btn-secondary min-h-11"
+                >
+                  Cancel
+                </Link>
+              </div>
+            </form>
+          </section>
+        ) : (
+          <div className="mt-6">
+            <Link
+              href={`/opzix-admin/customers/${customer.organization.id}?mode=edit`}
+              className="inline-flex rounded-full border border-dark-border px-4 py-2 text-sm font-semibold text-secondary hover:border-brand-cyan hover:text-primary"
+            >
+              Edit Customer
+            </Link>
+          </div>
+        )}
+
         <section className="mt-8 rounded-2xl border border-dark-border bg-dark-card p-5">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
@@ -491,34 +647,159 @@ export default async function CustomerDetailPage({
           )}
         </section>
 
-        {customer.isQa && customer.organization.status !== "archived" ? (
-          <section className="mt-8 rounded-2xl border border-amber-300/25 bg-amber-400/[0.04] p-5">
-            <h2 className="text-lg font-bold text-primary">
-              QA / test account controls
-            </h2>
-            <p className="mt-2 text-sm text-secondary">
-              Archive suspends memberships and blocks customer access without
-              deleting customer or audit data.
-            </p>
-            <form action={archiveQaCustomerAction} className="mt-4 flex flex-wrap items-center gap-3">
-              <input
-                type="hidden"
-                name="organization_id"
-                value={customer.organization.id}
-              />
-              <label className="flex items-center gap-2 text-sm text-secondary">
-                <input type="checkbox" name="confirm_archive" value="yes" required />
-                I confirm this QA organization should be archived.
-              </label>
-              <button
-                type="submit"
-                className="rounded-full border border-amber-300/40 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/10"
-              >
-                Archive QA Organization
-              </button>
-            </form>
-          </section>
-        ) : null}
+        <section
+          id="danger-zone"
+          className="mt-8 rounded-2xl border border-amber-300/25 bg-amber-400/[0.04] p-5"
+        >
+          <h2 className="text-lg font-bold text-primary">
+            Customer lifecycle controls
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-secondary">
+            Archive preserves onboarding, billing metadata, assets and audit
+            history. Permanent deletion is restricted and blocked when
+            protected dependencies are present.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {customer.organization.status === "archived" ? (
+              <form action={restoreCustomerAction} className="flex flex-wrap items-center gap-3">
+                <input
+                  type="hidden"
+                  name="organization_id"
+                  value={customer.organization.id}
+                />
+                <label className="flex items-center gap-2 text-sm text-secondary">
+                  <input type="checkbox" name="confirm_restore" value="yes" required />
+                  Confirm restore
+                </label>
+                <button type="submit" className="btn btn-secondary min-h-11">
+                  Restore Customer
+                </button>
+              </form>
+            ) : (
+              <form action={archiveCustomerAction} className="flex flex-wrap items-center gap-3">
+                <input
+                  type="hidden"
+                  name="organization_id"
+                  value={customer.organization.id}
+                />
+                <label className="flex items-center gap-2 text-sm text-secondary">
+                  <input type="checkbox" name="confirm_archive" value="yes" required />
+                  Confirm archive
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-full border border-amber-300/40 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/10"
+                >
+                  Archive Customer
+                </button>
+              </form>
+            )}
+          </div>
+
+          {deletionSummary ? (
+            <div className="mt-6 rounded-xl border border-dark-border bg-dark-deep p-4">
+              <h3 className="text-sm font-bold text-primary">
+                Permanent deletion dependency summary
+              </h3>
+              <div className="mt-4 grid gap-3 text-sm text-secondary sm:grid-cols-2 lg:grid-cols-3">
+                <Dependency label="Organization members" value={deletionSummary.organizationMembers} />
+                <Dependency label="Auth identities" value={deletionSummary.authIdentities} />
+                <Dependency label="Shared Auth relationships" value={deletionSummary.sharedAuthRelationships} />
+                <Dependency label="Invitations" value={deletionSummary.invitations} />
+                <Dependency label="Onboarding records" value={deletionSummary.onboardingRecords} />
+                <Dependency label="Onboarding assets" value={deletionSummary.onboardingAssets} />
+                <Dependency label="Storage objects" value={deletionSummary.storageObjects} />
+                <Dependency label="Launch updates" value={deletionSummary.launchUpdates} />
+                <Dependency label="Notes / info requests" value={deletionSummary.notesAndInformationRequests} />
+                <Dependency label="Subscriptions / entitlements" value={deletionSummary.subscriptionsAndEntitlements} />
+                <Dependency label="Financial dependencies" value={deletionSummary.financialDependencies} />
+                <Dependency label="Audit events" value={deletionSummary.auditEvents} />
+              </div>
+              <dl className="mt-4 grid gap-3 rounded-lg border border-dark-border bg-white/[0.025] p-3 text-sm text-secondary sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                    QA / Test account
+                  </dt>
+                  <dd className="mt-1 font-semibold text-primary">
+                    {deletionSummary.isTestAccount ? "Yes" : "No"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                    Permanent deletion allowed
+                  </dt>
+                  <dd className="mt-1 font-semibold text-primary">
+                    {deletionSummary.canDelete ? "Yes" : "No"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                    Active deletion job
+                  </dt>
+                  <dd className="mt-1 font-semibold text-primary">
+                    {deletionSummary.activeDeletionJobState
+                      ? deletionSummary.activeDeletionJobState.replaceAll("_", " ")
+                      : "None"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                    Auth identity handling
+                  </dt>
+                  <dd className="mt-1 font-semibold text-primary">
+                    Preserved
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-4 text-sm text-muted">
+                Auth users are never deleted by this workflow. Shared identities
+                remain available for other organizations.
+              </p>
+              {deletionSummary.associatedExternalData.map((note) => (
+                <p key={note} className="mt-2 text-sm text-muted">
+                  {note}
+                </p>
+              ))}
+              {deletionSummary.protectedReasons.length ? (
+                <div className="mt-4 rounded-lg border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                  <p className="font-bold">Deletion blocked</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {deletionSummary.protectedReasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <form action={deleteCustomerAction} className="mt-5 grid gap-3">
+                <input
+                  type="hidden"
+                  name="organization_id"
+                  value={customer.organization.id}
+                />
+                <label className="text-sm font-semibold text-secondary">
+                  Type the exact organization name to permanently delete:
+                  <span className="ml-1 text-primary">{customer.organization.name}</span>
+                  <input
+                    name="confirmation_name"
+                    className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary outline-none focus:border-red-300"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-sm text-secondary">
+                  <input type="checkbox" name="confirm_delete" value="yes" required />
+                  I understand this deletes organization-scoped records and
+                  storage objects but not Supabase Auth users.
+                </label>
+                <button
+                  type="submit"
+                  className="justify-self-start rounded-full border border-red-300/40 px-4 py-2 text-sm font-semibold text-red-100 hover:bg-red-400/10 disabled:opacity-50"
+                  disabled={!deletionSummary.canDelete}
+                >
+                  Permanently Delete
+                </button>
+              </form>
+            </div>
+          ) : null}
+        </section>
 
         <p className="mb-8 mt-6 text-xs text-muted">
           Active organization members: {customer.activeMembers}
@@ -626,6 +907,184 @@ async function saveFeatureAccessAction(formData: FormData) {
   redirect(`/opzix-admin/customers/${organizationId}`);
 }
 
+async function saveCustomerEditAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized customer admin action.");
+  }
+
+  const organizationId = stringField(formData, "organization_id");
+  if (!isUuid(organizationId)) throw new Error("Invalid organization reference.");
+
+  const customer = await getCustomerAdminDetail(organizationId);
+  if (!customer) throw new Error("Customer was not found.");
+
+  const organizationName = stringField(formData, "organization_name");
+  const customerDisplayName = stringField(formData, "customer_display_name");
+  const organizationType = stringField(formData, "organization_type");
+  const organizationStatus = stringField(formData, "organization_status");
+  const planCode = stringField(formData, "plan_code");
+  const phone = stringField(formData, "phone");
+  const setupFee = parseMoney(stringField(formData, "setup_fee"));
+  const monthlySubscription = parseMoney(
+    stringField(formData, "monthly_subscription"),
+  );
+  const isTestAccount = stringField(formData, "is_test_account") === "yes";
+
+  if (
+    organizationName.length < 2 ||
+    organizationName.length > 160 ||
+    !["agent", "team", "brokerage", "other"].includes(organizationType) ||
+    !["active", "onboarding", "suspended", "archived"].includes(
+      organizationStatus,
+    ) ||
+    setupFee === null ||
+    monthlySubscription === null
+  ) {
+    redirect(`/opzix-admin/customers/${organizationId}?mode=edit&error=edit`);
+  }
+
+  const names = splitCustomerName(customerDisplayName);
+  const changedFields = new Set<string>();
+  if (organizationName !== customer.organization.name) changedFields.add("organization_name");
+  if (organizationType !== customer.organization.organization_type) changedFields.add("business_type");
+  if (organizationStatus !== customer.organization.status) changedFields.add("customer_status");
+  if (isTestAccount !== customer.isQa) changedFields.add("qa_classification");
+  if ((customer.profile?.phone ?? "") !== phone) changedFields.add("contact_information");
+  if (customer.plan?.code !== planCode) changedFields.add("plan_assignment");
+  if ((customer.terms?.setup_fee ?? 0) !== setupFee) changedFields.add("setup_fee");
+  if ((customer.terms?.monthly_subscription ?? 0) !== monthlySubscription) {
+    changedFields.add("monthly_subscription");
+  }
+
+  const now = new Date().toISOString();
+  const metadata = {
+    ...(isRecord(customer.organization.metadata)
+      ? customer.organization.metadata
+      : {}),
+    is_qa: isTestAccount,
+  };
+  const organizationBody: Record<string, unknown> = {
+    name: organizationName,
+    organization_type: organizationType,
+    is_test_account: isTestAccount,
+    metadata,
+    updated_at: now,
+  };
+  if (organizationStatus !== "archived") {
+    organizationBody.status = organizationStatus;
+  }
+
+  const organizationUpdate = await supabaseAdminFetch<null>("organizations", {
+    method: "PATCH",
+    query: { id: `eq.${organizationId}` },
+    body: organizationBody,
+    prefer: "return=minimal",
+  });
+  if (!organizationUpdate.ok) throw new Error(organizationUpdate.error);
+
+  if (customer.invitation) {
+    const invitationUpdate = await supabaseAdminFetch<null>(
+      "organization_invitations",
+      {
+        method: "PATCH",
+        query: { id: `eq.${customer.invitation.id}` },
+        body: {
+          first_name: names.firstName,
+          last_name: names.lastName,
+          plan_code: planCode,
+          metadata: {
+            ...(isRecord(customer.invitation.metadata)
+              ? customer.invitation.metadata
+              : {}),
+            is_qa: isTestAccount,
+          },
+          updated_at: now,
+        },
+        prefer: "return=minimal",
+      },
+    );
+    if (!invitationUpdate.ok) throw new Error(invitationUpdate.error);
+  }
+
+  if (customer.invitation?.auth_user_id) {
+    const profileUpdate = await supabaseAdminFetch<null>("profiles", {
+      method: "POST",
+      query: { on_conflict: "user_id" },
+      body: {
+        user_id: customer.invitation.auth_user_id,
+        first_name: names.firstName,
+        last_name: names.lastName,
+        preferred_name: customerDisplayName || null,
+        phone: phone || null,
+        updated_at: now,
+      },
+      prefer: "resolution=merge-duplicates,return=minimal",
+    });
+    if (!profileUpdate.ok) throw new Error(profileUpdate.error);
+  }
+
+  const plan = await planByCode(planCode);
+  if (!plan) redirect(`/opzix-admin/customers/${organizationId}?mode=edit&error=edit`);
+  const subscriptionUpdate = await supabaseAdminFetch<null>(
+    "organization_subscriptions",
+    {
+      method: "POST",
+      query: { on_conflict: "organization_id" },
+      body: {
+        organization_id: organizationId,
+        plan_id: plan.id,
+        status: customer.subscription?.status ?? "active",
+        starts_at: customer.subscription?.starts_at ?? now,
+        external_subscription_id:
+          customer.subscription?.external_subscription_id ?? null,
+        updated_at: now,
+      },
+      prefer: "resolution=merge-duplicates,return=minimal",
+    },
+  );
+  if (!subscriptionUpdate.ok) throw new Error(subscriptionUpdate.error);
+
+  const termsUpdate = await supabaseAdminFetch<null>(
+    "organization_commercial_terms",
+    {
+      method: "POST",
+      query: { on_conflict: "organization_id" },
+      body: {
+        organization_id: organizationId,
+        setup_fee: setupFee,
+        monthly_subscription: monthlySubscription,
+        currency: "USD",
+        updated_at: now,
+      },
+      prefer: "resolution=merge-duplicates,return=minimal",
+    },
+  );
+  if (!termsUpdate.ok) throw new Error(termsUpdate.error);
+
+  if (organizationStatus === "archived") {
+    const archived = await archiveCustomerOrganization(organizationId);
+    if (!archived.ok) throw new Error(archived.error);
+  } else if (customer.organization.status === "archived") {
+    const restored = await restoreCustomerOrganization(organizationId);
+    if (!restored.ok) throw new Error(restored.error);
+    const statusUpdate = await supabaseAdminFetch<null>("organizations", {
+      method: "PATCH",
+      query: { id: `eq.${organizationId}` },
+      body: { status: organizationStatus, updated_at: now },
+      prefer: "return=minimal",
+    });
+    if (!statusUpdate.ok) throw new Error(statusUpdate.error);
+  }
+
+  await recordAdminEvent(organizationId, "customer_profile_updated", {
+    changedFields: Array.from(changedFields).sort().join(",") || "none",
+  });
+  revalidatePath("/opzix-admin/customers");
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
 async function saveLaunchProgressAction(formData: FormData) {
   "use server";
   if (!(await isAdminAuthenticated())) {
@@ -669,7 +1128,7 @@ async function saveLaunchProgressAction(formData: FormData) {
   redirect(`/opzix-admin/customers/${organizationId}`);
 }
 
-async function archiveQaCustomerAction(formData: FormData) {
+async function archiveCustomerAction(formData: FormData) {
   "use server";
   if (!(await isAdminAuthenticated())) {
     throw new Error("Unauthorized customer admin action.");
@@ -681,17 +1140,53 @@ async function archiveQaCustomerAction(formData: FormData) {
     redirect(`/opzix-admin/customers/${organizationId ?? ""}?error=archive`);
   }
 
-  const archived = await supabaseAdminRpc<boolean>("archive_qa_customer", {
-    p_organization_id: organizationId,
-  });
-  if (!archived.ok || archived.data !== true) {
-    throw new Error(
-      archived.ok ? "QA customer was not archived." : archived.error,
-    );
-  }
+  const archived = await archiveCustomerOrganization(organizationId);
+  if (!archived.ok) throw new Error(archived.error);
   revalidatePath("/opzix-admin/customers");
   revalidatePath(`/opzix-admin/customers/${organizationId}`);
-  redirect(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}?action=archived`);
+}
+
+async function restoreCustomerAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized customer admin action.");
+  }
+  const confirmed = stringField(formData, "confirm_restore") === "yes";
+  const organizationId = stringField(formData, "organization_id");
+  if (!isUuid(organizationId) || !confirmed) {
+    redirect(`/opzix-admin/customers/${organizationId ?? ""}?error=restore`);
+  }
+
+  const restored = await restoreCustomerOrganization(organizationId);
+  if (!restored.ok) throw new Error(restored.error);
+  revalidatePath("/opzix-admin/customers");
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}?action=restored`);
+}
+
+async function deleteCustomerAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) {
+    throw new Error("Unauthorized customer admin action.");
+  }
+  const organizationId = stringField(formData, "organization_id");
+  const confirmationName = stringField(formData, "confirmation_name");
+  const confirmed = stringField(formData, "confirm_delete") === "yes";
+  if (!isUuid(organizationId) || !confirmed) {
+    redirect(`/opzix-admin/customers/${organizationId ?? ""}?error=delete`);
+  }
+
+  const result = await permanentlyDeleteCustomerOrganization({
+    organizationId,
+    confirmationName,
+  });
+  if (!result.ok) {
+    revalidatePath(`/opzix-admin/customers/${organizationId}`);
+    redirect(`/opzix-admin/customers/${organizationId}?action=delete-blocked`);
+  }
+  revalidatePath("/opzix-admin/customers");
+  redirect("/opzix-admin/customers?filter=archived&action=deleted");
 }
 
 async function organizationForInvitation(invitationId: string) {
@@ -709,6 +1204,31 @@ async function organizationForInvitation(invitationId: string) {
   );
   if (!result.ok) throw new Error(result.error);
   return result.data[0]?.organization_id ?? null;
+}
+
+async function loadPlanOptions() {
+  const result = await supabaseAdminFetch<PlanRow[]>("plans", {
+    query: {
+      select: "id,code,name,status",
+      status: "eq.active",
+      order: "name.asc",
+    },
+  });
+  if (!result.ok) throw new Error(result.error);
+  return result.data;
+}
+
+async function planByCode(planCode: string) {
+  const result = await supabaseAdminFetch<PlanRow[]>("plans", {
+    query: {
+      select: "id,code,name,status",
+      code: `eq.${planCode}`,
+      status: "eq.active",
+      limit: 1,
+    },
+  });
+  if (!result.ok) throw new Error(result.error);
+  return result.data[0] ?? null;
 }
 
 async function recordAdminEvent(
@@ -752,6 +1272,17 @@ function DetailCard({
   );
 }
 
+function Dependency({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-dark-border bg-white/[0.025] p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-bold text-primary">{value}</p>
+    </div>
+  );
+}
+
 function MoneyField({
   name,
   label,
@@ -784,6 +1315,18 @@ function stringParam(value: string | string[] | undefined) {
 function stringField(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function splitCustomerName(value: string) {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] ?? null,
+    lastName: parts.length > 1 ? parts.slice(1).join(" ") : null,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseMoney(value: string) {

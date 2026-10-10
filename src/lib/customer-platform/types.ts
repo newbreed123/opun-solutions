@@ -42,6 +42,7 @@ export type OrganizationRow = {
   organization_type: OrganizationType;
   timezone: string;
   status: OrganizationStatus;
+  is_test_account?: boolean;
   created_at: string;
   updated_at: string;
 };

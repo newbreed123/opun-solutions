@@ -15,6 +15,7 @@ import type {
 
 type AdminOrganization = OrganizationRow & {
   metadata: Record<string, unknown>;
+  is_test_account?: boolean;
 };
 
 type AuditEventRow = {
@@ -61,7 +62,7 @@ export type CustomerAdminDetail = CustomerAdminSummary & {
 };
 
 const ORGANIZATION_SELECT =
-  "id,name,slug,organization_type,timezone,status,created_at,updated_at,metadata";
+  "id,name,slug,organization_type,timezone,status,is_test_account,created_at,updated_at,metadata";
 const INVITATION_SELECT =
   "id,organization_id,email,first_name,last_name,auth_user_id,plan_code,status,invitation_state,invited_at,accepted_at,last_error,metadata,updated_at";
 const ONBOARDING_SELECT =
@@ -322,6 +323,7 @@ async function summarizeOrganization(
     "Not invited";
   const lastActivity = activity[0] ?? null;
   const isQa =
+    organization.is_test_account === true ||
     organization.metadata?.is_qa === true ||
     invitation?.metadata?.is_qa === true ||
     Boolean(
