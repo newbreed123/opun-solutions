@@ -495,11 +495,15 @@ export default async function CustomerDetailPage({
           </div>
 
           <div className="mt-6 grid gap-4">
-            {billing.invoices.map((invoice) => (
-              <article
-                key={invoice.id}
-                className="rounded-xl border border-dark-border bg-white/[0.025] p-4"
-              >
+            {billing.invoices.map((invoice) => {
+              const canIssueInvoice =
+                invoice.status === "draft" && invoice.total > 0;
+
+              return (
+                <article
+                  key={invoice.id}
+                  className="rounded-xl border border-dark-border bg-white/[0.025] p-4"
+                >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <h3 className="font-bold text-primary">
@@ -572,14 +576,26 @@ export default async function CustomerDetailPage({
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-3">
                   {invoice.status === "draft" ? (
-                    <form action={issueInvoiceAction}>
-                      <input type="hidden" name="organization_id" value={customer.organization.id} />
-                      <input type="hidden" name="invoice_id" value={invoice.id} />
-                      <input type="hidden" name="payment_idempotency_key" value={crypto.randomUUID()} />
-                      <button type="submit" className="btn btn-primary min-h-10">
-                        Issue Invoice
-                      </button>
-                    </form>
+                    <div className="grid gap-2">
+                      <form action={issueInvoiceAction}>
+                        <input type="hidden" name="organization_id" value={customer.organization.id} />
+                        <input type="hidden" name="invoice_id" value={invoice.id} />
+                        <input type="hidden" name="payment_idempotency_key" value={crypto.randomUUID()} />
+                        <button
+                          type="submit"
+                          disabled={!canIssueInvoice}
+                          className="btn btn-primary min-h-10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Issue Invoice
+                        </button>
+                      </form>
+                      {!canIssueInvoice ? (
+                        <p className="max-w-xl text-sm text-amber-100">
+                          Add at least one positive line item before issuing this
+                          invoice.
+                        </p>
+                      ) : null}
+                    </div>
                   ) : null}
                   {invoice.status === "issued" || invoice.status === "partially_paid" ? (
                     <form action={recordPaymentAction} className="grid gap-3 rounded-lg border border-dark-border bg-dark-deep p-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -659,8 +675,9 @@ export default async function CustomerDetailPage({
                     </div>
                   </div>
                 ) : null}
-              </article>
-            ))}
+                </article>
+              );
+            })}
             {!billing.invoices.length ? (
               <p className="text-sm text-muted">No invoices have been created.</p>
             ) : null}
@@ -1747,7 +1764,7 @@ async function issueInvoiceAction(formData: FormData) {
   const invoiceId = stringField(formData, "invoice_id");
   if (!isUuid(invoiceId)) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
   const result = await issueInvoice({ organizationId, invoiceId });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
   await recordAdminEvent(organizationId, "customer_billing_invoice_issued", {
     invoiceId,
   });
