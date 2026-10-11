@@ -42,8 +42,8 @@ export default async function DocumentsPage({
       : null;
 
   return (
-    <div className="grid gap-6">
-      <section className="rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
+    <div className="grid min-w-0 gap-6">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
           Documents
         </p>
@@ -61,8 +61,8 @@ export default async function DocumentsPage({
         ) : null}
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-xl border border-dark-border bg-dark-card p-5">
+      <section className="grid min-w-0 gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
           <h2 className="text-xl font-bold text-primary">Upload Document</h2>
           <CustomerDocumentUploadForm
             categories={categories}
@@ -74,7 +74,7 @@ export default async function DocumentsPage({
           />
         </div>
 
-        <div className="rounded-xl border border-dark-border bg-dark-card p-5">
+        <div className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
           <h2 className="text-xl font-bold text-primary">Requested Documents</h2>
           {openRequests.length ? (
             <div className="mt-4 grid gap-3">
@@ -103,28 +103,28 @@ export default async function DocumentsPage({
         </div>
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-5">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
         <h2 className="text-xl font-bold text-primary">Shared Documents</h2>
         {documents.ok && documents.data.length ? (
           <div className="mt-4 grid gap-3">
             {documents.data.map((document) => (
               <div
                 key={document.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dark-border bg-white/[0.025] p-4"
+                className="grid min-w-0 gap-3 rounded-lg border border-dark-border bg-white/[0.025] p-4 sm:flex sm:items-center sm:justify-between"
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 items-start gap-3 sm:items-center">
                   <FileText className="h-5 w-5 shrink-0 text-brand-cyan" />
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-primary">
+                    <p className="break-words font-semibold text-primary sm:truncate">
                       {document.title}
                     </p>
-                    <p className="text-xs text-secondary">
+                    <p className="break-words text-xs text-secondary">
                       {documentCategoryLabel(document.category)} ·{" "}
                       {formatDate(document.created_at)}
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:justify-end">
                   {document.viewUrl ? (
                     <a
                       href={document.viewUrl}
@@ -136,7 +136,7 @@ export default async function DocumentsPage({
                   {document.downloadUrl ? (
                     <a
                       href={document.downloadUrl}
-                      className="inline-flex items-center gap-2 text-sm font-semibold text-brand-cyan"
+                      className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-brand-cyan"
                     >
                       <FileDown className="h-4 w-4" />
                       Download

@@ -45,8 +45,8 @@ export default async function CustomerAppPage() {
     context.user.email.split("@")[0];
 
   return (
-    <div className="grid gap-6 lg:gap-8">
-      <section className="rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
+    <div className="grid min-w-0 gap-6 lg:gap-8">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
           Business Hub
         </p>
@@ -61,7 +61,7 @@ export default async function CustomerAppPage() {
         </p>
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
@@ -84,8 +84,8 @@ export default async function CustomerAppPage() {
             style={{ width: `${launch.status.progress_percent}%` }}
           />
         </div>
-        <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-lg border border-dark-border bg-white/[0.025] p-4">
+        <div className="mt-6 grid min-w-0 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="min-w-0 rounded-lg border border-dark-border bg-white/[0.025] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
               Latest Opzix update
             </p>
@@ -94,7 +94,7 @@ export default async function CustomerAppPage() {
                 "Opzix will post launch updates here as your platform moves forward."}
             </p>
           </div>
-          <div className="rounded-lg border border-dark-border bg-white/[0.025] p-4">
+          <div className="min-w-0 rounded-lg border border-dark-border bg-white/[0.025] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
               Next action
             </p>
@@ -103,7 +103,7 @@ export default async function CustomerAppPage() {
             </p>
           </div>
         </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5">
           {launchStages.slice(0, 5).map((stage, index) => {
             const complete = index < currentIndex;
             const current = index === currentIndex;
@@ -111,21 +111,21 @@ export default async function CustomerAppPage() {
             return (
               <div
                 key={stage.code}
-                className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${
+                className={`flex min-w-0 items-center gap-2 rounded-lg border p-3 text-sm ${
                   current
                     ? "border-brand-cyan bg-brand-cyan/10 text-primary"
                     : "border-dark-border bg-white/[0.025] text-secondary"
                 }`}
               >
                 <Icon className="h-4 w-4 text-brand-cyan" />
-                <span>{stage.label}</span>
+                <span className="min-w-0 break-words">{stage.label}</span>
               </div>
             );
           })}
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid min-w-0 gap-4 lg:grid-cols-3">
         <OverviewCard title="Billing" href="/app/billing" action="View billing">
           <div className="mt-4 grid gap-3">
             <Metric label="Paid" value={formatCurrency(billing.totalPaid)} />
@@ -170,9 +170,9 @@ export default async function CustomerAppPage() {
         </OverviewCard>
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-5">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
         <h2 className="text-xl font-bold text-primary">Quick Actions</h2>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <QuickAction href="/app/onboarding" label="View Onboarding" />
           <QuickAction href="/app/billing" label="View Billing" />
           <QuickAction href="/app/documents" label="Upload Document" icon="upload" />
@@ -180,14 +180,14 @@ export default async function CustomerAppPage() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-5">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
         <h2 className="text-xl font-bold text-primary">Business Tools</h2>
         {enabledTools.length ? (
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {enabledTools.slice(0, 6).map((tool) => (
               <div
                 key={tool.featureCode}
-                className="rounded-lg border border-dark-border bg-white/[0.025] p-4"
+                className="min-w-0 rounded-lg border border-dark-border bg-white/[0.025] p-4"
               >
                 <p className="font-bold text-primary">{tool.featureName}</p>
                 <p className="mt-2 text-sm leading-6 text-secondary">
@@ -219,12 +219,12 @@ function OverviewCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-dark-card p-5">
-      <div className="flex items-center justify-between gap-3">
+    <div className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-primary">{title}</h2>
         <Link
           href={href}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-brand-cyan"
+          className="inline-flex min-w-0 items-center gap-1 text-sm font-semibold text-brand-cyan"
         >
           {action}
           <ArrowRight className="h-4 w-4" />
@@ -237,9 +237,9 @@ function OverviewCard({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 text-sm">
       <span className="text-secondary">{label}</span>
-      <span className="font-bold text-primary">{value}</span>
+      <span className="break-words font-bold text-primary">{value}</span>
     </div>
   );
 }
@@ -257,9 +257,9 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-dark-border bg-white/[0.025] px-4 text-sm font-semibold text-primary hover:border-brand-cyan"
+      className="flex min-h-12 min-w-0 items-center justify-between gap-3 rounded-lg border border-dark-border bg-white/[0.025] px-4 text-sm font-semibold text-primary hover:border-brand-cyan"
     >
-      {label}
+      <span className="min-w-0 break-words">{label}</span>
       <Icon className="h-4 w-4 text-brand-cyan" />
     </Link>
   );

@@ -28,8 +28,8 @@ export default async function BillingPage() {
     : [];
 
   return (
-    <div className="grid gap-6">
-      <section className="rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
+    <div className="grid min-w-0 gap-6">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-6 md:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-cyan">
           Billing
         </p>
@@ -48,7 +48,7 @@ export default async function BillingPage() {
         ) : null}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid min-w-0 gap-4 md:grid-cols-3">
         <BillingStat title="Setup fee" value={formatCurrency(billing.setupFee)} />
         <BillingStat title="Paid" value={formatCurrency(billing.totalPaid)} />
         <BillingStat
@@ -57,10 +57,10 @@ export default async function BillingPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-5">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
         <h2 className="text-xl font-bold text-primary">Subscription Terms</h2>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-dark-border bg-white/[0.025] p-4">
+        <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2">
+          <div className="min-w-0 rounded-lg border border-dark-border bg-white/[0.025] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
               Monthly subscription
             </p>
@@ -68,7 +68,7 @@ export default async function BillingPage() {
               {formatCurrency(billing.monthlySubscription)} / month
             </p>
           </div>
-          <div className="rounded-lg border border-dark-border bg-white/[0.025] p-4">
+          <div className="min-w-0 rounded-lg border border-dark-border bg-white/[0.025] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
               Starts
             </p>
@@ -79,9 +79,9 @@ export default async function BillingPage() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
             <h2 className="text-xl font-bold text-primary">Invoices</h2>
             <p className="mt-2 text-sm text-secondary">
               Balances are calculated from issued invoices and confirmed
@@ -97,11 +97,11 @@ export default async function BillingPage() {
             {billing.invoices.map((invoice) => (
               <article
                 key={invoice.id}
-                className="rounded-lg border border-dark-border bg-white/[0.025] p-4"
+                className="min-w-0 rounded-lg border border-dark-border bg-white/[0.025] p-4"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-primary">
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-bold text-primary">
                       {invoice.invoice_number}
                     </p>
                     <p className="mt-1 text-sm text-secondary">
@@ -109,8 +109,8 @@ export default async function BillingPage() {
                       {invoiceStatusLabel(invoice.status)}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-primary">
+                  <div className="min-w-0 text-left sm:text-right">
+                    <p className="break-words font-bold text-primary">
                       {formatCurrency(invoice.total)}
                     </p>
                     <p className="text-sm text-secondary">
@@ -138,13 +138,13 @@ export default async function BillingPage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-5">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
         <h2 className="text-xl font-bold text-primary">Payment History</h2>
         {billing.payments.length ? (
           <div className="mt-4 divide-y divide-dark-border">
             {billing.payments.map((payment) => (
-              <div key={payment.id} className="flex flex-wrap justify-between gap-3 py-3 text-sm">
-                <div>
+              <div key={payment.id} className="flex min-w-0 flex-wrap justify-between gap-3 py-3 text-sm">
+                <div className="min-w-0">
                   <p className="font-semibold text-primary">
                     {payment.payment_kind === "reversal" ? "Payment reversal" : "Payment received"}
                   </p>
@@ -167,19 +167,19 @@ export default async function BillingPage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-dark-border bg-dark-card p-5">
+      <section className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
         <h2 className="text-xl font-bold text-primary">Billing Documents</h2>
         {billingDocuments.length ? (
           <div className="mt-4 grid gap-3">
             {billingDocuments.map((document) => (
               <div
                 key={document.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dark-border bg-white/[0.025] p-3"
+                className="grid min-w-0 gap-3 rounded-lg border border-dark-border bg-white/[0.025] p-3 sm:flex sm:items-center sm:justify-between"
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 items-start gap-3 sm:items-center">
                   <ReceiptText className="h-5 w-5 shrink-0 text-brand-cyan" />
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-primary">
+                    <p className="break-words font-semibold text-primary sm:truncate">
                       {document.title}
                     </p>
                     <p className="text-xs text-secondary">
@@ -191,7 +191,7 @@ export default async function BillingPage() {
                 {document.downloadUrl ? (
                   <a
                     href={document.downloadUrl}
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-brand-cyan"
+                    className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-brand-cyan"
                   >
                     <FileDown className="h-4 w-4" />
                     Download
@@ -212,11 +212,11 @@ export default async function BillingPage() {
 
 function BillingStat({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-xl border border-dark-border bg-dark-card p-5">
+    <div className="min-w-0 rounded-xl border border-dark-border bg-dark-card p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-cyan">
         {title}
       </p>
-      <p className="mt-2 text-3xl font-extrabold text-primary">{value}</p>
+      <p className="mt-2 break-words text-3xl font-extrabold text-primary">{value}</p>
     </div>
   );
 }

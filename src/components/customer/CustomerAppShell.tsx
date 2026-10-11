@@ -3,18 +3,8 @@ import type { ReactNode } from "react";
 import { Bell, ChevronDown, CircleHelp, LogOut, UserCircle } from "lucide-react";
 import { logoutAction } from "@/lib/customer-platform/session-actions";
 import type { CustomerContext } from "@/lib/customer-platform/types";
+import CustomerAppNav from "./CustomerAppNav";
 import { EntitlementProvider } from "./EntitlementProvider";
-
-const navItems = [
-  { href: "/app", label: "Home" },
-  { href: "/app/onboarding", label: "Onboarding" },
-  { href: "/app/billing", label: "Billing" },
-  { href: "/app/documents", label: "Documents" },
-  { href: "/app/settings", label: "Account" },
-  { href: "/app/business-profile", label: "Business Profile" },
-  { href: "/app/plan-features", label: "Plan & Features" },
-  { href: "/app/support", label: "Support" },
-];
 
 export default function CustomerAppShell({
   context,
@@ -33,8 +23,8 @@ export default function CustomerAppShell({
     <EntitlementProvider entitlements={context.entitlements}>
       <div className="min-h-screen bg-dark text-primary">
         <header className="sticky top-0 z-40 border-b border-dark-border bg-dark/92 backdrop-blur-xl">
-          <div className="container-wide flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 flex-wrap items-center gap-4">
+          <div className="container-wide flex min-w-0 flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-4">
               <Link
                 href="/app/onboarding"
                 className="shrink-0 text-lg font-extrabold tracking-[0.18em] text-primary"
@@ -50,21 +40,8 @@ export default function CustomerAppShell({
                 </p>
               </div>
             </div>
-            <nav
-              aria-label="Customer app navigation"
-              className="flex gap-2 overflow-x-auto pb-1 text-sm font-semibold text-secondary lg:pb-0"
-            >
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="shrink-0 rounded-full border border-dark-border bg-white/[0.035] px-4 py-2 hover:border-brand-cyan/60 hover:text-primary"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-            <div className="flex items-center gap-2">
+            <CustomerAppNav />
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
               <Link
                 href="/app/support"
                 className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-dark-border bg-white/[0.035] px-3 text-sm font-semibold text-secondary hover:border-brand-cyan/60 hover:text-primary"

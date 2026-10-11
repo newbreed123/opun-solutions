@@ -117,14 +117,14 @@ export default function CustomerDocumentUploadForm({
   return (
     <form
       ref={formRef}
-      className="mt-5 grid gap-4"
+      className="mt-5 grid min-w-0 gap-4"
       onSubmit={handleSubmit}
     >
-      <label className="text-sm font-semibold text-secondary">
+      <label className="min-w-0 text-sm font-semibold text-secondary">
         Document request
         <select
           name="request_id"
-          className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+          className="mt-2 min-h-11 w-full min-w-0 rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
         >
           <option value="">General upload</option>
           {requests.map((request) => (
@@ -134,12 +134,12 @@ export default function CustomerDocumentUploadForm({
           ))}
         </select>
       </label>
-      <label className="text-sm font-semibold text-secondary">
+      <label className="min-w-0 text-sm font-semibold text-secondary">
         Category
         <select
           name="category"
           defaultValue="business_documents"
-          className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+          className="mt-2 min-h-11 w-full min-w-0 rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
         >
           {categories.map((category) => (
             <option key={category} value={category}>
@@ -148,16 +148,16 @@ export default function CustomerDocumentUploadForm({
           ))}
         </select>
       </label>
-      <label className="text-sm font-semibold text-secondary">
+      <label className="min-w-0 text-sm font-semibold text-secondary">
         Title
         <input
           name="title"
           required
-          className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
+          className="mt-2 min-h-11 w-full min-w-0 rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
           placeholder="Broker authorization, W-9, logo file..."
         />
       </label>
-      <label className="text-sm font-semibold text-secondary">
+      <label className="min-w-0 text-sm font-semibold text-secondary">
         File
         <input
           ref={fileInputRef}
@@ -176,7 +176,7 @@ export default function CustomerDocumentUploadForm({
             setError(validation.ok ? null : validation.error);
             setSuccess(null);
           }}
-          className="mt-2 block w-full rounded-xl border border-dark-border bg-dark-deep px-3 py-3 text-sm text-secondary file:mr-4 file:rounded-lg file:border-0 file:bg-brand-cyan file:px-3 file:py-2 file:font-semibold file:text-slate-950"
+          className="mt-2 block w-full min-w-0 max-w-full rounded-xl border border-dark-border bg-dark-deep px-3 py-3 text-sm text-secondary file:mr-4 file:rounded-lg file:border-0 file:bg-brand-cyan file:px-3 file:py-2 file:font-semibold file:text-slate-950"
         />
       </label>
       <p className="text-xs text-muted">
