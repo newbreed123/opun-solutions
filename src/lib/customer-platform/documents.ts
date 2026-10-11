@@ -1,14 +1,15 @@
 import { getSupabaseAdminConfig, supabaseAdminFetch } from "@/lib/supabase-admin";
+import {
+  DOCUMENT_ACCEPT,
+  type CustomerDocumentCategory as PolicyCustomerDocumentCategory,
+  MAX_DOCUMENT_BYTES,
+  documentCategoryLabel,
+} from "./document-policy";
 import { CUSTOMER_ASSETS_BUCKET, isPreviewableImage } from "./onboarding-assets";
 
-export type CustomerDocumentCategory =
-  | "agreements"
-  | "invoices"
-  | "receipts"
-  | "brand_assets"
-  | "mls_brokerage"
-  | "business_documents"
-  | "other";
+export { DOCUMENT_ACCEPT, documentCategoryLabel };
+
+export type CustomerDocumentCategory = PolicyCustomerDocumentCategory;
 
 export type CustomerDocumentVisibility = "customer_visible" | "internal";
 export type CustomerDocumentSource = "opzix_admin" | "customer";
@@ -58,8 +59,6 @@ const DOCUMENT_SELECT =
   "id,organization_id,category,title,description,visibility,source,status,bucket,object_path,filename,mime_type,size_bytes,uploaded_by_user_id,uploaded_by_label,replaced_by_document_id,created_at,updated_at";
 const REQUEST_SELECT =
   "id,organization_id,category,title,message,status,fulfilled_by_document_id,created_by,created_at,updated_at,fulfilled_at";
-const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
-export const DOCUMENT_ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,.txt";
 export const INTERNAL_DOCUMENTS_BUCKET = "opzix-internal-documents";
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "text/plain"]);
 const ACTIVE_CONTENT_PATTERNS = [
@@ -275,6 +274,197 @@ export async function createDocumentRequest({
   });
 }
 
+export async function createCustomerDocumentUploadUrl({
+  organizationId,
+  category,
+  filename,
+}: {
+  organizationId: string;
+  category: CustomerDocumentCategory;
+  filename: string;
+}) {
+  const config = getSupabaseAdminConfig();
+  if (!config) {
+    return { ok: false as const, error: "Supabase storage is not configured." };
+  }
+
+  const now = new Date();
+  const objectPath = [
+    organizationId,
+    "documents",
+    category,
+    `${now.getTime()}-${crypto.randomUUID()}-${safeFilename(filename)}`,
+  ].join("/");
+  const bucket = CUSTOMER_ASSETS_BUCKET;
+  const response = await fetch(
+    `${config.url}/storage/v1/object/upload/sign/${encodeURIComponent(bucket)}/${encodeObjectPath(objectPath)}`,
+    {
+      method: "POST",
+      headers: {
+        apikey: config.serviceRoleKey,
+        Authorization: `Bearer ${config.serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-upsert": "false",
+      },
+      body: JSON.stringify({}),
+      cache: "no-store",
+    },
+  ).catch(() => null);
+
+  if (!response) {
+    return { ok: false as const, error: "Storage upload authorization failed before a response." };
+  }
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      error: "Storage upload authorization failed.",
+      status: response.status,
+    };
+  }
+
+  const rawSignedUrl = stringValue(payload.signedUrl) || stringValue(payload.signedURL);
+  const rawUrl = stringValue(payload.url);
+  const signedUploadUrl = rawSignedUrl
+    ? absoluteStorageUrl(config.url, rawSignedUrl)
+    : rawUrl
+      ? absoluteStorageUrl(config.url, rawUrl)
+      : "";
+  if (!signedUploadUrl) {
+    return { ok: false as const, error: "Storage upload authorization was incomplete." };
+  }
+
+  return {
+    ok: true as const,
+    bucket,
+    objectPath,
+    signedUploadUrl,
+  };
+}
+
+export async function finalizeUploadedCustomerDocument({
+  organizationId,
+  userId,
+  title,
+  category,
+  requestId,
+  bucket,
+  objectPath,
+  filename,
+  browserMimeType,
+  sizeBytes,
+}: {
+  organizationId: string;
+  userId: string;
+  title: string;
+  category: CustomerDocumentCategory;
+  requestId?: string;
+  bucket: string;
+  objectPath: string;
+  filename: string;
+  browserMimeType?: string;
+  sizeBytes: number;
+}) {
+  if (bucket !== CUSTOMER_ASSETS_BUCKET) {
+    return { ok: false as const, error: "Document upload target is invalid." };
+  }
+  if (!objectPath.startsWith(`${organizationId}/documents/${category}/`)) {
+    return { ok: false as const, error: "Document upload path is invalid." };
+  }
+  if (sizeBytes > MAX_DOCUMENT_BYTES) {
+    await deleteStorageObject({ bucket, objectPath });
+    return { ok: false as const, error: "Documents must be 15 MB or smaller." };
+  }
+
+  if (requestId) {
+    const request = await loadDocumentRequest({ organizationId, requestId });
+    if (!request || request.status !== "open") {
+      await deleteStorageObject({ bucket, objectPath });
+      return { ok: false as const, error: "Document request was not found." };
+    }
+  }
+
+  const existing = await supabaseAdminFetch<CustomerDocumentRow[]>("customer_documents", {
+    query: {
+      select: DOCUMENT_SELECT,
+      organization_id: `eq.${organizationId}`,
+      bucket: `eq.${bucket}`,
+      object_path: `eq.${objectPath}`,
+      limit: 1,
+    },
+  });
+  if (!existing.ok) {
+    return existing;
+  }
+  const existingDocument = existing.data[0];
+  if (existingDocument) {
+    return { ok: true as const, document: existingDocument };
+  }
+
+  const downloaded = await downloadStorageObject({ bucket, objectPath });
+  if (!downloaded.ok) {
+    return downloaded;
+  }
+
+  const file = new File([downloaded.data], filename, {
+    type: browserMimeType || "application/octet-stream",
+  });
+  const validation = await validateDocumentFile(file);
+  if (!validation.ok) {
+    await deleteStorageObject({ bucket, objectPath });
+    return validation;
+  }
+
+  const inserted = await supabaseAdminFetch<CustomerDocumentRow[]>(
+    "customer_documents",
+    {
+      method: "POST",
+      body: {
+        organization_id: organizationId,
+        category,
+        title,
+        description: null,
+        visibility: "customer_visible",
+        source: "customer",
+        status: "active",
+        bucket,
+        object_path: objectPath,
+        filename: safeFilename(filename),
+        mime_type: validation.mimeType,
+        size_bytes: file.size,
+        uploaded_by_user_id: userId,
+        uploaded_by_label: "Customer upload",
+      },
+      prefer: "return=representation",
+    },
+  );
+  if (!inserted.ok) {
+    await deleteStorageObject({ bucket, objectPath });
+    return inserted;
+  }
+
+  const document = inserted.data[0];
+  if (requestId && document) {
+    await supabaseAdminFetch<null>("customer_document_requests", {
+      method: "PATCH",
+      query: {
+        id: `eq.${requestId}`,
+        organization_id: `eq.${organizationId}`,
+      },
+      body: {
+        status: "fulfilled",
+        fulfilled_by_document_id: document.id,
+        fulfilled_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      prefer: "returning=minimal",
+    });
+  }
+
+  return { ok: true as const, document };
+}
+
 export async function signCustomerDocument(
   document: CustomerDocumentRow,
 ): Promise<SignedCustomerDocument> {
@@ -290,25 +480,6 @@ export async function signCustomerDocument(
     downloadUrl,
     previewable: isPreviewableImage(document.mime_type) || document.mime_type === "application/pdf",
   };
-}
-
-export function documentCategoryLabel(category: CustomerDocumentCategory) {
-  switch (category) {
-    case "agreements":
-      return "Agreements";
-    case "invoices":
-      return "Invoices";
-    case "receipts":
-      return "Receipts";
-    case "brand_assets":
-      return "Brand Assets";
-    case "mls_brokerage":
-      return "MLS / Brokerage";
-    case "business_documents":
-      return "Business Documents";
-    case "other":
-      return "Other";
-  }
 }
 
 export async function validateDocumentFile(file: File) {
@@ -437,6 +608,68 @@ async function uploadStorageObject({
   return { ok: true as const };
 }
 
+async function downloadStorageObject({
+  bucket,
+  objectPath,
+}: {
+  bucket: string;
+  objectPath: string;
+}) {
+  const config = getSupabaseAdminConfig();
+  if (!config) {
+    return { ok: false as const, error: "Supabase storage is not configured." };
+  }
+
+  const response = await fetch(
+    `${config.url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeObjectPath(objectPath)}`,
+    {
+      method: "GET",
+      headers: {
+        apikey: config.serviceRoleKey,
+        Authorization: `Bearer ${config.serviceRoleKey}`,
+      },
+      cache: "no-store",
+    },
+  ).catch(() => null);
+  if (!response) {
+    return { ok: false as const, error: "Storage validation failed before a response." };
+  }
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      error: "Storage validation failed.",
+      status: response.status,
+    };
+  }
+  return { ok: true as const, data: await response.arrayBuffer() };
+}
+
+async function deleteStorageObject({
+  bucket,
+  objectPath,
+}: {
+  bucket: string;
+  objectPath: string;
+}) {
+  const config = getSupabaseAdminConfig();
+  if (!config) return { ok: false as const };
+
+  const response = await fetch(
+    `${config.url}/storage/v1/object/${encodeURIComponent(bucket)}`,
+    {
+      method: "DELETE",
+      headers: {
+        apikey: config.serviceRoleKey,
+        Authorization: `Bearer ${config.serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prefixes: [objectPath] }),
+    },
+  ).catch(() => null);
+
+  return { ok: response?.ok === true };
+}
+
 async function createSignedStorageUrl(bucket: string, objectPath: string) {
   const config = getSupabaseAdminConfig();
   if (!config || !bucket || !objectPath) return null;
@@ -485,4 +718,15 @@ function safeFilename(value: string) {
 
 function encodeObjectPath(value: string) {
   return value.split("/").map(encodeURIComponent).join("/");
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function absoluteStorageUrl(baseUrl: string, value: string) {
+  if (value.startsWith("http")) return value;
+  if (value.startsWith("/storage/v1")) return `${baseUrl}${value}`;
+  if (value.startsWith("/")) return `${baseUrl}/storage/v1${value}`;
+  return value;
 }

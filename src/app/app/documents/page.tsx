@@ -1,14 +1,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { FileDown, FileText, Upload } from "lucide-react";
+import { FileDown, FileText } from "lucide-react";
+import CustomerDocumentUploadForm from "@/components/customer/CustomerDocumentUploadForm";
 import {
-  DOCUMENT_ACCEPT,
   archiveCustomerDocument,
   documentCategoryLabel,
   listCustomerDocuments,
   listDocumentRequests,
   type CustomerDocumentCategory,
-  uploadCustomerDocument,
 } from "@/lib/customer-platform/documents";
 import { requireCustomerContext } from "@/lib/customer-platform/store";
 
@@ -37,6 +36,10 @@ export default async function DocumentsPage({
   ]);
   const openRequests = requests.filter((request) => request.status === "open");
   const uploadNotice = stringParam(query.upload);
+  const uploadError =
+    uploadNotice === "failed"
+      ? "Document upload failed. Check the file type and size, then try again."
+      : null;
 
   return (
     <div className="grid gap-6">
@@ -55,69 +58,20 @@ export default async function DocumentsPage({
           <p className="mt-5 rounded-lg border border-emerald-300/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
             Document uploaded.
           </p>
-        ) : uploadNotice === "failed" ? (
-          <p className="mt-5 rounded-lg border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100">
-            Document upload failed. Check the file type and size, then try again.
-          </p>
         ) : null}
       </section>
 
       <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-xl border border-dark-border bg-dark-card p-5">
           <h2 className="text-xl font-bold text-primary">Upload Document</h2>
-          <form action={uploadDocumentAction} className="mt-5 grid gap-4">
-            <label className="text-sm font-semibold text-secondary">
-              Document request
-              <select
-                name="request_id"
-                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
-              >
-                <option value="">General upload</option>
-                {openRequests.map((request) => (
-                  <option key={request.id} value={request.id}>
-                    {request.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm font-semibold text-secondary">
-              Category
-              <select
-                name="category"
-                defaultValue="business_documents"
-                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
-              >
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {documentCategoryLabel(category)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm font-semibold text-secondary">
-              Title
-              <input
-                name="title"
-                required
-                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-deep px-3 text-primary outline-none focus:border-brand-cyan"
-                placeholder="Broker authorization, W-9, logo file..."
-              />
-            </label>
-            <label className="text-sm font-semibold text-secondary">
-              File
-              <input
-                name="file"
-                type="file"
-                accept={DOCUMENT_ACCEPT}
-                required
-                className="mt-2 block w-full rounded-xl border border-dark-border bg-dark-deep px-3 py-3 text-sm text-secondary file:mr-4 file:rounded-lg file:border-0 file:bg-brand-cyan file:px-3 file:py-2 file:font-semibold file:text-slate-950"
-              />
-            </label>
-            <button type="submit" className="btn btn-primary min-h-11">
-              <Upload className="h-4 w-4" />
-              Upload Document
-            </button>
-          </form>
+          <CustomerDocumentUploadForm
+            categories={categories}
+            requests={openRequests.map((request) => ({
+              id: request.id,
+              title: request.title,
+            }))}
+            serverError={uploadError}
+          />
         </div>
 
         <div className="rounded-xl border border-dark-border bg-dark-card p-5">
@@ -213,32 +167,6 @@ export default async function DocumentsPage({
   );
 }
 
-async function uploadDocumentAction(formData: FormData) {
-  "use server";
-
-  const context = await requireCustomerContext();
-  const category = stringField(formData, "category");
-  const requestId = stringField(formData, "request_id");
-  const title = stringField(formData, "title");
-  const file = formData.get("file");
-  if (!isDocumentCategory(category) || title.length < 2 || !(file instanceof File)) {
-    redirect("/app/documents?upload=failed");
-  }
-
-  const uploaded = await uploadCustomerDocument({
-    organizationId: context.organization.id,
-    userId: context.user.id,
-    source: "customer",
-    title,
-    category,
-    visibility: "customer_visible",
-    file,
-    requestId: requestId || undefined,
-  });
-  revalidatePath("/app/documents");
-  redirect(`/app/documents?upload=${uploaded.ok ? "saved" : "failed"}`);
-}
-
 async function archiveDocumentAction(formData: FormData) {
   "use server";
 
@@ -253,10 +181,6 @@ async function archiveDocumentAction(formData: FormData) {
   });
   revalidatePath("/app/documents");
   redirect(`/app/documents?upload=${archived.ok ? "saved" : "failed"}`);
-}
-
-function isDocumentCategory(value: string): value is CustomerDocumentCategory {
-  return categories.includes(value as CustomerDocumentCategory);
 }
 
 function stringField(formData: FormData, key: string) {
