@@ -212,7 +212,15 @@ export default async function CustomerDetailPage({
             Onboarding invitation sent.
           </p>
         ) : null}
-        {pageError ? (
+        {pageError === "billing" ? (
+          <p
+            role="alert"
+            className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100"
+          >
+            Billing action could not be completed. Draft invoices require at
+            least one positive line item before they can be issued.
+          </p>
+        ) : pageError ? (
           <p
             role="alert"
             className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100"
