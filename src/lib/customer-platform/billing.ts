@@ -268,6 +268,13 @@ export async function addInvoiceLineItem({
 }) {
   const invoice = await loadInvoiceForOrganization({ organizationId, invoiceId });
   if (!invoice) return { ok: false as const, error: "Invoice was not found.", status: 404 };
+  if (invoice.status !== "draft") {
+    return {
+      ok: false as const,
+      error: "Invoice line items can only be added while the invoice is draft.",
+      status: 400,
+    };
+  }
 
   return supabaseAdminFetch<BillingLineItemRow[]>(
     "customer_billing_invoice_line_items",
@@ -280,6 +287,105 @@ export async function addInvoiceLineItem({
         description,
         quantity,
         unit_amount: unitAmount,
+      },
+      prefer: "return=representation",
+    },
+  );
+}
+
+export async function updateInvoiceLineItem({
+  organizationId,
+  invoiceId,
+  lineItemId,
+  lineType,
+  description,
+  quantity,
+  unitAmount,
+}: {
+  organizationId: string;
+  invoiceId: string;
+  lineItemId: string;
+  lineType: LineItemType;
+  description: string;
+  quantity: number;
+  unitAmount: number;
+}) {
+  const invoice = await loadInvoiceForOrganization({ organizationId, invoiceId });
+  if (!invoice) return { ok: false as const, error: "Invoice was not found.", status: 404 };
+  if (invoice.status !== "draft") {
+    return {
+      ok: false as const,
+      error: "Invoice line items can only be edited while the invoice is draft.",
+      status: 400,
+    };
+  }
+
+  const lineItem = await loadLineItemForInvoice({
+    organizationId,
+    invoiceId,
+    lineItemId,
+  });
+  if (!lineItem) {
+    return { ok: false as const, error: "Invoice line item was not found.", status: 404 };
+  }
+
+  return supabaseAdminFetch<BillingLineItemRow[]>(
+    "customer_billing_invoice_line_items",
+    {
+      method: "PATCH",
+      query: {
+        id: `eq.${lineItemId}`,
+        organization_id: `eq.${organizationId}`,
+        invoice_id: `eq.${invoiceId}`,
+      },
+      body: {
+        line_type: lineType,
+        description,
+        quantity,
+        unit_amount: unitAmount,
+        updated_at: new Date().toISOString(),
+      },
+      prefer: "return=representation",
+    },
+  );
+}
+
+export async function removeInvoiceLineItem({
+  organizationId,
+  invoiceId,
+  lineItemId,
+}: {
+  organizationId: string;
+  invoiceId: string;
+  lineItemId: string;
+}) {
+  const invoice = await loadInvoiceForOrganization({ organizationId, invoiceId });
+  if (!invoice) return { ok: false as const, error: "Invoice was not found.", status: 404 };
+  if (invoice.status !== "draft") {
+    return {
+      ok: false as const,
+      error: "Invoice line items can only be removed while the invoice is draft.",
+      status: 400,
+    };
+  }
+
+  const lineItem = await loadLineItemForInvoice({
+    organizationId,
+    invoiceId,
+    lineItemId,
+  });
+  if (!lineItem) {
+    return { ok: false as const, error: "Invoice line item was not found.", status: 404 };
+  }
+
+  return supabaseAdminFetch<BillingLineItemRow[]>(
+    "customer_billing_invoice_line_items",
+    {
+      method: "DELETE",
+      query: {
+        id: `eq.${lineItemId}`,
+        organization_id: `eq.${organizationId}`,
+        invoice_id: `eq.${invoiceId}`,
       },
       prefer: "return=representation",
     },
@@ -542,6 +648,30 @@ async function loadPaymentForOrganization({
       query: {
         select: PAYMENT_SELECT,
         id: `eq.${paymentId}`,
+        organization_id: `eq.${organizationId}`,
+        limit: 1,
+      },
+    },
+  );
+  return result.ok ? result.data[0] ?? null : null;
+}
+
+async function loadLineItemForInvoice({
+  organizationId,
+  invoiceId,
+  lineItemId,
+}: {
+  organizationId: string;
+  invoiceId: string;
+  lineItemId: string;
+}) {
+  const result = await supabaseAdminFetch<BillingLineItemRow[]>(
+    "customer_billing_invoice_line_items",
+    {
+      query: {
+        select: LINE_ITEM_SELECT,
+        id: `eq.${lineItemId}`,
+        invoice_id: `eq.${invoiceId}`,
         organization_id: `eq.${organizationId}`,
         limit: 1,
       },

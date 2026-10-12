@@ -17,7 +17,9 @@ import {
   issueInvoice,
   paymentMethodLabel,
   recordInvoicePayment,
+  removeInvoiceLineItem,
   reverseInvoicePayment,
+  updateInvoiceLineItem,
   voidInvoice,
   type InvoiceType,
   type LineItemType,
@@ -572,14 +574,105 @@ export default async function CustomerDetailPage({
                 ) : null}
                 {invoice.lineItems.length ? (
                   <div className="mt-4 divide-y divide-dark-border text-sm">
-                    {invoice.lineItems.map((item) => (
-                      <div key={item.id} className="flex justify-between gap-3 py-2">
-                        <span className="text-secondary">{item.description}</span>
-                        <span className="font-semibold text-primary">
-                          {formatCurrency(Number(item.quantity) * Number(item.unit_amount))}
-                        </span>
-                      </div>
-                    ))}
+                    {invoice.lineItems.map((item) =>
+                      invoice.status === "draft" ? (
+                        <div key={item.id} className="grid gap-3 py-3">
+                          <form
+                            action={updateLineItemAction}
+                            className="grid gap-3 rounded-lg border border-dark-border bg-dark-deep p-3 md:grid-cols-5"
+                          >
+                            <input type="hidden" name="organization_id" value={customer.organization.id} />
+                            <input type="hidden" name="invoice_id" value={invoice.id} />
+                            <input type="hidden" name="line_item_id" value={item.id} />
+                            <label className="text-sm font-semibold text-secondary">
+                              Line type
+                              <select
+                                name="line_type"
+                                defaultValue={item.line_type}
+                                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary"
+                              >
+                                {lineItemTypes.map((type) => (
+                                  <option key={type} value={type}>
+                                    {type.replaceAll("_", " ")}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="text-sm font-semibold text-secondary md:col-span-2">
+                              Description
+                              <input
+                                name="description"
+                                required
+                                defaultValue={item.description}
+                                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary"
+                              />
+                            </label>
+                            <label className="text-sm font-semibold text-secondary">
+                              Quantity
+                              <input
+                                name="quantity"
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                defaultValue={item.quantity}
+                                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary"
+                              />
+                            </label>
+                            <label className="text-sm font-semibold text-secondary">
+                              Amount
+                              <input
+                                name="unit_amount"
+                                type="number"
+                                step="0.01"
+                                required
+                                defaultValue={item.unit_amount}
+                                className="mt-2 min-h-11 w-full rounded-xl border border-dark-border bg-dark-card px-3 text-primary"
+                              />
+                            </label>
+                            <div className="flex flex-wrap items-center justify-between gap-3 md:col-span-5">
+                              <span className="font-semibold text-primary">
+                                Current line total:{" "}
+                                {formatCurrency(Number(item.quantity) * Number(item.unit_amount))}
+                              </span>
+                              <button type="submit" className="btn btn-secondary min-h-10">
+                                Save Line Item
+                              </button>
+                            </div>
+                          </form>
+                          <form
+                            action={removeLineItemAction}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300/25 bg-amber-400/[0.06] p-3"
+                          >
+                            <input type="hidden" name="organization_id" value={customer.organization.id} />
+                            <input type="hidden" name="invoice_id" value={invoice.id} />
+                            <input type="hidden" name="line_item_id" value={item.id} />
+                            <label className="flex items-center gap-2 text-sm font-semibold text-amber-100">
+                              <input
+                                type="checkbox"
+                                name="confirm_remove"
+                                value="yes"
+                                required
+                                className="h-4 w-4 rounded border-amber-300/50 bg-dark-card"
+                              />
+                              Confirm removing this draft line item
+                            </label>
+                            <button
+                              type="submit"
+                              className="rounded-full border border-amber-300/40 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-300/10"
+                            >
+                              Remove Line Item
+                            </button>
+                          </form>
+                        </div>
+                      ) : (
+                        <div key={item.id} className="flex justify-between gap-3 py-2">
+                          <span className="text-secondary">{item.description}</span>
+                          <span className="font-semibold text-primary">
+                            {formatCurrency(Number(item.quantity) * Number(item.unit_amount))}
+                          </span>
+                        </div>
+                      ),
+                    )}
                   </div>
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-3">
@@ -1757,11 +1850,75 @@ async function addLineItemAction(formData: FormData) {
     quantity,
     unitAmount,
   });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
   await recordAdminEvent(organizationId, "customer_billing_line_item_added", {
     invoiceId,
   });
   revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function updateLineItemAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const invoiceId = stringField(formData, "invoice_id");
+  const lineItemId = stringField(formData, "line_item_id");
+  const lineType = stringField(formData, "line_type");
+  const quantity = parsePositiveMoney(stringField(formData, "quantity"));
+  const unitAmount = parseSignedMoney(stringField(formData, "unit_amount"));
+  const description = stringField(formData, "description");
+  if (
+    !isUuid(invoiceId) ||
+    !isUuid(lineItemId) ||
+    !isLineItemType(lineType) ||
+    quantity === null ||
+    unitAmount === null ||
+    description.length < 2
+  ) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  }
+  const result = await updateInvoiceLineItem({
+    organizationId,
+    invoiceId,
+    lineItemId,
+    lineType,
+    description,
+    quantity,
+    unitAmount,
+  });
+  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  await recordAdminEvent(organizationId, "customer_billing_line_item_updated", {
+    invoiceId,
+    lineItemId,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/billing");
+  redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
+}
+
+async function removeLineItemAction(formData: FormData) {
+  "use server";
+  if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
+  const organizationId = validOrganizationId(formData);
+  const invoiceId = stringField(formData, "invoice_id");
+  const lineItemId = stringField(formData, "line_item_id");
+  const confirmed = stringField(formData, "confirm_remove") === "yes";
+  if (!isUuid(invoiceId) || !isUuid(lineItemId) || !confirmed) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  }
+  const result = await removeInvoiceLineItem({
+    organizationId,
+    invoiceId,
+    lineItemId,
+  });
+  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  await recordAdminEvent(organizationId, "customer_billing_line_item_removed", {
+    invoiceId,
+    lineItemId,
+  });
+  revalidatePath(`/opzix-admin/customers/${organizationId}`);
+  revalidatePath("/app/billing");
   redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
 }
 
