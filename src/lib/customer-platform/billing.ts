@@ -498,6 +498,107 @@ export async function findSimilarInvoicePayments({
   return result.ok ? result.data : [];
 }
 
+export async function findSimilarOrganizationPayments({
+  organizationId,
+  amount,
+  paymentMethod,
+  receivedOn,
+}: {
+  organizationId: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  receivedOn: string;
+}) {
+  const result = await supabaseAdminFetch<BillingPaymentRow[]>(
+    "customer_billing_payments",
+    {
+      query: {
+        select: PAYMENT_SELECT,
+        organization_id: `eq.${organizationId}`,
+        payment_kind: "eq.payment",
+        amount: `eq.${roundMoney(amount).toFixed(2)}`,
+        payment_method: `eq.${paymentMethod}`,
+        received_on: `eq.${receivedOn}`,
+        order: "created_at.desc",
+        limit: 25,
+      },
+    },
+  );
+  return result.ok ? result.data : [];
+}
+
+export async function findPaymentByIdempotencyKey({
+  organizationId,
+  idempotencyKey,
+}: {
+  organizationId: string;
+  idempotencyKey: string;
+}) {
+  const normalizedKey = idempotencyKey.trim();
+  if (!normalizedKey) return null;
+
+  const result = await supabaseAdminFetch<BillingPaymentRow[]>(
+    "customer_billing_payments",
+    {
+      query: {
+        select: PAYMENT_SELECT,
+        organization_id: `eq.${organizationId}`,
+        payment_kind: "eq.payment",
+        payment_idempotency_key: `eq.${normalizedKey}`,
+        limit: 1,
+      },
+    },
+  );
+  return result.ok ? result.data[0] ?? null : null;
+}
+
+export async function findPaymentByExternalTransactionRef({
+  organizationId,
+  externalTransactionRef,
+}: {
+  organizationId: string;
+  externalTransactionRef: string;
+}) {
+  const normalizedRef = externalTransactionRef.trim();
+  if (!normalizedRef) return null;
+
+  const result = await supabaseAdminFetch<BillingPaymentRow[]>(
+    "customer_billing_payments",
+    {
+      query: {
+        select: PAYMENT_SELECT,
+        organization_id: `eq.${organizationId}`,
+        payment_kind: "eq.payment",
+        external_transaction_ref: `eq.${normalizedRef}`,
+        limit: 1,
+      },
+    },
+  );
+  return result.ok ? result.data[0] ?? null : null;
+}
+
+export async function findPaymentReversal({
+  organizationId,
+  paymentId,
+}: {
+  organizationId: string;
+  paymentId: string;
+}) {
+  const result = await supabaseAdminFetch<BillingPaymentRow[]>(
+    "customer_billing_payments",
+    {
+      query: {
+        select: PAYMENT_SELECT,
+        organization_id: `eq.${organizationId}`,
+        payment_kind: "eq.reversal",
+        reversal_of_payment_id: `eq.${paymentId}`,
+        limit: 1,
+      },
+    },
+  );
+  return result.ok ? result.data[0] ?? null : null;
+}
+
 export async function voidInvoice({
   organizationId,
   invoiceId,

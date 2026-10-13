@@ -9,8 +9,12 @@ import {
   addBillingNote,
   addInvoiceLineItem,
   createDraftInvoice,
+  findPaymentByExternalTransactionRef,
+  findPaymentByIdempotencyKey,
+  findPaymentReversal,
   formatCurrency,
   findSimilarInvoicePayments,
+  findSimilarOrganizationPayments,
   getOrganizationBillingSummary,
   invoiceStatusLabel,
   invoiceTypeLabel,
@@ -21,6 +25,8 @@ import {
   reverseInvoicePayment,
   updateInvoiceLineItem,
   voidInvoice,
+  type BillingInvoice,
+  type BillingPaymentRow,
   type InvoiceType,
   type LineItemType,
   type PaymentMethod,
@@ -97,6 +103,8 @@ const documentCategories: CustomerDocumentCategory[] = [
   "business_documents",
   "other",
 ];
+const paymentHistoryFilters = ["all", "active", "reversed", "reversals"] as const;
+type PaymentHistoryFilter = (typeof paymentHistoryFilters)[number];
 
 const billingErrorMessages: Record<string, string> = {
   billing: "Billing action could not be completed. Review the invoice and try again.",
@@ -114,6 +122,12 @@ const billingErrorMessages: Record<string, string> = {
     "Payment exceeds the outstanding invoice balance.",
   "billing-payment-duplicate":
     "Duplicate payment submission detected. Review the payment history before trying again.",
+  "billing-payment-idempotency-conflict":
+    "This payment request key was already used for different payment details.",
+  "billing-payment-external-ref-active":
+    "This external transaction reference is already attached to an active payment. Review Payment History before taking another action.",
+  "billing-payment-external-ref-reversed":
+    "This external transaction reference is attached to a reversed payment. Review Payment History and make an explicit reconciliation decision before recording it again.",
   "billing-payment-conflict":
     "Payment could not be recorded because the reference or request key conflicts with an existing payment.",
   "billing-payment-failed":
@@ -174,6 +188,13 @@ export default async function CustomerDetailPage({
   const billingErrorMessage = billingErrorMessages[pageError] ?? "";
   const actionNotice = stringParam(query.action);
   const mode = stringParam(query.mode);
+  const paymentHistoryFilter = paymentHistoryFilterParam(
+    stringParam(query.paymentHistory),
+  );
+  const paymentHistory = buildPaymentHistoryRows(
+    billing.invoices,
+    paymentHistoryFilter,
+  );
   const mlsStatus =
     customer.mlsData && Object.keys(customer.mlsData).length > 0
       ? "Details submitted"
@@ -243,6 +264,15 @@ export default async function CustomerDetailPage({
             className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100"
           >
             {billingErrorMessage}
+            {pageError.startsWith("billing-payment") ? (
+              <>
+                {" "}
+                <a href="#payment-history" className="font-bold underline">
+                  Review Payment History
+                </a>
+                .
+              </>
+            ) : null}
           </p>
         ) : pageError ? (
           <p
@@ -275,6 +305,25 @@ export default async function CustomerDetailPage({
             Payment recorded. A similar payment already existed for that invoice,
             amount, method, and date, so review the payment history before taking
             any additional action.
+          </p>
+        ) : actionNotice === "payment-idempotent" ? (
+          <p className="mt-6 rounded-xl border border-emerald-300/30 bg-emerald-400/10 p-4 text-emerald-100">
+            Payment was already recorded for this exact request. No duplicate
+            ledger entry was created.{" "}
+            <a href="#payment-history" className="font-bold underline">
+              Review Payment History
+            </a>
+            .
+          </p>
+        ) : actionNotice === "payment-review-active" ? (
+          <p className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100">
+            Payment recorded. A similar active payment already existed, so
+            review Payment History before taking any additional action.
+          </p>
+        ) : actionNotice === "payment-review-reversed" ? (
+          <p className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100">
+            Payment recorded. A similar historical payment had been reversed, so
+            review Payment History for the reconciliation trail.
           </p>
         ) : null}
 
@@ -804,6 +853,85 @@ export default async function CustomerDetailPage({
             {!billing.invoices.length ? (
               <p className="text-sm text-muted">No invoices have been created.</p>
             ) : null}
+          </div>
+
+          <div id="payment-history" className="mt-6 rounded-xl border border-dark-border bg-dark-deep p-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-primary">Payment History</h3>
+                <p className="mt-1 text-sm leading-6 text-secondary">
+                  Organization-level ledger across active and voided invoices.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                {paymentHistoryFilters.map((filter) => (
+                  <Link
+                    key={filter}
+                    href={`/opzix-admin/customers/${customer.organization.id}?paymentHistory=${filter}#payment-history`}
+                    className={
+                      paymentHistoryFilter === filter
+                        ? "rounded-full border border-brand-cyan bg-brand-cyan px-3 py-1 text-slate-950"
+                        : "rounded-full border border-dark-border px-3 py-1 text-secondary hover:border-brand-cyan hover:text-primary"
+                    }
+                  >
+                    {paymentHistoryFilterLabel(filter)}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {paymentHistory.length ? (
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-[920px] w-full text-left text-sm">
+                  <thead className="text-xs uppercase tracking-[0.12em] text-muted">
+                    <tr className="border-b border-dark-border">
+                      <th className="py-2 pr-3">Invoice</th>
+                      <th className="py-2 pr-3">Date</th>
+                      <th className="py-2 pr-3">Method</th>
+                      <th className="py-2 pr-3">Amount</th>
+                      <th className="py-2 pr-3">Payment Status</th>
+                      <th className="py-2 pr-3">Reversal Status</th>
+                      <th className="py-2 pr-3">External Reference</th>
+                      <th className="py-2 pr-3">Related Transaction</th>
+                      <th className="py-2">Reversal Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dark-border">
+                    {paymentHistory.map((entry) => (
+                      <tr key={entry.payment.id} className="align-top text-secondary">
+                        <td className="py-3 pr-3 font-semibold text-primary">
+                          {entry.invoice.invoice_number}
+                          {entry.invoice.status === "void" ? (
+                            <span className="mt-1 block text-xs font-semibold text-amber-100">
+                              Voided
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="py-3 pr-3">{formatDate(entry.payment.received_on)}</td>
+                        <td className="py-3 pr-3">{paymentMethodLabel(entry.payment.payment_method)}</td>
+                        <td className="py-3 pr-3 font-semibold text-primary">
+                          {entry.payment.payment_kind === "reversal" ? "-" : ""}
+                          {formatCurrency(entry.payment.amount)}
+                        </td>
+                        <td className="py-3 pr-3">{entry.paymentStatus}</td>
+                        <td className="py-3 pr-3">{entry.reversalStatus}</td>
+                        <td className="max-w-[170px] break-words py-3 pr-3">
+                          {entry.payment.external_transaction_ref || "None"}
+                        </td>
+                        <td className="py-3 pr-3">{entry.relatedTransaction}</td>
+                        <td className="max-w-[220px] break-words py-3">
+                          {entry.reversalReason || "None"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-muted">
+                No payments match this filter.
+              </p>
+            )}
           </div>
 
           {billing.notes.length ? (
@@ -1975,6 +2103,8 @@ async function recordPaymentAction(formData: FormData) {
   const paymentMethod = stringField(formData, "payment_method");
   const receivedOn = stringField(formData, "received_on");
   const idempotencyKey = stringField(formData, "payment_idempotency_key");
+  const externalTransactionRef = stringField(formData, "external_transaction_ref");
+  const internalNote = stringField(formData, "internal_note");
   if (
     !isUuid(invoiceId) ||
     amount === null ||
@@ -1984,12 +2114,61 @@ async function recordPaymentAction(formData: FormData) {
   ) {
     redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
   }
-  const similarPayments = await findSimilarInvoicePayments({
+  const existingIdempotencyPayment = await findPaymentByIdempotencyKey({
+    organizationId,
+    idempotencyKey,
+  });
+  if (existingIdempotencyPayment) {
+    const action = paymentMatchesSubmission(existingIdempotencyPayment, {
+      invoiceId,
+      amount,
+      paymentMethod,
+      receivedOn,
+      externalTransactionRef,
+      internalNote,
+    })
+      ? "payment-idempotent"
+      : "billing-payment-idempotency-conflict";
+    redirect(
+      `/opzix-admin/customers/${organizationId}?${action.startsWith("billing-") ? "error" : "action"}=${action}#payment-history`,
+    );
+  }
+
+  const existingExternalPayment = await findPaymentByExternalTransactionRef({
+    organizationId,
+    externalTransactionRef,
+  });
+  if (existingExternalPayment) {
+    const reversal = await findPaymentReversal({
+      organizationId,
+      paymentId: existingExternalPayment.id,
+    });
+    redirect(
+      `/opzix-admin/customers/${organizationId}?error=${
+        reversal
+          ? "billing-payment-external-ref-reversed"
+          : "billing-payment-external-ref-active"
+      }#payment-history`,
+    );
+  }
+
+  const invoiceSimilarPayments = await findSimilarInvoicePayments({
     organizationId,
     invoiceId,
     amount,
     paymentMethod,
     receivedOn,
+  });
+  const organizationSimilarPayments = await findSimilarOrganizationPayments({
+    organizationId,
+    amount,
+    paymentMethod,
+    receivedOn,
+  });
+  const similarReview = await classifySimilarPaymentReview({
+    organizationId,
+    currentInvoiceId: invoiceId,
+    similarPayments: organizationSimilarPayments,
   });
   const result = await recordInvoicePayment({
     organizationId,
@@ -1997,9 +2176,9 @@ async function recordPaymentAction(formData: FormData) {
     amount,
     paymentMethod,
     receivedOn,
-    externalTransactionRef: stringField(formData, "external_transaction_ref"),
+    externalTransactionRef,
     idempotencyKey,
-    internalNote: stringField(formData, "internal_note"),
+    internalNote,
   });
   if (!result.ok) {
     redirect(
@@ -2009,12 +2188,20 @@ async function recordPaymentAction(formData: FormData) {
   await recordAdminEvent(organizationId, "customer_billing_payment_recorded", {
     invoiceId,
     amount: String(amount),
-    possibleDuplicatePaymentCount: String(similarPayments.length),
+    possibleDuplicatePaymentCount: String(invoiceSimilarPayments.length),
+    organizationSimilarPaymentCount: String(organizationSimilarPayments.length),
+    similarPaymentReview: similarReview || "none",
   });
   revalidatePath(`/opzix-admin/customers/${organizationId}`);
   revalidatePath("/app/billing");
   redirect(
-    `/opzix-admin/customers/${organizationId}?action=${similarPayments.length ? "payment-review" : "saved"}`,
+    `/opzix-admin/customers/${organizationId}?action=${
+      similarReview
+        ? `payment-review-${similarReview}`
+        : invoiceSimilarPayments.length
+          ? "payment-review"
+          : "saved"
+    }#payment-history`,
   );
 }
 
@@ -2365,13 +2552,168 @@ function billingPaymentErrorCode(error: string) {
   if (/exceeds.*outstanding|outstanding invoice balance/i.test(error)) {
     return "billing-payment-exceeds-balance";
   }
+  if (/transaction reference/i.test(error)) {
+    return "billing-payment-external-ref-active";
+  }
+  if (/idempotency key was reused/i.test(error)) {
+    return "billing-payment-idempotency-conflict";
+  }
   if (/already been recorded|already submitted|duplicate/i.test(error)) {
     return "billing-payment-duplicate";
   }
-  if (/idempotency key was reused|transaction reference/i.test(error)) {
-    return "billing-payment-conflict";
-  }
   return "billing-payment-failed";
+}
+
+function paymentHistoryFilterParam(value: string): PaymentHistoryFilter {
+  return paymentHistoryFilters.includes(value as PaymentHistoryFilter)
+    ? (value as PaymentHistoryFilter)
+    : "all";
+}
+
+function paymentHistoryFilterLabel(filter: PaymentHistoryFilter) {
+  switch (filter) {
+    case "all":
+      return "All";
+    case "active":
+      return "Active";
+    case "reversed":
+      return "Reversed";
+    case "reversals":
+      return "Reversals";
+  }
+}
+
+function buildPaymentHistoryRows(
+  invoices: BillingInvoice[],
+  filter: PaymentHistoryFilter,
+) {
+  const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
+  const allPayments = invoices.flatMap((invoice) => invoice.payments);
+  const reversalByPaymentId = new Map(
+    allPayments
+      .filter((payment) => payment.payment_kind === "reversal")
+      .map((payment) => [payment.reversal_of_payment_id ?? "", payment]),
+  );
+  const paymentById = new Map(allPayments.map((payment) => [payment.id, payment]));
+
+  return allPayments
+    .map((payment) => {
+      const invoice = invoiceById.get(payment.invoice_id);
+      if (!invoice) return null;
+      const reversal =
+        payment.payment_kind === "payment"
+          ? reversalByPaymentId.get(payment.id) ?? null
+          : null;
+      const original =
+        payment.payment_kind === "reversal" && payment.reversal_of_payment_id
+          ? paymentById.get(payment.reversal_of_payment_id) ?? null
+          : null;
+      const paymentStatus =
+        payment.payment_kind === "reversal" ? "Reversal entry" : "Payment";
+      const reversalStatus =
+        payment.payment_kind === "reversal"
+          ? "Reversal"
+          : reversal
+            ? "Reversed"
+            : "Active";
+      const relatedTransaction =
+        payment.payment_kind === "reversal"
+          ? original
+            ? `Original ${shortId(original.id)}`
+            : "Original unavailable"
+          : reversal
+            ? `Reversal ${shortId(reversal.id)}`
+            : "None";
+      const reversalReason =
+        payment.payment_kind === "reversal"
+          ? payment.internal_note
+          : reversal?.internal_note ?? "";
+
+      return {
+        invoice,
+        payment,
+        reversal,
+        original,
+        paymentStatus,
+        reversalStatus,
+        relatedTransaction,
+        reversalReason,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => {
+      if (!entry) return false;
+      if (filter === "active") {
+        return entry.payment.payment_kind === "payment" && !entry.reversal;
+      }
+      if (filter === "reversed") {
+        return entry.payment.payment_kind === "payment" && Boolean(entry.reversal);
+      }
+      if (filter === "reversals") {
+        return entry.payment.payment_kind === "reversal";
+      }
+      return true;
+    })
+    .sort((left, right) =>
+      right.payment.created_at.localeCompare(left.payment.created_at),
+    );
+}
+
+function paymentMatchesSubmission(
+  payment: BillingPaymentRow,
+  submission: {
+    invoiceId: string;
+    amount: number;
+    paymentMethod: PaymentMethod;
+    receivedOn: string;
+    externalTransactionRef: string;
+    internalNote: string;
+  },
+) {
+  return (
+    payment.invoice_id === submission.invoiceId &&
+    roundMoney(Number(payment.amount)) === roundMoney(submission.amount) &&
+    payment.payment_method === submission.paymentMethod &&
+    payment.received_on === submission.receivedOn &&
+    normalizedOptionalString(payment.external_transaction_ref) ===
+      normalizedOptionalString(submission.externalTransactionRef) &&
+    normalizedOptionalString(payment.internal_note) ===
+      normalizedOptionalString(submission.internalNote)
+  );
+}
+
+async function classifySimilarPaymentReview({
+  organizationId,
+  currentInvoiceId,
+  similarPayments,
+}: {
+  organizationId: string;
+  currentInvoiceId: string;
+  similarPayments: BillingPaymentRow[];
+}) {
+  const otherPayments = similarPayments.filter(
+    (payment) => payment.invoice_id !== currentInvoiceId,
+  );
+  if (!otherPayments.length) return "";
+
+  const reversals = await Promise.all(
+    otherPayments.map((payment) =>
+      findPaymentReversal({ organizationId, paymentId: payment.id }),
+    ),
+  );
+  return reversals.every(Boolean) ? "reversed" : "active";
+}
+
+function normalizedOptionalString(value: string | null | undefined) {
+  const normalized = value?.trim() ?? "";
+  return normalized || null;
+}
+
+function shortId(value: string) {
+  return value.slice(0, 8);
+}
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function isInvoiceType(value: string): value is InvoiceType {
