@@ -98,6 +98,28 @@ const documentCategories: CustomerDocumentCategory[] = [
   "other",
 ];
 
+const billingErrorMessages: Record<string, string> = {
+  billing: "Billing action could not be completed. Review the invoice and try again.",
+  "billing-invalid":
+    "Billing action could not be completed. Review the submitted values and try again.",
+  "billing-issue-empty":
+    "Invoice must include at least one positive line item before it can be issued.",
+  "billing-issue-state":
+    "Only draft invoices can be issued.",
+  "billing-issue-failed":
+    "Invoice could not be issued. Review the invoice and try again.",
+  "billing-payment-invoice-state":
+    "Invoice must be issued before recording a payment.",
+  "billing-payment-exceeds-balance":
+    "Payment exceeds the outstanding invoice balance.",
+  "billing-payment-duplicate":
+    "Duplicate payment submission detected. Review the payment history before trying again.",
+  "billing-payment-conflict":
+    "Payment could not be recorded because the reference or request key conflicts with an existing payment.",
+  "billing-payment-failed":
+    "Payment could not be recorded. Review the invoice and try again.",
+};
+
 export default async function CustomerDetailPage({
   params,
   searchParams,
@@ -149,6 +171,7 @@ export default async function CustomerDetailPage({
   const displayName = customer.customerName;
   const inviteNotice = stringParam(query.invite);
   const pageError = stringParam(query.error);
+  const billingErrorMessage = billingErrorMessages[pageError] ?? "";
   const actionNotice = stringParam(query.action);
   const mode = stringParam(query.mode);
   const mlsStatus =
@@ -214,13 +237,12 @@ export default async function CustomerDetailPage({
             Onboarding invitation sent.
           </p>
         ) : null}
-        {pageError === "billing" ? (
+        {billingErrorMessage ? (
           <p
             role="alert"
             className="mt-6 rounded-xl border border-amber-300/30 bg-amber-400/10 p-4 text-amber-100"
           >
-            Billing action could not be completed. Draft invoices require at
-            least one positive line item before they can be issued.
+            {billingErrorMessage}
           </p>
         ) : pageError ? (
           <p
@@ -681,7 +703,6 @@ export default async function CustomerDetailPage({
                       <form action={issueInvoiceAction}>
                         <input type="hidden" name="organization_id" value={customer.organization.id} />
                         <input type="hidden" name="invoice_id" value={invoice.id} />
-                        <input type="hidden" name="payment_idempotency_key" value={crypto.randomUUID()} />
                         <button
                           type="submit"
                           disabled={!canIssueInvoice}
@@ -702,6 +723,7 @@ export default async function CustomerDetailPage({
                     <form action={recordPaymentAction} className="grid gap-3 rounded-lg border border-dark-border bg-dark-deep p-3 sm:grid-cols-3 lg:grid-cols-6">
                       <input type="hidden" name="organization_id" value={customer.organization.id} />
                       <input type="hidden" name="invoice_id" value={invoice.id} />
+                      <input type="hidden" name="payment_idempotency_key" value={crypto.randomUUID()} />
                       <label className="text-sm font-semibold text-secondary">
                         Amount
                         <input name="amount" type="number" min="0.01" step="0.01" required className="mt-2 min-h-10 w-full rounded-lg border border-dark-border bg-dark-card px-3 text-primary" />
@@ -1805,7 +1827,7 @@ async function createInvoiceAction(formData: FormData) {
   const invoiceType = stringField(formData, "invoice_type");
   const issueDate = stringField(formData, "issue_date");
   if (!isInvoiceType(invoiceType) || !isDateField(issueDate)) {
-    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
   }
   const result = await createDraftInvoice({
     organizationId,
@@ -1816,7 +1838,7 @@ async function createInvoiceAction(formData: FormData) {
     dueCondition: stringField(formData, "due_condition"),
     customerDescription: stringField(formData, "customer_description"),
   });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
   await recordAdminEvent(organizationId, "customer_billing_invoice_created", {
     invoiceType,
   });
@@ -1840,7 +1862,7 @@ async function addLineItemAction(formData: FormData) {
     unitAmount === null ||
     description.length < 2
   ) {
-    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
   }
   const result = await addInvoiceLineItem({
     organizationId,
@@ -1876,7 +1898,7 @@ async function updateLineItemAction(formData: FormData) {
     unitAmount === null ||
     description.length < 2
   ) {
-    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
   }
   const result = await updateInvoiceLineItem({
     organizationId,
@@ -1905,7 +1927,7 @@ async function removeLineItemAction(formData: FormData) {
   const lineItemId = stringField(formData, "line_item_id");
   const confirmed = stringField(formData, "confirm_remove") === "yes";
   if (!isUuid(invoiceId) || !isUuid(lineItemId) || !confirmed) {
-    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
   }
   const result = await removeInvoiceLineItem({
     organizationId,
@@ -1927,9 +1949,15 @@ async function issueInvoiceAction(formData: FormData) {
   if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
   const organizationId = validOrganizationId(formData);
   const invoiceId = stringField(formData, "invoice_id");
-  if (!isUuid(invoiceId)) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  if (!isUuid(invoiceId)) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
+  }
   const result = await issueInvoice({ organizationId, invoiceId });
-  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  if (!result.ok) {
+    redirect(
+      `/opzix-admin/customers/${organizationId}?error=${billingIssueErrorCode(result.error)}`,
+    );
+  }
   await recordAdminEvent(organizationId, "customer_billing_invoice_issued", {
     invoiceId,
   });
@@ -1954,7 +1982,7 @@ async function recordPaymentAction(formData: FormData) {
     !isDateField(receivedOn) ||
     !idempotencyKey
   ) {
-    redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
   }
   const similarPayments = await findSimilarInvoicePayments({
     organizationId,
@@ -1973,7 +2001,11 @@ async function recordPaymentAction(formData: FormData) {
     idempotencyKey,
     internalNote: stringField(formData, "internal_note"),
   });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) {
+    redirect(
+      `/opzix-admin/customers/${organizationId}?error=${billingPaymentErrorCode(result.error)}`,
+    );
+  }
   await recordAdminEvent(organizationId, "customer_billing_payment_recorded", {
     invoiceId,
     amount: String(amount),
@@ -1991,13 +2023,19 @@ async function reversePaymentAction(formData: FormData) {
   if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
   const organizationId = validOrganizationId(formData);
   const paymentId = stringField(formData, "payment_id");
-  if (!isUuid(paymentId)) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  if (!isUuid(paymentId)) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
+  }
   const result = await reverseInvoicePayment({
     organizationId,
     paymentId,
     internalNote: "Admin reversal from Customer Hub.",
   });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) {
+    redirect(
+      `/opzix-admin/customers/${organizationId}?error=${billingPaymentErrorCode(result.error)}`,
+    );
+  }
   await recordAdminEvent(organizationId, "customer_billing_payment_reversed", {
     paymentId,
   });
@@ -2011,9 +2049,11 @@ async function voidInvoiceAction(formData: FormData) {
   if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
   const organizationId = validOrganizationId(formData);
   const invoiceId = stringField(formData, "invoice_id");
-  if (!isUuid(invoiceId)) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  if (!isUuid(invoiceId)) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
+  }
   const result = await voidInvoice({ organizationId, invoiceId });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
   await recordAdminEvent(organizationId, "customer_billing_invoice_voided", {
     invoiceId,
   });
@@ -2027,9 +2067,11 @@ async function addBillingNoteAction(formData: FormData) {
   if (!(await isAdminAuthenticated())) throw new Error("Unauthorized billing action.");
   const organizationId = validOrganizationId(formData);
   const note = stringField(formData, "note");
-  if (note.length < 2) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
+  if (note.length < 2) {
+    redirect(`/opzix-admin/customers/${organizationId}?error=billing-invalid`);
+  }
   const result = await addBillingNote({ organizationId, note });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) redirect(`/opzix-admin/customers/${organizationId}?error=billing`);
   await recordAdminEvent(organizationId, "customer_billing_note_added");
   revalidatePath(`/opzix-admin/customers/${organizationId}`);
   redirect(`/opzix-admin/customers/${organizationId}?action=saved`);
@@ -2304,6 +2346,32 @@ function isPaymentReversed(
 
 function dateOrUndefined(value: string) {
   return isDateField(value) ? value : undefined;
+}
+
+function billingIssueErrorCode(error: string) {
+  if (/positive line item|at least one/i.test(error)) {
+    return "billing-issue-empty";
+  }
+  if (/only draft/i.test(error)) {
+    return "billing-issue-state";
+  }
+  return "billing-issue-failed";
+}
+
+function billingPaymentErrorCode(error: string) {
+  if (/issued invoices|must be issued/i.test(error)) {
+    return "billing-payment-invoice-state";
+  }
+  if (/exceeds.*outstanding|outstanding invoice balance/i.test(error)) {
+    return "billing-payment-exceeds-balance";
+  }
+  if (/already been recorded|already submitted|duplicate/i.test(error)) {
+    return "billing-payment-duplicate";
+  }
+  if (/idempotency key was reused|transaction reference/i.test(error)) {
+    return "billing-payment-conflict";
+  }
+  return "billing-payment-failed";
 }
 
 function isInvoiceType(value: string): value is InvoiceType {
