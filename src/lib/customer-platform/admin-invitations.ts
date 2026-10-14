@@ -67,6 +67,11 @@ export type InvitationActivationValidationResult =
       code: "invitation_record_invalid" | "supabase_api_key_invalid";
     };
 
+export type ActivationRecoveryRequestResult = {
+  ok: true;
+  alreadyActivated?: boolean;
+};
+
 const INVITATION_SELECT =
   "id,organization_id,email,first_name,last_name,auth_user_id,invitation_state";
 
@@ -394,6 +399,73 @@ export async function activateCustomerInvitation({
     };
   }
   return { ok: true as const };
+}
+
+export async function requestCustomerActivationRecovery({
+  invitationId,
+  email,
+}: {
+  invitationId: string;
+  email: string;
+}): Promise<ActivationRecoveryRequestResult> {
+  if (!isUuid(invitationId) || !email) {
+    return { ok: true };
+  }
+
+  const inviteResult = await supabaseAdminFetch<
+    (CustomerInvitationRow & {
+      status: string;
+      invited_at: string | null;
+      accepted_at: string | null;
+    })[]
+  >("organization_invitations", {
+    query: {
+      select:
+        "id,organization_id,email,first_name,last_name,auth_user_id,invitation_state,status,invited_at,accepted_at",
+      id: `eq.${invitationId}`,
+      limit: 1,
+    },
+  });
+
+  const invitation = inviteResult.ok ? inviteResult.data[0] : null;
+  if (!invitation || invitation.email.toLowerCase() !== email.toLowerCase()) {
+    return { ok: true };
+  }
+
+  const organizationResult = await supabaseAdminFetch<OrganizationRow[]>(
+    "organizations",
+    {
+      query: {
+        select: "id,status",
+        id: `eq.${invitation.organization_id}`,
+        limit: 1,
+      },
+    },
+  );
+  const organization = organizationResult.ok
+    ? organizationResult.data[0]
+    : null;
+  if (!organization || organization.status === "archived") {
+    return { ok: true };
+  }
+
+  if (invitation.invitation_state === "activated") {
+    return { ok: true, alreadyActivated: true };
+  }
+
+  if (await activationRecoveryRateLimited(invitation.id)) {
+    return { ok: true };
+  }
+
+  await recordInvitationEvent({
+    organizationId: invitation.organization_id,
+    invitationId: invitation.id,
+    eventName: "customer_activation_recovery_requested",
+    metadata: { requestType: "customer_self_service" },
+  });
+
+  await sendCustomerInvitation(invitation.id, true).catch(() => null);
+  return { ok: true };
 }
 
 export async function validateCustomerInvitationForActivation({
@@ -846,4 +918,28 @@ function escapeHtml(value: string) {
 
 function safeErrorCode(value: string) {
   return /^[a-z0-9_-]+$/i.test(value) ? value.slice(0, 80) : "invite_failed";
+}
+
+async function activationRecoveryRateLimited(invitationId: string) {
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const result = await supabaseAdminFetch<{ id: string }[]>(
+    "customer_account_audit_events",
+    {
+      query: {
+        select: "id",
+        target_type: "eq.organization_invitation",
+        target_id: `eq.${invitationId}`,
+        event_name: "eq.customer_activation_recovery_requested",
+        created_at: `gte.${since}`,
+        limit: 3,
+      },
+    },
+  );
+  return result.ok && result.data.length >= 3;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }

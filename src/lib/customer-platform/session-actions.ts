@@ -8,6 +8,7 @@ import {
   signInWithPassword,
   verifyInviteToken,
 } from "./auth";
+import { requestCustomerActivationRecovery } from "./admin-invitations";
 
 export type PasswordRecoveryState = {
   error?: string;
@@ -84,7 +85,7 @@ export async function acceptInviteAction(formData: FormData) {
     !isUuid(invitationId) ||
     !verificationType
   ) {
-    redirect("/accept-invite?error=missing-fields");
+    redirect(acceptInviteErrorUrl("missing", invitationId));
   }
 
   const result = await verifyInviteToken({
@@ -94,10 +95,23 @@ export async function acceptInviteAction(formData: FormData) {
     verificationType,
   });
   if (!result.ok) {
-    redirect(`/accept-invite?error=${encodeURIComponent(result.error)}`);
+    redirect(acceptInviteErrorUrl("invalid", invitationId));
   }
 
   redirect("/app/onboarding");
+}
+
+export async function requestActivationLinkAction(formData: FormData) {
+  const invitationId = stringField(formData, "invitation_id");
+  const email = stringField(formData, "email").toLowerCase();
+
+  if (isUuid(invitationId) && email) {
+    await requestCustomerActivationRecovery({ invitationId, email });
+  }
+
+  const params = new URLSearchParams({ recovery_requested: "1" });
+  if (isUuid(invitationId)) params.set("invitation_id", invitationId);
+  redirect(`/accept-invite?${params.toString()}`);
 }
 
 export async function logoutAction() {
@@ -114,4 +128,12 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function acceptInviteErrorUrl(reason: "missing" | "invalid", invitationId: string) {
+  const params = new URLSearchParams({
+    activation_error: reason,
+  });
+  if (isUuid(invitationId)) params.set("invitation_id", invitationId);
+  return `/accept-invite?${params.toString()}`;
 }

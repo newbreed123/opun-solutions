@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { acceptInviteAction } from "@/lib/customer-platform/session-actions";
+import {
+  acceptInviteAction,
+  requestActivationLinkAction,
+} from "@/lib/customer-platform/session-actions";
 import { RecoveryPasswordForm } from "./RecoveryPasswordForm";
 
 export const metadata: Metadata = {
@@ -21,8 +24,14 @@ export default async function AcceptInvitePage({
     stringParam(params.organization_invitation_id),
   );
   const verificationType = stringParam(params.type);
-  const error = stringParam(params.error);
+  const activationError = stringParam(params.activation_error);
+  const legacyError = stringParam(params.error);
+  const recoveryRequested = stringParam(params.recovery_requested) === "1";
   const isRecoveryMode = stringParam(params.mode) === "recovery";
+  const canRequestRecovery =
+    !isRecoveryMode && isUuid(invitationId) && !recoveryRequested;
+  const shouldShowActivationForm =
+    !isRecoveryMode && Boolean(tokenHash) && !activationError && !legacyError;
 
   return (
     <main className="min-h-screen bg-dark py-16 text-primary">
@@ -42,21 +51,29 @@ export default async function AcceptInvitePage({
               ? "Enter a new password for your Opzix account."
               : "Set your password to finish invitation acceptance and enter guided onboarding."}
           </p>
-          {!isRecoveryMode && !tokenHash ? (
+          {!isRecoveryMode && !tokenHash && !recoveryRequested ? (
             <div className="mt-5 rounded-xl border border-dark-border bg-white/[0.035] p-3 text-sm text-secondary">
               Open this page using the secure link in your Opzix invitation
               email. If the link has expired, ask your Opzix contact to resend
               the invitation.
             </div>
           ) : null}
-          {error && !isRecoveryMode ? (
+          {(activationError || legacyError) && !isRecoveryMode ? (
             <div className="mt-5 rounded-xl border border-amber-300/35 bg-amber-400/10 p-3 text-sm text-amber-100">
-              {decodeURIComponent(error)}
+              This activation link is no longer valid. Request a fresh link, or
+              sign in if your account is already active.
+            </div>
+          ) : null}
+          {recoveryRequested ? (
+            <div className="mt-5 rounded-xl border border-brand-cyan/35 bg-brand-cyan/10 p-3 text-sm text-cyan-50">
+              If this invitation is eligible, a fresh activation link will be
+              sent to the email address on the account. Already activated?
+              Sign in or reset your password.
             </div>
           ) : null}
           {isRecoveryMode ? (
             <RecoveryPasswordForm />
-          ) : (
+          ) : shouldShowActivationForm ? (
             <form action={acceptInviteAction} className="mt-6 grid gap-4">
               <input type="hidden" name="token_hash" value={tokenHash ?? ""} />
               <input
@@ -88,6 +105,31 @@ export default async function AcceptInvitePage({
                 Activate Account
               </button>
             </form>
+          ) : canRequestRecovery ? (
+            <form action={requestActivationLinkAction} className="mt-6 grid gap-4">
+              <input
+                type="hidden"
+                name="invitation_id"
+                value={invitationId ?? ""}
+              />
+              <label className="text-sm font-semibold text-secondary">
+                Email address
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="mt-2 min-h-12 w-full rounded-xl border border-dark-border bg-dark-deep px-4 text-primary outline-none focus:border-brand-cyan"
+                />
+              </label>
+              <button type="submit" className="btn btn-primary min-h-12 w-full">
+                Request New Activation Link
+              </button>
+            </form>
+          ) : (
+            <div className="mt-5 rounded-xl border border-dark-border bg-white/[0.035] p-3 text-sm text-secondary">
+              Contact Opzix support for a fresh activation link.
+            </div>
           )}
           <Link
             href="/login"
@@ -117,4 +159,13 @@ function resolveInvitationId(
     return "";
   }
   return invitationId || organizationInvitationId || "";
+}
+
+function isUuid(value: string | undefined) {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+  );
 }
