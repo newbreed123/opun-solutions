@@ -8,10 +8,27 @@ import {
   signInWithPassword,
   verifyInviteToken,
 } from "./auth";
-import { requestCustomerActivationRecovery } from "./admin-invitations";
+import {
+  completeCustomerActivationWithCode,
+  requestCustomerActivationRecovery,
+  sendCustomerActivationVerificationCode,
+} from "./admin-invitations";
 
 export type PasswordRecoveryState = {
   error?: string;
+};
+
+export type ActivationCodeState = {
+  error?: string;
+  sent?: boolean;
+  challengeId?: string;
+  invitedEmail?: string;
+  invitationId?: string;
+};
+
+export type ActivationCompletionState = {
+  error?: string;
+  invitationId?: string;
 };
 
 export async function loginAction(formData: FormData) {
@@ -112,6 +129,68 @@ export async function requestActivationLinkAction(formData: FormData) {
   const params = new URLSearchParams({ recovery_requested: "1" });
   if (isUuid(invitationId)) params.set("invitation_id", invitationId);
   redirect(`/accept-invite?${params.toString()}`);
+}
+
+export async function sendActivationCodeAction(
+  _state: ActivationCodeState,
+  formData: FormData,
+): Promise<ActivationCodeState> {
+  const activationToken = stringField(formData, "activation_token");
+  const result = await sendCustomerActivationVerificationCode(activationToken);
+
+  if (result.ok) {
+    return {
+      sent: true,
+      challengeId: result.challengeId,
+      invitedEmail: result.email,
+    };
+  }
+
+  return {
+    error:
+      "A verification code could not be sent. Request a fresh link if this invitation has expired.",
+    invitationId: result.invitationId,
+  };
+}
+
+export async function completeActivationWithCodeAction(
+  _state: ActivationCompletionState,
+  formData: FormData,
+): Promise<ActivationCompletionState> {
+  const activationToken = stringField(formData, "activation_token");
+  const challengeId = stringField(formData, "challenge_id");
+  const code = stringField(formData, "verification_code").replace(/\s+/g, "");
+  const password = stringField(formData, "password");
+  const confirmPassword = stringField(formData, "confirm_password");
+
+  if (password !== confirmPassword) {
+    return { error: "Passwords must match." };
+  }
+
+  const result = await completeCustomerActivationWithCode({
+    activationToken,
+    challengeId,
+    code,
+    password,
+  });
+  if (!result.ok) {
+    return {
+      error:
+        "Activation could not be completed. Request a fresh link or contact Opzix support.",
+      invitationId: result.invitationId,
+    };
+  }
+
+  const signedIn = await signInWithPassword(result.email, password);
+  if (!signedIn.ok) {
+    redirect(
+      `/login?message=${encodeURIComponent(
+        "Account activated. Sign in with your new password.",
+      )}`,
+    );
+  }
+
+  redirect("/app/onboarding");
 }
 
 export async function logoutAction() {

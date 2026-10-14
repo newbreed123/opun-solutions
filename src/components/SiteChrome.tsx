@@ -13,6 +13,7 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
     pathname?.startsWith("/app") ||
     pathname?.startsWith("/opzix-admin") ||
     pathname?.startsWith("/admin") ||
+    pathname === "/accept-invite" ||
     false;
 
   if (isInternalApp) {

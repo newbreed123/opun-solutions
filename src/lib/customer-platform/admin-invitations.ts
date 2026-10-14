@@ -1,3 +1,4 @@
+import { createHash, createHmac, randomBytes, randomInt, randomUUID } from "crypto";
 import {
   getSupabaseAdminConfig,
   supabaseAdminFetch,
@@ -54,6 +55,70 @@ type AuthResponse = AuthUser & {
   error?: string;
 };
 
+type AuthAdminUserResponse = {
+  id?: string;
+  user?: AuthUser;
+  app_metadata?: Record<string, unknown>;
+  msg?: string;
+  message?: string;
+  error?: string;
+};
+
+type ActivationInvitationTokenRow = {
+  id: string;
+  invitation_id: string;
+  organization_id: string;
+  auth_user_id: string;
+  email: string;
+  token_hash: string;
+  expires_at: string;
+  consumed_at: string | null;
+  revoked_at: string | null;
+  superseded_at: string | null;
+};
+
+type ActivationInvitationView =
+  | {
+      ok: true;
+      tokenHash: string;
+      tokenId: string;
+      invitationId: string;
+      organizationId: string;
+      authUserId: string;
+      email: string;
+      businessName: string;
+      expiresAt: string;
+      state: "valid";
+    }
+  | {
+      ok: false;
+      invitationId?: string;
+      state:
+        | "missing"
+        | "invalid"
+        | "expired"
+        | "used"
+        | "superseded"
+        | "revoked"
+        | "archived"
+        | "activated";
+    };
+
+type ActivationChallengeResult = {
+  ok: boolean;
+  invitation_id?: string;
+  organization_id?: string;
+  auth_user_id?: string;
+  email?: string;
+  business_name?: string;
+  error?: string;
+};
+
+type ActivationReservationResult = ActivationChallengeResult & {
+  operation_id?: string;
+  password_already_set?: boolean;
+};
+
 export type InvitationResult =
   | { ok: true; state: "invited" }
   | { ok: false; error: string; state: "invite_failed" };
@@ -71,6 +136,17 @@ export type ActivationRecoveryRequestResult = {
   ok: true;
   alreadyActivated?: boolean;
 };
+
+export type SendActivationCodeResult =
+  | { ok: true; challengeId: string; email: string }
+  | { ok: false; error: string; invitationId?: string };
+
+export type CompleteActivationWithCodeResult =
+  | { ok: true; email: string }
+  | { ok: false; error: string; invitationId?: string };
+
+const ACTIVATION_INVITATION_TTL_MS = 24 * 60 * 60 * 1000;
+const ACTIVATION_CODE_TTL_MS = 10 * 60 * 1000;
 
 const INVITATION_SELECT =
   "id,organization_id,email,first_name,last_name,auth_user_id,invitation_state";
@@ -215,142 +291,24 @@ export async function sendCustomerInvitation(
     };
   }
 
-  let userId = invitation.auth_user_id;
-  let delivery: "supabase-auth" | "resend" = "supabase-auth";
+  const activationInvitation = await sendApplicationActivationInvitation({
+    invitation,
+    businessName: organization.name,
+    redirectTo: redirectTo.url,
+  });
 
-  if (resend && userId) {
-    const linkResult = await createMagicLink({
-      email: invitation.email,
-      redirectTo: redirectTo.url,
-    });
-    if (!linkResult.ok) {
-      await markInvitationFailed(
-        invitation.id,
-        linkResult.code,
-        userId ?? undefined,
-      );
-      return {
-        ok: false,
-        state: "invite_failed",
-        error: linkResult.error,
-      };
-    }
-    userId = linkResult.userId || userId;
-    const emailResult = await sendResendInvitation({
-      email: invitation.email,
-      firstName: invitation.first_name ?? "",
-      businessName: organization.name,
-      tokenHash: linkResult.tokenHash,
-      invitationId: invitation.id,
-    });
-    if (!emailResult.ok) {
-      await markInvitationFailed(
-        invitation.id,
-        emailResult.code,
-        userId ?? undefined,
-      );
-      return {
-        ok: false,
-        state: "invite_failed",
-        error: emailResult.error,
-      };
-    }
-    delivery = "resend";
-  } else {
-    const authResult = await inviteWithSupabase({
-      email: invitation.email,
-      redirectTo: redirectTo.url,
-      invitationId: invitation.id,
-      organizationId: invitation.organization_id,
-      businessName: organization.name,
-      firstName: invitation.first_name ?? "",
-      lastName: invitation.last_name ?? "",
-    });
-
-    if (authResult.ok) {
-      userId = authResult.userId;
-    } else if (authResult.alreadyRegistered) {
-      const linkResult = await createMagicLink({
-        email: invitation.email,
-        redirectTo: redirectTo.url,
-      });
-      if (!linkResult.ok) {
-        await markInvitationFailed(invitation.id, linkResult.code);
-        return {
-          ok: false,
-          state: "invite_failed",
-          error: linkResult.error,
-        };
-      }
-      userId = linkResult.userId ?? invitation.auth_user_id;
-      const emailResult = await sendResendInvitation({
-        email: invitation.email,
-        firstName: invitation.first_name ?? "",
-        businessName: organization.name,
-        tokenHash: linkResult.tokenHash,
-        invitationId: invitation.id,
-      });
-      if (!emailResult.ok) {
-        await markInvitationFailed(
-          invitation.id,
-          emailResult.code,
-          userId ?? undefined,
-        );
-        return {
-          ok: false,
-          state: "invite_failed",
-          error: emailResult.error,
-        };
-      }
-      delivery = "resend";
-    } else {
-      await markInvitationFailed(invitation.id, authResult.code);
-      return {
-        ok: false,
-        state: "invite_failed",
-        error: authResult.error,
-      };
-    }
-  }
-
-  if (!userId) {
-    await markInvitationFailed(invitation.id, "auth_user_id_missing");
-    return {
-      ok: false,
-      state: "invite_failed",
-      error: "Supabase Auth did not return a customer account identifier.",
-    };
-  }
-
-  const linked = await supabaseAdminRpc<string>(
-    "link_customer_invitation",
-    {
-      p_invitation_id: invitation.id,
-      p_user_id: userId,
-      p_delivery: delivery,
-    },
-  );
-  if (!linked.ok || !["invited", "activated"].includes(linked.data)) {
-    const state = await invitationState(invitation.id);
-    if (state?.auth_user_id === userId && state.invitation_state === "invited") {
-      return { ok: true, state: "invited" };
-    }
-    if (
-      state?.auth_user_id === userId &&
-      state.invitation_state === "activated"
-    ) {
-      return { ok: true, state: "invited" };
-    }
+  if (!activationInvitation.ok) {
     await markInvitationFailed(
       invitation.id,
-      `customer_link_http_${linked.ok ? 200 : linked.status}`,
-      userId,
+      activationInvitation.code,
+      activationInvitation.userId,
     );
     return {
       ok: false,
       state: "invite_failed",
       error:
-        "The invitation was sent, but account linking needs reconciliation. Retry the invitation.",
+        activationInvitation.error ??
+        "The activation invitation could not be sent.",
     };
   }
 
@@ -466,6 +424,310 @@ export async function requestCustomerActivationRecovery({
 
   await sendCustomerInvitation(invitation.id, true).catch(() => null);
   return { ok: true };
+}
+
+export async function getCustomerActivationInvitationView(
+  activationToken: string,
+): Promise<ActivationInvitationView> {
+  if (!activationToken) return { ok: false, state: "missing" };
+  const tokenHash = hashActivationToken(activationToken);
+  const tokenResult = await supabaseAdminFetch<ActivationInvitationTokenRow[]>(
+    "customer_activation_invitation_tokens",
+    {
+      query: {
+        select:
+          "id,invitation_id,organization_id,auth_user_id,email,token_hash,expires_at,consumed_at,revoked_at,superseded_at",
+        token_hash: `eq.${tokenHash}`,
+        limit: 1,
+      },
+    },
+  );
+
+  const token = tokenResult.ok ? tokenResult.data[0] : null;
+  if (!token) return { ok: false, state: "invalid" };
+  if (token.consumed_at) {
+    return { ok: false, state: "used", invitationId: token.invitation_id };
+  }
+  if (token.revoked_at) {
+    return { ok: false, state: "revoked", invitationId: token.invitation_id };
+  }
+  if (token.superseded_at) {
+    return { ok: false, state: "superseded", invitationId: token.invitation_id };
+  }
+  if (Date.parse(token.expires_at) <= Date.now()) {
+    return { ok: false, state: "expired", invitationId: token.invitation_id };
+  }
+
+  const invitationResult = await supabaseAdminFetch<CustomerInvitationRow[]>(
+    "organization_invitations",
+    {
+      query: {
+        select: INVITATION_SELECT,
+        id: `eq.${token.invitation_id}`,
+        limit: 1,
+      },
+    },
+  );
+  const invitation = invitationResult.ok ? invitationResult.data[0] : null;
+  if (
+    !invitation ||
+    invitation.organization_id !== token.organization_id ||
+    invitation.auth_user_id !== token.auth_user_id ||
+    invitation.email.toLowerCase() !== token.email
+  ) {
+    return { ok: false, state: "invalid", invitationId: token.invitation_id };
+  }
+  if (invitation.invitation_state === "activated") {
+    return { ok: false, state: "activated", invitationId: token.invitation_id };
+  }
+
+  const organizationResult = await supabaseAdminFetch<OrganizationRow[]>(
+    "organizations",
+    {
+      query: {
+        select: "id,name,status",
+        id: `eq.${token.organization_id}`,
+        limit: 1,
+      },
+    },
+  );
+  const organization = organizationResult.ok
+    ? organizationResult.data[0]
+    : null;
+  if (!organization) {
+    return { ok: false, state: "invalid", invitationId: token.invitation_id };
+  }
+  if (organization.status === "archived") {
+    return { ok: false, state: "archived", invitationId: token.invitation_id };
+  }
+
+  return {
+    ok: true,
+    state: "valid",
+    tokenHash,
+    tokenId: token.id,
+    invitationId: token.invitation_id,
+    organizationId: token.organization_id,
+    authUserId: token.auth_user_id,
+    email: token.email,
+    businessName: organization.name,
+    expiresAt: token.expires_at,
+  };
+}
+
+export async function sendCustomerActivationVerificationCode(
+  activationToken: string,
+): Promise<SendActivationCodeResult> {
+  const view = await getCustomerActivationInvitationView(activationToken);
+  if (!view.ok) {
+    return {
+      ok: false,
+      error: "This invitation is no longer valid.",
+      invitationId: view.invitationId,
+    };
+  }
+
+  const challengeId = randomUUID();
+  const code = randomSixDigitCode();
+  const codeHash = tryHashActivationCode({
+    code,
+    challengeId,
+    tokenHash: view.tokenHash,
+  });
+  if (!codeHash) {
+    return {
+      ok: false,
+      error: "A verification code could not be sent right now.",
+      invitationId: view.invitationId,
+    };
+  }
+  const expiresAt = new Date(Date.now() + ACTIVATION_CODE_TTL_MS).toISOString();
+  const challenge = await supabaseAdminRpc<ActivationChallengeResult[]>(
+    "create_customer_activation_email_challenge",
+    {
+      p_token_hash: view.tokenHash,
+      p_challenge_id: challengeId,
+      p_code_hash: codeHash,
+      p_expires_at: expiresAt,
+    },
+  );
+
+  const challengeResult = challenge.ok ? challenge.data[0] : null;
+  if (!challenge.ok || !challengeResult?.ok) {
+    return {
+      ok: false,
+      error: "A verification code could not be sent right now.",
+      invitationId: view.invitationId,
+    };
+  }
+
+  const sent = await sendActivationCodeEmail({
+    email: view.email,
+    businessName: view.businessName,
+    code,
+  });
+  if (!sent.ok) {
+    await supabaseAdminRpc<boolean>(
+      "record_customer_activation_email_challenge_delivery",
+      {
+        p_challenge_id: challengeId,
+        p_delivered: false,
+      },
+    ).catch(() => null);
+    return {
+      ok: false,
+      error: "A verification code could not be sent right now.",
+      invitationId: view.invitationId,
+    };
+  }
+
+  const delivered = await supabaseAdminRpc<boolean>(
+    "record_customer_activation_email_challenge_delivery",
+    {
+      p_challenge_id: challengeId,
+      p_delivered: true,
+    },
+  );
+  if (!delivered.ok || delivered.data !== true) {
+    return {
+      ok: false,
+      error: "A verification code could not be sent right now.",
+      invitationId: view.invitationId,
+    };
+  }
+
+  return { ok: true, challengeId, email: view.email };
+}
+
+export async function completeCustomerActivationWithCode({
+  activationToken,
+  challengeId,
+  code,
+  password,
+}: {
+  activationToken: string;
+  challengeId: string;
+  code: string;
+  password: string;
+}): Promise<CompleteActivationWithCodeResult> {
+  const view = await getCustomerActivationInvitationView(activationToken);
+  if (!view.ok) {
+    return {
+      ok: false,
+      error: "This invitation is no longer valid.",
+      invitationId: view.invitationId,
+    };
+  }
+  if (!isUuid(challengeId) || !/^[0-9]{6}$/.test(code) || password.length < 8) {
+    return {
+      ok: false,
+      error: "Enter the verification code and a password with at least 8 characters.",
+      invitationId: view.invitationId,
+    };
+  }
+
+  const codeHash = tryHashActivationCode({
+    code,
+    challengeId,
+    tokenHash: view.tokenHash,
+  });
+  if (!codeHash) {
+    return {
+      ok: false,
+      error: "The verification code could not be verified.",
+      invitationId: view.invitationId,
+    };
+  }
+  const operationId = randomUUID();
+  const reserved = await supabaseAdminRpc<ActivationReservationResult[]>(
+    "reserve_customer_activation_password_setup",
+    {
+      p_token_hash: view.tokenHash,
+      p_challenge_id: challengeId,
+      p_code_hash: codeHash,
+      p_operation_id: operationId,
+    },
+  );
+  const reservation = reserved.ok ? reserved.data[0] : null;
+  if (!reserved.ok || !reservation?.ok || !reservation.operation_id) {
+    return {
+      ok: false,
+      error: "The verification code could not be verified.",
+      invitationId: view.invitationId,
+    };
+  }
+
+  if (!reservation.password_already_set) {
+    const passwordUpdate = await setActivationUserPassword({
+      userId: view.authUserId,
+      password,
+      operationId: reservation.operation_id,
+    });
+    if (!passwordUpdate.ok) {
+      await supabaseAdminRpc<boolean>(
+        "record_customer_activation_password_setup_result",
+        {
+          p_token_hash: view.tokenHash,
+          p_challenge_id: challengeId,
+          p_operation_id: reservation.operation_id,
+          p_result: passwordUpdate.unknown ? "unknown" : "failed",
+        },
+      ).catch(() => null);
+      return {
+        ok: false,
+        error: "Your password could not be saved. Request a fresh activation link.",
+        invitationId: view.invitationId,
+      };
+    }
+
+    const recorded = await supabaseAdminRpc<boolean>(
+      "record_customer_activation_password_setup_result",
+      {
+        p_token_hash: view.tokenHash,
+        p_challenge_id: challengeId,
+        p_operation_id: reservation.operation_id,
+        p_result: "succeeded",
+      },
+    );
+    if (!recorded.ok || recorded.data !== true) {
+      return {
+        ok: false,
+        error:
+          "Your password was saved, but activation needs support reconciliation.",
+        invitationId: view.invitationId,
+      };
+    }
+  }
+
+  const activated = await supabaseAdminRpc<boolean>(
+    "finalize_customer_activation_with_reservation",
+    {
+      p_token_hash: view.tokenHash,
+      p_challenge_id: challengeId,
+      p_operation_id: reservation.operation_id,
+      p_user_id: view.authUserId,
+      p_email: view.email,
+    },
+  );
+  if (!activated.ok || activated.data !== true) {
+    await supabaseAdminRpc<boolean>(
+      "record_customer_activation_password_setup_result",
+      {
+        p_token_hash: view.tokenHash,
+        p_challenge_id: challengeId,
+        p_operation_id: reservation.operation_id,
+        p_result: "succeeded",
+      },
+    ).catch(() => null);
+    return {
+      ok: false,
+      error:
+        "Your password was saved, but account activation could not be completed. Contact Opzix support.",
+      invitationId: view.invitationId,
+    };
+  }
+
+  return { ok: true, email: view.email };
 }
 
 export async function validateCustomerInvitationForActivation({
@@ -755,6 +1017,349 @@ async function sendResendInvitation({
   return { ok: true as const };
 }
 
+async function sendApplicationActivationInvitation({
+  invitation,
+  businessName,
+  redirectTo,
+}: {
+  invitation: CustomerInvitationRow;
+  businessName: string;
+  redirectTo: string;
+}) {
+  const authUser = invitation.auth_user_id
+    ? { ok: true as const, userId: invitation.auth_user_id }
+    : await createActivationAuthUser({
+        invitation,
+        businessName,
+      });
+  if (!authUser.ok) return authUser;
+
+  const linked = await supabaseAdminRpc<string>("link_customer_invitation", {
+    p_invitation_id: invitation.id,
+    p_user_id: authUser.userId,
+    p_delivery: "resend",
+  });
+  if (!linked.ok || !["invited", "activated"].includes(linked.data)) {
+    return {
+      ok: false as const,
+      code: `customer_link_http_${linked.ok ? 200 : linked.status}`,
+      error:
+        "The activation invitation could not be linked to the customer account.",
+      userId: authUser.userId,
+    };
+  }
+
+  const token = await createActivationInvitationToken({
+    invitation,
+    authUserId: authUser.userId,
+  });
+  if (!token.ok) {
+    return {
+      ...token,
+      userId: authUser.userId,
+    };
+  }
+
+  const sent = await sendActivationInvitationEmail({
+    email: invitation.email,
+    firstName: invitation.first_name ?? "",
+    businessName,
+    activationToken: token.token,
+    redirectTo,
+  });
+  if (!sent.ok) {
+    return {
+      ...sent,
+      userId: authUser.userId,
+    };
+  }
+
+  return { ok: true as const };
+}
+
+async function createActivationAuthUser({
+  invitation,
+  businessName,
+}: {
+  invitation: CustomerInvitationRow;
+  businessName: string;
+}) {
+  const config = getSupabaseAdminConfig();
+  if (!config) {
+    return {
+      ok: false as const,
+      code: "supabase_admin_not_configured",
+      error: "Supabase server-side Auth credentials are not configured.",
+    };
+  }
+
+  const response = await fetch(`${config.url}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: adminAuthHeaders(config.serviceRoleKey),
+    body: JSON.stringify({
+      email: invitation.email,
+      user_metadata: {
+        organization_id: invitation.organization_id,
+        organization_invitation_id: invitation.id,
+        business_name: businessName,
+        first_name: invitation.first_name ?? "",
+        last_name: invitation.last_name ?? "",
+      },
+    }),
+  }).catch(() => null);
+  if (!response) {
+    return {
+      ok: false as const,
+      code: "supabase_auth_transport_error",
+      error: "Supabase Auth could not be reached.",
+    };
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as AuthAdminUserResponse;
+  const userId = payload.user?.id ?? payload.id;
+  if (!response.ok || !userId) {
+    return {
+      ok: false as const,
+      code: `supabase_auth_create_user_http_${response.status}`,
+      error: `Supabase Auth could not create the customer account (HTTP ${response.status}).`,
+    };
+  }
+
+  return { ok: true as const, userId };
+}
+
+async function createActivationInvitationToken({
+  invitation,
+  authUserId,
+}: {
+  invitation: CustomerInvitationRow;
+  authUserId: string;
+}) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + ACTIVATION_INVITATION_TTL_MS);
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashActivationToken(token);
+  const supersede = await supabaseAdminFetch<null>(
+    "customer_activation_invitation_tokens",
+    {
+      method: "PATCH",
+      query: {
+        invitation_id: `eq.${invitation.id}`,
+        consumed_at: "is.null",
+        revoked_at: "is.null",
+        superseded_at: "is.null",
+      },
+      body: {
+        superseded_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      },
+      prefer: "return=minimal",
+    },
+  );
+  if (!supersede.ok && supersede.status !== 404) {
+    return {
+      ok: false as const,
+      code: "activation_token_supersede_failed",
+      error: "Existing activation links could not be superseded.",
+    };
+  }
+
+  const created = await supabaseAdminFetch<null>(
+    "customer_activation_invitation_tokens",
+    {
+      method: "POST",
+      body: {
+        invitation_id: invitation.id,
+        organization_id: invitation.organization_id,
+        auth_user_id: authUserId,
+        email: invitation.email.toLowerCase(),
+        token_hash: tokenHash,
+        issued_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+      },
+      prefer: "return=minimal",
+    },
+  );
+  if (!created.ok) {
+    return {
+      ok: false as const,
+      code: `activation_token_create_http_${created.status}`,
+      error: "A 24-hour activation link could not be created.",
+    };
+  }
+
+  return { ok: true as const, token };
+}
+
+async function sendActivationInvitationEmail({
+  email,
+  firstName,
+  businessName,
+  activationToken,
+  redirectTo,
+}: {
+  email: string;
+  firstName: string;
+  businessName: string;
+  activationToken: string;
+  redirectTo: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const fromAddress = opzixAuthFromAddress();
+  const from = opzixAuthSenderIdentity();
+  if (!apiKey || !fromAddress) {
+    return {
+      ok: false as const,
+      code: "resend_not_configured",
+      error:
+        "Activation invitation email needs RESEND_API_KEY and OPZIX_AUTH_FROM_EMAIL configured.",
+    };
+  }
+
+  const link = new URL(redirectTo);
+  link.hash = `activation_token=${encodeURIComponent(activationToken)}`;
+  const name = escapeHtml(firstName || "there");
+  const business = escapeHtml(businessName);
+  const url = link.toString();
+  const text = [
+    `Welcome to Opzix, ${firstName || "there"}.`,
+    `Your Opzix onboarding invitation for ${businessName} is valid for 24 hours.`,
+    "When you're ready, open the link and verify your email to create your password.",
+    url,
+    "If you were not expecting this invitation, you can ignore this email.",
+  ].join("\n\n");
+  const html = `<div style="font-family:Arial,sans-serif;color:#132238;line-height:1.6"><p>Welcome to Opzix, ${name}.</p><p>Your Opzix onboarding invitation for <strong>${business}</strong> is valid for 24 hours.</p><p>When you're ready, open the link and verify your email to create your password.</p><p><a href="${escapeHtml(url)}" style="display:inline-block;background:#13b8d4;color:#06202a;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700">Open Invitation</a></p><p>If you were not expecting this invitation, you can ignore this email.</p></div>`;
+
+  return sendResendEmail({
+    apiKey,
+    from,
+    to: email,
+    subject: "Your Opzix onboarding invitation",
+    text,
+    html,
+    code: "activation_invitation",
+  });
+}
+
+async function sendActivationCodeEmail({
+  email,
+  businessName,
+  code,
+}: {
+  email: string;
+  businessName: string;
+  code: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const fromAddress = opzixAuthFromAddress();
+  const from = opzixAuthSenderIdentity();
+  if (!apiKey || !fromAddress) {
+    return { ok: false as const };
+  }
+
+  const business = escapeHtml(businessName);
+  const safeCode = escapeHtml(code);
+  const text = [
+    `Your Opzix verification code for ${businessName} is ${code}.`,
+    "This code expires in 10 minutes.",
+    "If you did not request this code, you can ignore this email.",
+  ].join("\n\n");
+  const html = `<div style="font-family:Arial,sans-serif;color:#132238;line-height:1.6"><p>Your Opzix verification code for <strong>${business}</strong> is:</p><p style="font-size:28px;letter-spacing:6px;font-weight:700">${safeCode}</p><p>This code expires in 10 minutes.</p><p>If you did not request this code, you can ignore this email.</p></div>`;
+
+  return sendResendEmail({
+    apiKey,
+    from,
+    to: email,
+    subject: "Your Opzix verification code",
+    text,
+    html,
+    code: "activation_code",
+  });
+}
+
+async function sendResendEmail({
+  apiKey,
+  from,
+  to,
+  subject,
+  text,
+  html,
+  code,
+}: {
+  apiKey: string;
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  code: string;
+}) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      text,
+      html,
+    }),
+  }).catch(() => null);
+
+  if (!response) return { ok: false as const, code: `${code}_transport_error` };
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      code: `${code}_http_${response.status}`,
+    };
+  }
+  return { ok: true as const };
+}
+
+async function setActivationUserPassword({
+  userId,
+  password,
+  operationId,
+}: {
+  userId: string;
+  password: string;
+  operationId: string;
+}) {
+  const config = getSupabaseAdminConfig();
+  if (!config) return { ok: false as const, unknown: false };
+  const userResponse = await fetch(
+    `${config.url}/auth/v1/admin/users/${encodeURIComponent(userId)}`,
+    { headers: adminAuthHeaders(config.serviceRoleKey) },
+  ).catch(() => null);
+  if (!userResponse?.ok) return { ok: false as const, unknown: false };
+  const user = (await userResponse.json().catch(() => ({}))) as AuthAdminUserResponse;
+  const appMetadata = isRecord(user.app_metadata) ? user.app_metadata : {};
+  const response = await fetch(
+    `${config.url}/auth/v1/admin/users/${encodeURIComponent(userId)}`,
+    {
+      method: "PUT",
+      headers: adminAuthHeaders(config.serviceRoleKey),
+      body: JSON.stringify({
+        password,
+        email_confirm: true,
+        app_metadata: {
+          ...appMetadata,
+          opzix_activation_password_operation_id: operationId,
+        },
+      }),
+    },
+  ).catch(() => null);
+  if (!response) return { ok: false as const, unknown: true };
+  return { ok: response.ok, unknown: false };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 async function updateInvitation(
   invitationId: string,
   body: Record<string, unknown>,
@@ -918,6 +1523,51 @@ function escapeHtml(value: string) {
 
 function safeErrorCode(value: string) {
   return /^[a-z0-9_-]+$/i.test(value) ? value.slice(0, 80) : "invite_failed";
+}
+
+function hashActivationToken(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function hashActivationCode({
+  code,
+  challengeId,
+  tokenHash,
+}: {
+  code: string;
+  challengeId: string;
+  tokenHash: string;
+}) {
+  return createHmac("sha256", activationHashSecret())
+    .update(`${challengeId}.${tokenHash}.${code}`)
+    .digest("hex");
+}
+
+function tryHashActivationCode(input: {
+  code: string;
+  challengeId: string;
+  tokenHash: string;
+}) {
+  try {
+    return hashActivationCode(input);
+  } catch {
+    return "";
+  }
+}
+
+function activationHashSecret() {
+  const secret = process.env.OPZIX_ACTIVATION_CODE_SECRET?.trim();
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production";
+  if (!secret && isProduction) {
+    throw new Error("OPZIX_ACTIVATION_CODE_SECRET is required.");
+  }
+  return secret || "opzix-activation-code-secret-dev";
+}
+
+function randomSixDigitCode() {
+  return String(randomInt(0, 1000000)).padStart(6, "0");
 }
 
 async function activationRecoveryRateLimited(invitationId: string) {

@@ -4,6 +4,7 @@ import {
   acceptInviteAction,
   requestActivationLinkAction,
 } from "@/lib/customer-platform/session-actions";
+import { ActivationInvitationFlow } from "./ActivationInvitationFlow";
 import { RecoveryPasswordForm } from "./RecoveryPasswordForm";
 
 export const metadata: Metadata = {
@@ -28,10 +29,14 @@ export default async function AcceptInvitePage({
   const legacyError = stringParam(params.error);
   const recoveryRequested = stringParam(params.recovery_requested) === "1";
   const isRecoveryMode = stringParam(params.mode) === "recovery";
+  const recoveryInvitationId = invitationId;
   const canRequestRecovery =
-    !isRecoveryMode && isUuid(invitationId) && !recoveryRequested;
+    !isRecoveryMode && isUuid(recoveryInvitationId) && !recoveryRequested;
   const shouldShowActivationForm =
-    !isRecoveryMode && Boolean(tokenHash) && !activationError && !legacyError;
+    !isRecoveryMode &&
+    Boolean(tokenHash) &&
+    !activationError &&
+    !legacyError;
 
   return (
     <main className="min-h-screen bg-dark py-16 text-primary">
@@ -51,13 +56,6 @@ export default async function AcceptInvitePage({
               ? "Enter a new password for your Opzix account."
               : "Set your password to finish invitation acceptance and enter guided onboarding."}
           </p>
-          {!isRecoveryMode && !tokenHash && !recoveryRequested ? (
-            <div className="mt-5 rounded-xl border border-dark-border bg-white/[0.035] p-3 text-sm text-secondary">
-              Open this page using the secure link in your Opzix invitation
-              email. If the link has expired, ask your Opzix contact to resend
-              the invitation.
-            </div>
-          ) : null}
           {(activationError || legacyError) && !isRecoveryMode ? (
             <div className="mt-5 rounded-xl border border-amber-300/35 bg-amber-400/10 p-3 text-sm text-amber-100">
               This activation link is no longer valid. Request a fresh link, or
@@ -110,7 +108,7 @@ export default async function AcceptInvitePage({
               <input
                 type="hidden"
                 name="invitation_id"
-                value={invitationId ?? ""}
+                value={recoveryInvitationId ?? ""}
               />
               <label className="text-sm font-semibold text-secondary">
                 Email address
@@ -127,9 +125,7 @@ export default async function AcceptInvitePage({
               </button>
             </form>
           ) : (
-            <div className="mt-5 rounded-xl border border-dark-border bg-white/[0.035] p-3 text-sm text-secondary">
-              Contact Opzix support for a fresh activation link.
-            </div>
+            <ActivationInvitationFlow />
           )}
           <Link
             href="/login"
